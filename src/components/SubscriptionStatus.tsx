@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Crown, Zap, AlertTriangle, CreditCard, Settings } from "lucide-react";
+import { Crown, Zap, AlertTriangle, CreditCard, Settings, Gift } from "lucide-react";
 import { useSubscription } from "@/hooks/useSubscription";
 import { toast } from "sonner";
 
@@ -63,9 +63,9 @@ const SubscriptionStatus = () => {
             </>
           ) : (
             <>
-              <Zap className="h-5 w-5 text-gray-500" />
+              <Gift className="h-5 w-5 text-green-500" />
               <span>Free Plan</span>
-              <Badge variant="outline">Free</Badge>
+              <Badge variant="outline" className="bg-green-100 text-green-800">Free Trial</Badge>
             </>
           )}
         </CardTitle>
@@ -89,11 +89,11 @@ const SubscriptionStatus = () => {
 
         {isFreeTier && (
           <>
-            <div className="flex items-start gap-2 p-3 bg-orange-50 border border-orange-200 rounded-md">
-              <AlertTriangle className="h-4 w-4 text-orange-500 mt-0.5 flex-shrink-0" />
-              <div className="text-sm text-orange-700">
-                <p className="font-medium">Free Plan Limitations</p>
-                <p>Upgrade to Pro for unlimited optimizations and premium features.</p>
+            <div className="flex items-start gap-2 p-3 bg-green-50 border border-green-200 rounded-md">
+              <Gift className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-green-700">
+                <p className="font-medium">Free Test Available!</p>
+                <p>Try 1 optimization for free, then upgrade to Pro for unlimited access.</p>
               </div>
             </div>
             <Button 

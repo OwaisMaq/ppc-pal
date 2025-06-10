@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -77,7 +76,7 @@ export const useSubscription = () => {
       setUsage(usageData);
       setUsageLimit(limitData.optimization_limit);
 
-      // Check if user can optimize
+      // Check if user can optimize - now free tier gets 1 optimization
       const currentUsage = usageData?.optimizations_used || 0;
       setCanOptimize(currentUsage < limitData.optimization_limit);
 

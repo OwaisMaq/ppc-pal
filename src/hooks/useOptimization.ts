@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { toast } from "sonner";
 import { optimizeAdvertisingData } from "@/lib/aiOptimizer";
@@ -29,7 +28,7 @@ export const useOptimization = () => {
     
     if (!canOptimize) {
       if (isFreeTier) {
-        toast.error("Free plan doesn't include optimizations. Please upgrade to Pro to access this feature.");
+        toast.error("You've used your free optimization. Upgrade to Pro for unlimited optimizations.");
       } else {
         toast.error("You've reached your monthly optimization limit. Please wait for next month or contact support.");
       }
@@ -70,7 +69,11 @@ export const useOptimization = () => {
       // Refresh subscription data to show updated usage
       await refreshSubscription();
       
-      toast.success("Advertising data optimized successfully!");
+      if (isFreeTier) {
+        toast.success("Optimization complete! This was your free test optimization. Upgrade to Pro for unlimited optimizations.");
+      } else {
+        toast.success("Advertising data optimized successfully!");
+      }
     } catch (error) {
       console.error("Optimization error:", error);
       toast.error("Failed to optimize data. Please try again.");
