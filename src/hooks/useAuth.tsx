@@ -38,6 +38,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+        
+        // Check subscription status when user logs in
+        if (event === 'SIGNED_IN' && session?.user) {
+          setTimeout(() => {
+            checkSubscriptionStatus(session);
+          }, 100);
+        }
       }
     );
 
@@ -46,10 +53,29 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      
+      // Check subscription status for existing session
+      if (session?.user) {
+        setTimeout(() => {
+          checkSubscriptionStatus(session);
+        }, 100);
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const checkSubscriptionStatus = async (session: Session) => {
+    try {
+      await supabase.functions.invoke('check-subscription', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+    } catch (error) {
+      console.error('Error checking subscription status:', error);
+    }
+  };
 
   const signOut = async () => {
     try {

@@ -9,6 +9,8 @@ interface SubscriptionData {
   plan_type: 'free' | 'pro';
   status: 'active' | 'cancelled' | 'past_due' | 'incomplete';
   current_period_end?: string;
+  stripe_customer_id?: string;
+  stripe_subscription_id?: string;
 }
 
 interface UsageData {
@@ -38,6 +40,9 @@ export const useSubscription = () => {
 
     try {
       setLoading(true);
+
+      // Check subscription status with Stripe
+      await checkStripeSubscription();
 
       // Fetch subscription
       const { data: subscriptionData, error: subError } = await supabase
@@ -81,6 +86,60 @@ export const useSubscription = () => {
       toast.error('Failed to load subscription information');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkStripeSubscription = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase.functions.invoke('check-subscription', {
+        headers: {
+          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+      console.log('Stripe subscription check result:', data);
+    } catch (error) {
+      console.error('Error checking Stripe subscription:', error);
+    }
+  };
+
+  const createCheckoutSession = async () => {
+    if (!user) return null;
+
+    try {
+      const { data, error } = await supabase.functions.invoke('create-checkout', {
+        headers: {
+          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+      return data.url;
+    } catch (error) {
+      console.error('Error creating checkout session:', error);
+      toast.error('Failed to create checkout session');
+      return null;
+    }
+  };
+
+  const openCustomerPortal = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase.functions.invoke('customer-portal', {
+        headers: {
+          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+      window.open(data.url, '_blank');
+    } catch (error) {
+      console.error('Error opening customer portal:', error);
+      toast.error('Failed to open customer portal');
     }
   };
 
@@ -130,6 +189,8 @@ export const useSubscription = () => {
     checkCanOptimize,
     incrementUsage,
     refreshSubscription: fetchSubscriptionData,
+    createCheckoutSession,
+    openCustomerPortal,
     isFreeTier: subscription?.plan_type === 'free' || !subscription,
     isProTier: subscription?.plan_type === 'pro'
   };

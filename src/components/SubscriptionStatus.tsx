@@ -1,12 +1,23 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Crown, Zap, AlertTriangle } from "lucide-react";
+import { Crown, Zap, AlertTriangle, CreditCard, Settings } from "lucide-react";
 import { useSubscription } from "@/hooks/useSubscription";
+import { toast } from "sonner";
 
 const SubscriptionStatus = () => {
-  const { subscription, usage, usageLimit, loading, isFreeTier, isProTier } = useSubscription();
+  const { 
+    subscription, 
+    usage, 
+    usageLimit, 
+    loading, 
+    isFreeTier, 
+    isProTier,
+    createCheckoutSession,
+    openCustomerPortal
+  } = useSubscription();
 
   if (loading) {
     return (
@@ -26,6 +37,17 @@ const SubscriptionStatus = () => {
 
   const currentUsage = usage?.optimizations_used || 0;
   const progressPercentage = usageLimit > 0 ? (currentUsage / usageLimit) * 100 : 0;
+
+  const handleUpgrade = async () => {
+    const checkoutUrl = await createCheckoutSession();
+    if (checkoutUrl) {
+      window.open(checkoutUrl, '_blank');
+    }
+  };
+
+  const handleManageSubscription = () => {
+    openCustomerPortal();
+  };
 
   return (
     <Card className="w-full">
@@ -66,22 +88,52 @@ const SubscriptionStatus = () => {
         </div>
 
         {isFreeTier && (
-          <div className="flex items-start gap-2 p-3 bg-orange-50 border border-orange-200 rounded-md">
-            <AlertTriangle className="h-4 w-4 text-orange-500 mt-0.5 flex-shrink-0" />
-            <div className="text-sm text-orange-700">
-              <p className="font-medium">Free Plan Limitations</p>
-              <p>Upgrade to Pro for unlimited optimizations and premium features.</p>
+          <>
+            <div className="flex items-start gap-2 p-3 bg-orange-50 border border-orange-200 rounded-md">
+              <AlertTriangle className="h-4 w-4 text-orange-500 mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-orange-700">
+                <p className="font-medium">Free Plan Limitations</p>
+                <p>Upgrade to Pro for unlimited optimizations and premium features.</p>
+              </div>
             </div>
-          </div>
+            <Button 
+              onClick={handleUpgrade}
+              className="w-full bg-blue-600 hover:bg-blue-700"
+              size="sm"
+            >
+              <CreditCard className="h-4 w-4 mr-2" />
+              Upgrade to Pro - $10/month
+            </Button>
+          </>
         )}
 
-        {isProTier && progressPercentage > 80 && (
-          <div className="flex items-start gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-            <AlertTriangle className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />
-            <div className="text-sm text-yellow-700">
-              <p className="font-medium">Usage Warning</p>
-              <p>You're approaching your monthly optimization limit.</p>
-            </div>
+        {isProTier && (
+          <>
+            {progressPercentage > 80 && (
+              <div className="flex items-start gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                <AlertTriangle className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />
+                <div className="text-sm text-yellow-700">
+                  <p className="font-medium">Usage Warning</p>
+                  <p>You're approaching your monthly optimization limit.</p>
+                </div>
+              </div>
+            )}
+            <Button 
+              onClick={handleManageSubscription}
+              variant="outline"
+              className="w-full"
+              size="sm"
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Manage Subscription
+            </Button>
+          </>
+        )}
+
+        {subscription?.current_period_end && (
+          <div className="text-xs text-gray-500 text-center">
+            {isProTier ? 'Renews' : 'Expires'} on{' '}
+            {new Date(subscription.current_period_end).toLocaleDateString()}
           </div>
         )}
       </CardContent>
