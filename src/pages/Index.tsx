@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +7,7 @@ import { toast } from "sonner";
 import FileUpload from "@/components/FileUpload";
 import DataPreview from "@/components/DataPreview";
 import OptimizationResults from "@/components/OptimizationResults";
+import Header from "@/components/Header";
 import { optimizeAdvertisingData } from "@/lib/aiOptimizer";
 import { exportToExcel } from "@/lib/excelProcessor";
 
@@ -84,6 +84,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50">
+      <Header />
       <div className="container mx-auto py-8 px-4">
         {/* Header */}
         <div className="text-center mb-12">
