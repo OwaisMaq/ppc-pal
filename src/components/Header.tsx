@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
-import { LogOut, User, Crown } from "lucide-react";
+import { LogOut, User, Crown, LinkIcon, Settings } from "lucide-react";
+import ComingSoon from "@/components/ComingSoon";
 
 const Header = () => {
   const { user, signOut } = useAuth();
@@ -31,15 +32,29 @@ const Header = () => {
           )}
         </div>
         
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={signOut}
-          className="flex items-center gap-2"
-        >
-          <LogOut className="h-4 w-4" />
-          Sign Out
-        </Button>
+        <div className="flex items-center gap-4">
+          {/* Coming Soon Features */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1">
+              <LinkIcon className="h-4 w-4 text-muted-foreground" />
+              <ComingSoon feature="Account Sync" className="text-xs" />
+            </div>
+            <div className="flex items-center gap-1">
+              <Settings className="h-4 w-4 text-muted-foreground" />
+              <ComingSoon feature="Automation" className="text-xs" />
+            </div>
+          </div>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={signOut}
+            className="flex items-center gap-2"
+          >
+            <LogOut className="h-4 w-4" />
+            Sign Out
+          </Button>
+        </div>
       </div>
     </header>
   );
