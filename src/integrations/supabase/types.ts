@@ -159,6 +159,30 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -168,12 +192,24 @@ export type Database = {
         Args: { user_uuid: string }
         Returns: boolean
       }
+      grant_admin_role_by_email: {
+        Args: { user_email: string }
+        Returns: undefined
+      }
+      has_role: {
+        Args: {
+          user_uuid: string
+          role_name: Database["public"]["Enums"]["app_role"]
+        }
+        Returns: boolean
+      }
       increment_optimization_usage: {
         Args: { user_uuid: string }
         Returns: undefined
       }
     }
     Enums: {
+      app_role: "admin" | "user"
       subscription_plan: "free" | "pro"
       subscription_status: "active" | "cancelled" | "past_due" | "incomplete"
     }
@@ -291,6 +327,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["admin", "user"],
       subscription_plan: ["free", "pro"],
       subscription_status: ["active", "cancelled", "past_due", "incomplete"],
     },
