@@ -1,0 +1,100 @@
+
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Zap, Download, TrendingUp } from "lucide-react";
+import OptimizationResults from "@/components/OptimizationResults";
+import { AdvertisingData } from "@/pages/Index";
+
+interface OptimizationSectionProps {
+  uploadedData: AdvertisingData | null;
+  optimizedData: AdvertisingData | null;
+  isProcessing: boolean;
+  onOptimize: () => void;
+  onDownload: () => void;
+}
+
+const OptimizationSection = ({ 
+  uploadedData, 
+  optimizedData, 
+  isProcessing, 
+  onOptimize, 
+  onDownload 
+}: OptimizationSectionProps) => {
+  return (
+    <div className="space-y-6">
+      {uploadedData && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Zap className="h-5 w-5 text-yellow-600" />
+              AI Optimization
+            </CardTitle>
+            <CardDescription>
+              Let AI analyze and optimize your advertising data
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button 
+              onClick={onOptimize} 
+              disabled={isProcessing}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+              size="lg"
+            >
+              {isProcessing ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <Zap className="h-4 w-4 mr-2" />
+                  Optimize Data
+                </>
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {optimizedData && (
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-green-600" />
+                Optimization Results
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <OptimizationResults 
+                originalData={uploadedData!}
+                optimizedData={optimizedData}
+              />
+            </CardContent>
+          </Card>
+
+          <Card className="border-green-200 bg-green-50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-green-700">
+                <Download className="h-5 w-5" />
+                Download Optimized Data
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Button 
+                onClick={onDownload}
+                className="w-full bg-green-600 hover:bg-green-700 text-white"
+                size="lg"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download Excel Workbook
+              </Button>
+            </CardContent>
+          </Card>
+        </>
+      )}
+    </div>
+  );
+};
+
+export default OptimizationSection;
