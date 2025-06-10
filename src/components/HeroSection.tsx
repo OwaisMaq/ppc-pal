@@ -1,9 +1,12 @@
 
 import { Target } from "lucide-react";
+import HolidayReminder from "@/components/HolidayReminder";
 
 const HeroSection = () => {
   return (
     <div className="text-center mb-12">
+      <HolidayReminder />
+      
       <div className="flex items-center justify-center mb-4">
         <div className="bg-blue-600 rounded-full p-3 mr-4">
           <Target className="h-8 w-8 text-white" />
