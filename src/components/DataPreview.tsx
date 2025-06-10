@@ -60,38 +60,24 @@ const DataPreview = ({ data }: DataPreviewProps) => {
         <div className="mt-6">
           <h4 className="font-medium text-gray-900 mb-3">Sample Keywords Preview</h4>
           
-          {/* Debug section showing available fields */}
-          <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
-            <h5 className="font-medium text-yellow-800 mb-2">Debug: Available Fields</h5>
-            <div className="text-sm text-yellow-700">
-              {data.keywords[0] && (
-                <div>
-                  <p className="mb-1">Available columns in keyword data:</p>
-                  <div className="flex flex-wrap gap-1">
-                    {Object.keys(data.keywords[0]).map((field, index) => (
-                      <Badge key={index} variant="outline" className="text-xs bg-yellow-100">
-                        {field}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-          
           <div className="space-y-2 max-h-40 overflow-y-auto">
             {data.keywords.slice(0, 5).map((keyword: any, index: number) => (
               <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
                 <span className="text-sm font-medium text-gray-700">
-                  {keyword.keyword || keyword.Keyword || keyword['Targeting'] || 'N/A'}
+                  {keyword['Keyword text'] || keyword.keyword || keyword.Keyword || keyword['Targeting'] || 'N/A'}
                 </span>
                 <div className="flex gap-2">
                   <Badge variant="outline" className="text-xs">
-                    Bid: ${keyword.bid || keyword.Bid || keyword['Max CPC'] || '0.00'}
+                    Bid: ${keyword.Bid || keyword.bid || keyword['Max CPC'] || '0.00'}
                   </Badge>
-                  {keyword.matchType && (
+                  {keyword['Match type'] && (
                     <Badge variant="secondary" className="text-xs">
-                      {keyword.matchType || keyword['Match Type']}
+                      {keyword['Match type'] || keyword.matchType}
+                    </Badge>
+                  )}
+                  {keyword.ACOS && (
+                    <Badge variant="outline" className="text-xs bg-blue-50">
+                      ACOS: {(parseFloat(keyword.ACOS) * 100).toFixed(1)}%
                     </Badge>
                   )}
                 </div>

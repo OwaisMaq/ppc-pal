@@ -1,4 +1,3 @@
-
 import { AdvertisingData } from '@/pages/Index';
 
 const OPENAI_API_KEY = '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';
@@ -219,29 +218,33 @@ const applyOptimizations = (data: AdvertisingData, suggestions: OptimizationSugg
       
       // Apply suggestions in a deterministic pattern
       for (const suggestion of suggestions) {
-        const currentBid = parseFloat(keyword.bid || keyword.Bid || keyword['Max CPC'] || '1.00');
+        // Use the correct field names for your data structure
+        const currentBid = parseFloat(keyword.Bid || keyword.bid || keyword['Max CPC'] || '1.00');
         
         switch (suggestion.type) {
           case 'bid_increase':
             if (currentBid < 2.0) { // Only increase low bids
-              optimizedKeyword.bid = Math.max(currentBid * 1.3, currentBid + 0.25).toFixed(2);
-              optimizedKeyword['Max CPC'] = optimizedKeyword.bid;
-              optimizedKeyword.Bid = optimizedKeyword.bid;
+              const newBid = Math.max(currentBid * 1.3, currentBid + 0.25).toFixed(2);
+              optimizedKeyword.Bid = newBid;
+              if (optimizedKeyword.bid) optimizedKeyword.bid = newBid;
+              if (optimizedKeyword['Max CPC']) optimizedKeyword['Max CPC'] = newBid;
             }
             break;
             
           case 'bid_decrease':
             if (currentBid > 2.5) { // Only decrease high bids
-              optimizedKeyword.bid = Math.max(currentBid * 0.8, 0.25).toFixed(2);
-              optimizedKeyword['Max CPC'] = optimizedKeyword.bid;
-              optimizedKeyword.Bid = optimizedKeyword.bid;
+              const newBid = Math.max(currentBid * 0.8, 0.25).toFixed(2);
+              optimizedKeyword.Bid = newBid;
+              if (optimizedKeyword.bid) optimizedKeyword.bid = newBid;
+              if (optimizedKeyword['Max CPC']) optimizedKeyword['Max CPC'] = newBid;
             }
             break;
             
           case 'change_match_type':
-            if (keyword.matchType === 'broad') {
-              optimizedKeyword.matchType = 'phrase';
-              optimizedKeyword['Match Type'] = 'phrase';
+            // Use the correct field name for match type
+            if (keyword['Match type'] === 'broad') {
+              optimizedKeyword['Match type'] = 'phrase';
+              if (optimizedKeyword.matchType) optimizedKeyword.matchType = 'phrase';
             }
             break;
         }
@@ -273,20 +276,22 @@ const applyDeterministicRuleBasedOptimization = (data: AdvertisingData): Adverti
     optimizedData.keywords = optimizedData.keywords.map((keyword: any) => {
       const optimizedKeyword = { ...keyword };
       
-      // Deterministic optimization based on bid ranges
-      const currentBid = parseFloat(keyword.bid || keyword.Bid || keyword['Max CPC'] || '1.00');
+      // Deterministic optimization based on bid ranges using correct field names
+      const currentBid = parseFloat(keyword.Bid || keyword.bid || keyword['Max CPC'] || '1.00');
       
       // Increase bids for low bids (likely high performers)
       if (currentBid < 1.00) {
-        optimizedKeyword.bid = (currentBid * 1.3).toFixed(2);
-        optimizedKeyword['Max CPC'] = optimizedKeyword.bid;
-        optimizedKeyword.Bid = optimizedKeyword.bid;
+        const newBid = (currentBid * 1.3).toFixed(2);
+        optimizedKeyword.Bid = newBid;
+        if (optimizedKeyword.bid) optimizedKeyword.bid = newBid;
+        if (optimizedKeyword['Max CPC']) optimizedKeyword['Max CPC'] = newBid;
       }
       // Decrease high bids (likely underperformers)
       else if (currentBid > 3.00) {
-        optimizedKeyword.bid = (currentBid * 0.8).toFixed(2);
-        optimizedKeyword['Max CPC'] = optimizedKeyword.bid;
-        optimizedKeyword.Bid = optimizedKeyword.bid;
+        const newBid = (currentBid * 0.8).toFixed(2);
+        optimizedKeyword.Bid = newBid;
+        if (optimizedKeyword.bid) optimizedKeyword.bid = newBid;
+        if (optimizedKeyword['Max CPC']) optimizedKeyword['Max CPC'] = newBid;
       }
       
       return optimizedKeyword;
