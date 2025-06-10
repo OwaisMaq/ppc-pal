@@ -10,9 +10,31 @@ interface OptimizationSuggestion {
   suggestedValue?: any;
 }
 
+// Cache for storing optimization results
+const optimizationCache = new Map<string, AdvertisingData>();
+
+// Generate a simple hash for the data to use as cache key
+const generateDataHash = (data: AdvertisingData): string => {
+  const keyData = {
+    keywordCount: data.keywords?.length || 0,
+    campaignCount: data.campaigns?.length || 0,
+    firstKeywords: data.keywords?.slice(0, 5) || []
+  };
+  return btoa(JSON.stringify(keyData)).substring(0, 16);
+};
+
 export const optimizeAdvertisingData = async (data: AdvertisingData): Promise<AdvertisingData> => {
   try {
     console.log("Starting AI optimization process...");
+    
+    // Check cache first for consistent results
+    const dataHash = generateDataHash(data);
+    console.log("Data hash:", dataHash);
+    
+    if (optimizationCache.has(dataHash)) {
+      console.log("Returning cached optimization result");
+      return optimizationCache.get(dataHash)!;
+    }
     
     // Prepare data summary for AI analysis
     const dataSummary = {
@@ -25,12 +47,15 @@ export const optimizeAdvertisingData = async (data: AdvertisingData): Promise<Ad
     console.log("Data summary for AI:", dataSummary);
 
     // Call OpenAI API for optimization suggestions
-    const suggestions = await getOptimizationSuggestions(dataSummary);
+    const suggestions = await getOptimizationSuggestions(dataSummary, dataHash);
     
     console.log("AI suggestions received:", suggestions);
 
     // Apply optimizations based on AI suggestions
     const optimizedData = applyOptimizations(data, suggestions);
+    
+    // Cache the result
+    optimizationCache.set(dataHash, optimizedData);
     
     console.log("Optimizations applied successfully");
     return optimizedData;
@@ -38,13 +63,22 @@ export const optimizeAdvertisingData = async (data: AdvertisingData): Promise<Ad
   } catch (error) {
     console.error("AI optimization error:", error);
     
-    // Fallback to rule-based optimization if AI fails
-    console.log("Falling back to rule-based optimization...");
-    return applyRuleBasedOptimization(data);
+    // Fallback to deterministic rule-based optimization if AI fails
+    console.log("Falling back to deterministic rule-based optimization...");
+    const dataHash = generateDataHash(data);
+    
+    if (optimizationCache.has(dataHash)) {
+      console.log("Returning cached fallback result");
+      return optimizationCache.get(dataHash)!;
+    }
+    
+    const fallbackResult = applyDeterministicRuleBasedOptimization(data);
+    optimizationCache.set(dataHash, fallbackResult);
+    return fallbackResult;
   }
 };
 
-const getOptimizationSuggestions = async (dataSummary: any): Promise<OptimizationSuggestion[]> => {
+const getOptimizationSuggestions = async (dataSummary: any, seed: string): Promise<OptimizationSuggestion[]> => {
   const prompt = `
 As an Amazon advertising optimization expert, analyze this advertising data and provide specific optimization suggestions:
 
@@ -85,19 +119,21 @@ Respond with a JSON array of suggestions in this format:
         messages: [
           {
             role: 'system',
-            content: 'You are an expert Amazon advertising optimizer. Provide actionable, data-driven optimization suggestions.'
+            content: 'You are an expert Amazon advertising optimizer. Always provide consistent, actionable, data-driven optimization suggestions in valid JSON format.'
           },
           {
             role: 'user',
             content: prompt
           }
         ],
-        temperature: 0.3,
+        temperature: 0, // Deterministic results
+        seed: parseInt(seed.substring(0, 8), 16), // Consistent seed based on data
         max_tokens: 2000
       })
     });
 
     if (!response.ok) {
+      console.error(`OpenAI API error: ${response.status} ${response.statusText}`);
       throw new Error(`OpenAI API error: ${response.status}`);
     }
 
@@ -106,49 +142,100 @@ Respond with a JSON array of suggestions in this format:
     
     console.log("Raw AI response:", content);
 
-    // Try to parse JSON from the response
-    try {
-      const jsonMatch = content.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-    } catch (parseError) {
-      console.error("Error parsing AI suggestions:", parseError);
+    // Improved JSON parsing
+    if (!content) {
+      console.error("Empty response from OpenAI");
+      return generateFallbackSuggestions(dataSummary);
     }
 
-    // Fallback to empty suggestions if parsing fails
-    return [];
+    try {
+      // Try to find JSON array in the response
+      const jsonMatch = content.match(/\[[\s\S]*?\]/);
+      if (jsonMatch) {
+        const suggestions = JSON.parse(jsonMatch[0]);
+        if (Array.isArray(suggestions) && suggestions.length > 0) {
+          return suggestions;
+        }
+      }
+      
+      // If no valid JSON found, generate fallback suggestions
+      console.warn("No valid JSON suggestions found in AI response");
+      return generateFallbackSuggestions(dataSummary);
+      
+    } catch (parseError) {
+      console.error("Error parsing AI suggestions:", parseError);
+      return generateFallbackSuggestions(dataSummary);
+    }
 
   } catch (error) {
     console.error("Error calling OpenAI API:", error);
-    throw error;
+    return generateFallbackSuggestions(dataSummary);
   }
+};
+
+// Generate consistent fallback suggestions based on data characteristics
+const generateFallbackSuggestions = (dataSummary: any): OptimizationSuggestion[] => {
+  const suggestions: OptimizationSuggestion[] = [];
+  const keywordCount = dataSummary.totalKeywords;
+  
+  // Generate deterministic suggestions based on data size
+  if (keywordCount > 0) {
+    suggestions.push({
+      type: 'bid_increase',
+      reason: 'Systematic bid optimization for performance keywords',
+      originalValue: 1.0,
+      suggestedValue: 1.3
+    });
+  }
+  
+  if (keywordCount > 10) {
+    suggestions.push({
+      type: 'bid_decrease',
+      reason: 'Cost optimization for high-bid keywords',
+      originalValue: 3.0,
+      suggestedValue: 2.4
+    });
+  }
+  
+  if (keywordCount > 20) {
+    suggestions.push({
+      type: 'remove_keyword',
+      reason: 'Remove underperforming keywords',
+      originalValue: null,
+      suggestedValue: null
+    });
+  }
+  
+  return suggestions;
 };
 
 const applyOptimizations = (data: AdvertisingData, suggestions: OptimizationSuggestion[]): AdvertisingData => {
   const optimizedData = JSON.parse(JSON.stringify(data)); // Deep clone
 
-  // Apply AI suggestions to keywords
+  // Apply AI suggestions to keywords deterministically
   if (optimizedData.keywords && suggestions.length > 0) {
     optimizedData.keywords = optimizedData.keywords.map((keyword: any, index: number) => {
-      const suggestion = suggestions[index % suggestions.length]; // Cycle through suggestions
+      const optimizedKeyword = { ...keyword };
       
-      if (suggestion) {
-        const optimizedKeyword = { ...keyword };
+      // Apply suggestions in a deterministic pattern
+      for (const suggestion of suggestions) {
+        const currentBid = parseFloat(keyword.bid || keyword.Bid || keyword['Max CPC'] || '1.00');
         
         switch (suggestion.type) {
           case 'bid_increase':
-            const currentBid = parseFloat(keyword.bid || keyword.Bid || keyword['Max CPC'] || '1.00');
-            optimizedKeyword.bid = Math.max(currentBid * 1.2, currentBid + 0.25).toFixed(2);
-            optimizedKeyword['Max CPC'] = optimizedKeyword.bid;
-            optimizedKeyword.Bid = optimizedKeyword.bid;
+            if (currentBid < 2.0) { // Only increase low bids
+              optimizedKeyword.bid = Math.max(currentBid * 1.3, currentBid + 0.25).toFixed(2);
+              optimizedKeyword['Max CPC'] = optimizedKeyword.bid;
+              optimizedKeyword.Bid = optimizedKeyword.bid;
+            }
             break;
             
           case 'bid_decrease':
-            const currentBidDec = parseFloat(keyword.bid || keyword.Bid || keyword['Max CPC'] || '1.00');
-            optimizedKeyword.bid = Math.max(currentBidDec * 0.8, 0.25).toFixed(2);
-            optimizedKeyword['Max CPC'] = optimizedKeyword.bid;
-            optimizedKeyword.Bid = optimizedKeyword.bid;
+            if (currentBid > 2.5) { // Only decrease high bids
+              optimizedKeyword.bid = Math.max(currentBid * 0.8, 0.25).toFixed(2);
+              optimizedKeyword['Max CPC'] = optimizedKeyword.bid;
+              optimizedKeyword.Bid = optimizedKeyword.bid;
+            }
             break;
             
           case 'change_match_type':
@@ -158,35 +245,35 @@ const applyOptimizations = (data: AdvertisingData, suggestions: OptimizationSugg
             }
             break;
         }
-        
-        return optimizedKeyword;
       }
       
-      return keyword;
+      return optimizedKeyword;
     });
 
-    // Remove underperforming keywords based on suggestions
+    // Remove underperforming keywords deterministically (last 5% of keywords)
     const removeCount = suggestions.filter(s => s.type === 'remove_keyword').length;
     if (removeCount > 0) {
-      const removeIndices = Math.min(removeCount, Math.floor(optimizedData.keywords.length * 0.1));
-      optimizedData.keywords = optimizedData.keywords.slice(removeIndices);
+      const removeAmount = Math.min(Math.floor(optimizedData.keywords.length * 0.05), 5);
+      if (removeAmount > 0) {
+        optimizedData.keywords = optimizedData.keywords.slice(0, -removeAmount);
+      }
     }
   }
 
   return optimizedData;
 };
 
-const applyRuleBasedOptimization = (data: AdvertisingData): AdvertisingData => {
-  console.log("Applying rule-based optimization as fallback...");
+const applyDeterministicRuleBasedOptimization = (data: AdvertisingData): AdvertisingData => {
+  console.log("Applying deterministic rule-based optimization as fallback...");
   
   const optimizedData = JSON.parse(JSON.stringify(data)); // Deep clone
 
-  // Rule-based optimization for keywords
+  // Deterministic rule-based optimization for keywords
   if (optimizedData.keywords) {
     optimizedData.keywords = optimizedData.keywords.map((keyword: any) => {
       const optimizedKeyword = { ...keyword };
       
-      // Simulate optimization based on bid ranges
+      // Deterministic optimization based on bid ranges
       const currentBid = parseFloat(keyword.bid || keyword.Bid || keyword['Max CPC'] || '1.00');
       
       // Increase bids for low bids (likely high performers)
@@ -205,10 +292,10 @@ const applyRuleBasedOptimization = (data: AdvertisingData): AdvertisingData => {
       return optimizedKeyword;
     });
 
-    // Remove some keywords to simulate removing underperformers
-    const removeCount = Math.floor(optimizedData.keywords.length * 0.05); // Remove 5%
+    // Remove keywords deterministically (last 5% instead of random)
+    const removeCount = Math.floor(optimizedData.keywords.length * 0.05);
     if (removeCount > 0) {
-      optimizedData.keywords = optimizedData.keywords.slice(removeCount);
+      optimizedData.keywords = optimizedData.keywords.slice(0, -removeCount);
     }
   }
 
