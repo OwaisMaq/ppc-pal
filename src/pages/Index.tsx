@@ -52,7 +52,12 @@ const Index = () => {
           currentStep={currentStep}
         />
 
-        {/* Single row grid layout - only first row remains */}
+        {/* Info cards at the top - moved from bottom */}
+        <div className="mb-8">
+          <InfoCards />
+        </div>
+
+        {/* Second row - original first row moved down */}
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Upload Amazon Data */}
           <Card className="border-2 border-dashed border-gray-300 hover:border-blue-400 transition-colors">
@@ -75,11 +80,6 @@ const Index = () => {
 
           {/* Free Plan Section */}
           <SubscriptionStatus />
-        </div>
-
-        {/* Info cards at the bottom */}
-        <div className="mt-8">
-          <InfoCards />
         </div>
       </div>
     </div>
