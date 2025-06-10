@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TrendingUp, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { Robot, Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -119,9 +119,9 @@ const Auth = () => {
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
             <div className="bg-blue-600 rounded-full p-3 mr-3">
-              <TrendingUp className="h-6 w-6 text-white" />
+              <Robot className="h-6 w-6 text-white" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">Amazon Ad Optimizer</h1>
+            <h1 className="text-2xl font-bold text-gray-900">PPC Pal</h1>
           </div>
           <p className="text-gray-600">
             Sign in to optimize your Amazon advertising campaigns
