@@ -1,9 +1,10 @@
 
 import { Bot } from "lucide-react";
 import HolidayReminder from "@/components/HolidayReminder";
+import ComingSoon from "@/components/ComingSoon";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Zap, Download, TrendingUp, FileSpreadsheet } from "lucide-react";
+import { Zap, Download, TrendingUp, FileSpreadsheet, LinkIcon, Settings } from "lucide-react";
 import DataPreview from "@/components/DataPreview";
 import OptimizationResults from "@/components/OptimizationResults";
 import { AdvertisingData } from "@/pages/Index";
@@ -26,6 +27,23 @@ const HeroSection = ({ uploadedData, optimizedData, isProcessing, onOptimize, on
           <Bot className="h-8 w-8 text-white" />
         </div>
         <h1 className="text-4xl font-bold text-gray-900">PPC Pal</h1>
+      </div>
+
+      {/* Coming Soon Features Section */}
+      <div className="mb-8 p-4 bg-muted/30 rounded-lg border border-dashed border-muted-foreground/30">
+        <h3 className="text-lg font-semibold mb-3 text-muted-foreground">Exciting Features Coming Soon</h3>
+        <div className="flex flex-wrap justify-center gap-4">
+          <div className="flex items-center gap-2">
+            <LinkIcon className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">Amazon Account Sync</span>
+            <ComingSoon />
+          </div>
+          <div className="flex items-center gap-2">
+            <Settings className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">Automated PPC Management</span>
+            <ComingSoon />
+          </div>
+        </div>
       </div>
 
       {/* Second row from the grid - now in hero section */}
