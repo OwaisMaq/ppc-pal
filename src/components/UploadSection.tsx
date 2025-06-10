@@ -14,6 +14,11 @@ interface UploadSectionProps {
 const UploadSection = ({ uploadedData, onFileUpload }: UploadSectionProps) => {
   return (
     <div className="space-y-6">
+      {/* Amazon Guide - Now prominent and outside the upload card */}
+      <div className="flex justify-center">
+        <AmazonGuide />
+      </div>
+
       <Card className="border-2 border-dashed border-gray-300 hover:border-blue-400 transition-colors">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -24,12 +29,8 @@ const UploadSection = ({ uploadedData, onFileUpload }: UploadSectionProps) => {
             Upload your Excel workbook containing portfolio, campaign, ad group, and keyword data
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent>
           <FileUpload onFileUpload={onFileUpload} />
-          
-          <div className="flex justify-center pt-4 border-t">
-            <AmazonGuide />
-          </div>
         </CardContent>
       </Card>
 
