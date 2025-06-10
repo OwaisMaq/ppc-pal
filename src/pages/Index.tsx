@@ -37,7 +37,7 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50">
       <Header />
-      <div className="container mx-auto py-8 px-4">
+      <div className="container mx-auto py-6 px-4">
         <HeroSection 
           uploadedData={uploadedData}
           optimizedData={optimizedData}
@@ -52,25 +52,25 @@ const Index = () => {
           currentStep={currentStep}
         />
 
-        {/* Info cards at the top - moved from bottom */}
-        <div className="mb-8">
+        {/* Info cards at the top - smaller and circular */}
+        <div className="mb-6">
           <InfoCards />
         </div>
 
         {/* Second row - original first row moved down */}
-        <div className="grid lg:grid-cols-3 gap-8 mb-8">
+        <div className="grid lg:grid-cols-3 gap-6 mb-6">
           {/* Upload Amazon Data */}
           <Card className="border-2 border-dashed border-gray-300 hover:border-blue-400 transition-colors">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-2 text-lg">
                 <Upload className="h-5 w-5 text-blue-600" />
                 Upload Amazon Data
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-sm">
                 Upload your Excel workbook containing portfolio, campaign, ad group, and keyword data
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-0">
               <FileUpload onFileUpload={handleFileUpload} />
             </CardContent>
           </Card>
@@ -83,18 +83,18 @@ const Index = () => {
         </div>
 
         {/* Bottom row - Data preview and AI optimization */}
-        <div className="grid lg:grid-cols-3 gap-8">
+        <div className="grid lg:grid-cols-3 gap-6">
           {/* Upload Data Preview */}
           <div className="space-y-6">
             {uploadedData && (
               <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+                <CardHeader className="pb-4">
+                  <CardTitle className="flex items-center gap-2 text-lg">
                     <FileSpreadsheet className="h-5 w-5 text-green-600" />
                     Data Preview
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pt-0">
                   <DataPreview data={uploadedData} />
                 </CardContent>
               </Card>
@@ -105,16 +105,16 @@ const Index = () => {
           <div className="space-y-6">
             {uploadedData && (
               <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+                <CardHeader className="pb-4">
+                  <CardTitle className="flex items-center gap-2 text-lg">
                     <Zap className="h-5 w-5 text-yellow-600" />
                     AI Optimization
                   </CardTitle>
-                  <CardDescription>
+                  <CardDescription className="text-sm">
                     Let AI analyze and optimize your advertising data
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pt-0">
                   <Button 
                     onClick={handleOptimize} 
                     disabled={isProcessing}
@@ -143,13 +143,13 @@ const Index = () => {
             {optimizedData && (
               <>
                 <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
+                  <CardHeader className="pb-4">
+                    <CardTitle className="flex items-center gap-2 text-lg">
                       <TrendingUp className="h-5 w-5 text-green-600" />
                       Optimization Results
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="pt-0">
                     <OptimizationResults 
                       originalData={uploadedData!}
                       optimizedData={optimizedData}
@@ -158,13 +158,13 @@ const Index = () => {
                 </Card>
 
                 <Card className="border-green-200 bg-green-50">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-green-700">
+                  <CardHeader className="pb-4">
+                    <CardTitle className="flex items-center gap-2 text-green-700 text-lg">
                       <Download className="h-5 w-5" />
                       Download Optimized Data
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="pt-0">
                     <Button 
                       onClick={handleDownload}
                       className="w-full bg-green-600 hover:bg-green-700 text-white"

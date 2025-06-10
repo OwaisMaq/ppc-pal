@@ -25,13 +25,13 @@ const InfoCards = () => {
   ];
 
   return (
-    <div className="grid md:grid-cols-3 gap-6 mt-12">
+    <div className="grid md:grid-cols-3 gap-4 mt-8">
       {cards.map((card) => (
-        <Card key={card.title} className="text-center">
-          <CardContent className="pt-6">
-            <card.icon className={`h-12 w-12 ${card.color} mx-auto mb-4`} />
-            <h3 className="font-semibold mb-2">{card.title}</h3>
-            <p className="text-sm text-gray-600">{card.description}</p>
+        <Card key={card.title} className="text-center rounded-full p-3 h-32 w-32 mx-auto flex items-center justify-center">
+          <CardContent className="p-0 flex flex-col items-center justify-center">
+            <card.icon className={`h-6 w-6 ${card.color} mb-1`} />
+            <h3 className="font-semibold text-xs mb-1">{card.title}</h3>
+            <p className="text-xs text-gray-600 leading-tight">{card.description}</p>
           </CardContent>
         </Card>
       ))}
