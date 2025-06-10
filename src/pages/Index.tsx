@@ -8,6 +8,12 @@ import InfoCards from "@/components/InfoCards";
 import SubscriptionStatus from "@/components/SubscriptionStatus";
 import AmazonGuide from "@/components/AmazonGuide";
 import { useOptimization } from "@/hooks/useOptimization";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Upload, Zap, Download, FileSpreadsheet, TrendingUp } from "lucide-react";
+import FileUpload from "@/components/FileUpload";
+import DataPreview from "@/components/DataPreview";
+import OptimizationResults from "@/components/OptimizationResults";
 
 export interface AdvertisingData {
   portfolios: any[];
@@ -40,41 +46,129 @@ const Index = () => {
           currentStep={currentStep}
         />
 
-        {/* Main content grid */}
-        <div className="grid lg:grid-cols-4 gap-8">
-          {/* Left sidebar with subscription */}
-          <div className="lg:col-span-1 order-3 lg:order-1">
-            <SubscriptionStatus />
+        {/* 3x2 Grid Layout */}
+        <div className="grid lg:grid-cols-3 gap-8">
+          {/* Row 1 - Column 1: Upload Amazon Data */}
+          <Card className="border-2 border-dashed border-gray-300 hover:border-blue-400 transition-colors">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Upload className="h-5 w-5 text-blue-600" />
+                Upload Amazon Data
+              </CardTitle>
+              <CardDescription>
+                Upload your Excel workbook containing portfolio, campaign, ad group, and keyword data
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <FileUpload onFileUpload={handleFileUpload} />
+            </CardContent>
+          </Card>
+
+          {/* Row 1 - Column 2: Amazon Data Download Guide */}
+          <AmazonGuide />
+
+          {/* Row 1 - Column 3: Free Plan Section */}
+          <SubscriptionStatus />
+
+          {/* Row 2 - Column 1: Upload Data Preview */}
+          <div className="space-y-6">
+            {uploadedData && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileSpreadsheet className="h-5 w-5 text-green-600" />
+                    Data Preview
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <DataPreview data={uploadedData} />
+                </CardContent>
+              </Card>
+            )}
           </div>
 
-          {/* Main content area */}
-          <div className="lg:col-span-3 order-1 lg:order-2 space-y-8">
-            {/* Guide section - prominent at the top */}
-            <div className="flex justify-center">
-              <div className="w-full max-w-2xl">
-                <AmazonGuide />
-              </div>
-            </div>
-
-            {/* Upload and Optimization sections */}
-            <div className="grid lg:grid-cols-2 gap-8">
-              <UploadSection 
-                uploadedData={uploadedData}
-                onFileUpload={handleFileUpload}
-              />
-
-              <OptimizationSection 
-                uploadedData={uploadedData}
-                optimizedData={optimizedData}
-                isProcessing={isProcessing}
-                onOptimize={handleOptimize}
-                onDownload={handleDownload}
-              />
-            </div>
-
-            {/* Info cards at the bottom */}
-            <InfoCards />
+          {/* Row 2 - Column 2: AI Optimization */}
+          <div className="space-y-6">
+            {uploadedData && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Zap className="h-5 w-5 text-yellow-600" />
+                    AI Optimization
+                  </CardTitle>
+                  <CardDescription>
+                    Let AI analyze and optimize your advertising data
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button 
+                    onClick={handleOptimize} 
+                    disabled={isProcessing}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                    size="lg"
+                  >
+                    {isProcessing ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="h-4 w-4 mr-2" />
+                        Optimize Data
+                      </>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </div>
+
+          {/* Row 2 - Column 3: Download Results */}
+          <div className="space-y-6">
+            {optimizedData && (
+              <>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <TrendingUp className="h-5 w-5 text-green-600" />
+                      Optimization Results
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <OptimizationResults 
+                      originalData={uploadedData!}
+                      optimizedData={optimizedData}
+                    />
+                  </CardContent>
+                </Card>
+
+                <Card className="border-green-200 bg-green-50">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-green-700">
+                      <Download className="h-5 w-5" />
+                      Download Optimized Data
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Button 
+                      onClick={handleDownload}
+                      className="w-full bg-green-600 hover:bg-green-700 text-white"
+                      size="lg"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Download Excel Workbook
+                    </Button>
+                  </CardContent>
+                </Card>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Info cards at the bottom */}
+        <div className="mt-8">
+          <InfoCards />
         </div>
       </div>
     </div>
