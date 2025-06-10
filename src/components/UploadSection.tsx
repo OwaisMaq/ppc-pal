@@ -3,7 +3,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Upload, FileSpreadsheet } from "lucide-react";
 import FileUpload from "@/components/FileUpload";
 import DataPreview from "@/components/DataPreview";
-import AmazonGuide from "@/components/AmazonGuide";
 import { AdvertisingData } from "@/pages/Index";
 
 interface UploadSectionProps {
@@ -14,11 +13,6 @@ interface UploadSectionProps {
 const UploadSection = ({ uploadedData, onFileUpload }: UploadSectionProps) => {
   return (
     <div className="space-y-6">
-      {/* Amazon Guide - Now prominent and outside the upload card */}
-      <div className="flex justify-center">
-        <AmazonGuide />
-      </div>
-
       <Card className="border-2 border-dashed border-gray-300 hover:border-blue-400 transition-colors">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

@@ -6,6 +6,7 @@ import UploadSection from "@/components/UploadSection";
 import OptimizationSection from "@/components/OptimizationSection";
 import InfoCards from "@/components/InfoCards";
 import SubscriptionStatus from "@/components/SubscriptionStatus";
+import AmazonGuide from "@/components/AmazonGuide";
 import { useOptimization } from "@/hooks/useOptimization";
 
 export interface AdvertisingData {
@@ -39,8 +40,23 @@ const Index = () => {
           currentStep={currentStep}
         />
 
-        <div className="grid lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-8">
+        {/* Main content grid */}
+        <div className="grid lg:grid-cols-4 gap-8">
+          {/* Left sidebar with subscription */}
+          <div className="lg:col-span-1 order-3 lg:order-1">
+            <SubscriptionStatus />
+          </div>
+
+          {/* Main content area */}
+          <div className="lg:col-span-3 order-1 lg:order-2 space-y-8">
+            {/* Guide section - prominent at the top */}
+            <div className="flex justify-center">
+              <div className="w-full max-w-2xl">
+                <AmazonGuide />
+              </div>
+            </div>
+
+            {/* Upload and Optimization sections */}
             <div className="grid lg:grid-cols-2 gap-8">
               <UploadSection 
                 uploadedData={uploadedData}
@@ -56,11 +72,8 @@ const Index = () => {
               />
             </div>
 
+            {/* Info cards at the bottom */}
             <InfoCards />
-          </div>
-
-          <div className="space-y-6">
-            <SubscriptionStatus />
           </div>
         </div>
       </div>

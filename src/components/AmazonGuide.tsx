@@ -1,6 +1,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -9,8 +10,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Card, CardContent } from "@/components/ui/card";
-import { Download, HelpCircle } from "lucide-react";
+import { Download, HelpCircle, BookOpen, ArrowRight } from "lucide-react";
 
 const AmazonGuide = () => {
   const steps = [
@@ -31,10 +31,31 @@ const AmazonGuide = () => {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-3 shadow-lg">
-          <HelpCircle className="h-5 w-5 mr-2" />
-          How to Download Amazon Bulk Template
-        </Button>
+        <Card className="border-2 border-dashed border-orange-300 hover:border-orange-400 transition-all duration-200 cursor-pointer group hover:shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-orange-700 group-hover:text-orange-800">
+              <BookOpen className="h-5 w-5" />
+              Amazon Data Download Guide
+            </CardTitle>
+            <CardDescription>
+              Step-by-step instructions to download your bulk template from Amazon Advertising
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="bg-orange-100 rounded-full p-3 group-hover:bg-orange-200 transition-colors">
+                  <HelpCircle className="h-6 w-6 text-orange-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Need help getting your data?</p>
+                  <p className="text-sm text-gray-600">Click to view the complete guide</p>
+                </div>
+              </div>
+              <ArrowRight className="h-5 w-5 text-orange-500 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </CardContent>
+        </Card>
       </DialogTrigger>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
