@@ -1,5 +1,5 @@
 
-import { Target } from "lucide-react";
+import { Bot } from "lucide-react";
 import HolidayReminder from "@/components/HolidayReminder";
 
 const HeroSection = () => {
@@ -9,7 +9,7 @@ const HeroSection = () => {
       
       <div className="flex items-center justify-center mb-4">
         <div className="bg-blue-600 rounded-full p-3 mr-4">
-          <Target className="h-8 w-8 text-white" />
+          <Bot className="h-8 w-8 text-white" />
         </div>
         <h1 className="text-4xl font-bold text-gray-900">PPC Pal</h1>
       </div>
