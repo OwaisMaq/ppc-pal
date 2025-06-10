@@ -30,15 +30,113 @@ export type Database = {
         }
         Relationships: []
       }
+      subscriptions: {
+        Row: {
+          created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          plan_type: Database["public"]["Enums"]["subscription_plan"]
+          status: Database["public"]["Enums"]["subscription_status"]
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          plan_type?: Database["public"]["Enums"]["subscription_plan"]
+          status?: Database["public"]["Enums"]["subscription_status"]
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          plan_type?: Database["public"]["Enums"]["subscription_plan"]
+          status?: Database["public"]["Enums"]["subscription_status"]
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      usage_limits: {
+        Row: {
+          created_at: string
+          id: string
+          optimization_limit: number
+          plan_type: Database["public"]["Enums"]["subscription_plan"]
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          optimization_limit: number
+          plan_type: Database["public"]["Enums"]["subscription_plan"]
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          optimization_limit?: number
+          plan_type?: Database["public"]["Enums"]["subscription_plan"]
+        }
+        Relationships: []
+      }
+      usage_tracking: {
+        Row: {
+          created_at: string
+          id: string
+          optimizations_used: number
+          period_end: string
+          period_start: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          optimizations_used?: number
+          period_end?: string
+          period_start?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          optimizations_used?: number
+          period_end?: string
+          period_start?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      can_user_optimize: {
+        Args: { user_uuid: string }
+        Returns: boolean
+      }
+      increment_optimization_usage: {
+        Args: { user_uuid: string }
+        Returns: undefined
+      }
     }
     Enums: {
-      [_ in never]: never
+      subscription_plan: "free" | "pro"
+      subscription_status: "active" | "cancelled" | "past_due" | "incomplete"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -153,6 +251,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      subscription_plan: ["free", "pro"],
+      subscription_status: ["active", "cancelled", "past_due", "incomplete"],
+    },
   },
 } as const

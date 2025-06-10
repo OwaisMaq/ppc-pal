@@ -5,6 +5,7 @@ import ProcessingProgress from "@/components/ProcessingProgress";
 import UploadSection from "@/components/UploadSection";
 import OptimizationSection from "@/components/OptimizationSection";
 import InfoCards from "@/components/InfoCards";
+import SubscriptionStatus from "@/components/SubscriptionStatus";
 import { useOptimization } from "@/hooks/useOptimization";
 
 export interface AdvertisingData {
@@ -38,22 +39,30 @@ const Index = () => {
           currentStep={currentStep}
         />
 
-        <div className="grid lg:grid-cols-2 gap-8">
-          <UploadSection 
-            uploadedData={uploadedData}
-            onFileUpload={handleFileUpload}
-          />
+        <div className="grid lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 space-y-8">
+            <div className="grid lg:grid-cols-2 gap-8">
+              <UploadSection 
+                uploadedData={uploadedData}
+                onFileUpload={handleFileUpload}
+              />
 
-          <OptimizationSection 
-            uploadedData={uploadedData}
-            optimizedData={optimizedData}
-            isProcessing={isProcessing}
-            onOptimize={handleOptimize}
-            onDownload={handleDownload}
-          />
+              <OptimizationSection 
+                uploadedData={uploadedData}
+                optimizedData={optimizedData}
+                isProcessing={isProcessing}
+                onOptimize={handleOptimize}
+                onDownload={handleDownload}
+              />
+            </div>
+
+            <InfoCards />
+          </div>
+
+          <div className="space-y-6">
+            <SubscriptionStatus />
+          </div>
         </div>
-
-        <InfoCards />
       </div>
     </div>
   );

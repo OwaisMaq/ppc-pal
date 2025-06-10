@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { optimizeAdvertisingData } from "@/lib/aiOptimizer";
 import { exportToExcel } from "@/lib/excelProcessor";
 import { AdvertisingData } from "@/pages/Index";
+import { useSubscription } from "@/hooks/useSubscription";
 
 export const useOptimization = () => {
   const [uploadedData, setUploadedData] = useState<AdvertisingData | null>(null);
@@ -11,6 +12,8 @@ export const useOptimization = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState<string>("");
+
+  const { checkCanOptimize, incrementUsage, isFreeTier, refreshSubscription } = useSubscription();
 
   const handleFileUpload = (data: AdvertisingData) => {
     setUploadedData(data);
@@ -20,6 +23,18 @@ export const useOptimization = () => {
 
   const handleOptimize = async () => {
     if (!uploadedData) return;
+
+    // Check if user can optimize before starting
+    const canOptimize = await checkCanOptimize();
+    
+    if (!canOptimize) {
+      if (isFreeTier) {
+        toast.error("Free plan doesn't include optimizations. Please upgrade to Pro to access this feature.");
+      } else {
+        toast.error("You've reached your monthly optimization limit. Please wait for next month or contact support.");
+      }
+      return;
+    }
 
     setIsProcessing(true);
     setProgress(0);
@@ -40,9 +55,20 @@ export const useOptimization = () => {
       
       await new Promise(resolve => setTimeout(resolve, 500));
       
+      // Increment usage count after successful optimization
+      const usageIncremented = await incrementUsage();
+      
+      if (!usageIncremented) {
+        toast.error("Failed to track usage. Please contact support.");
+        return;
+      }
+      
       setOptimizedData(optimized);
       setProgress(100);
       setCurrentStep("Optimization complete!");
+      
+      // Refresh subscription data to show updated usage
+      await refreshSubscription();
       
       toast.success("Advertising data optimized successfully!");
     } catch (error) {
