@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
-import { LogOut, User, Crown, LinkIcon, Settings, MessageSquare } from "lucide-react";
+import { LogOut, User, Crown, LinkIcon, MessageSquare, Bot } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import ComingSoon from "@/components/ComingSoon";
 
@@ -18,8 +18,10 @@ const Header = () => {
     <header className="bg-white border-b border-gray-200 px-4 py-3">
       <div className="container mx-auto flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link to="/" className="text-xl font-bold text-blue-600 hover:text-blue-700">
-            PPC Pal
+          <Link to="/" className="flex items-center">
+            <div className="bg-blue-600 rounded-full p-2">
+              <Bot className="h-6 w-6 text-white" />
+            </div>
           </Link>
           
           <div className="flex items-center gap-2">
@@ -59,10 +61,6 @@ const Header = () => {
             <div className="flex items-center gap-1">
               <LinkIcon className="h-4 w-4 text-muted-foreground" />
               <ComingSoon feature="Account Sync" className="text-xs" />
-            </div>
-            <div className="flex items-center gap-1">
-              <Settings className="h-4 w-4 text-muted-foreground" />
-              <ComingSoon feature="Automation" className="text-xs" />
             </div>
           </div>
           
