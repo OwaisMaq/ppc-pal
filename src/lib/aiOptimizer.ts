@@ -1,6 +1,6 @@
-import { AdvertisingData } from '@/pages/Index';
 
-const OPENAI_API_KEY = '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';
+import { AdvertisingData } from '@/pages/Index';
+import { supabase } from '@/integrations/supabase/client';
 
 interface OptimizationSuggestion {
   type: 'bid_increase' | 'bid_decrease' | 'remove_keyword' | 'add_negative' | 'change_match_type';
@@ -11,6 +11,40 @@ interface OptimizationSuggestion {
 
 // Cache for storing optimization results
 const optimizationCache = new Map<string, AdvertisingData>();
+
+// Input validation and sanitization
+const validateAndSanitizeData = (data: AdvertisingData): AdvertisingData => {
+  if (!data || typeof data !== 'object') {
+    throw new Error('Invalid data format');
+  }
+
+  // Sanitize and validate keywords array
+  if (data.keywords && Array.isArray(data.keywords)) {
+    data.keywords = data.keywords.filter(keyword => {
+      if (!keyword || typeof keyword !== 'object') return false;
+      
+      // Sanitize string fields to prevent injection
+      Object.keys(keyword).forEach(key => {
+        if (typeof keyword[key] === 'string') {
+          keyword[key] = keyword[key].replace(/[<>]/g, ''); // Basic HTML tag removal
+        }
+      });
+      
+      return true;
+    });
+  }
+
+  // Similar validation for campaigns and adGroups
+  if (data.campaigns && Array.isArray(data.campaigns)) {
+    data.campaigns = data.campaigns.filter(campaign => campaign && typeof campaign === 'object');
+  }
+
+  if (data.adGroups && Array.isArray(data.adGroups)) {
+    data.adGroups = data.adGroups.filter(adGroup => adGroup && typeof adGroup === 'object');
+  }
+
+  return data;
+};
 
 // Generate a simple hash for the data to use as cache key
 const generateDataHash = (data: AdvertisingData): string => {
@@ -26,8 +60,11 @@ export const optimizeAdvertisingData = async (data: AdvertisingData): Promise<Ad
   try {
     console.log("Starting AI optimization process...");
     
+    // Validate and sanitize input data
+    const sanitizedData = validateAndSanitizeData(data);
+    
     // Check cache first for consistent results
-    const dataHash = generateDataHash(data);
+    const dataHash = generateDataHash(sanitizedData);
     console.log("Data hash:", dataHash);
     
     if (optimizationCache.has(dataHash)) {
@@ -35,23 +72,24 @@ export const optimizeAdvertisingData = async (data: AdvertisingData): Promise<Ad
       return optimizationCache.get(dataHash)!;
     }
     
-    // Prepare data summary for AI analysis
+    // Prepare data summary for AI analysis with size limits
+    const maxKeywords = 50; // Limit to prevent excessive API usage
     const dataSummary = {
-      totalKeywords: data.keywords?.length || 0,
-      totalCampaigns: data.campaigns?.length || 0,
-      totalAdGroups: data.adGroups?.length || 0,
-      sampleKeywords: data.keywords?.slice(0, 10) || []
+      totalKeywords: Math.min(sanitizedData.keywords?.length || 0, maxKeywords),
+      totalCampaigns: sanitizedData.campaigns?.length || 0,
+      totalAdGroups: sanitizedData.adGroups?.length || 0,
+      sampleKeywords: sanitizedData.keywords?.slice(0, 10) || []
     };
 
     console.log("Data summary for AI:", dataSummary);
 
-    // Call OpenAI API for optimization suggestions
+    // Call OpenAI API for optimization suggestions using Supabase edge function
     const suggestions = await getOptimizationSuggestions(dataSummary, dataHash);
     
     console.log("AI suggestions received:", suggestions);
 
     // Apply optimizations based on AI suggestions
-    const optimizedData = applyOptimizations(data, suggestions);
+    const optimizedData = applyOptimizations(sanitizedData, suggestions);
     
     // Cache the result
     optimizationCache.set(dataHash, optimizedData);
@@ -64,110 +102,44 @@ export const optimizeAdvertisingData = async (data: AdvertisingData): Promise<Ad
     
     // Fallback to deterministic rule-based optimization if AI fails
     console.log("Falling back to deterministic rule-based optimization...");
-    const dataHash = generateDataHash(data);
+    const sanitizedData = validateAndSanitizeData(data);
+    const dataHash = generateDataHash(sanitizedData);
     
     if (optimizationCache.has(dataHash)) {
       console.log("Returning cached fallback result");
       return optimizationCache.get(dataHash)!;
     }
     
-    const fallbackResult = applyDeterministicRuleBasedOptimization(data);
+    const fallbackResult = applyDeterministicRuleBasedOptimization(sanitizedData);
     optimizationCache.set(dataHash, fallbackResult);
     return fallbackResult;
   }
 };
 
 const getOptimizationSuggestions = async (dataSummary: any, seed: string): Promise<OptimizationSuggestion[]> => {
-  const prompt = `
-As an Amazon advertising optimization expert, analyze this advertising data and provide specific optimization suggestions:
-
-Data Summary:
-- Total Keywords: ${dataSummary.totalKeywords}
-- Total Campaigns: ${dataSummary.totalCampaigns}
-- Total Ad Groups: ${dataSummary.totalAdGroups}
-
-Sample Keywords:
-${JSON.stringify(dataSummary.sampleKeywords, null, 2)}
-
-Please provide optimization suggestions focusing on:
-1. Bid adjustments for keywords
-2. Underperforming keywords to remove
-3. Match type optimizations
-4. Budget allocation improvements
-
-Respond with a JSON array of suggestions in this format:
-[
-  {
-    "type": "bid_increase",
-    "reason": "High conversion rate, low impression share",
-    "originalValue": 1.50,
-    "suggestedValue": 2.25
-  }
-]
-  `;
-
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an expert Amazon advertising optimizer. Always provide consistent, actionable, data-driven optimization suggestions in valid JSON format.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0, // Deterministic results
-        seed: parseInt(seed.substring(0, 8), 16), // Consistent seed based on data
-        max_tokens: 2000
-      })
+    // Use Supabase edge function instead of direct OpenAI API call
+    const { data, error } = await supabase.functions.invoke('ai-optimize', {
+      body: {
+        dataSummary,
+        seed
+      }
     });
 
-    if (!response.ok) {
-      console.error(`OpenAI API error: ${response.status} ${response.statusText}`);
-      throw new Error(`OpenAI API error: ${response.status}`);
+    if (error) {
+      console.error('Edge function error:', error);
+      throw error;
     }
 
-    const result = await response.json();
-    const content = result.choices[0]?.message?.content;
-    
-    console.log("Raw AI response:", content);
-
-    // Improved JSON parsing
-    if (!content) {
-      console.error("Empty response from OpenAI");
-      return generateFallbackSuggestions(dataSummary);
+    if (data?.suggestions && Array.isArray(data.suggestions)) {
+      return data.suggestions;
     }
 
-    try {
-      // Try to find JSON array in the response
-      const jsonMatch = content.match(/\[[\s\S]*?\]/);
-      if (jsonMatch) {
-        const suggestions = JSON.parse(jsonMatch[0]);
-        if (Array.isArray(suggestions) && suggestions.length > 0) {
-          return suggestions;
-        }
-      }
-      
-      // If no valid JSON found, generate fallback suggestions
-      console.warn("No valid JSON suggestions found in AI response");
-      return generateFallbackSuggestions(dataSummary);
-      
-    } catch (parseError) {
-      console.error("Error parsing AI suggestions:", parseError);
-      return generateFallbackSuggestions(dataSummary);
-    }
+    console.warn("No valid suggestions from edge function");
+    return generateFallbackSuggestions(dataSummary);
 
   } catch (error) {
-    console.error("Error calling OpenAI API:", error);
+    console.error("Error calling optimization edge function:", error);
     return generateFallbackSuggestions(dataSummary);
   }
 };
@@ -220,6 +192,11 @@ const applyOptimizations = (data: AdvertisingData, suggestions: OptimizationSugg
       for (const suggestion of suggestions) {
         // Use the correct field names for your data structure
         const currentBid = parseFloat(keyword.Bid || keyword.bid || keyword['Max CPC'] || '1.00');
+        
+        // Validate bid value to prevent injection
+        if (isNaN(currentBid) || currentBid < 0 || currentBid > 100) {
+          continue; // Skip invalid bids
+        }
         
         switch (suggestion.type) {
           case 'bid_increase':
@@ -278,6 +255,11 @@ const applyDeterministicRuleBasedOptimization = (data: AdvertisingData): Adverti
       
       // Deterministic optimization based on bid ranges using correct field names
       const currentBid = parseFloat(keyword.Bid || keyword.bid || keyword['Max CPC'] || '1.00');
+      
+      // Validate bid value
+      if (isNaN(currentBid) || currentBid < 0 || currentBid > 100) {
+        return optimizedKeyword; // Skip invalid bids
+      }
       
       // Increase bids for low bids (likely high performers)
       if (currentBid < 1.00) {
