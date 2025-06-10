@@ -1,7 +1,15 @@
-
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import { AdvertisingData } from '@/pages/Index';
+
+// Store original workbook structure
+interface OriginalWorkbookStructure {
+  sheetNames: string[];
+  sheetStructures: { [sheetName: string]: any };
+  originalWorkbook: XLSX.WorkBook;
+}
+
+let originalStructure: OriginalWorkbookStructure | null = null;
 
 export const parseExcelFile = async (file: File): Promise<AdvertisingData> => {
   return new Promise((resolve, reject) => {
@@ -14,6 +22,13 @@ export const parseExcelFile = async (file: File): Promise<AdvertisingData> => {
         
         console.log("Workbook sheets:", workbook.SheetNames);
         
+        // Store original structure for later export
+        originalStructure = {
+          sheetNames: [...workbook.SheetNames],
+          sheetStructures: {},
+          originalWorkbook: workbook
+        };
+
         const result: AdvertisingData = {
           portfolios: [],
           campaigns: [],
@@ -21,10 +36,17 @@ export const parseExcelFile = async (file: File): Promise<AdvertisingData> => {
           keywords: []
         };
 
-        // Parse each sheet
+        // Parse each sheet and store original structure
         workbook.SheetNames.forEach(sheetName => {
           const worksheet = workbook.Sheets[sheetName];
           const jsonData = XLSX.utils.sheet_to_json(worksheet);
+          
+          // Store original sheet structure
+          originalStructure!.sheetStructures[sheetName] = {
+            originalData: jsonData,
+            headers: jsonData.length > 0 ? Object.keys(jsonData[0]) : [],
+            range: worksheet['!ref'] || 'A1'
+          };
           
           console.log(`Sheet ${sheetName} has ${jsonData.length} rows`);
           
@@ -80,28 +102,64 @@ export const parseExcelFile = async (file: File): Promise<AdvertisingData> => {
 
 export const exportToExcel = async (data: AdvertisingData) => {
   try {
+    if (!originalStructure) {
+      throw new Error("Original file structure not found. Please upload a file first.");
+    }
+
     const workbook = XLSX.utils.book_new();
 
-    // Add each data type as a separate sheet
-    if (data.portfolios && data.portfolios.length > 0) {
-      const portfolioSheet = XLSX.utils.json_to_sheet(data.portfolios);
-      XLSX.utils.book_append_sheet(workbook, portfolioSheet, "Portfolios");
-    }
+    // Recreate all original sheets with exact same structure
+    originalStructure.sheetNames.forEach(sheetName => {
+      const originalSheetData = originalStructure!.sheetStructures[sheetName];
+      let sheetData = originalSheetData.originalData;
 
-    if (data.campaigns && data.campaigns.length > 0) {
-      const campaignSheet = XLSX.utils.json_to_sheet(data.campaigns);
-      XLSX.utils.book_append_sheet(workbook, campaignSheet, "Campaigns");
-    }
+      // Determine which optimized data to use based on sheet name/content
+      const lowerSheetName = sheetName.toLowerCase();
+      
+      if (lowerSheetName.includes('portfolio') && data.portfolios.length > 0) {
+        sheetData = data.portfolios;
+      } else if (lowerSheetName.includes('campaign') && data.campaigns.length > 0) {
+        sheetData = data.campaigns;
+      } else if ((lowerSheetName.includes('adgroup') || lowerSheetName.includes('ad group')) && data.adGroups.length > 0) {
+        sheetData = data.adGroups;
+      } else if ((lowerSheetName.includes('keyword') || lowerSheetName.includes('targeting')) && data.keywords.length > 0) {
+        sheetData = data.keywords;
+      } else {
+        // Try to detect based on original headers
+        const headers = originalSheetData.headers;
+        const lowerHeaders = headers.map((h: string) => h.toLowerCase());
+        
+        if (lowerHeaders.some(h => h.includes('keyword') || h.includes('targeting')) && data.keywords.length > 0) {
+          sheetData = data.keywords;
+        } else if (lowerHeaders.some(h => h.includes('campaign')) && data.campaigns.length > 0) {
+          sheetData = data.campaigns;
+        } else if (lowerHeaders.some(h => h.includes('adgroup') || h.includes('ad group')) && data.adGroups.length > 0) {
+          sheetData = data.adGroups;
+        } else if (lowerHeaders.some(h => h.includes('portfolio')) && data.portfolios.length > 0) {
+          sheetData = data.portfolios;
+        }
+        // If no match found, keep original data
+      }
 
-    if (data.adGroups && data.adGroups.length > 0) {
-      const adGroupSheet = XLSX.utils.json_to_sheet(data.adGroups);
-      XLSX.utils.book_append_sheet(workbook, adGroupSheet, "Ad Groups");
-    }
-
-    if (data.keywords && data.keywords.length > 0) {
-      const keywordSheet = XLSX.utils.json_to_sheet(data.keywords);
-      XLSX.utils.book_append_sheet(workbook, keywordSheet, "Keywords");
-    }
+      // Ensure the data maintains the exact same column structure
+      if (sheetData && sheetData.length > 0) {
+        const processedData = sheetData.map((row: any) => {
+          const newRow: any = {};
+          // Maintain exact same column order and names from original
+          originalSheetData.headers.forEach((header: string) => {
+            newRow[header] = row[header] !== undefined ? row[header] : '';
+          });
+          return newRow;
+        });
+        
+        const worksheet = XLSX.utils.json_to_sheet(processedData);
+        XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+      } else {
+        // Keep original data if no optimized data available
+        const worksheet = XLSX.utils.json_to_sheet(originalSheetData.originalData);
+        XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+      }
+    });
 
     // Generate Excel file
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
