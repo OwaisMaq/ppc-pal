@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
-import { LogOut, User, Crown, LinkIcon, MessageSquare, Bot } from "lucide-react";
+import { LogOut, User, Crown, LinkIcon, MessageSquare, Bot, Shield, Database } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import ComingSoon from "@/components/ComingSoon";
 
@@ -53,6 +53,30 @@ const Header = () => {
             >
               <MessageSquare className="h-4 w-4" />
               Give us Feedback!
+            </Link>
+            
+            <Link 
+              to="/data-management"
+              className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
+                location.pathname === '/data-management' 
+                  ? 'bg-blue-100 text-blue-700' 
+                  : 'text-gray-600 hover:text-blue-600 hover:bg-gray-100'
+              }`}
+            >
+              <Database className="h-4 w-4" />
+              My Data
+            </Link>
+            
+            <Link 
+              to="/privacy"
+              className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
+                location.pathname === '/privacy' 
+                  ? 'bg-blue-100 text-blue-700' 
+                  : 'text-gray-600 hover:text-blue-600 hover:bg-gray-100'
+              }`}
+            >
+              <Shield className="h-4 w-4" />
+              Privacy
             </Link>
           </nav>
 
