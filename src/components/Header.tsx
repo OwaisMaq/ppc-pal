@@ -52,7 +52,7 @@ const Header = () => {
               }`}
             >
               <MessageSquare className="h-4 w-4" />
-              Feedback
+              Give us Feedback!
             </Link>
           </nav>
 
