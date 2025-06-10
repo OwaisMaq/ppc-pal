@@ -36,6 +36,12 @@ const DataPreview = ({ data }: DataPreviewProps) => {
     }
   ];
 
+  // Debug: Log the first keyword to see available fields
+  if (data.keywords && data.keywords.length > 0) {
+    console.log("First keyword object:", data.keywords[0]);
+    console.log("Available keyword fields:", Object.keys(data.keywords[0]));
+  }
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
@@ -53,6 +59,26 @@ const DataPreview = ({ data }: DataPreviewProps) => {
       {data.keywords && data.keywords.length > 0 && (
         <div className="mt-6">
           <h4 className="font-medium text-gray-900 mb-3">Sample Keywords Preview</h4>
+          
+          {/* Debug section showing available fields */}
+          <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
+            <h5 className="font-medium text-yellow-800 mb-2">Debug: Available Fields</h5>
+            <div className="text-sm text-yellow-700">
+              {data.keywords[0] && (
+                <div>
+                  <p className="mb-1">Available columns in keyword data:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {Object.keys(data.keywords[0]).map((field, index) => (
+                      <Badge key={index} variant="outline" className="text-xs bg-yellow-100">
+                        {field}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          
           <div className="space-y-2 max-h-40 overflow-y-auto">
             {data.keywords.slice(0, 5).map((keyword: any, index: number) => (
               <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
