@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Upload, FileSpreadsheet } from "lucide-react";
 import FileUpload from "@/components/FileUpload";
 import DataPreview from "@/components/DataPreview";
+import AmazonGuide from "@/components/AmazonGuide";
 import { AdvertisingData } from "@/pages/Index";
 
 interface UploadSectionProps {
@@ -23,8 +24,12 @@ const UploadSection = ({ uploadedData, onFileUpload }: UploadSectionProps) => {
             Upload your Excel workbook containing portfolio, campaign, ad group, and keyword data
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <FileUpload onFileUpload={onFileUpload} />
+          
+          <div className="flex justify-center pt-4 border-t">
+            <AmazonGuide />
+          </div>
         </CardContent>
       </Card>
 
