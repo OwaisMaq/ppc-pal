@@ -1,12 +1,20 @@
-
 import { AdvertisingData } from '@/pages/Index';
 import { OptimizationSuggestion } from './aiService';
 
 export const applyOptimizationsPreservingStructure = (data: AdvertisingData, suggestions: OptimizationSuggestion[]): AdvertisingData => {
   const optimizedData = JSON.parse(JSON.stringify(data)); // Deep clone to preserve all original structure
 
-  // Apply AI suggestions to keywords deterministically while preserving all columns
-  if (optimizedData.keywords && suggestions.length > 0) {
+  console.log("Applying optimizations with suggestions:", suggestions);
+  console.log("Original data structure:", {
+    keywords: optimizedData.keywords?.length || 0,
+    campaigns: optimizedData.campaigns?.length || 0,
+    adGroups: optimizedData.adGroups?.length || 0,
+    portfolios: optimizedData.portfolios?.length || 0
+  });
+
+  // Apply AI suggestions ONLY to keywords - never to campaigns, ad groups, or portfolios
+  if (optimizedData.keywords && optimizedData.keywords.length > 0 && suggestions.length > 0) {
+    console.log("Optimizing keywords...");
     optimizedData.keywords = optimizedData.keywords.map((keyword: any, index: number) => {
       const optimizedKeyword = { ...keyword }; // Preserve all original fields
       
@@ -72,11 +80,20 @@ export const applyOptimizationsPreservingStructure = (data: AdvertisingData, sug
       const removeAmount = Math.min(Math.floor(optimizedData.keywords.length * 0.05), 5);
       if (removeAmount > 0) {
         optimizedData.keywords = optimizedData.keywords.slice(0, -removeAmount);
+        console.log(`Removed ${removeAmount} underperforming keywords`);
       }
     }
   }
 
-  // Preserve all other data arrays exactly as they were
+  // Keep campaigns, adGroups, and portfolios exactly as they were - NO MODIFICATIONS
+  // This prevents mixing keyword data into campaign sheets
+  console.log("Final optimized data structure:", {
+    keywords: optimizedData.keywords?.length || 0,
+    campaigns: optimizedData.campaigns?.length || 0,
+    adGroups: optimizedData.adGroups?.length || 0,
+    portfolios: optimizedData.portfolios?.length || 0
+  });
+
   return optimizedData;
 };
 
@@ -85,8 +102,9 @@ export const applyDeterministicRuleBasedOptimizationPreservingStructure = (data:
   
   const optimizedData = JSON.parse(JSON.stringify(data)); // Deep clone to preserve all structure
 
-  // Deterministic rule-based optimization for keywords while preserving all columns
-  if (optimizedData.keywords) {
+  // Deterministic rule-based optimization ONLY for keywords
+  if (optimizedData.keywords && optimizedData.keywords.length > 0) {
+    console.log("Optimizing keywords with rule-based approach...");
     optimizedData.keywords = optimizedData.keywords.map((keyword: any) => {
       const optimizedKeyword = { ...keyword }; // Preserve all original fields
       
@@ -133,8 +151,11 @@ export const applyDeterministicRuleBasedOptimizationPreservingStructure = (data:
     const removeCount = Math.floor(optimizedData.keywords.length * 0.05);
     if (removeCount > 0) {
       optimizedData.keywords = optimizedData.keywords.slice(0, -removeCount);
+      console.log(`Removed ${removeCount} underperforming keywords`);
     }
   }
 
+  // Keep campaigns, adGroups, and portfolios exactly as they were - NO MODIFICATIONS
+  console.log("Fallback optimization completed");
   return optimizedData;
 };

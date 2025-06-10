@@ -108,45 +108,72 @@ export const exportToExcel = async (data: AdvertisingData) => {
 
     const workbook = XLSX.utils.book_new();
 
-    // Recreate all original sheets with exact same structure
+    // Only recreate sheets that existed in the original file, maintaining their exact structure
     originalStructure.sheetNames.forEach(sheetName => {
       const originalSheetData = originalStructure!.sheetStructures[sheetName];
       let sheetData = originalSheetData.originalData;
+      const originalHeaders = originalSheetData.headers;
 
-      // Determine which optimized data to use based on sheet name/content
-      const lowerSheetName = sheetName.toLowerCase();
-      
-      if (lowerSheetName.includes('portfolio') && data.portfolios.length > 0) {
-        sheetData = data.portfolios;
-      } else if (lowerSheetName.includes('campaign') && data.campaigns.length > 0) {
-        sheetData = data.campaigns;
-      } else if ((lowerSheetName.includes('adgroup') || lowerSheetName.includes('ad group')) && data.adGroups.length > 0) {
-        sheetData = data.adGroups;
-      } else if ((lowerSheetName.includes('keyword') || lowerSheetName.includes('targeting')) && data.keywords.length > 0) {
-        sheetData = data.keywords;
-      } else {
-        // Try to detect based on original headers
-        const headers = originalSheetData.headers;
-        const lowerHeaders = headers.map((h: string) => h.toLowerCase());
+      console.log(`Processing sheet: ${sheetName}`);
+      console.log(`Original headers:`, originalHeaders);
+
+      // Determine the correct data type for this sheet based on its original content
+      // Look at the original data to determine what type of entity this sheet contains
+      if (originalSheetData.originalData.length > 0) {
+        const firstRow = originalSheetData.originalData[0];
+        const headers = Object.keys(firstRow).map(h => h.toLowerCase());
         
-        if (lowerHeaders.some(h => h.includes('keyword') || h.includes('targeting')) && data.keywords.length > 0) {
+        // Check if this sheet contains keyword data by looking at headers
+        const isKeywordSheet = headers.some(h => 
+          h.includes('keyword') || 
+          h.includes('targeting') || 
+          h.includes('match type') || 
+          h.includes('bid') || 
+          h.includes('max cpc')
+        );
+        
+        // Check if this sheet contains campaign data
+        const isCampaignSheet = headers.some(h => 
+          h.includes('campaign') && 
+          !h.includes('keyword') && 
+          !h.includes('targeting')
+        );
+        
+        // Check if this sheet contains ad group data
+        const isAdGroupSheet = headers.some(h => 
+          h.includes('adgroup') || h.includes('ad group')
+        ) && !isKeywordSheet;
+        
+        // Check if this sheet contains portfolio data
+        const isPortfolioSheet = headers.some(h => 
+          h.includes('portfolio')
+        );
+
+        // Only use optimized data if it matches the sheet type
+        if (isKeywordSheet && data.keywords.length > 0) {
+          console.log(`Using optimized keyword data for sheet: ${sheetName}`);
           sheetData = data.keywords;
-        } else if (lowerHeaders.some(h => h.includes('campaign')) && data.campaigns.length > 0) {
+        } else if (isCampaignSheet && data.campaigns.length > 0) {
+          console.log(`Using optimized campaign data for sheet: ${sheetName}`);
           sheetData = data.campaigns;
-        } else if (lowerHeaders.some(h => h.includes('adgroup') || h.includes('ad group')) && data.adGroups.length > 0) {
+        } else if (isAdGroupSheet && data.adGroups.length > 0) {
+          console.log(`Using optimized ad group data for sheet: ${sheetName}`);
           sheetData = data.adGroups;
-        } else if (lowerHeaders.some(h => h.includes('portfolio')) && data.portfolios.length > 0) {
+        } else if (isPortfolioSheet && data.portfolios.length > 0) {
+          console.log(`Using optimized portfolio data for sheet: ${sheetName}`);
           sheetData = data.portfolios;
+        } else {
+          console.log(`Keeping original data for sheet: ${sheetName} (no matching optimized data)`);
+          // Keep original data if no matching optimized data
         }
-        // If no match found, keep original data
       }
 
-      // Ensure the data maintains the exact same column structure
+      // Ensure the data maintains the exact same column structure as original
       if (sheetData && sheetData.length > 0) {
         const processedData = sheetData.map((row: any) => {
           const newRow: any = {};
           // Maintain exact same column order and names from original
-          originalSheetData.headers.forEach((header: string) => {
+          originalHeaders.forEach((header: string) => {
             newRow[header] = row[header] !== undefined ? row[header] : '';
           });
           return newRow;
