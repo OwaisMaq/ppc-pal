@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
@@ -41,12 +40,14 @@ const Auth = () => {
   const location = useLocation();
   const { user, loading } = useAuth();
 
-  // Only redirect authenticated users who are on the /auth page
-  // Do NOT redirect if they're on other pages
+  // Only redirect authenticated users who are specifically on the /auth page
   useEffect(() => {
     if (!loading && user && location.pathname === '/auth') {
       console.log('Auth: User already logged in on /auth page, redirecting to /app');
-      navigate("/app", { replace: true });
+      // Add delay to ensure stable redirect
+      setTimeout(() => {
+        navigate("/app", { replace: true });
+      }, 100);
     }
   }, [user, loading, navigate, location.pathname]);
 

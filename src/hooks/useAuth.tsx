@@ -64,25 +64,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(session?.user ?? null);
         setLoading(false);
         
-        // Only check subscription status when user logs in, not on every auth change
-        // and only if we're not on a public page
+        // Clean up on sign out
+        if (event === 'SIGNED_OUT') {
+          console.log('AuthProvider: User signed out, cleaning up');
+          cleanupAuthState();
+        }
+        
+        // Only check subscription after auth state is fully established
         if (event === 'SIGNED_IN' && session?.user) {
           const currentPath = window.location.pathname;
           const isPublicPage = ['/', '/company', '/about', '/contact', '/privacy'].includes(currentPath);
           
           console.log('AuthProvider: User signed in, current path:', currentPath, 'isPublicPage:', isPublicPage);
           
+          // Defer subscription check to avoid interfering with auth flow
           if (!isPublicPage) {
             setTimeout(() => {
               checkSubscriptionStatus(session);
-            }, 100);
+            }, 500); // Longer delay to ensure auth is stable
           }
-        }
-        
-        // Clean up on sign out
-        if (event === 'SIGNED_OUT') {
-          console.log('AuthProvider: User signed out, cleaning up');
-          cleanupAuthState();
         }
       }
     );
@@ -102,10 +102,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const isPublicPage = ['/', '/company', '/about', '/contact', '/privacy'].includes(currentPath);
         console.log('AuthProvider: Existing session found, current path:', currentPath, 'isPublicPage:', isPublicPage);
         
+        // Defer subscription check to avoid interfering with routing
         if (!isPublicPage) {
           setTimeout(() => {
             checkSubscriptionStatus(session);
-          }, 100);
+          }, 500);
         }
       }
     });
