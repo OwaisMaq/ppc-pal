@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
@@ -20,21 +19,21 @@ const Auth = () => {
   const location = useLocation();
   const { user } = useAuth();
 
-  // Only redirect if already logged in and coming from a protected route
+  // Only redirect if already logged in
   useEffect(() => {
     if (user) {
       console.log('User already logged in, checking redirect logic');
       const from = location.state?.from?.pathname;
-      const isFromProtectedRoute = from && !['/auth', '/', '/company', '/about', '/contact', '/privacy'].includes(from);
       
-      // Only redirect to app if user came from a protected route
-      if (isFromProtectedRoute) {
+      // If user came from a protected route, redirect to app
+      if (from && !['/auth', '/', '/company', '/about', '/contact', '/privacy'].includes(from)) {
         console.log('Redirecting logged in user to /app from protected route');
         navigate("/app");
       } else {
-        // If user is logged in but came from public page or directly to auth, redirect to public landing
-        console.log('Redirecting logged in user to public landing');
-        navigate("/");
+        // If user is logged in and on auth page without coming from protected route,
+        // redirect to app (they shouldn't be on auth page when logged in)
+        console.log('Redirecting logged in user to /app');
+        navigate("/app");
       }
     }
   }, [user, navigate, location.state]);
