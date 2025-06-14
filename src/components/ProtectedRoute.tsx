@@ -13,19 +13,19 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const location = useLocation();
 
   useEffect(() => {
-    console.log('ProtectedRoute check:', { 
-      user: user?.email, 
-      loading, 
-      path: location.pathname 
-    });
+    console.log('ProtectedRoute: Auth check for path:', location.pathname);
+    console.log('ProtectedRoute: User:', user?.email || 'No user', 'Loading:', loading);
     
     if (!loading && !user) {
-      console.log('Redirecting to auth from protected route:', location.pathname);
+      console.log('ProtectedRoute: No user found, redirecting to auth from:', location.pathname);
       navigate("/auth");
+    } else if (!loading && user) {
+      console.log('ProtectedRoute: User authenticated, allowing access to:', location.pathname);
     }
   }, [user, loading, navigate, location.pathname]);
 
   if (loading) {
+    console.log('ProtectedRoute: Still loading auth state');
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -34,9 +34,11 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   }
 
   if (!user) {
+    console.log('ProtectedRoute: No user, returning null (redirect should happen)');
     return null;
   }
 
+  console.log('ProtectedRoute: Rendering protected content for:', location.pathname);
   return <>{children}</>;
 };
 

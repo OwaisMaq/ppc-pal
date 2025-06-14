@@ -31,10 +31,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log('AuthProvider: Setting up auth state listener');
+    
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        console.log('Auth event:', event, session?.user?.email);
+        console.log('AuthProvider: Auth event:', event, 'User:', session?.user?.email || 'No user');
+        console.log('AuthProvider: Current path:', window.location.pathname);
+        
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
@@ -44,6 +48,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (event === 'SIGNED_IN' && session?.user) {
           const currentPath = window.location.pathname;
           const isPublicPage = ['/', '/company', '/about', '/contact', '/privacy'].includes(currentPath);
+          
+          console.log('AuthProvider: User signed in, current path:', currentPath, 'isPublicPage:', isPublicPage);
           
           if (!isPublicPage) {
             setTimeout(() => {
@@ -56,7 +62,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('Existing session found:', session?.user?.email);
+      console.log('AuthProvider: Existing session check:', session?.user?.email || 'No existing session');
+      console.log('AuthProvider: Current path during session check:', window.location.pathname);
+      
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
@@ -66,6 +74,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const currentPath = window.location.pathname;
         const isPublicPage = ['/', '/company', '/about', '/contact', '/privacy'].includes(currentPath);
         
+        console.log('AuthProvider: Existing session found, current path:', currentPath, 'isPublicPage:', isPublicPage);
+        
         if (!isPublicPage) {
           setTimeout(() => {
             checkSubscriptionStatus(session);
@@ -74,34 +84,39 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      console.log('AuthProvider: Cleaning up auth state listener');
+      subscription.unsubscribe();
+    };
   }, []);
 
   const checkSubscriptionStatus = async (session: Session) => {
     try {
-      console.log('Checking subscription status for:', session.user.email);
+      console.log('AuthProvider: Checking subscription status for:', session.user.email);
       await supabase.functions.invoke('check-subscription', {
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
       });
     } catch (error) {
-      console.error('Error checking subscription status:', error);
+      console.error('AuthProvider: Error checking subscription status:', error);
     }
   };
 
   const signOut = async () => {
     try {
-      console.log('Signing out user');
+      console.log('AuthProvider: Signing out user');
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       
       // Force page reload and redirect to public landing
       window.location.href = '/';
     } catch (error) {
-      console.error('Error signing out:', error);
+      console.error('AuthProvider: Error signing out:', error);
     }
   };
+
+  console.log('AuthProvider: Rendering with user:', user?.email || 'No user', 'loading:', loading);
 
   const value = {
     user,
