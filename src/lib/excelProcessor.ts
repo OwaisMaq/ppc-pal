@@ -12,12 +12,27 @@ interface OriginalWorkbookStructure {
 
 let originalStructure: OriginalWorkbookStructure | null = null;
 
-// Amazon required headers mapping
+// Amazon required headers for each entity type
 const AMAZON_REQUIRED_HEADERS = {
-  keyword: ['Product', 'Entity', 'Operation', 'Campaign', 'Ad Group', 'Keyword', 'Match Type', 'Max Bid'],
-  campaign: ['Product', 'Entity', 'Operation', 'Campaign', 'Campaign Budget', 'Campaign Budget Type'],
-  adgroup: ['Product', 'Entity', 'Operation', 'Campaign', 'Ad Group', 'Ad Group Default Bid'],
-  portfolio: ['Product', 'Entity', 'Operation', 'Portfolio', 'Portfolio Budget']
+  keyword: [
+    'Product', 'Entity', 'Operation', 'Campaign', 'Ad Group', 'Keyword', 'Match Type', 'Max Bid'
+  ],
+  campaign: [
+    'Product', 'Entity', 'Operation', 'Campaign', 'Campaign Budget', 'Campaign Budget Type'
+  ],
+  adgroup: [
+    'Product', 'Entity', 'Operation', 'Campaign', 'Ad Group', 'Ad Group Default Bid'
+  ],
+  portfolio: [
+    'Product', 'Entity', 'Operation', 'Portfolio', 'Portfolio Budget'
+  ]
+};
+
+// Valid Amazon product types
+const AMAZON_PRODUCT_TYPES = {
+  'Sponsored Products': 'Sponsored Products',
+  'Sponsored Brands': 'Sponsored Brands', 
+  'Sponsored Display': 'Sponsored Display'
 };
 
 export const parseExcelFile = async (file: File): Promise<AdvertisingData> => {
@@ -111,49 +126,86 @@ export const parseExcelFile = async (file: File): Promise<AdvertisingData> => {
   });
 };
 
-const ensureAmazonCompatibleHeaders = (data: any[], originalHeaders: string[], entityType: string): any[] => {
+const normalizeAmazonData = (data: any[], entityType: string): any[] => {
   if (!data.length) return data;
 
-  console.log(`Ensuring Amazon compatibility for ${entityType} with original headers:`, originalHeaders);
+  console.log(`Normalizing Amazon data for ${entityType}:`, data.length, 'rows');
 
-  // Amazon requires specific first three columns: Product, Entity, Operation
-  const processedData = data.map(row => {
-    const newRow: any = {};
+  return data.map(row => {
+    const normalizedRow: any = {};
     
-    // Ensure Amazon required first three columns exist
-    newRow['Product'] = row['Product'] || 'Sponsored Products';
+    // CRITICAL: Ensure consistent Product type - Amazon requires all rows in a sheet to have same product type
+    const productType = row['Product'] || 'Sponsored Products';
+    normalizedRow['Product'] = AMAZON_PRODUCT_TYPES[productType as keyof typeof AMAZON_PRODUCT_TYPES] || 'Sponsored Products';
     
-    // Set Entity based on data type and existing data
-    if (row['Entity']) {
-      newRow['Entity'] = row['Entity'];
-    } else {
-      // Infer entity type from data structure
-      if (entityType === 'keyword' && (row['Keyword'] || row['keyword'])) {
-        newRow['Entity'] = 'Keyword';
-      } else if (entityType === 'campaign' && (row['Campaign'] || row['campaign'])) {
-        newRow['Entity'] = 'Campaign';
-      } else if (entityType === 'adgroup' && (row['Ad Group'] || row['adgroup'] || row['AdGroup'])) {
-        newRow['Entity'] = 'Ad Group';
-      } else if (entityType === 'portfolio' && (row['Portfolio'] || row['portfolio'])) {
-        newRow['Entity'] = 'Portfolio';
-      } else {
-        newRow['Entity'] = 'Keyword'; // Default fallback
-      }
+    // Set correct Entity based on type
+    if (entityType === 'keyword') {
+      normalizedRow['Entity'] = 'Keyword';
+    } else if (entityType === 'campaign') {
+      normalizedRow['Entity'] = 'Campaign';
+    } else if (entityType === 'adgroup') {
+      normalizedRow['Entity'] = 'Ad Group';
+    } else if (entityType === 'portfolio') {
+      normalizedRow['Entity'] = 'Portfolio';
     }
     
-    newRow['Operation'] = row['Operation'] || 'update';
+    // Always set Operation to 'update' for Amazon compatibility
+    normalizedRow['Operation'] = 'update';
 
-    // Copy all other original columns in their original order
-    originalHeaders.forEach(header => {
-      if (header !== 'Product' && header !== 'Entity' && header !== 'Operation') {
-        newRow[header] = row[header];
-      }
+    // Map common fields based on entity type
+    if (entityType === 'keyword') {
+      normalizedRow['Campaign'] = row['Campaign'] || row['campaign'] || '';
+      normalizedRow['Ad Group'] = row['Ad Group'] || row['adgroup'] || row['AdGroup'] || '';
+      normalizedRow['Keyword'] = row['Keyword'] || row['keyword'] || row['Keyword text'] || '';
+      normalizedRow['Match Type'] = row['Match Type'] || row['Match type'] || row['matchType'] || 'exact';
+      normalizedRow['Max Bid'] = row['Max Bid'] || row['Bid'] || row['bid'] || row['Max CPC'] || '0.50';
+    } else if (entityType === 'campaign') {
+      normalizedRow['Campaign'] = row['Campaign'] || row['campaign'] || '';
+      normalizedRow['Campaign Budget'] = row['Campaign Budget'] || row['Budget'] || row['budget'] || '100.00';
+      normalizedRow['Campaign Budget Type'] = row['Campaign Budget Type'] || row['Budget Type'] || 'daily';
+    } else if (entityType === 'adgroup') {
+      normalizedRow['Campaign'] = row['Campaign'] || row['campaign'] || '';
+      normalizedRow['Ad Group'] = row['Ad Group'] || row['adgroup'] || row['AdGroup'] || '';
+      normalizedRow['Ad Group Default Bid'] = row['Ad Group Default Bid'] || row['Default Bid'] || row['bid'] || '0.50';
+    } else if (entityType === 'portfolio') {
+      normalizedRow['Portfolio'] = row['Portfolio'] || row['portfolio'] || '';
+      normalizedRow['Portfolio Budget'] = row['Portfolio Budget'] || row['Budget'] || row['budget'] || '1000.00';
+    }
+
+    return normalizedRow;
+  });
+};
+
+const createAmazonCompatibleSheet = (data: any[], entityType: string, sheetName: string) => {
+  if (!data.length) {
+    console.log(`No data for ${entityType} sheet: ${sheetName}`);
+    return XLSX.utils.json_to_sheet([]);
+  }
+
+  // Normalize data for Amazon format
+  const normalizedData = normalizeAmazonData(data, entityType);
+  
+  // Get required headers for this entity type
+  const requiredHeaders = AMAZON_REQUIRED_HEADERS[entityType as keyof typeof AMAZON_REQUIRED_HEADERS] || AMAZON_REQUIRED_HEADERS.keyword;
+  
+  // Ensure all rows have all required columns with default values
+  const completeData = normalizedData.map(row => {
+    const completeRow: any = {};
+    
+    // Add all required headers in correct order
+    requiredHeaders.forEach(header => {
+      completeRow[header] = row[header] || '';
     });
-
-    return newRow;
+    
+    return completeRow;
   });
 
-  return processedData;
+  console.log(`Creating ${entityType} sheet with ${completeData.length} rows and headers:`, requiredHeaders);
+  
+  // Create worksheet with exact Amazon header order
+  return XLSX.utils.json_to_sheet(completeData, {
+    header: requiredHeaders
+  });
 };
 
 export const exportToExcel = async (data: AdvertisingData) => {
@@ -164,57 +216,58 @@ export const exportToExcel = async (data: AdvertisingData) => {
 
     const workbook = XLSX.utils.book_new();
 
-    // Recreate sheets maintaining exact original structure and order
-    originalStructure.sheetNames.forEach(sheetName => {
-      const originalSheetData = originalStructure!.sheetStructures[sheetName];
-      let sheetData = originalSheetData.originalData;
-      const originalHeaders = originalSheetData.headers;
-
-      console.log(`Processing sheet: ${sheetName}`);
-      console.log(`Original headers:`, originalHeaders);
-
-      // Determine entity type from original data
-      let entityType = 'keyword'; // default
-      if (originalSheetData.originalData.length > 0) {
-        const sampleRow = originalSheetData.originalData[0];
-        const entityValue = sampleRow.Entity || '';
-        
-        if (entityValue === 'Campaign') {
-          entityType = 'campaign';
-        } else if (entityValue === 'Ad Group') {
-          entityType = 'adgroup';
-        } else if (entityValue === 'Portfolio') {
-          entityType = 'portfolio';
-        } else if (entityValue === 'Keyword' || entityValue === 'Product Targeting') {
-          entityType = 'keyword';
-        }
+    // Group data by product type to ensure Amazon compatibility
+    const dataByProductType = {
+      'Sponsored Products': {
+        keywords: data.keywords.filter(k => !k.Product || k.Product === 'Sponsored Products'),
+        campaigns: data.campaigns.filter(c => !c.Product || c.Product === 'Sponsored Products'),
+        adGroups: data.adGroups.filter(a => !a.Product || a.Product === 'Sponsored Products'),
+        portfolios: data.portfolios.filter(p => !p.Product || p.Product === 'Sponsored Products')
+      },
+      'Sponsored Brands': {
+        keywords: data.keywords.filter(k => k.Product === 'Sponsored Brands'),
+        campaigns: data.campaigns.filter(c => c.Product === 'Sponsored Brands'),
+        adGroups: data.adGroups.filter(a => a.Product === 'Sponsored Brands'),
+        portfolios: data.portfolios.filter(p => p.Product === 'Sponsored Brands')
+      },
+      'Sponsored Display': {
+        keywords: data.keywords.filter(k => k.Product === 'Sponsored Display'),
+        campaigns: data.campaigns.filter(c => c.Product === 'Sponsored Display'),
+        adGroups: data.adGroups.filter(a => a.Product === 'Sponsored Display'),
+        portfolios: data.portfolios.filter(p => p.Product === 'Sponsored Display')
       }
+    };
 
-      // Use optimized data if available and matches entity type
-      if (entityType === 'keyword' && data.keywords.length > 0) {
-        console.log(`Using optimized keyword data for sheet: ${sheetName}`);
-        sheetData = data.keywords;
-      } else if (entityType === 'campaign' && data.campaigns.length > 0) {
-        console.log(`Using optimized campaign data for sheet: ${sheetName}`);
-        sheetData = data.campaigns;
-      } else if (entityType === 'adgroup' && data.adGroups.length > 0) {
-        console.log(`Using optimized ad group data for sheet: ${sheetName}`);
-        sheetData = data.adGroups;
-      } else if (entityType === 'portfolio' && data.portfolios.length > 0) {
-        console.log(`Using optimized portfolio data for sheet: ${sheetName}`);
-        sheetData = data.portfolios;
+    // Create separate sheets for each entity type and product type combination
+    Object.entries(dataByProductType).forEach(([productType, typeData]) => {
+      if (typeData.keywords.length > 0) {
+        const worksheet = createAmazonCompatibleSheet(typeData.keywords, 'keyword', `${productType} Keywords`);
+        XLSX.utils.book_append_sheet(workbook, worksheet, `${productType} Keywords`);
       }
-
-      // Ensure Amazon-compatible structure
-      const amazonCompatibleData = ensureAmazonCompatibleHeaders(sheetData, originalHeaders, entityType);
       
-      // Create worksheet with exact column order as original
-      const worksheet = XLSX.utils.json_to_sheet(amazonCompatibleData, {
-        header: originalHeaders.length > 0 ? originalHeaders : ['Product', 'Entity', 'Operation']
-      });
+      if (typeData.campaigns.length > 0) {
+        const worksheet = createAmazonCompatibleSheet(typeData.campaigns, 'campaign', `${productType} Campaigns`);
+        XLSX.utils.book_append_sheet(workbook, worksheet, `${productType} Campaigns`);
+      }
       
-      XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+      if (typeData.adGroups.length > 0) {
+        const worksheet = createAmazonCompatibleSheet(typeData.adGroups, 'adgroup', `${productType} Ad Groups`);
+        XLSX.utils.book_append_sheet(workbook, worksheet, `${productType} Ad Groups`);
+      }
+      
+      if (typeData.portfolios.length > 0) {
+        const worksheet = createAmazonCompatibleSheet(typeData.portfolios, 'portfolio', `${productType} Portfolios`);
+        XLSX.utils.book_append_sheet(workbook, worksheet, `${productType} Portfolios`);
+      }
     });
+
+    // If no sheets were created, create a default keywords sheet
+    if (workbook.SheetNames.length === 0) {
+      console.log("No valid data found, creating default Sponsored Products Keywords sheet");
+      const defaultData = data.keywords.length > 0 ? data.keywords : [{}];
+      const worksheet = createAmazonCompatibleSheet(defaultData, 'keyword', 'Sponsored Products Keywords');
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Sponsored Products Keywords');
+    }
 
     // Generate Excel file
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
@@ -223,6 +276,8 @@ export const exportToExcel = async (data: AdvertisingData) => {
     // Download file
     const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
     saveAs(dataBlob, `amazon-ads-optimized-${timestamp}.xlsx`);
+    
+    console.log("Excel export completed successfully with Amazon-compatible format");
   } catch (error) {
     console.error("Error exporting to Excel:", error);
     throw error;
