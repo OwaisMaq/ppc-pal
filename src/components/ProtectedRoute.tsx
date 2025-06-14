@@ -7,6 +7,12 @@ interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
+const PROTECTED_ROUTES = ['/app', '/feedback', '/data-management'];
+
+const isProtectedRoute = (pathname: string) => {
+  return PROTECTED_ROUTES.some(route => pathname.startsWith(route));
+};
+
 const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
@@ -17,7 +23,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     console.log('ProtectedRoute: User:', user?.email || 'No user', 'Loading:', loading);
     
     // CRITICAL: Only redirect if we're actually on a protected route and there's no user
-    if (!loading && !user) {
+    if (!loading && !user && isProtectedRoute(location.pathname)) {
       console.log('ProtectedRoute: No user found, redirecting to auth from protected route:', location.pathname);
       navigate("/auth", { replace: true });
     } else if (!loading && user) {
