@@ -92,31 +92,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.log('AuthProvider: Existing session check:', session?.user?.email || 'No existing session');
       console.log('AuthProvider: Current path during session check:', window.location.pathname);
       
-      // If we find an existing session but we're on a public page and the user
-      // didn't intentionally navigate here, this might be stale data
-      const currentPath = window.location.pathname;
-      const isPublicPage = ['/', '/company', '/about', '/contact', '/privacy'].includes(currentPath);
-      
-      if (session?.user && isPublicPage && currentPath === '/') {
-        console.log('AuthProvider: Found session on public landing page - checking if this is intentional');
-        
-        // Check if there's a recent navigation intent (within last 30 seconds)
-        const lastNavigationTime = sessionStorage.getItem('lastNavigationTime');
-        const now = Date.now();
-        const isRecentNavigation = lastNavigationTime && (now - parseInt(lastNavigationTime)) < 30000;
-        
-        if (!isRecentNavigation) {
-          console.log('AuthProvider: No recent navigation detected, session might be stale');
-          // Don't automatically clean up here, let the user decide
-        }
-      }
-      
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
       
       // Only check subscription status for existing session if not on public page
       if (session?.user) {
+        const currentPath = window.location.pathname;
+        const isPublicPage = ['/', '/company', '/about', '/contact', '/privacy'].includes(currentPath);
         console.log('AuthProvider: Existing session found, current path:', currentPath, 'isPublicPage:', isPublicPage);
         
         if (!isPublicPage) {

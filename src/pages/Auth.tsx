@@ -39,43 +39,16 @@ const Auth = () => {
   });
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
 
-  // Clean up auth state when component mounts to ensure fresh start
+  // Only redirect authenticated users who are on the /auth page
+  // Do NOT redirect if they're on other pages
   useEffect(() => {
-    console.log('Auth: Component mounted, checking for stale auth data');
-    
-    // Only clean up if we're coming to auth page directly (not from a redirect)
-    const hasFromState = location.state?.from;
-    if (!hasFromState) {
-      console.log('Auth: No redirect state, performing auth cleanup');
-      cleanupAuthState();
-      
-      // Force sign out to ensure clean state
-      supabase.auth.signOut({ scope: 'global' }).catch(() => {
-        // Ignore errors during cleanup
-      });
+    if (!loading && user && location.pathname === '/auth') {
+      console.log('Auth: User already logged in on /auth page, redirecting to /app');
+      navigate("/app", { replace: true });
     }
-  }, [location.state]);
-
-  // Only redirect if already logged in
-  useEffect(() => {
-    if (user) {
-      console.log('Auth: User already logged in, checking redirect logic');
-      const from = location.state?.from?.pathname;
-      
-      // If user came from a protected route, redirect to app
-      if (from && !['/auth', '/', '/company', '/about', '/contact', '/privacy'].includes(from)) {
-        console.log('Auth: Redirecting logged in user to /app from protected route');
-        navigate("/app");
-      } else {
-        // If user is logged in and on auth page without coming from protected route,
-        // redirect to app (they shouldn't be on auth page when logged in)
-        console.log('Auth: Redirecting logged in user to /app');
-        navigate("/app");
-      }
-    }
-  }, [user, navigate, location.state]);
+  }, [user, loading, navigate, location.pathname]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -180,6 +153,15 @@ const Auth = () => {
       setIsLoading(false);
     }
   };
+
+  // Show loading while auth state is being determined
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50 flex flex-col items-center justify-center p-4">
