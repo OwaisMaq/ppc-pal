@@ -20,17 +20,21 @@ const Auth = () => {
   const location = useLocation();
   const { user } = useAuth();
 
-  // Only redirect if already logged in and not coming from a public page
+  // Only redirect if already logged in and coming from a protected route
   useEffect(() => {
     if (user) {
       console.log('User already logged in, checking redirect logic');
       const from = location.state?.from?.pathname;
-      const isFromPublicPage = from && ['/', '/company', '/about', '/contact', '/privacy'].includes(from);
+      const isFromProtectedRoute = from && !['/auth', '/', '/company', '/about', '/contact', '/privacy'].includes(from);
       
-      // Only redirect to app if user came from a protected route or directly accessed auth
-      if (!isFromPublicPage) {
-        console.log('Redirecting logged in user to /app');
+      // Only redirect to app if user came from a protected route
+      if (isFromProtectedRoute) {
+        console.log('Redirecting logged in user to /app from protected route');
         navigate("/app");
+      } else {
+        // If user is logged in but came from public page or directly to auth, redirect to public landing
+        console.log('Redirecting logged in user to public landing');
+        navigate("/");
       }
     }
   }, [user, navigate, location.state]);
