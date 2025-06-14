@@ -3,8 +3,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bot, TrendingUp, Shield, Zap, Users, Mail, Building2 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useEffect } from "react";
 
 const PublicLanding = () => {
+  useEffect(() => {
+    console.log('PublicLanding: Component mounted');
+    console.log('PublicLanding: Current URL:', window.location.href);
+    console.log('PublicLanding: Current pathname:', window.location.pathname);
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50">
       {/* Header */}
