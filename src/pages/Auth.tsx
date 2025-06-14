@@ -25,7 +25,7 @@ const Auth = () => {
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      navigate("/");
+      navigate("/app");
     }
   }, [user, navigate]);
 
@@ -55,7 +55,7 @@ const Auth = () => {
 
       if (data.user) {
         toast.success("Welcome back!");
-        navigate("/");
+        navigate("/app");
       }
     } catch (error: any) {
       console.error("Sign in error:", error);
@@ -84,7 +84,7 @@ const Auth = () => {
 
     setIsLoading(true);
     try {
-      const redirectUrl = `${window.location.origin}/`;
+      const redirectUrl = `${window.location.origin}/app`;
       
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,

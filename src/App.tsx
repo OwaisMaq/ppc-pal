@@ -7,6 +7,10 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import CookieConsent from "@/components/CookieConsent";
+import PublicLanding from "./pages/PublicLanding";
+import Company from "./pages/Company";
+import About from "./pages/About";
+import Contact from "./pages/Contact";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Feedback from "./pages/Feedback";
@@ -24,9 +28,16 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
+            {/* Public routes */}
+            <Route path="/" element={<PublicLanding />} />
+            <Route path="/company" element={<Company />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/contact" element={<Contact />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/privacy" element={<Privacy />} />
-            <Route path="/" element={
+            
+            {/* Protected routes */}
+            <Route path="/app" element={
               <ProtectedRoute>
                 <Index />
               </ProtectedRoute>
@@ -41,6 +52,7 @@ const App = () => (
                 <DataManagement />
               </ProtectedRoute>
             } />
+            
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
