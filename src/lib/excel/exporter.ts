@@ -19,13 +19,18 @@ const createAmazonCompatibleSheet = (data: any[], entityType: EntityType, sheetN
   // Get required headers for this entity type
   const requiredHeaders = AMAZON_REQUIRED_HEADERS[entityType] || AMAZON_REQUIRED_HEADERS.keyword;
   
-  // Ensure all rows have all required columns with default values
+  // Ensure all rows have all required columns with proper default values
   const completeData = normalizedData.map(row => {
     const completeRow: any = {};
     
-    // Add all required headers in correct order
+    // Add all required headers in correct order with proper defaults
     requiredHeaders.forEach(header => {
-      completeRow[header] = row[header] || '';
+      if (header.includes('ID') && (row[header] === undefined || row[header] === '')) {
+        // For ID fields, leave empty if not provided - Amazon will handle appropriately
+        completeRow[header] = '';
+      } else {
+        completeRow[header] = row[header] || '';
+      }
     });
     
     return completeRow;
@@ -114,9 +119,32 @@ export const exportToExcel = async (data: AdvertisingData) => {
     const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
     saveAs(dataBlob, `amazon-ads-optimized-${timestamp}.xlsx`);
     
-    console.log("Excel export completed successfully with Amazon-compatible format");
+    console.log("Excel export completed successfully with Amazon-compatible format including required ID fields");
   } catch (error) {
     console.error("Error exporting to Excel:", error);
     throw error;
   }
+};
+
+const groupDataByProductType = (data: AdvertisingData): GroupedDataByProductType => {
+  return {
+    'Sponsored Products': {
+      keywords: data.keywords.filter(k => !k.Product || k.Product === 'Sponsored Products'),
+      campaigns: data.campaigns.filter(c => !c.Product || c.Product === 'Sponsored Products'),
+      adGroups: data.adGroups.filter(a => !a.Product || a.Product === 'Sponsored Products'),
+      portfolios: data.portfolios.filter(p => !p.Product || p.Product === 'Sponsored Products')
+    },
+    'Sponsored Brands': {
+      keywords: data.keywords.filter(k => k.Product === 'Sponsored Brands'),
+      campaigns: data.campaigns.filter(c => c.Product === 'Sponsored Brands'),
+      adGroups: data.adGroups.filter(a => a.Product === 'Sponsored Brands'),
+      portfolios: data.portfolios.filter(p => p.Product === 'Sponsored Brands')
+    },
+    'Sponsored Display': {
+      keywords: data.keywords.filter(k => k.Product === 'Sponsored Display'),
+      campaigns: data.campaigns.filter(c => c.Product === 'Sponsored Display'),
+      adGroups: data.adGroups.filter(a => a.Product === 'Sponsored Display'),
+      portfolios: data.portfolios.filter(p => p.Product === 'Sponsored Display')
+    }
+  };
 };

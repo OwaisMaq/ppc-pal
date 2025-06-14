@@ -7,7 +7,7 @@ export const normalizeAmazonData = (data: any[], entityType: EntityType): any[] 
 
   console.log(`Normalizing Amazon data for ${entityType}:`, data.length, 'rows');
 
-  return data.map(row => {
+  return data.map((row, index) => {
     const normalizedRow: any = {};
     
     // CRITICAL: Ensure consistent Product type - Amazon requires all rows in a sheet to have same product type
@@ -28,24 +28,32 @@ export const normalizeAmazonData = (data: any[], entityType: EntityType): any[] 
     // Always set Operation to 'update' for Amazon compatibility
     normalizedRow['Operation'] = 'update';
 
-    // Map common fields based on entity type
+    // Map common fields based on entity type and handle required ID fields
     if (entityType === 'keyword') {
       normalizedRow['Campaign'] = row['Campaign'] || row['campaign'] || '';
       normalizedRow['Ad Group'] = row['Ad Group'] || row['adgroup'] || row['AdGroup'] || '';
       normalizedRow['Keyword'] = row['Keyword'] || row['keyword'] || row['Keyword text'] || '';
       normalizedRow['Match Type'] = row['Match Type'] || row['Match type'] || row['matchType'] || 'exact';
       normalizedRow['Max Bid'] = row['Max Bid'] || row['Bid'] || row['bid'] || row['Max CPC'] || '0.50';
+      // Handle Keyword ID - use existing ID or leave empty (Amazon will assign new IDs for new keywords)
+      normalizedRow['Keyword ID'] = row['Keyword ID'] || row['keywordId'] || row['id'] || '';
     } else if (entityType === 'campaign') {
       normalizedRow['Campaign'] = row['Campaign'] || row['campaign'] || '';
       normalizedRow['Campaign Budget'] = row['Campaign Budget'] || row['Budget'] || row['budget'] || '100.00';
       normalizedRow['Campaign Budget Type'] = row['Campaign Budget Type'] || row['Budget Type'] || 'daily';
+      // Handle Campaign ID
+      normalizedRow['Campaign ID'] = row['Campaign ID'] || row['campaignId'] || row['id'] || '';
     } else if (entityType === 'adgroup') {
       normalizedRow['Campaign'] = row['Campaign'] || row['campaign'] || '';
       normalizedRow['Ad Group'] = row['Ad Group'] || row['adgroup'] || row['AdGroup'] || '';
       normalizedRow['Ad Group Default Bid'] = row['Ad Group Default Bid'] || row['Default Bid'] || row['bid'] || '0.50';
+      // Handle Ad Group ID
+      normalizedRow['Ad Group ID'] = row['Ad Group ID'] || row['adGroupId'] || row['id'] || '';
     } else if (entityType === 'portfolio') {
       normalizedRow['Portfolio'] = row['Portfolio'] || row['portfolio'] || '';
       normalizedRow['Portfolio Budget'] = row['Portfolio Budget'] || row['Budget'] || row['budget'] || '1000.00';
+      // Handle Portfolio ID
+      normalizedRow['Portfolio ID'] = row['Portfolio ID'] || row['portfolioId'] || row['id'] || '';
     }
 
     return normalizedRow;
