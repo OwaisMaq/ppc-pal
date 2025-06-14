@@ -70,18 +70,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           cleanupAuthState();
         }
         
-        // Only check subscription after auth state is fully established
+        // Only check subscription for authenticated users on protected pages
         if (event === 'SIGNED_IN' && session?.user) {
           const currentPath = window.location.pathname;
-          const isPublicPage = ['/', '/company', '/about', '/contact', '/privacy'].includes(currentPath);
+          const isProtectedPage = currentPath.startsWith('/app') || currentPath === '/feedback' || currentPath === '/data-management';
           
-          console.log('AuthProvider: User signed in, current path:', currentPath, 'isPublicPage:', isPublicPage);
+          console.log('AuthProvider: User signed in, current path:', currentPath, 'isProtectedPage:', isProtectedPage);
           
-          // Defer subscription check to avoid interfering with auth flow
-          if (!isPublicPage) {
+          // Only check subscription for protected pages
+          if (isProtectedPage) {
             setTimeout(() => {
               checkSubscriptionStatus(session);
-            }, 500); // Longer delay to ensure auth is stable
+            }, 500);
           }
         }
       }
@@ -96,14 +96,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(session?.user ?? null);
       setLoading(false);
       
-      // Only check subscription status for existing session if not on public page
+      // Only check subscription for existing sessions on protected pages
       if (session?.user) {
         const currentPath = window.location.pathname;
-        const isPublicPage = ['/', '/company', '/about', '/contact', '/privacy'].includes(currentPath);
-        console.log('AuthProvider: Existing session found, current path:', currentPath, 'isPublicPage:', isPublicPage);
+        const isProtectedPage = currentPath.startsWith('/app') || currentPath === '/feedback' || currentPath === '/data-management';
+        console.log('AuthProvider: Existing session found, current path:', currentPath, 'isProtectedPage:', isProtectedPage);
         
-        // Defer subscription check to avoid interfering with routing
-        if (!isPublicPage) {
+        // Only defer subscription check for protected pages
+        if (isProtectedPage) {
           setTimeout(() => {
             checkSubscriptionStatus(session);
           }, 500);

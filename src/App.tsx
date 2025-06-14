@@ -40,7 +40,7 @@ const App = () => (
         <AuthProvider>
           <RouteLogger />
           <Routes>
-            {/* Public routes */}
+            {/* Public routes - these should NEVER redirect to auth */}
             <Route path="/" element={<PublicLanding />} />
             <Route path="/company" element={<Company />} />
             <Route path="/about" element={<About />} />
@@ -48,7 +48,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/privacy" element={<Privacy />} />
             
-            {/* Protected routes */}
+            {/* Protected routes - these redirect to auth if not authenticated */}
             <Route path="/app" element={
               <ProtectedRoute>
                 <Index />
@@ -65,7 +65,7 @@ const App = () => (
               </ProtectedRoute>
             } />
             
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            {/* Catch-all route for 404 */}
             <Route path="*" element={<NotFound />} />
           </Routes>
           <CookieConsent />
