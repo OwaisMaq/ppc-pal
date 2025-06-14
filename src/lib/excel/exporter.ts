@@ -125,26 +125,3 @@ export const exportToExcel = async (data: AdvertisingData) => {
     throw error;
   }
 };
-
-const groupDataByProductType = (data: AdvertisingData): GroupedDataByProductType => {
-  return {
-    'Sponsored Products': {
-      keywords: data.keywords.filter(k => !k.Product || k.Product === 'Sponsored Products'),
-      campaigns: data.campaigns.filter(c => !c.Product || c.Product === 'Sponsored Products'),
-      adGroups: data.adGroups.filter(a => !a.Product || a.Product === 'Sponsored Products'),
-      portfolios: data.portfolios.filter(p => !p.Product || p.Product === 'Sponsored Products')
-    },
-    'Sponsored Brands': {
-      keywords: data.keywords.filter(k => k.Product === 'Sponsored Brands'),
-      campaigns: data.campaigns.filter(c => c.Product === 'Sponsored Brands'),
-      adGroups: data.adGroups.filter(a => a.Product === 'Sponsored Brands'),
-      portfolios: data.portfolios.filter(p => p.Product === 'Sponsored Brands')
-    },
-    'Sponsored Display': {
-      keywords: data.keywords.filter(k => k.Product === 'Sponsored Display'),
-      campaigns: data.campaigns.filter(c => c.Product === 'Sponsored Display'),
-      adGroups: data.adGroups.filter(a => a.Product === 'Sponsored Display'),
-      portfolios: data.portfolios.filter(p => p.Product === 'Sponsored Display')
-    }
-  };
-};
