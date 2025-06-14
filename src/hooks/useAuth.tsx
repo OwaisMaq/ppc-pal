@@ -39,26 +39,38 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(session?.user ?? null);
         setLoading(false);
         
-        // Check subscription status when user logs in
+        // Only check subscription status when user logs in, not on every auth change
+        // and only if we're not on a public page
         if (event === 'SIGNED_IN' && session?.user) {
-          setTimeout(() => {
-            checkSubscriptionStatus(session);
-          }, 100);
+          const currentPath = window.location.pathname;
+          const isPublicPage = ['/', '/company', '/about', '/contact', '/privacy'].includes(currentPath);
+          
+          if (!isPublicPage) {
+            setTimeout(() => {
+              checkSubscriptionStatus(session);
+            }, 100);
+          }
         }
       }
     );
 
     // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Existing session found:', session?.user?.email);
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
       
-      // Check subscription status for existing session
+      // Only check subscription status for existing session if not on public page
       if (session?.user) {
-        setTimeout(() => {
-          checkSubscriptionStatus(session);
-        }, 100);
+        const currentPath = window.location.pathname;
+        const isPublicPage = ['/', '/company', '/about', '/contact', '/privacy'].includes(currentPath);
+        
+        if (!isPublicPage) {
+          setTimeout(() => {
+            checkSubscriptionStatus(session);
+          }, 100);
+        }
       }
     });
 
@@ -67,6 +79,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const checkSubscriptionStatus = async (session: Session) => {
     try {
+      console.log('Checking subscription status for:', session.user.email);
       await supabase.functions.invoke('check-subscription', {
         headers: {
           Authorization: `Bearer ${session.access_token}`,
@@ -79,6 +92,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signOut = async () => {
     try {
+      console.log('Signing out user');
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       

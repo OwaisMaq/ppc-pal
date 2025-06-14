@@ -1,6 +1,5 @@
-
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,14 +19,23 @@ const Auth = () => {
     confirmPassword: ""
   });
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
 
-  // Redirect if already logged in
+  // Only redirect if already logged in and not coming from a public page
   useEffect(() => {
     if (user) {
-      navigate("/app");
+      console.log('User already logged in, checking redirect logic');
+      const from = location.state?.from?.pathname;
+      const isFromPublicPage = from && ['/', '/company', '/about', '/contact', '/privacy'].includes(from);
+      
+      // Only redirect to app if user came from a protected route or directly accessed auth
+      if (!isFromPublicPage) {
+        console.log('Redirecting logged in user to /app');
+        navigate("/app");
+      }
     }
-  }, [user, navigate]);
+  }, [user, navigate, location.state]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
