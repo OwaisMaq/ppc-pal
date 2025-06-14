@@ -147,7 +147,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const { error } = await supabase.auth.signOut({ scope: 'global' });
       if (error) throw error;
       
-      // Force page reload and redirect to public landing
+      // Navigate to landing page instead of forcing reload
       window.location.href = '/';
     } catch (error) {
       console.error('AuthProvider: Error signing out:', error);

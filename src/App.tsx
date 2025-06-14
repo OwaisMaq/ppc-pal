@@ -48,7 +48,7 @@ const App = () => {
           <AuthProvider>
             <RouteLogger />
             <Routes>
-              {/* Public routes - these should NEVER redirect to auth */}
+              {/* Public routes - these should NEVER redirect to auth automatically */}
               <Route path="/" element={<PublicLanding />} />
               <Route path="/company" element={<Company />} />
               <Route path="/about" element={<About />} />
