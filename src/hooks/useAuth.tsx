@@ -77,20 +77,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           cleanupAuthState();
         }
         
-        // Only check subscription for authenticated users on protected pages
-        if (event === 'SIGNED_IN' && session?.user) {
-          const currentPath = window.location.pathname;
-          const isProtected = isProtectedRoute(currentPath);
-          
-          console.log('AuthProvider: User signed in, current path:', currentPath, 'isProtectedPage:', isProtected);
-          
-          // Only check subscription for protected pages
-          if (isProtected) {
-            setTimeout(() => {
-              checkSubscriptionStatus(session);
-            }, 500);
-          }
-        }
+        // CRITICAL: Do NOT check subscription or redirect for any events
+        // Let the components handle their own routing logic
+        console.log('AuthProvider: Auth state updated, no automatic redirects');
       }
     );
 
@@ -103,19 +92,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(session?.user ?? null);
       setLoading(false);
       
-      // Only check subscription for existing sessions on protected pages
-      if (session?.user) {
-        const currentPath = window.location.pathname;
-        const isProtected = isProtectedRoute(currentPath);
-        console.log('AuthProvider: Existing session found, current path:', currentPath, 'isProtectedPage:', isProtected);
-        
-        // Only defer subscription check for protected pages
-        if (isProtected) {
-          setTimeout(() => {
-            checkSubscriptionStatus(session);
-          }, 500);
-        }
-      }
+      // CRITICAL: Do NOT perform any automatic redirects here
+      console.log('AuthProvider: Session loaded, letting components handle routing');
     });
 
     return () => {
@@ -123,19 +101,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       subscription.unsubscribe();
     };
   }, []);
-
-  const checkSubscriptionStatus = async (session: Session) => {
-    try {
-      console.log('AuthProvider: Checking subscription status for:', session.user.email);
-      await supabase.functions.invoke('check-subscription', {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-    } catch (error) {
-      console.error('AuthProvider: Error checking subscription status:', error);
-    }
-  };
 
   const signOut = async () => {
     try {
@@ -157,7 +122,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  console.log('AuthProvider: Rendering with user:', user?.email || 'No user', 'loading:', loading);
+  console.log('AuthProvider: Rendering with user:', user?.email || 'No user', 'loading:', loading, 'current path:', window.location.pathname);
 
   const value = {
     user,

@@ -1,16 +1,22 @@
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bot, TrendingUp, Shield, Zap, Users, Mail, Building2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
 
 const PublicLanding = () => {
+  const { user, loading } = useAuth();
+  
   useEffect(() => {
     console.log('PublicLanding: Component mounted');
     console.log('PublicLanding: Current URL:', window.location.href);
     console.log('PublicLanding: Current pathname:', window.location.pathname);
-  }, []);
+    console.log('PublicLanding: User:', user?.email || 'No user', 'Loading:', loading);
+    
+    // CRITICAL: This is a public page - NEVER redirect automatically
+    console.log('PublicLanding: This is a public page, no redirects should happen');
+  }, [user, loading]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50">
@@ -34,9 +40,15 @@ const PublicLanding = () => {
             <Link to="/contact" className="text-gray-600 hover:text-blue-600 transition-colors">
               Contact
             </Link>
-            <Link to="/auth">
-              <Button>Sign In</Button>
-            </Link>
+            {user ? (
+              <Link to="/app">
+                <Button>Go to App</Button>
+              </Link>
+            ) : (
+              <Link to="/auth">
+                <Button>Sign In</Button>
+              </Link>
+            )}
           </nav>
         </div>
       </header>
@@ -52,11 +64,19 @@ const PublicLanding = () => {
             helping you increase sales while reducing wasted ad spend.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/auth">
-              <Button size="lg" className="w-full sm:w-auto">
-                Start Optimizing Now
-              </Button>
-            </Link>
+            {user ? (
+              <Link to="/app">
+                <Button size="lg" className="w-full sm:w-auto">
+                  Go to Dashboard
+                </Button>
+              </Link>
+            ) : (
+              <Link to="/auth">
+                <Button size="lg" className="w-full sm:w-auto">
+                  Start Optimizing Now
+                </Button>
+              </Link>
+            )}
             <Link to="/about">
               <Button variant="outline" size="lg" className="w-full sm:w-auto">
                 Learn More

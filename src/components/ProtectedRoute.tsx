@@ -16,20 +16,17 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     console.log('ProtectedRoute: Auth check for path:', location.pathname);
     console.log('ProtectedRoute: User:', user?.email || 'No user', 'Loading:', loading);
     
-    // Only redirect after loading is complete and we're certain there's no user
+    // CRITICAL: Only redirect if we're actually on a protected route and there's no user
     if (!loading && !user) {
-      console.log('ProtectedRoute: No user found, redirecting to auth from:', location.pathname);
-      // Add a small delay to ensure auth state is stable
-      setTimeout(() => {
-        navigate("/auth", { replace: true });
-      }, 100);
+      console.log('ProtectedRoute: No user found, redirecting to auth from protected route:', location.pathname);
+      navigate("/auth", { replace: true });
     } else if (!loading && user) {
-      console.log('ProtectedRoute: User authenticated, allowing access to:', location.pathname);
+      console.log('ProtectedRoute: User authenticated, allowing access to protected route:', location.pathname);
     }
   }, [user, loading, navigate, location.pathname]);
 
   if (loading) {
-    console.log('ProtectedRoute: Still loading auth state');
+    console.log('ProtectedRoute: Still loading auth state for protected route');
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -38,7 +35,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   }
 
   if (!user) {
-    console.log('ProtectedRoute: No user, showing loading while redirect happens');
+    console.log('ProtectedRoute: No user, showing loading while redirect happens from protected route');
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
