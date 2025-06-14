@@ -46,6 +46,13 @@ const cleanupAuthState = () => {
   });
 };
 
+// Define protected routes that require authentication
+const PROTECTED_ROUTES = ['/app', '/feedback', '/data-management'];
+
+const isProtectedRoute = (pathname: string) => {
+  return PROTECTED_ROUTES.some(route => pathname.startsWith(route));
+};
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -73,12 +80,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         // Only check subscription for authenticated users on protected pages
         if (event === 'SIGNED_IN' && session?.user) {
           const currentPath = window.location.pathname;
-          const isProtectedPage = currentPath.startsWith('/app') || currentPath === '/feedback' || currentPath === '/data-management';
+          const isProtected = isProtectedRoute(currentPath);
           
-          console.log('AuthProvider: User signed in, current path:', currentPath, 'isProtectedPage:', isProtectedPage);
+          console.log('AuthProvider: User signed in, current path:', currentPath, 'isProtectedPage:', isProtected);
           
           // Only check subscription for protected pages
-          if (isProtectedPage) {
+          if (isProtected) {
             setTimeout(() => {
               checkSubscriptionStatus(session);
             }, 500);
@@ -99,11 +106,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // Only check subscription for existing sessions on protected pages
       if (session?.user) {
         const currentPath = window.location.pathname;
-        const isProtectedPage = currentPath.startsWith('/app') || currentPath === '/feedback' || currentPath === '/data-management';
-        console.log('AuthProvider: Existing session found, current path:', currentPath, 'isProtectedPage:', isProtectedPage);
+        const isProtected = isProtectedRoute(currentPath);
+        console.log('AuthProvider: Existing session found, current path:', currentPath, 'isProtectedPage:', isProtected);
         
         // Only defer subscription check for protected pages
-        if (isProtectedPage) {
+        if (isProtected) {
           setTimeout(() => {
             checkSubscriptionStatus(session);
           }, 500);

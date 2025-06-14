@@ -13,20 +13,18 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const location = useLocation();
 
   useEffect(() => {
+    console.log('ProtectedRoute: Auth check for path:', location.pathname);
+    console.log('ProtectedRoute: User:', user?.email || 'No user', 'Loading:', loading);
+    
     // Only redirect after loading is complete and we're certain there's no user
-    if (!loading) {
-      console.log('ProtectedRoute: Auth check for path:', location.pathname);
-      console.log('ProtectedRoute: User:', user?.email || 'No user', 'Loading:', loading);
-      
-      if (!user) {
-        console.log('ProtectedRoute: No user found, redirecting to auth from:', location.pathname);
-        // Add a small delay to ensure auth state is stable
-        setTimeout(() => {
-          navigate("/auth", { replace: true });
-        }, 100);
-      } else {
-        console.log('ProtectedRoute: User authenticated, allowing access to:', location.pathname);
-      }
+    if (!loading && !user) {
+      console.log('ProtectedRoute: No user found, redirecting to auth from:', location.pathname);
+      // Add a small delay to ensure auth state is stable
+      setTimeout(() => {
+        navigate("/auth", { replace: true });
+      }, 100);
+    } else if (!loading && user) {
+      console.log('ProtectedRoute: User authenticated, allowing access to:', location.pathname);
     }
   }, [user, loading, navigate, location.pathname]);
 
