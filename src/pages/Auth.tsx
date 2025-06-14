@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
@@ -40,11 +41,16 @@ const Auth = () => {
   const location = useLocation();
   const { user, loading } = useAuth();
 
-  // Only redirect authenticated users who are specifically on the /auth page
+  // Only redirect authenticated users who are specifically trying to access the auth page
   useEffect(() => {
+    console.log('Auth: useEffect triggered, loading:', loading, 'user:', user?.email || 'No user', 'pathname:', location.pathname);
+    
+    // Only redirect if:
+    // 1. Auth loading is complete
+    // 2. User is authenticated 
+    // 3. User is specifically on the /auth page (not other pages)
     if (!loading && user && location.pathname === '/auth') {
-      console.log('Auth: User already logged in on /auth page, redirecting to /app');
-      // Add delay to ensure stable redirect
+      console.log('Auth: Authenticated user on /auth page, redirecting to /app');
       setTimeout(() => {
         navigate("/app", { replace: true });
       }, 100);
@@ -68,6 +74,8 @@ const Auth = () => {
 
     setIsLoading(true);
     try {
+      console.log('Auth: Starting sign in process');
+      
       // Clean up before sign in
       cleanupAuthState();
       
@@ -86,6 +94,7 @@ const Auth = () => {
       if (error) throw error;
 
       if (data.user) {
+        console.log('Auth: Sign in successful, redirecting to /app');
         toast.success("Welcome back!");
         // Force page reload to ensure clean state
         window.location.href = '/app';
@@ -117,6 +126,8 @@ const Auth = () => {
 
     setIsLoading(true);
     try {
+      console.log('Auth: Starting sign up process');
+      
       // Clean up before sign up
       cleanupAuthState();
       
@@ -140,6 +151,7 @@ const Auth = () => {
       if (error) throw error;
 
       if (data.user) {
+        console.log('Auth: Sign up successful');
         toast.success("Account created successfully! Please check your email to confirm your account.");
         // Don't redirect immediately for signup - wait for email confirmation
       }
@@ -155,14 +167,17 @@ const Auth = () => {
     }
   };
 
-  // Show loading while auth state is being determined
-  if (loading) {
+  // Show loading while auth state is being determined, but only if on auth page
+  if (loading && location.pathname === '/auth') {
+    console.log('Auth: Showing loading spinner while auth state loads');
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     );
   }
+
+  console.log('Auth: Rendering auth form');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50 flex flex-col items-center justify-center p-4">
