@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
@@ -6,6 +7,27 @@ import { useAuth } from "@/hooks/useAuth";
 import AuthHeader from "@/components/auth/AuthHeader";
 import AuthForm from "@/components/auth/AuthForm";
 import AuthFooter from "@/components/auth/AuthFooter";
+
+// Cleanup function to remove stale auth data
+const cleanupAuthState = () => {
+  console.log('Auth: Cleaning up auth state');
+  
+  // Remove all Supabase auth keys from localStorage
+  Object.keys(localStorage).forEach((key) => {
+    if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+      console.log('Auth: Removing localStorage key:', key);
+      localStorage.removeItem(key);
+    }
+  });
+  
+  // Remove from sessionStorage if in use
+  Object.keys(sessionStorage || {}).forEach((key) => {
+    if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+      console.log('Auth: Removing sessionStorage key:', key);
+      sessionStorage.removeItem(key);
+    }
+  });
+};
 
 const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -19,20 +41,37 @@ const Auth = () => {
   const location = useLocation();
   const { user } = useAuth();
 
+  // Clean up auth state when component mounts to ensure fresh start
+  useEffect(() => {
+    console.log('Auth: Component mounted, checking for stale auth data');
+    
+    // Only clean up if we're coming to auth page directly (not from a redirect)
+    const hasFromState = location.state?.from;
+    if (!hasFromState) {
+      console.log('Auth: No redirect state, performing auth cleanup');
+      cleanupAuthState();
+      
+      // Force sign out to ensure clean state
+      supabase.auth.signOut({ scope: 'global' }).catch(() => {
+        // Ignore errors during cleanup
+      });
+    }
+  }, [location.state]);
+
   // Only redirect if already logged in
   useEffect(() => {
     if (user) {
-      console.log('User already logged in, checking redirect logic');
+      console.log('Auth: User already logged in, checking redirect logic');
       const from = location.state?.from?.pathname;
       
       // If user came from a protected route, redirect to app
       if (from && !['/auth', '/', '/company', '/about', '/contact', '/privacy'].includes(from)) {
-        console.log('Redirecting logged in user to /app from protected route');
+        console.log('Auth: Redirecting logged in user to /app from protected route');
         navigate("/app");
       } else {
         // If user is logged in and on auth page without coming from protected route,
         // redirect to app (they shouldn't be on auth page when logged in)
-        console.log('Redirecting logged in user to /app');
+        console.log('Auth: Redirecting logged in user to /app');
         navigate("/app");
       }
     }
@@ -55,6 +94,16 @@ const Auth = () => {
 
     setIsLoading(true);
     try {
+      // Clean up before sign in
+      cleanupAuthState();
+      
+      // Attempt global sign out first
+      try {
+        await supabase.auth.signOut({ scope: 'global' });
+      } catch (err) {
+        console.log('Auth: Sign out during sign in cleanup failed (continuing)');
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password,
@@ -64,7 +113,8 @@ const Auth = () => {
 
       if (data.user) {
         toast.success("Welcome back!");
-        navigate("/app");
+        // Force page reload to ensure clean state
+        window.location.href = '/app';
       }
     } catch (error: any) {
       console.error("Sign in error:", error);
@@ -93,6 +143,16 @@ const Auth = () => {
 
     setIsLoading(true);
     try {
+      // Clean up before sign up
+      cleanupAuthState();
+      
+      // Attempt global sign out first
+      try {
+        await supabase.auth.signOut({ scope: 'global' });
+      } catch (err) {
+        console.log('Auth: Sign out during sign up cleanup failed (continuing)');
+      }
+
       const redirectUrl = `${window.location.origin}/app`;
       
       const { data, error } = await supabase.auth.signUp({

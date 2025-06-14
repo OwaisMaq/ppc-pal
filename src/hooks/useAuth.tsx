@@ -25,6 +25,27 @@ export const useAuth = () => {
   return context;
 };
 
+// Cleanup function to remove stale auth data
+const cleanupAuthState = () => {
+  console.log('AuthProvider: Cleaning up auth state');
+  
+  // Remove all Supabase auth keys from localStorage
+  Object.keys(localStorage).forEach((key) => {
+    if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+      console.log('AuthProvider: Removing localStorage key:', key);
+      localStorage.removeItem(key);
+    }
+  });
+  
+  // Remove from sessionStorage if in use
+  Object.keys(sessionStorage || {}).forEach((key) => {
+    if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+      console.log('AuthProvider: Removing sessionStorage key:', key);
+      sessionStorage.removeItem(key);
+    }
+  });
+};
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -57,6 +78,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             }, 100);
           }
         }
+        
+        // Clean up on sign out
+        if (event === 'SIGNED_OUT') {
+          console.log('AuthProvider: User signed out, cleaning up');
+          cleanupAuthState();
+        }
       }
     );
 
@@ -65,15 +92,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.log('AuthProvider: Existing session check:', session?.user?.email || 'No existing session');
       console.log('AuthProvider: Current path during session check:', window.location.pathname);
       
+      // If we find an existing session but we're on a public page and the user
+      // didn't intentionally navigate here, this might be stale data
+      const currentPath = window.location.pathname;
+      const isPublicPage = ['/', '/company', '/about', '/contact', '/privacy'].includes(currentPath);
+      
+      if (session?.user && isPublicPage && currentPath === '/') {
+        console.log('AuthProvider: Found session on public landing page - checking if this is intentional');
+        
+        // Check if there's a recent navigation intent (within last 30 seconds)
+        const lastNavigationTime = sessionStorage.getItem('lastNavigationTime');
+        const now = Date.now();
+        const isRecentNavigation = lastNavigationTime && (now - parseInt(lastNavigationTime)) < 30000;
+        
+        if (!isRecentNavigation) {
+          console.log('AuthProvider: No recent navigation detected, session might be stale');
+          // Don't automatically clean up here, let the user decide
+        }
+      }
+      
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
       
       // Only check subscription status for existing session if not on public page
       if (session?.user) {
-        const currentPath = window.location.pathname;
-        const isPublicPage = ['/', '/company', '/about', '/contact', '/privacy'].includes(currentPath);
-        
         console.log('AuthProvider: Existing session found, current path:', currentPath, 'isPublicPage:', isPublicPage);
         
         if (!isPublicPage) {
@@ -106,13 +149,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signOut = async () => {
     try {
       console.log('AuthProvider: Signing out user');
-      const { error } = await supabase.auth.signOut();
+      
+      // Clean up auth state first
+      cleanupAuthState();
+      
+      const { error } = await supabase.auth.signOut({ scope: 'global' });
       if (error) throw error;
       
       // Force page reload and redirect to public landing
       window.location.href = '/';
     } catch (error) {
       console.error('AuthProvider: Error signing out:', error);
+      // Even if sign out fails, clean up and redirect
+      cleanupAuthState();
+      window.location.href = '/';
     }
   };
 
