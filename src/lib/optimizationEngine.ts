@@ -1,5 +1,7 @@
 import { AdvertisingData } from '@/pages/Index';
 import { OptimizationSuggestion } from './aiService';
+import { generateRecommendations, OptimizationRule } from './optimizationRules';
+import { PERFORMANCE_THRESHOLDS } from './excel/constants';
 
 export const applyOptimizationsPreservingStructure = (data: AdvertisingData, suggestions: OptimizationSuggestion[]): AdvertisingData => {
   const optimizedData = JSON.parse(JSON.stringify(data)); // Deep clone to preserve all original structure
