@@ -47,12 +47,12 @@ serve(async (req) => {
       console.log('Redirect URI:', redirectUri)
 
       const stateParam = `${user.id}_${Date.now()}`
-      const scope = 'advertising::campaign_management'
       
-      // Use the correct Amazon OAuth endpoint
+      // Use the correct Amazon LWA (Login with Amazon) OAuth endpoint
+      // for Amazon Advertising API - this is different from the standard amazon.com OAuth
       const authUrl = `https://www.amazon.com/ap/oa?` +
         `client_id=${encodeURIComponent(clientId)}&` +
-        `scope=${encodeURIComponent(scope)}&` +
+        `scope=advertising%3A%3Acampaign_management&` +
         `response_type=code&` +
         `redirect_uri=${encodeURIComponent(redirectUri)}&` +
         `state=${encodeURIComponent(stateParam)}`
@@ -93,6 +93,7 @@ serve(async (req) => {
           code,
           client_id: clientId,
           client_secret: clientSecret,
+          redirect_uri: redirectUri,
         }),
       })
 
