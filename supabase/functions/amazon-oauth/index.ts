@@ -48,11 +48,11 @@ serve(async (req) => {
 
       const stateParam = `${user.id}_${Date.now()}`
       
-      // Use the correct Amazon Advertising API OAuth endpoint
-      // The correct scope for Amazon Advertising API is advertising:campaign_management
+      // Use the correct Amazon Advertising API OAuth endpoint with the proper scope
+      // Changed from advertising:campaign_management to advertising::campaign_management
       const authUrl = `https://www.amazon.com/ap/oa?` +
         `client_id=${encodeURIComponent(clientId)}&` +
-        `scope=advertising%3Acampaign_management&` +
+        `scope=advertising%3A%3Acampaign_management&` +
         `response_type=code&` +
         `redirect_uri=${encodeURIComponent(redirectUri)}&` +
         `state=${encodeURIComponent(stateParam)}`
