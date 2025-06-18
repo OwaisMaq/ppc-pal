@@ -18,28 +18,33 @@ import Company from "@/pages/Company";
 import NotFound from "@/pages/NotFound";
 import CookieConsent from "@/components/CookieConsent";
 import { useEffect } from "react";
+import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 
 const queryClient = new QueryClient();
 
-const App = () => {
+const AmazonCallbackHandler = () => {
+  const { handleOAuthCallback } = useAmazonConnections();
+
   useEffect(() => {
-    // Handle Amazon OAuth callback
-    const handleAmazonCallback = async () => {
+    const handleCallback = async () => {
       const urlParams = new URLSearchParams(window.location.search);
       const code = urlParams.get('code');
       const state = urlParams.get('state');
       
-      if (code && state && window.location.pathname === '/auth/amazon/callback') {
-        // This would be handled by the useAmazonConnections hook
+      if (code && state) {
         console.log('Amazon OAuth callback received', { code, state });
-        // Redirect to dashboard after handling
-        window.location.href = '/dashboard';
+        await handleOAuthCallback(code, state);
       }
     };
 
-    handleAmazonCallback();
-  }, []);
+    handleCallback();
+  }, [handleOAuthCallback]);
 
+  // Redirect to dashboard after processing
+  return <Navigate to="/dashboard" replace />;
+};
+
+const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
@@ -53,7 +58,7 @@ const App = () => {
               <Route path="/contact" element={<Contact />} />
               <Route path="/company" element={<Company />} />
               <Route path="/auth" element={<Auth />} />
-              <Route path="/auth/amazon/callback" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/auth/amazon/callback" element={<AmazonCallbackHandler />} />
               
               {/* Protected routes */}
               <Route path="/app" element={

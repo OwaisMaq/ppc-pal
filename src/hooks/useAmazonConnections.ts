@@ -36,6 +36,8 @@ export const useAmazonConnections = () => {
 
   const initiateConnection = async (redirectUri: string) => {
     try {
+      console.log('Starting Amazon OAuth flow...');
+      
       // Call edge function to initiate Amazon OAuth
       const { data, error } = await supabase.functions.invoke('amazon-oauth', {
         body: { action: 'initiate', redirectUri },
@@ -44,18 +46,25 @@ export const useAmazonConnections = () => {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Edge function error:', error);
+        throw error;
+      }
+      
+      console.log('OAuth URL generated, redirecting to Amazon...');
       
       // Redirect to Amazon OAuth URL
       window.location.href = data.authUrl;
     } catch (error) {
       console.error('Error initiating connection:', error);
-      toast.error('Failed to initiate Amazon connection');
+      toast.error('Failed to initiate Amazon connection. Please check your API credentials.');
     }
   };
 
   const handleOAuthCallback = async (code: string, state: string) => {
     try {
+      console.log('Processing OAuth callback...');
+      
       const { data, error } = await supabase.functions.invoke('amazon-oauth', {
         body: { action: 'callback', code, state },
         headers: {
@@ -65,7 +74,7 @@ export const useAmazonConnections = () => {
 
       if (error) throw error;
       
-      toast.success('Amazon account connected successfully!');
+      toast.success(`Amazon account connected successfully! Found ${data.profileCount} advertising profiles.`);
       await fetchConnections();
       return data;
     } catch (error) {
@@ -76,6 +85,8 @@ export const useAmazonConnections = () => {
 
   const syncConnection = async (connectionId: string) => {
     try {
+      console.log('Starting data sync for connection:', connectionId);
+      
       const { error } = await supabase.functions.invoke('sync-amazon-data', {
         body: { connectionId },
         headers: {
@@ -85,7 +96,7 @@ export const useAmazonConnections = () => {
 
       if (error) throw error;
       
-      toast.success('Data sync initiated successfully!');
+      toast.success('Campaign data sync started! This may take a few minutes.');
       await fetchConnections();
     } catch (error) {
       console.error('Error syncing connection:', error);
