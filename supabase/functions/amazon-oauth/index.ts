@@ -49,20 +49,24 @@ serve(async (req) => {
 
       const stateParam = `${user.id}_${Date.now()}`
       
-      // Use the correct Amazon Advertising API OAuth endpoint with the proper scope
-      // The correct scope for Amazon Advertising API is advertising:campaign_management (single colon)
+      // TEMPORARY: Use profile scope instead of advertising scope for testing
+      // You need to apply for Amazon Ads API access to use advertising:campaign_management
       const authUrl = `https://www.amazon.com/ap/oa?` +
         `client_id=${encodeURIComponent(clientId)}&` +
-        `scope=advertising%3Acampaign_management&` +
+        `scope=profile&` +
         `response_type=code&` +
         `redirect_uri=${encodeURIComponent(redirectUri)}&` +
         `state=${encodeURIComponent(stateParam)}`
 
       console.log('Generated auth URL for user:', user.id)
       console.log('Full auth URL:', authUrl)
+      console.log('WARNING: Using profile scope instead of advertising scope - you need to apply for Amazon Ads API access')
       
       return new Response(
-        JSON.stringify({ authUrl }),
+        JSON.stringify({ 
+          authUrl,
+          warning: 'Using basic profile scope. You need to apply for Amazon Ads API access for full functionality.'
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -109,62 +113,38 @@ serve(async (req) => {
       const tokenData = await tokenResponse.json()
       console.log('Token exchange successful')
 
-      // Get profile information
-      console.log('Fetching profiles...')
-      const profileResponse = await fetch('https://advertising-api.amazon.com/v2/profiles', {
-        headers: {
-          'Authorization': `Bearer ${tokenData.access_token}`,
-          'Amazon-Advertising-API-ClientId': clientId,
-          'Accept': 'application/json'
-        },
-      })
+      // Since we're using profile scope instead of advertising scope,
+      // we'll store a basic connection without trying to fetch advertising profiles
+      console.log('Creating basic Amazon connection...')
+      
+      const { error: insertError } = await supabase
+        .from('amazon_connections')
+        .upsert({
+          user_id: user.id,
+          profile_id: 'temp_profile_' + Date.now(),
+          profile_name: 'Amazon Profile (Limited Access)',
+          marketplace_id: 'US',
+          access_token: tokenData.access_token,
+          refresh_token: tokenData.refresh_token,
+          token_expires_at: new Date(Date.now() + (tokenData.expires_in * 1000)).toISOString(),
+          status: 'limited', // Mark as limited since we don't have advertising API access
+        }, {
+          onConflict: 'user_id, profile_id'
+        })
 
-      console.log('Profile response status:', profileResponse.status)
-
-      if (!profileResponse.ok) {
-        const errorData = await profileResponse.text()
-        console.error('Profile fetch failed:', errorData)
-        throw new Error(`Failed to fetch profiles: ${errorData}`)
+      if (insertError) {
+        console.error('Error storing connection:', insertError)
+        throw insertError
       }
 
-      const profiles = await profileResponse.json()
-      console.log('Retrieved profiles:', profiles.length)
-
-      if (!profiles || profiles.length === 0) {
-        throw new Error('No advertising profiles found for this account')
-      }
-
-      // Store connection for each profile
-      for (const profile of profiles) {
-        const expiresAt = new Date(Date.now() + (tokenData.expires_in * 1000))
-        
-        console.log('Storing profile:', profile.profileId)
-        
-        const { error: insertError } = await supabase
-          .from('amazon_connections')
-          .upsert({
-            user_id: user.id,
-            profile_id: profile.profileId.toString(),
-            profile_name: profile.accountInfo?.name || `Profile ${profile.profileId}`,
-            marketplace_id: profile.countryCode,
-            access_token: tokenData.access_token,
-            refresh_token: tokenData.refresh_token,
-            token_expires_at: expiresAt.toISOString(),
-            status: 'active',
-          }, {
-            onConflict: 'user_id, profile_id'
-          })
-
-        if (insertError) {
-          console.error('Error storing connection:', insertError)
-          throw insertError
-        }
-      }
-
-      console.log('Successfully stored connections for user:', user.id)
+      console.log('Successfully stored limited connection for user:', user.id)
       
       return new Response(
-        JSON.stringify({ success: true, profileCount: profiles.length }),
+        JSON.stringify({ 
+          success: true, 
+          profileCount: 1,
+          warning: 'Connected with limited access. Apply for Amazon Ads API access for full functionality.'
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
