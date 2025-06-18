@@ -43,17 +43,22 @@ serve(async (req) => {
         throw new Error('Amazon Client ID not configured')
       }
 
+      console.log('Client ID found:', clientId.substring(0, 10) + '...')
+      console.log('Redirect URI:', redirectUri)
+
       const stateParam = `${user.id}_${Date.now()}`
       const scope = 'advertising::campaign_management'
       
+      // Use the correct Amazon OAuth endpoint
       const authUrl = `https://www.amazon.com/ap/oa?` +
-        `client_id=${clientId}&` +
-        `scope=${scope}&` +
+        `client_id=${encodeURIComponent(clientId)}&` +
+        `scope=${encodeURIComponent(scope)}&` +
         `response_type=code&` +
         `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-        `state=${stateParam}`
+        `state=${encodeURIComponent(stateParam)}`
 
       console.log('Generated auth URL for user:', user.id)
+      console.log('Full auth URL:', authUrl)
       
       return new Response(
         JSON.stringify({ authUrl }),
@@ -64,6 +69,8 @@ serve(async (req) => {
     if (action === 'callback') {
       // Handle OAuth callback
       console.log('Processing OAuth callback for user:', user.id)
+      console.log('Received code:', code?.substring(0, 10) + '...')
+      console.log('Received state:', state)
       
       const clientId = Deno.env.get('AMAZON_CLIENT_ID')
       const clientSecret = Deno.env.get('AMAZON_CLIENT_SECRET')
@@ -72,11 +79,14 @@ serve(async (req) => {
         throw new Error('Amazon credentials not configured')
       }
 
+      console.log('Attempting token exchange...')
+
       // Exchange code for tokens
       const tokenResponse = await fetch('https://api.amazon.com/auth/o2/token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json'
         },
         body: new URLSearchParams({
           grant_type: 'authorization_code',
@@ -86,29 +96,47 @@ serve(async (req) => {
         }),
       })
 
+      console.log('Token response status:', tokenResponse.status)
+
       if (!tokenResponse.ok) {
         const errorData = await tokenResponse.text()
         console.error('Token exchange failed:', errorData)
-        throw new Error('Failed to exchange code for tokens')
+        throw new Error(`Failed to exchange code for tokens: ${errorData}`)
       }
 
       const tokenData = await tokenResponse.json()
       console.log('Token exchange successful')
 
       // Get profile information
+      console.log('Fetching profiles...')
       const profileResponse = await fetch('https://advertising-api.amazon.com/v2/profiles', {
         headers: {
           'Authorization': `Bearer ${tokenData.access_token}`,
           'Amazon-Advertising-API-ClientId': clientId,
+          'Accept': 'application/json'
         },
       })
+
+      console.log('Profile response status:', profileResponse.status)
+
+      if (!profileResponse.ok) {
+        const errorData = await profileResponse.text()
+        console.error('Profile fetch failed:', errorData)
+        throw new Error(`Failed to fetch profiles: ${errorData}`)
+      }
 
       const profiles = await profileResponse.json()
       console.log('Retrieved profiles:', profiles.length)
 
+      if (!profiles || profiles.length === 0) {
+        throw new Error('No advertising profiles found for this account')
+      }
+
       // Store connection for each profile
       for (const profile of profiles) {
         const expiresAt = new Date(Date.now() + (tokenData.expires_in * 1000))
+        
+        console.log('Storing profile:', profile.profileId)
         
         const { error: insertError } = await supabase
           .from('amazon_connections')
