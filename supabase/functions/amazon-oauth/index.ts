@@ -48,11 +48,11 @@ serve(async (req) => {
 
       const stateParam = `${user.id}_${Date.now()}`
       
-      // Use the correct Amazon LWA (Login with Amazon) OAuth endpoint
-      // for Amazon Advertising API - this is different from the standard amazon.com OAuth
+      // Use the correct Amazon Advertising API OAuth endpoint
+      // This is different from the standard Login with Amazon endpoint
       const authUrl = `https://www.amazon.com/ap/oa?` +
         `client_id=${encodeURIComponent(clientId)}&` +
-        `scope=advertising%3A%3Acampaign_management&` +
+        `scope=cpc_advertising%3Acampaign_management&` +
         `response_type=code&` +
         `redirect_uri=${encodeURIComponent(redirectUri)}&` +
         `state=${encodeURIComponent(stateParam)}`
@@ -81,7 +81,7 @@ serve(async (req) => {
 
       console.log('Attempting token exchange...')
 
-      // Exchange code for tokens
+      // Exchange code for tokens using the correct Amazon LWA token endpoint
       const tokenResponse = await fetch('https://api.amazon.com/auth/o2/token', {
         method: 'POST',
         headers: {
