@@ -1,4 +1,5 @@
 
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -49,10 +50,10 @@ serve(async (req) => {
       const stateParam = `${user.id}_${Date.now()}`
       
       // Use the correct Amazon Advertising API OAuth endpoint with the proper scope
-      // Changed from advertising:campaign_management to advertising::campaign_management
+      // The correct scope for Amazon Advertising API is advertising:campaign_management (single colon)
       const authUrl = `https://www.amazon.com/ap/oa?` +
         `client_id=${encodeURIComponent(clientId)}&` +
-        `scope=advertising%3A%3Acampaign_management&` +
+        `scope=advertising%3Acampaign_management&` +
         `response_type=code&` +
         `redirect_uri=${encodeURIComponent(redirectUri)}&` +
         `state=${encodeURIComponent(stateParam)}`
@@ -181,3 +182,4 @@ serve(async (req) => {
     )
   }
 })
+
