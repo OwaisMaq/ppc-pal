@@ -147,7 +147,7 @@ serve(async (req) => {
         access_token: tokenData.access_token,
         refresh_token: tokenData.refresh_token || '',
         token_expires_at: new Date(Date.now() + ((tokenData.expires_in || 3600) * 1000)).toISOString(),
-        status: 'limited' as const,
+        status: 'pending' as const, // Changed from 'limited' to 'pending'
       }
 
       console.log('Creating connection record for user:', user.id)

@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAmazonConnections } from '@/hooks/useAmazonConnections';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,10 +12,19 @@ const AmazonCallbackPage = () => {
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
   const [message, setMessage] = useState('Processing your Amazon connection...');
   const [details, setDetails] = useState<string>('');
+  const hasProcessed = useRef(false);
 
   useEffect(() => {
+    // Prevent multiple calls to the callback handler
+    if (hasProcessed.current) {
+      console.log('Callback already processed, skipping...');
+      return;
+    }
+
     const processCallback = async () => {
       try {
+        hasProcessed.current = true;
+        
         const code = searchParams.get('code');
         const state = searchParams.get('state');
         const error = searchParams.get('error');
@@ -68,7 +77,7 @@ const AmazonCallbackPage = () => {
     };
 
     processCallback();
-  }, [searchParams, handleOAuthCallback, navigate]);
+  }, []); // Empty dependency array and useRef to ensure it only runs once
 
   const getIcon = () => {
     switch (status) {
