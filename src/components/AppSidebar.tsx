@@ -25,7 +25,6 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import LogoProcessor from "@/components/LogoProcessor";
 
 const navigationItems = [
   {
@@ -68,11 +67,6 @@ const AppSidebar = () => {
     <Sidebar>
       <SidebarHeader className="p-4">
         <Link to="/dashboard" className="flex items-center gap-3">
-          <LogoProcessor 
-            originalSrc="/lovable-uploads/f599cf68-ce1e-4dc1-9e76-3870678e6772.png"
-            alt="PPC Pal Logo"
-            className="w-10 h-10 rounded-lg object-cover"
-          />
           <span className="text-xl font-bold text-blue-600">PPC Pal</span>
         </Link>
       </SidebarHeader>

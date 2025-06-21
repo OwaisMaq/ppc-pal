@@ -1,4 +1,5 @@
 
+import PerformanceSummary from "@/components/PerformanceSummary";
 import OptimizationDashboard from "@/components/OptimizationDashboard";
 import SubscriptionStatus from "@/components/SubscriptionStatus";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
@@ -7,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Settings, LinkIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import AuthenticatedLayout from "@/components/AuthenticatedLayout";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const Dashboard = () => {
   const { connections } = useAmazonConnections();
@@ -28,7 +30,20 @@ const Dashboard = () => {
           {/* Main Content */}
           <div className="lg:col-span-2">
             {hasActiveConnections ? (
-              <OptimizationDashboard />
+              <Tabs defaultValue="performance" className="space-y-4">
+                <TabsList>
+                  <TabsTrigger value="performance">Performance Summary</TabsTrigger>
+                  <TabsTrigger value="optimization">Optimization</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="performance">
+                  <PerformanceSummary />
+                </TabsContent>
+                
+                <TabsContent value="optimization">
+                  <OptimizationDashboard />
+                </TabsContent>
+              </Tabs>
             ) : (
               <Card>
                 <CardHeader>
