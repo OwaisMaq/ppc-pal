@@ -1,7 +1,6 @@
-
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 
 export const useAuthRedirect = () => {
   const [authTimeout, setAuthTimeout] = useState(false);
