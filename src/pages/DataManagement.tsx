@@ -1,15 +1,17 @@
 
 import React from 'react';
-import DataManagementLayout from '@/components/data-management/DataManagementLayout';
 import DataManagementHeader from '@/components/data-management/DataManagementHeader';
 import DataManagementSections from '@/components/data-management/DataManagementSections';
+import AuthenticatedLayout from '@/components/AuthenticatedLayout';
 
 const DataManagement = () => {
   return (
-    <DataManagementLayout>
-      <DataManagementHeader />
-      <DataManagementSections />
-    </DataManagementLayout>
+    <AuthenticatedLayout>
+      <div className="max-w-4xl space-y-6">
+        <DataManagementHeader />
+        <DataManagementSections />
+      </div>
+    </AuthenticatedLayout>
   );
 };
 

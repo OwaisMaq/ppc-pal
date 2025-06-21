@@ -1,15 +1,14 @@
 
-import Header from "@/components/Header";
 import AmazonAccountSetup from "@/components/AmazonAccountSetup";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Settings as SettingsIcon } from "lucide-react";
+import AuthenticatedLayout from "@/components/AuthenticatedLayout";
 
 const Settings = () => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50">
-      <Header />
-      <div className="container mx-auto py-6 px-4">
-        <div className="mb-8">
+    <AuthenticatedLayout>
+      <div className="space-y-6">
+        <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
             <SettingsIcon className="h-8 w-8 text-blue-600" />
             Settings
@@ -43,7 +42,7 @@ const Settings = () => {
           </div>
         </div>
       </div>
-    </div>
+    </AuthenticatedLayout>
   );
 };
 

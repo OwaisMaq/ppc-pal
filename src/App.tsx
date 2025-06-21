@@ -17,6 +17,11 @@ import Company from './pages/Company';
 import Contact from './pages/Contact';
 import Privacy from './pages/Privacy';
 import NotFound from './pages/NotFound';
+import Trends from './pages/Trends';
+import OptimizationLogs from './pages/OptimizationLogs';
+import KeywordData from './pages/KeywordData';
+import Recommendations from './pages/Recommendations';
+import Reporting from './pages/Reporting';
 
 import Settings from "@/pages/Settings";
 import AmazonCallbackPage from './pages/AmazonCallbackPage';
@@ -44,6 +49,31 @@ function App() {
           <Route path="/settings" element={
             <ProtectedRoute>
               <Settings />
+            </ProtectedRoute>
+          } />
+          <Route path="/trends" element={
+            <ProtectedRoute>
+              <Trends />
+            </ProtectedRoute>
+          } />
+          <Route path="/optimization-logs" element={
+            <ProtectedRoute>
+              <OptimizationLogs />
+            </ProtectedRoute>
+          } />
+          <Route path="/keyword-data" element={
+            <ProtectedRoute>
+              <KeywordData />
+            </ProtectedRoute>
+          } />
+          <Route path="/recommendations" element={
+            <ProtectedRoute>
+              <Recommendations />
+            </ProtectedRoute>
+          } />
+          <Route path="/reporting" element={
+            <ProtectedRoute>
+              <Reporting />
             </ProtectedRoute>
           } />
           <Route path="/data-management" element={
