@@ -3,15 +3,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Zap, TrendingUp, Clock, CheckCircle, AlertCircle, Play } from "lucide-react";
-import { useOptimizationEngine } from "@/hooks/useOptimizationEngine";
+import { useOptimizationDashboard } from "@/hooks/useOptimizationDashboard";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { useEffect, useState } from "react";
-import { OptimizationResult } from "@/lib/amazon/types";
 import { formatDistanceToNow } from "date-fns";
 
 const OptimizationDashboard = () => {
   const { connections } = useAmazonConnections();
-  const { optimizations, loading, runOptimization, fetchOptimizations } = useOptimizationEngine();
+  const { optimizations, loading, runOptimization, fetchOptimizations } = useOptimizationDashboard();
   const [selectedConnection, setSelectedConnection] = useState<string>('');
 
   useEffect(() => {

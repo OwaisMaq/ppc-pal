@@ -1,19 +1,25 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MessageSquare, Star } from 'lucide-react';
+import { MessageSquare } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 
-const FeedbackForm = () => {
+interface FeedbackFormProps {
+  onSuccess?: () => void;
+}
+
+const FeedbackForm = ({ onSuccess }: FeedbackFormProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [feedbackText, setFeedbackText] = useState('');
-  const [rating, setRating] = useState('');
+  const [subject, setSubject] = useState('');
+  const [message, setMessage] = useState('');
   const [feedbackType, setFeedbackType] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -27,7 +33,7 @@ const FeedbackForm = () => {
       return;
     }
 
-    if (!feedbackText || !rating || !feedbackType) {
+    if (!subject || !message || !feedbackType) {
       toast({
         title: "Missing fields",
         description: "Please fill out all fields before submitting.",
@@ -38,29 +44,32 @@ const FeedbackForm = () => {
 
     setIsSubmitting(true);
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('feedback')
-        .insert([
-          {
-            user_id: user.id,
-            feedback_text: feedbackText,
-            rating: parseInt(rating),
-            feedback_type: feedbackType,
-          },
-        ]);
+        .insert({
+          user_id: user.id,
+          subject: subject,
+          message: message,
+          feedback_type: feedbackType,
+          user_email: user.email,
+        });
 
       if (error) {
         throw error;
       }
 
-      setFeedbackText('');
-      setRating('');
+      setSubject('');
+      setMessage('');
       setFeedbackType('');
 
       toast({
         title: "Feedback submitted",
         description: "Thank you for your feedback!",
       });
+
+      if (onSuccess) {
+        onSuccess();
+      }
     } catch (error: any) {
       console.error("Error submitting feedback:", error);
       toast({
@@ -86,28 +95,22 @@ const FeedbackForm = () => {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid w-full gap-2">
-          <Label htmlFor="feedback">Your Feedback</Label>
-          <Textarea
-            id="feedback"
-            placeholder="Tell us what you think..."
-            value={feedbackText}
-            onChange={(e) => setFeedbackText(e.target.value)}
+          <Label htmlFor="subject">Subject</Label>
+          <Input
+            id="subject"
+            placeholder="Brief summary of your feedback..."
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
           />
         </div>
         <div className="grid w-full gap-2">
-          <Label htmlFor="rating">Rating</Label>
-          <Select value={rating} onValueChange={(value) => setRating(value)}>
-            <SelectTrigger id="rating">
-              <SelectValue placeholder="Select a rating" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="1">1 - Poor</SelectItem>
-              <SelectItem value="2">2 - Fair</SelectItem>
-              <SelectItem value="3">3 - Good</SelectItem>
-              <SelectItem value="4">4 - Very Good</SelectItem>
-              <SelectItem value="5">5 - Excellent</SelectItem>
-            </SelectContent>
-          </Select>
+          <Label htmlFor="message">Your Feedback</Label>
+          <Textarea
+            id="message"
+            placeholder="Tell us what you think..."
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+          />
         </div>
         <div className="grid w-full gap-2">
           <Label htmlFor="feedback-type">Feedback Type</Label>
@@ -116,23 +119,15 @@ const FeedbackForm = () => {
               <SelectValue placeholder="Select feedback type" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="bug">Bug Report</SelectItem>
-              <SelectItem value="feature">Feature Request</SelectItem>
+              <SelectItem value="bug_report">Bug Report</SelectItem>
+              <SelectItem value="feature_request">Feature Request</SelectItem>
               <SelectItem value="improvement">Improvement Suggestion</SelectItem>
-              <SelectItem value="other">Other</SelectItem>
+              <SelectItem value="general">General Feedback</SelectItem>
             </SelectContent>
           </Select>
         </div>
         <Button onClick={handleFeedbackSubmit} disabled={isSubmitting} className="w-full">
-          {isSubmitting ? (
-            <>
-              Submitting...
-            </>
-          ) : (
-            <>
-              Submit Feedback
-            </>
-          )}
+          {isSubmitting ? "Submitting..." : "Submit Feedback"}
         </Button>
       </CardContent>
     </Card>

@@ -1,7 +1,9 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { AmazonConnection } from '@/lib/amazon/types';
 
 export const useAmazonConnections = () => {
   const { user } = useAuth();
@@ -27,7 +29,11 @@ export const useAmazonConnections = () => {
       setConnections(data || []);
     } catch (error) {
       console.error('Error fetching connections:', error);
-      toast.error('Failed to load Amazon connections');
+      toast({
+        title: "Error",
+        description: "Failed to load Amazon connections",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -56,7 +62,11 @@ export const useAmazonConnections = () => {
       window.location.href = data.authUrl;
     } catch (error) {
       console.error('Error initiating connection:', error);
-      toast.error('Failed to initiate Amazon connection. Please check your API credentials.');
+      toast({
+        title: "Error",
+        description: "Failed to initiate Amazon connection. Please check your API credentials.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -73,12 +83,19 @@ export const useAmazonConnections = () => {
 
       if (error) throw error;
       
-      toast.success(`Amazon account connected successfully! Found ${data.profileCount} advertising profiles.`);
+      toast({
+        title: "Success",
+        description: `Amazon account connected successfully! Found ${data.profileCount} advertising profiles.`,
+      });
       await fetchConnections();
       return data;
     } catch (error) {
       console.error('Error handling OAuth callback:', error);
-      toast.error('Failed to complete Amazon connection');
+      toast({
+        title: "Error",
+        description: "Failed to complete Amazon connection",
+        variant: "destructive",
+      });
     }
   };
 
@@ -95,11 +112,18 @@ export const useAmazonConnections = () => {
 
       if (error) throw error;
       
-      toast.success('Campaign data sync started! This may take a few minutes.');
+      toast({
+        title: "Success",
+        description: "Campaign data sync started! This may take a few minutes.",
+      });
       await fetchConnections();
     } catch (error) {
       console.error('Error syncing connection:', error);
-      toast.error('Failed to sync Amazon data');
+      toast({
+        title: "Error",
+        description: "Failed to sync Amazon data",
+        variant: "destructive",
+      });
     }
   };
 
@@ -112,11 +136,18 @@ export const useAmazonConnections = () => {
 
       if (error) throw error;
       
-      toast.success('Amazon connection deleted successfully!');
+      toast({
+        title: "Success",
+        description: "Amazon connection deleted successfully!",
+      });
       await fetchConnections();
     } catch (error) {
       console.error('Error deleting connection:', error);
-      toast.error('Failed to delete Amazon connection');
+      toast({
+        title: "Error",
+        description: "Failed to delete Amazon connection",
+        variant: "destructive",
+      });
     }
   };
 

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -23,8 +24,8 @@ const PublicLanding = () => {
   return (
     <div className="relative overflow-hidden">
       <CosmicBackground />
-      <LandingHeader />
-      <LandingHero />
+      <LandingHeader user={user} />
+      <LandingHero user={user} />
       <LandingFeatures />
       <LandingCompanyInfo />
       <LandingFooter />
