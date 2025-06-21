@@ -116,6 +116,71 @@ export type Database = {
         }
         Relationships: []
       }
+      automation_preferences: {
+        Row: {
+          acos_pause_threshold: number
+          auto_bidding_enabled: boolean
+          auto_keywords_enabled: boolean
+          auto_optimization_enabled: boolean
+          auto_pausing_enabled: boolean
+          budget_optimization_enabled: boolean
+          connection_id: string
+          created_at: string
+          id: string
+          last_optimization_run: string | null
+          max_bid_adjustment_percent: number
+          max_budget_increase_percent: number
+          optimization_frequency_hours: number
+          performance_review_days: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          acos_pause_threshold?: number
+          auto_bidding_enabled?: boolean
+          auto_keywords_enabled?: boolean
+          auto_optimization_enabled?: boolean
+          auto_pausing_enabled?: boolean
+          budget_optimization_enabled?: boolean
+          connection_id: string
+          created_at?: string
+          id?: string
+          last_optimization_run?: string | null
+          max_bid_adjustment_percent?: number
+          max_budget_increase_percent?: number
+          optimization_frequency_hours?: number
+          performance_review_days?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          acos_pause_threshold?: number
+          auto_bidding_enabled?: boolean
+          auto_keywords_enabled?: boolean
+          auto_optimization_enabled?: boolean
+          auto_pausing_enabled?: boolean
+          budget_optimization_enabled?: boolean
+          connection_id?: string
+          created_at?: string
+          id?: string
+          last_optimization_run?: string | null
+          max_bid_adjustment_percent?: number
+          max_budget_increase_percent?: number
+          optimization_frequency_hours?: number
+          performance_review_days?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_preferences_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "amazon_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaigns: {
         Row: {
           acos: number | null
