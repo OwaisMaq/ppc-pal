@@ -1,9 +1,13 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DollarSign, TrendingUp, Target, ShoppingCart } from "lucide-react";
+import FilterBar from "@/components/FilterBar";
 
 const PerformanceSummary = () => {
+  const [selectedCountry, setSelectedCountry] = useState("all");
+  const [selectedAsin, setSelectedAsin] = useState("all");
+
   const performanceData = [
     {
       title: "Total Sales",
@@ -39,12 +43,44 @@ const PerformanceSummary = () => {
     }
   ];
 
+  // Function to get filtered description based on selected filters
+  const getFilteredDescription = () => {
+    const parts = [];
+    if (selectedCountry !== "all") {
+      const countryLabels: { [key: string]: string } = {
+        "US": "United States",
+        "CA": "Canada", 
+        "UK": "United Kingdom",
+        "DE": "Germany",
+        "FR": "France",
+        "IT": "Italy",
+        "ES": "Spain",
+        "JP": "Japan",
+        "AU": "Australia"
+      };
+      parts.push(`in ${countryLabels[selectedCountry] || selectedCountry}`);
+    }
+    if (selectedAsin !== "all") {
+      parts.push(`for ${selectedAsin}`);
+    }
+    return parts.length > 0 ? ` ${parts.join(" ")}` : "";
+  };
+
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Performance Summary</h2>
-        <p className="text-gray-600">Overview of your advertising performance metrics</p>
+        <p className="text-gray-600">
+          Overview of your advertising performance metrics{getFilteredDescription()}
+        </p>
       </div>
+
+      <FilterBar
+        selectedCountry={selectedCountry}
+        selectedAsin={selectedAsin}
+        onCountryChange={setSelectedCountry}
+        onAsinChange={setSelectedAsin}
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {performanceData.map((metric) => {
