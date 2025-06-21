@@ -1,6 +1,5 @@
 
 import PerformanceSummary from "@/components/PerformanceSummary";
-import SubscriptionStatus from "@/components/SubscriptionStatus";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import AuthenticatedLayout from "@/components/AuthenticatedLayout";
 
@@ -19,16 +18,8 @@ const Dashboard = () => {
           </p>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Main Content */}
-          <div className="lg:col-span-2">
-            <PerformanceSummary />
-          </div>
-
-          {/* Subscription Status */}
-          <div>
-            <SubscriptionStatus />
-          </div>
+        <div>
+          <PerformanceSummary />
         </div>
       </div>
     </AuthenticatedLayout>
