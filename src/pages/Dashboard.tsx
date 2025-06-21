@@ -1,9 +1,9 @@
 
+
 import PerformanceSummary from "@/components/PerformanceSummary";
-import OptimizationDashboard from "@/components/OptimizationDashboard";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import AuthenticatedLayout from "@/components/AuthenticatedLayout";
-import { BarChart3, Zap } from "lucide-react";
+import { BarChart3 } from "lucide-react";
 
 const Dashboard = () => {
   const { connections } = useAmazonConnections();
@@ -23,13 +23,8 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          <div className="xl:col-span-2">
-            <PerformanceSummary />
-          </div>
-          <div>
-            <OptimizationDashboard />
-          </div>
+        <div>
+          <PerformanceSummary />
         </div>
       </div>
     </AuthenticatedLayout>
@@ -37,3 +32,4 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+
