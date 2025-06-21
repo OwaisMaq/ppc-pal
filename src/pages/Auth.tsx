@@ -45,15 +45,16 @@ const Auth = () => {
   useEffect(() => {
     console.log('Auth: useEffect triggered, loading:', loading, 'user:', user?.email || 'No user', 'pathname:', location.pathname);
     
-    // CRITICAL: Only redirect if:
-    // 1. Auth loading is complete
-    // 2. User is authenticated 
-    // 3. User is specifically on the /auth page (not other pages)
-    // 4. We're not currently loading auth state
-    if (!loading && user && location.pathname === '/auth') {
-      console.log('Auth: Authenticated user on /auth page, redirecting to /app');
-      // Use replace to prevent back button issues
-      navigate("/app", { replace: true });
+    // Wait for auth to finish loading before making any decisions
+    if (loading) {
+      console.log('Auth: Still loading auth state, waiting...');
+      return;
+    }
+    
+    // Only redirect if user is authenticated and specifically on /auth page
+    if (user && location.pathname === '/auth') {
+      console.log('Auth: Authenticated user on /auth page, redirecting to /dashboard');
+      navigate("/dashboard", { replace: true });
     }
   }, [user, loading, navigate, location.pathname]);
 
@@ -94,10 +95,10 @@ const Auth = () => {
       if (error) throw error;
 
       if (data.user) {
-        console.log('Auth: Sign in successful, redirecting to /app');
+        console.log('Auth: Sign in successful, redirecting to /dashboard');
         toast.success("Welcome back!");
-        // Navigate to app after successful sign in
-        navigate("/app", { replace: true });
+        // Navigate to dashboard after successful sign in
+        navigate("/dashboard", { replace: true });
       }
     } catch (error: any) {
       console.error("Sign in error:", error);
@@ -138,7 +139,7 @@ const Auth = () => {
         console.log('Auth: Sign out during sign up cleanup failed (continuing)');
       }
 
-      const redirectUrl = `${window.location.origin}/app`;
+      const redirectUrl = `${window.location.origin}/dashboard`;
       
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,
@@ -167,8 +168,8 @@ const Auth = () => {
     }
   };
 
-  // Show loading only when we're specifically on the auth page and auth is loading
-  if (loading && location.pathname === '/auth') {
+  // Show loading only when auth state is actually loading
+  if (loading) {
     console.log('Auth: Showing loading spinner while auth state loads');
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50 flex items-center justify-center">
@@ -177,7 +178,7 @@ const Auth = () => {
     );
   }
 
-  // If user is authenticated and on auth page, don't render the form (redirect will happen)
+  // If user is authenticated and on auth page, show loading while redirect happens
   if (user && location.pathname === '/auth') {
     console.log('Auth: User authenticated on auth page, showing loading during redirect');
     return (
