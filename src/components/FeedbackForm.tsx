@@ -1,80 +1,75 @@
-import React from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { MessageSquare, Send } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { MessageSquare, Star } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
-const feedbackSchema = z.object({
-  feedback_type: z.string().min(1, 'Please select a feedback type'),
-  subject: z.string().min(1, 'Subject is required').max(100, 'Subject must be less than 100 characters'),
-  message: z.string().min(10, 'Message must be at least 10 characters').max(1000, 'Message must be less than 1000 characters'),
-});
-
-type FeedbackFormData = z.infer<typeof feedbackSchema>;
-
-interface FeedbackFormProps {
-  onSuccess?: () => void;
-}
-
-const FeedbackForm = ({ onSuccess }: FeedbackFormProps) => {
+const FeedbackForm = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  
-  const form = useForm<FeedbackFormData>({
-    resolver: zodResolver(feedbackSchema),
-    defaultValues: {
-      feedback_type: '',
-      subject: '',
-      message: '',
-    },
-  });
+  const [feedbackText, setFeedbackText] = useState('');
+  const [rating, setRating] = useState('');
+  const [feedbackType, setFeedbackType] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const onSubmit = async (data: FeedbackFormData) => {
+  const handleFeedbackSubmit = async () => {
     if (!user) {
       toast({
-        title: "Error",
-        description: "You must be logged in to submit feedback",
+        title: "Not authenticated",
+        description: "You must be logged in to submit feedback.",
         variant: "destructive",
       });
       return;
     }
 
-    try {
-      const { error } = await supabase
-        .from('feedback')
-        .insert({
-          user_id: user.id,
-          user_email: user.email,
-          feedback_type: data.feedback_type,
-          subject: data.subject,
-          message: data.message,
-        });
-
-      if (error) throw error;
-
+    if (!feedbackText || !rating || !feedbackType) {
       toast({
-        title: "Success",
-        description: "Your feedback has been submitted successfully!",
-      });
-
-      form.reset();
-      onSuccess?.();
-    } catch (error) {
-      console.error('Error submitting feedback:', error);
-      toast({
-        title: "Error",
-        description: "Failed to submit feedback. Please try again.",
+        title: "Missing fields",
+        description: "Please fill out all fields before submitting.",
         variant: "destructive",
       });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const { data, error } = await supabase
+        .from('feedback')
+        .insert([
+          {
+            user_id: user.id,
+            feedback_text: feedbackText,
+            rating: parseInt(rating),
+            feedback_type: feedbackType,
+          },
+        ]);
+
+      if (error) {
+        throw error;
+      }
+
+      setFeedbackText('');
+      setRating('');
+      setFeedbackType('');
+
+      toast({
+        title: "Feedback submitted",
+        description: "Thank you for your feedback!",
+      });
+    } catch (error: any) {
+      console.error("Error submitting feedback:", error);
+      toast({
+        title: "Failed to submit",
+        description: error.message || "There was an error submitting your feedback. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -83,90 +78,62 @@ const FeedbackForm = ({ onSuccess }: FeedbackFormProps) => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <MessageSquare className="h-5 w-5" />
-          Submit Feedback
+          Feedback Form
         </CardTitle>
         <CardDescription>
-          Help us improve PPC Pal by sharing your thoughts and suggestions
+          We appreciate your feedback!
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="feedback_type"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Feedback Type</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select feedback type" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="feature_request">Feature Request</SelectItem>
-                      <SelectItem value="bug_report">Bug Report</SelectItem>
-                      <SelectItem value="improvement">Improvement Suggestion</SelectItem>
-                      <SelectItem value="general">General Feedback</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="subject"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Subject</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Brief summary of your feedback" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="message"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Message</FormLabel>
-                  <FormControl>
-                    <Textarea 
-                      placeholder="Describe your feedback in detail..."
-                      className="min-h-[120px]"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <Button 
-              type="submit" 
-              className="w-full"
-              disabled={form.formState.isSubmitting}
-            >
-              {form.formState.isSubmitting ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Submitting...
-                </>
-              ) : (
-                <>
-                  <Send className="h-4 w-4 mr-2" />
-                  Submit Feedback
-                </>
-              )}
-            </Button>
-          </form>
-        </Form>
+      <CardContent className="space-y-4">
+        <div className="grid w-full gap-2">
+          <Label htmlFor="feedback">Your Feedback</Label>
+          <Textarea
+            id="feedback"
+            placeholder="Tell us what you think..."
+            value={feedbackText}
+            onChange={(e) => setFeedbackText(e.target.value)}
+          />
+        </div>
+        <div className="grid w-full gap-2">
+          <Label htmlFor="rating">Rating</Label>
+          <Select value={rating} onValueChange={(value) => setRating(value)}>
+            <SelectTrigger id="rating">
+              <SelectValue placeholder="Select a rating" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">1 - Poor</SelectItem>
+              <SelectItem value="2">2 - Fair</SelectItem>
+              <SelectItem value="3">3 - Good</SelectItem>
+              <SelectItem value="4">4 - Very Good</SelectItem>
+              <SelectItem value="5">5 - Excellent</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid w-full gap-2">
+          <Label htmlFor="feedback-type">Feedback Type</Label>
+          <Select value={feedbackType} onValueChange={(value) => setFeedbackType(value)}>
+            <SelectTrigger id="feedback-type">
+              <SelectValue placeholder="Select feedback type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="bug">Bug Report</SelectItem>
+              <SelectItem value="feature">Feature Request</SelectItem>
+              <SelectItem value="improvement">Improvement Suggestion</SelectItem>
+              <SelectItem value="other">Other</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <Button onClick={handleFeedbackSubmit} disabled={isSubmitting} className="w-full">
+          {isSubmitting ? (
+            <>
+              Submitting...
+            </>
+          ) : (
+            <>
+              Submit Feedback
+            </>
+          )}
+        </Button>
       </CardContent>
     </Card>
   );

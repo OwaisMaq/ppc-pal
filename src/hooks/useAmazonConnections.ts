@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import { AmazonConnection } from '@/lib/amazon/types';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 
 export const useAmazonConnections = () => {
   const { user } = useAuth();
   const [connections, setConnections] = useState<AmazonConnection[]>([]);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (user) {
