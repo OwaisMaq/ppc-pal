@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
@@ -37,16 +36,29 @@ const Auth = () => {
     password: "",
     confirmPassword: ""
   });
+  const [authTimeout, setAuthTimeout] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { user, loading } = useAuth();
+
+  // Timeout fallback to prevent infinite loading
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (loading) {
+        console.log('Auth: Auth loading timeout reached, forcing loading to false');
+        setAuthTimeout(true);
+      }
+    }, 5000); // 5 second timeout
+
+    return () => clearTimeout(timeout);
+  }, [loading]);
 
   // Only redirect authenticated users who are specifically trying to access the auth page
   useEffect(() => {
     console.log('Auth: useEffect triggered, loading:', loading, 'user:', user?.email || 'No user', 'pathname:', location.pathname);
     
-    // Wait for auth to finish loading before making any decisions
-    if (loading) {
+    // Wait for auth to finish loading before making any decisions (unless timeout)
+    if (loading && !authTimeout) {
       console.log('Auth: Still loading auth state, waiting...');
       return;
     }
@@ -56,7 +68,7 @@ const Auth = () => {
       console.log('Auth: Authenticated user on /auth page, redirecting to /dashboard');
       navigate("/dashboard", { replace: true });
     }
-  }, [user, loading, navigate, location.pathname]);
+  }, [user, loading, navigate, location.pathname, authTimeout]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -168,8 +180,8 @@ const Auth = () => {
     }
   };
 
-  // Show loading only when auth state is actually loading
-  if (loading) {
+  // Show loading only when auth state is actually loading and no timeout
+  if (loading && !authTimeout) {
     console.log('Auth: Showing loading spinner while auth state loads');
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50 flex items-center justify-center">

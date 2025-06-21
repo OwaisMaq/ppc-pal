@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -45,13 +46,6 @@ const cleanupAuthState = () => {
   });
 };
 
-// Define protected routes that require authentication
-const PROTECTED_ROUTES = ['/app', '/feedback', '/data-management'];
-
-const isProtectedRoute = (pathname: string) => {
-  return PROTECTED_ROUTES.some(route => pathname.startsWith(route));
-};
-
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -60,15 +54,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     console.log('AuthProvider: Setting up auth state listener');
     
+    let mounted = true;
+    
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         console.log('AuthProvider: Auth event:', event, 'User:', session?.user?.email || 'No user');
         console.log('AuthProvider: Current path:', window.location.pathname);
         
+        if (!mounted) return;
+        
         setSession(session);
         setUser(session?.user ?? null);
-        setLoading(false);
+        setLoading(false); // Always set loading to false when auth state changes
         
         // Clean up on sign out
         if (event === 'SIGNED_OUT') {
@@ -76,27 +74,52 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           cleanupAuthState();
         }
         
-        // CRITICAL: Do NOT check subscription or redirect for any events
-        // Let the components handle their own routing logic
-        console.log('AuthProvider: Auth state updated, no automatic redirects');
+        console.log('AuthProvider: Auth state updated, loading set to false');
       }
     );
 
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('AuthProvider: Existing session check:', session?.user?.email || 'No existing session');
-      console.log('AuthProvider: Current path during session check:', window.location.pathname);
-      
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-      
-      // CRITICAL: Do NOT perform any automatic redirects here
-      console.log('AuthProvider: Session loaded, letting components handle routing');
-    });
+    // THEN check for existing session with proper error handling
+    const checkSession = async () => {
+      try {
+        console.log('AuthProvider: Checking for existing session...');
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('AuthProvider: Error getting session:', error);
+          // Even if there's an error, we should stop loading
+          if (mounted) {
+            setSession(null);
+            setUser(null);
+            setLoading(false);
+          }
+          return;
+        }
+        
+        console.log('AuthProvider: Existing session check result:', session?.user?.email || 'No existing session');
+        console.log('AuthProvider: Current path during session check:', window.location.pathname);
+        
+        if (mounted) {
+          setSession(session);
+          setUser(session?.user ?? null);
+          setLoading(false);
+        }
+        
+        console.log('AuthProvider: Session loaded, loading set to false');
+      } catch (error) {
+        console.error('AuthProvider: Unexpected error during session check:', error);
+        if (mounted) {
+          setSession(null);
+          setUser(null);
+          setLoading(false);
+        }
+      }
+    };
+
+    checkSession();
 
     return () => {
       console.log('AuthProvider: Cleaning up auth state listener');
+      mounted = false;
       subscription.unsubscribe();
     };
   }, []);
