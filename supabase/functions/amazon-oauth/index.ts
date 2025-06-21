@@ -1,5 +1,4 @@
 
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -23,6 +22,7 @@ serve(async (req) => {
     // Get the authorization header
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
+      console.error('No authorization header provided')
       throw new Error('No authorization header')
     }
 
@@ -31,8 +31,11 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token)
     
     if (authError || !user) {
+      console.error('Auth error:', authError)
       throw new Error('Invalid authorization')
     }
+
+    console.log('Processing request for user:', user.id)
 
     const { action, redirectUri, code, state } = await req.json()
     console.log('Amazon OAuth action:', action)
@@ -41,16 +44,16 @@ serve(async (req) => {
       // Generate OAuth URL for Amazon Advertising API
       const clientId = Deno.env.get('AMAZON_CLIENT_ID')
       if (!clientId) {
+        console.error('Amazon Client ID not configured')
         throw new Error('Amazon Client ID not configured')
       }
 
-      console.log('Client ID found:', clientId.substring(0, 10) + '...')
+      console.log('Client ID found, length:', clientId.length)
       console.log('Redirect URI:', redirectUri)
 
       const stateParam = `${user.id}_${Date.now()}`
       
-      // TEMPORARY: Use profile scope instead of advertising scope for testing
-      // You need to apply for Amazon Ads API access to use advertising:campaign_management
+      // Use profile scope for testing since advertising scope requires approval
       const authUrl = `https://www.amazon.com/ap/oa?` +
         `client_id=${encodeURIComponent(clientId)}&` +
         `scope=profile&` +
@@ -59,13 +62,13 @@ serve(async (req) => {
         `state=${encodeURIComponent(stateParam)}`
 
       console.log('Generated auth URL for user:', user.id)
-      console.log('Full auth URL:', authUrl)
-      console.log('WARNING: Using profile scope instead of advertising scope - you need to apply for Amazon Ads API access')
+      console.log('State parameter:', stateParam)
       
       return new Response(
         JSON.stringify({ 
           authUrl,
-          warning: 'Using basic profile scope. You need to apply for Amazon Ads API access for full functionality.'
+          state: stateParam,
+          warning: 'Using basic profile scope. Apply for Amazon Ads API access for full functionality.'
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
@@ -74,75 +77,99 @@ serve(async (req) => {
     if (action === 'callback') {
       // Handle OAuth callback
       console.log('Processing OAuth callback for user:', user.id)
-      console.log('Received code:', code?.substring(0, 10) + '...')
+      console.log('Received code length:', code?.length || 0)
       console.log('Received state:', state)
       
+      if (!code) {
+        console.error('No authorization code received')
+        throw new Error('No authorization code received')
+      }
+
+      if (!state) {
+        console.error('No state parameter received')
+        throw new Error('No state parameter received')
+      }
+
+      // Verify state parameter contains user ID
+      const stateUserId = state.split('_')[0]
+      if (stateUserId !== user.id) {
+        console.error('State parameter user ID mismatch. Expected:', user.id, 'Got:', stateUserId)
+        throw new Error('Invalid state parameter')
+      }
+
       const clientId = Deno.env.get('AMAZON_CLIENT_ID')
       const clientSecret = Deno.env.get('AMAZON_CLIENT_SECRET')
       
       if (!clientId || !clientSecret) {
+        console.error('Amazon credentials not configured')
         throw new Error('Amazon credentials not configured')
       }
 
-      console.log('Attempting token exchange...')
+      console.log('Attempting token exchange with Amazon...')
 
       // Exchange code for tokens using the correct Amazon LWA token endpoint
+      const tokenBody = new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: redirectUri,
+      })
+
+      console.log('Token request body prepared')
+
       const tokenResponse = await fetch('https://api.amazon.com/auth/o2/token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           'Accept': 'application/json'
         },
-        body: new URLSearchParams({
-          grant_type: 'authorization_code',
-          code,
-          client_id: clientId,
-          client_secret: clientSecret,
-          redirect_uri: redirectUri,
-        }),
+        body: tokenBody,
       })
 
       console.log('Token response status:', tokenResponse.status)
 
       if (!tokenResponse.ok) {
-        const errorData = await tokenResponse.text()
-        console.error('Token exchange failed:', errorData)
-        throw new Error(`Failed to exchange code for tokens: ${errorData}`)
+        const errorText = await tokenResponse.text()
+        console.error('Token exchange failed:', errorText)
+        throw new Error(`Failed to exchange code for tokens: ${errorText}`)
       }
 
       const tokenData = await tokenResponse.json()
-      console.log('Token exchange successful')
+      console.log('Token exchange successful, token type:', tokenData.token_type)
 
-      // Since we're using profile scope instead of advertising scope,
-      // we'll store a basic connection without trying to fetch advertising profiles
-      console.log('Creating basic Amazon connection...')
-      
-      const { error: insertError } = await supabase
+      // Create connection record
+      const connectionData = {
+        user_id: user.id,
+        profile_id: 'basic_profile_' + Date.now(),
+        profile_name: 'Amazon Profile (Basic Access)',
+        marketplace_id: 'US',
+        access_token: tokenData.access_token,
+        refresh_token: tokenData.refresh_token || '',
+        token_expires_at: new Date(Date.now() + ((tokenData.expires_in || 3600) * 1000)).toISOString(),
+        status: 'limited' as const,
+      }
+
+      console.log('Creating connection record for user:', user.id)
+
+      const { data: insertedConnection, error: insertError } = await supabase
         .from('amazon_connections')
-        .upsert({
-          user_id: user.id,
-          profile_id: 'temp_profile_' + Date.now(),
-          profile_name: 'Amazon Profile (Limited Access)',
-          marketplace_id: 'US',
-          access_token: tokenData.access_token,
-          refresh_token: tokenData.refresh_token,
-          token_expires_at: new Date(Date.now() + (tokenData.expires_in * 1000)).toISOString(),
-          status: 'limited', // Mark as limited since we don't have advertising API access
-        }, {
-          onConflict: 'user_id, profile_id'
-        })
+        .insert(connectionData)
+        .select()
+        .single()
 
       if (insertError) {
         console.error('Error storing connection:', insertError)
-        throw insertError
+        throw new Error(`Failed to store connection: ${insertError.message}`)
       }
 
-      console.log('Successfully stored limited connection for user:', user.id)
+      console.log('Successfully stored connection with ID:', insertedConnection.id)
       
       return new Response(
         JSON.stringify({ 
           success: true, 
           profileCount: 1,
+          connectionId: insertedConnection.id,
           warning: 'Connected with limited access. Apply for Amazon Ads API access for full functionality.'
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -154,7 +181,10 @@ serve(async (req) => {
   } catch (error) {
     console.error('Amazon OAuth error:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        details: 'Check edge function logs for more information'
+      }),
       { 
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -162,4 +192,3 @@ serve(async (req) => {
     )
   }
 })
-

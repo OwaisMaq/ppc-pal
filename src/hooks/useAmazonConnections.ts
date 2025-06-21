@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -13,6 +12,7 @@ export const useAmazonConnections = () => {
 
   useEffect(() => {
     if (user) {
+      console.log('Fetching connections for user:', user.id);
       fetchConnections();
     }
   }, [user]);
@@ -20,12 +20,19 @@ export const useAmazonConnections = () => {
   const fetchConnections = async () => {
     try {
       setLoading(true);
+      console.log('Fetching Amazon connections...');
+      
       const { data, error } = await supabase
         .from('amazon_connections')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching connections:', error);
+        throw error;
+      }
+      
+      console.log('Fetched connections:', data?.length || 0, 'connections');
       setConnections(data || []);
     } catch (error) {
       console.error('Error fetching connections:', error);
@@ -41,13 +48,20 @@ export const useAmazonConnections = () => {
 
   const initiateConnection = async (redirectUri: string) => {
     try {
-      console.log('Starting Amazon OAuth flow...');
+      console.log('Starting Amazon OAuth flow with redirect URI:', redirectUri);
       
+      const session = await supabase.auth.getSession();
+      if (!session.data.session?.access_token) {
+        throw new Error('No valid session found');
+      }
+
+      console.log('Session validated, calling edge function...');
+
       // Call edge function to initiate Amazon OAuth
       const { data, error } = await supabase.functions.invoke('amazon-oauth', {
         body: { action: 'initiate', redirectUri },
         headers: {
-          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+          Authorization: `Bearer ${session.data.session.access_token}`,
         },
       });
 
@@ -56,7 +70,8 @@ export const useAmazonConnections = () => {
         throw error;
       }
       
-      console.log('OAuth URL generated, redirecting to Amazon...');
+      console.log('OAuth URL generated successfully');
+      console.log('Redirecting to Amazon...');
       
       // Redirect to Amazon OAuth URL
       window.location.href = data.authUrl;
@@ -73,20 +88,41 @@ export const useAmazonConnections = () => {
   const handleOAuthCallback = async (code: string, state: string) => {
     try {
       console.log('Processing OAuth callback...');
-      
+      console.log('Code length:', code.length);
+      console.log('State:', state);
+
+      const session = await supabase.auth.getSession();
+      if (!session.data.session?.access_token) {
+        throw new Error('No valid session found');
+      }
+
+      console.log('Session validated, calling callback edge function...');
+
       const { data, error } = await supabase.functions.invoke('amazon-oauth', {
-        body: { action: 'callback', code, state },
+        body: { 
+          action: 'callback', 
+          code, 
+          state,
+          redirectUri: `${window.location.origin}/auth/amazon/callback`
+        },
         headers: {
-          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+          Authorization: `Bearer ${session.data.session.access_token}`,
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Callback edge function error:', error);
+        throw error;
+      }
+      
+      console.log('Callback processed successfully:', data);
       
       toast({
         title: "Success",
-        description: `Amazon account connected successfully! Found ${data.profileCount} advertising profiles.`,
+        description: data.warning || `Amazon account connected successfully! Found ${data.profileCount} advertising profiles.`,
       });
+      
+      // Refresh connections
       await fetchConnections();
       return data;
     } catch (error) {
@@ -96,6 +132,7 @@ export const useAmazonConnections = () => {
         description: "Failed to complete Amazon connection",
         variant: "destructive",
       });
+      throw error;
     }
   };
 
