@@ -1,14 +1,20 @@
+
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { AmazonConnection } from '@/lib/amazon/types';
+import { amazonConnectionService } from '@/services/amazonConnectionService';
+import { useAmazonOAuth } from './useAmazonOAuth';
+import { useConnectionOperations } from './useConnectionOperations';
 
 export const useAmazonConnections = () => {
   const { user } = useAuth();
   const [connections, setConnections] = useState<AmazonConnection[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  
+  const { initiateConnection, handleOAuthCallback } = useAmazonOAuth();
+  const { syncConnection: syncConnectionOp, deleteConnection: deleteConnectionOp } = useConnectionOperations();
 
   useEffect(() => {
     if (user) {
@@ -20,20 +26,8 @@ export const useAmazonConnections = () => {
   const fetchConnections = async () => {
     try {
       setLoading(true);
-      console.log('Fetching Amazon connections...');
-      
-      const { data, error } = await supabase
-        .from('amazon_connections')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching connections:', error);
-        throw error;
-      }
-      
-      console.log('Fetched connections:', data?.length || 0, 'connections');
-      setConnections(data || []);
+      const data = await amazonConnectionService.fetchConnections();
+      setConnections(data);
     } catch (error) {
       console.error('Error fetching connections:', error);
       toast({
@@ -46,146 +40,12 @@ export const useAmazonConnections = () => {
     }
   };
 
-  const initiateConnection = async (redirectUri: string) => {
-    try {
-      console.log('Starting Amazon OAuth flow with redirect URI:', redirectUri);
-      
-      const session = await supabase.auth.getSession();
-      if (!session.data.session?.access_token) {
-        throw new Error('No valid session found');
-      }
-
-      console.log('Session validated, calling edge function...');
-
-      // Call edge function to initiate Amazon OAuth
-      const { data, error } = await supabase.functions.invoke('amazon-oauth', {
-        body: { action: 'initiate', redirectUri },
-        headers: {
-          Authorization: `Bearer ${session.data.session.access_token}`,
-        },
-      });
-
-      if (error) {
-        console.error('Edge function error:', error);
-        throw error;
-      }
-      
-      console.log('OAuth URL generated successfully');
-      console.log('Redirecting to Amazon...');
-      
-      // Redirect to Amazon OAuth URL
-      window.location.href = data.authUrl;
-    } catch (error) {
-      console.error('Error initiating connection:', error);
-      toast({
-        title: "Error",
-        description: "Failed to initiate Amazon connection. Please check your API credentials.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleOAuthCallback = async (code: string, state: string) => {
-    try {
-      console.log('Processing OAuth callback...');
-      console.log('Code length:', code.length);
-      console.log('State:', state);
-
-      const session = await supabase.auth.getSession();
-      if (!session.data.session?.access_token) {
-        throw new Error('No valid session found');
-      }
-
-      console.log('Session validated, calling callback edge function...');
-
-      const { data, error } = await supabase.functions.invoke('amazon-oauth', {
-        body: { 
-          action: 'callback', 
-          code, 
-          state,
-          redirectUri: `${window.location.origin}/auth/amazon/callback`
-        },
-        headers: {
-          Authorization: `Bearer ${session.data.session.access_token}`,
-        },
-      });
-
-      if (error) {
-        console.error('Callback edge function error:', error);
-        throw error;
-      }
-      
-      console.log('Callback processed successfully:', data);
-      
-      toast({
-        title: "Success",
-        description: data.warning || `Amazon account connected successfully! Found ${data.profileCount} advertising profiles.`,
-      });
-      
-      // Refresh connections
-      await fetchConnections();
-      return data;
-    } catch (error) {
-      console.error('Error handling OAuth callback:', error);
-      toast({
-        title: "Error",
-        description: "Failed to complete Amazon connection",
-        variant: "destructive",
-      });
-      throw error;
-    }
-  };
-
   const syncConnection = async (connectionId: string) => {
-    try {
-      console.log('Starting data sync for connection:', connectionId);
-      
-      const { error } = await supabase.functions.invoke('sync-amazon-data', {
-        body: { connectionId },
-        headers: {
-          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-        },
-      });
-
-      if (error) throw error;
-      
-      toast({
-        title: "Success",
-        description: "Campaign data sync started! This may take a few minutes.",
-      });
-      await fetchConnections();
-    } catch (error) {
-      console.error('Error syncing connection:', error);
-      toast({
-        title: "Error",
-        description: "Failed to sync Amazon data",
-        variant: "destructive",
-      });
-    }
+    await syncConnectionOp(connectionId, fetchConnections);
   };
 
   const deleteConnection = async (connectionId: string) => {
-    try {
-      const { error } = await supabase
-        .from('amazon_connections')
-        .delete()
-        .eq('id', connectionId);
-
-      if (error) throw error;
-      
-      toast({
-        title: "Success",
-        description: "Amazon connection deleted successfully!",
-      });
-      await fetchConnections();
-    } catch (error) {
-      console.error('Error deleting connection:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete Amazon connection",
-        variant: "destructive",
-      });
-    }
+    await deleteConnectionOp(connectionId, fetchConnections);
   };
 
   return {
