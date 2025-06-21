@@ -1,97 +1,64 @@
-import { Toaster } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider } from "@/hooks/useAuth";
-import ProtectedRoute from "@/components/ProtectedRoute";
-import Auth from "@/pages/Auth";
-import Dashboard from "@/pages/Dashboard";
-import Feedback from "@/pages/Feedback";
-import DataManagement from "@/pages/DataManagement";
-import Privacy from "@/pages/Privacy";
-import PublicLanding from "@/pages/PublicLanding";
-import About from "@/pages/About";
-import Contact from "@/pages/Contact";
-import Company from "@/pages/Company";
-import NotFound from "@/pages/NotFound";
-import CookieConsent from "@/components/CookieConsent";
-import { useEffect } from "react";
-import { useAmazonConnections } from "@/hooks/useAmazonConnections";
+import './App.css';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+} from "react-router-dom";
+import PublicLanding from './pages/PublicLanding';
+import Auth from './pages/Auth';
+import Dashboard from './pages/Dashboard';
+import ProtectedRoute from './components/ProtectedRoute';
+import DataManagement from './pages/DataManagement';
+import Feedback from './pages/Feedback';
+import About from './pages/About';
+import Company from './pages/Company';
+import Contact from './pages/Contact';
+import Privacy from './pages/Privacy';
+import NotFound from './pages/NotFound';
 
-const queryClient = new QueryClient();
+import Settings from "@/pages/Settings";
+import AmazonCallbackPage from './pages/AmazonCallbackPage';
 
-const AmazonCallbackHandler = () => {
-  const { handleOAuthCallback } = useAmazonConnections();
-
-  useEffect(() => {
-    const handleCallback = async () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const code = urlParams.get('code');
-      const state = urlParams.get('state');
-      
-      if (code && state) {
-        console.log('Amazon OAuth callback received', { code, state });
-        await handleOAuthCallback(code, state);
-      }
-    };
-
-    handleCallback();
-  }, [handleOAuthCallback]);
-
-  // Redirect to dashboard after processing
-  return <Navigate to="/dashboard" replace />;
-};
-
-const App = () => {
+function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <BrowserRouter>
-            <Routes>
-              {/* Public routes */}
-              <Route path="/" element={<PublicLanding />} />
-              <Route path="/about" element={<About />} />
-              <Route path="/contact" element={<Contact />} />
-              <Route path="/company" element={<Company />} />
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/auth/amazon/callback" element={<AmazonCallbackHandler />} />
-              
-              {/* Protected routes */}
-              <Route path="/dashboard" element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              } />
-              <Route path="/feedback" element={
-                <ProtectedRoute>
-                  <Feedback />
-                </ProtectedRoute>
-              } />
-              <Route path="/data-management" element={
-                <ProtectedRoute>
-                  <DataManagement />
-                </ProtectedRoute>
-              } />
-              <Route path="/privacy" element={
-                <ProtectedRoute>
-                  <Privacy />
-                </ProtectedRoute>
-              } />
-              
-              {/* Redirect /app to /dashboard for backward compatibility */}
-              <Route path="/app" element={<Navigate to="/dashboard" replace />} />
-              
-              {/* 404 */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-          <CookieConsent />
-        </TooltipProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+    <Router>
+        <Routes>
+          {/* Public routes */}
+          <Route path="/" element={<PublicLanding />} />
+          <Route path="/auth" element={<Auth />} />
+          <Route path="/auth/amazon/callback" element={<AmazonCallbackPage />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/company" element={<Company />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/privacy" element={<Privacy />} />
+          
+          {/* Protected routes */}
+          <Route path="/dashboard" element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/settings" element={
+            <ProtectedRoute>
+              <Settings />
+            </ProtectedRoute>
+          } />
+          <Route path="/data-management" element={
+            <ProtectedRoute>
+              <DataManagement />
+            </ProtectedRoute>
+          } />
+          <Route path="/feedback" element={
+            <ProtectedRoute>
+              <Feedback />
+            </ProtectedRoute>
+          } />
+          
+          {/* Catch all route */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+    </Router>
   );
-};
+}
 
 export default App;

@@ -1,103 +1,90 @@
-
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { useSubscription } from "@/hooks/useSubscription";
-import { LogOut, User, Crown, LinkIcon, MessageSquare, Bot, Shield, Database } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
-import ComingSoon from "@/components/ComingSoon";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { LogOut } from "lucide-react";
 
 const Header = () => {
   const { user, signOut } = useAuth();
-  const { subscription, loading } = useSubscription();
-  const location = useLocation();
-
-  if (!user) return null;
 
   return (
-    <header className="bg-white border-b border-gray-200 px-4 py-3">
-      <div className="container mx-auto flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link to="/dashboard" className="flex items-center">
-            <div className="bg-blue-600 rounded-full p-2">
-              <Bot className="h-6 w-6 text-white" />
-            </div>
-          </Link>
-          
-          <div className="flex items-center gap-2">
-            <User className="h-5 w-5 text-gray-500" />
-            <span className="text-sm text-gray-700">{user.email}</span>
-          </div>
-          
-          {!loading && subscription && (
-            <Badge 
-              variant={subscription.plan_type === 'pro' ? 'default' : 'outline'}
-              className={subscription.plan_type === 'pro' ? 'bg-yellow-500 hover:bg-yellow-600' : ''}
-            >
-              {subscription.plan_type === 'pro' && <Crown className="h-3 w-3 mr-1" />}
-              {subscription.plan_type === 'pro' ? 'Pro Plan' : 'Free Plan'}
-            </Badge>
-          )}
-        </div>
-        
-        <div className="flex items-center gap-4">
-          {/* Navigation Links */}
-          <nav className="flex items-center gap-2">
-            <Link 
-              to="/feedback"
-              className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
-                location.pathname === '/feedback' 
-                  ? 'bg-blue-100 text-blue-700' 
-                  : 'text-gray-600 hover:text-blue-600 hover:bg-gray-100'
-              }`}
-            >
-              <MessageSquare className="h-4 w-4" />
-              Give us Feedback!
-            </Link>
-            
-            <Link 
-              to="/data-management"
-              className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
-                location.pathname === '/data-management' 
-                  ? 'bg-blue-100 text-blue-700' 
-                  : 'text-gray-600 hover:text-blue-600 hover:bg-gray-100'
-              }`}
-            >
-              <Database className="h-4 w-4" />
-              My Data
-            </Link>
-            
-            <Link 
-              to="/privacy"
-              className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
-                location.pathname === '/privacy' 
-                  ? 'bg-blue-100 text-blue-700' 
-                  : 'text-gray-600 hover:text-blue-600 hover:bg-gray-100'
-              }`}
-            >
-              <Shield className="h-4 w-4" />
-              Privacy
-            </Link>
-          </nav>
+    <header className="bg-white shadow-md">
+      <div className="container mx-auto py-4 px-6 flex items-center justify-between">
+        <Link to="/" className="text-2xl font-bold text-blue-600">
+          PPC Pal
+        </Link>
 
-          {/* Coming Soon Features */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1">
-              <LinkIcon className="h-4 w-4 text-muted-foreground" />
-              <ComingSoon feature="Account Sync" className="text-xs" />
-            </div>
-          </div>
-          
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={signOut}
-            className="flex items-center gap-2"
-          >
-            <LogOut className="h-4 w-4" />
-            Sign Out
-          </Button>
-        </div>
+        <nav>
+          <ul className="flex items-center space-x-6">
+            {user ? (
+              <div className="flex items-center space-x-4">
+                <Link
+                  to="/dashboard"
+                  className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                >
+                  Dashboard
+                </Link>
+                <Link
+                  to="/settings"
+                  className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                >
+                  Settings
+                </Link>
+                <Link
+                  to="/feedback"
+                  className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                >
+                  Feedback
+                </Link>
+                
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="h-8 w-8 rounded-full">
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={user.user_metadata?.avatar_url} alt={user.email || "Avatar"} />
+                        <AvatarFallback>{user.email?.charAt(0).toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-56" align="end" forceMount>
+                    <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem>
+                      <Link to="/data-management" className="w-full h-full block">
+                        Data Management
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={signOut} className="cursor-pointer">
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Log out</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            ) : (
+              <>
+                <li>
+                  <Link
+                    to="/auth"
+                    className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                  >
+                    Sign In
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/auth"
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                  >
+                    Sign Up
+                  </Link>
+                </li>
+              </>
+            )}
+          </ul>
+        </nav>
       </div>
     </header>
   );

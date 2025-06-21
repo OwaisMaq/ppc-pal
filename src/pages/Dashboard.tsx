@@ -1,9 +1,12 @@
 
 import Header from "@/components/Header";
-import AmazonAccountSetup from "@/components/AmazonAccountSetup";
 import OptimizationDashboard from "@/components/OptimizationDashboard";
 import SubscriptionStatus from "@/components/SubscriptionStatus";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Settings, LinkIcon } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const Dashboard = () => {
   const { connections } = useAmazonConnections();
@@ -18,27 +21,45 @@ const Dashboard = () => {
             PPC Automation Dashboard
           </h1>
           <p className="text-gray-600">
-            Connect your Amazon Advertising accounts and let AI optimize your campaigns automatically
+            Monitor and optimize your Amazon Advertising campaigns with AI
           </p>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
-          {/* Account Setup */}
+          {/* Main Content */}
           <div className="lg:col-span-2">
-            <AmazonAccountSetup />
+            {hasActiveConnections ? (
+              <OptimizationDashboard />
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <LinkIcon className="h-5 w-5 text-blue-600" />
+                    Get Started
+                  </CardTitle>
+                  <CardDescription>
+                    Connect your Amazon Advertising account to begin optimization
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="text-center py-8">
+                  <p className="text-gray-500 mb-6">
+                    To start optimizing your campaigns, you'll need to connect your Amazon Advertising account first.
+                  </p>
+                  <Link to="/settings">
+                    <Button className="bg-blue-600 hover:bg-blue-700">
+                      <Settings className="h-4 w-4 mr-2" />
+                      Go to Settings
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Subscription Status */}
           <div>
             <SubscriptionStatus />
           </div>
-
-          {/* Optimization Dashboard - Full Width */}
-          {hasActiveConnections && (
-            <div className="lg:col-span-3">
-              <OptimizationDashboard />
-            </div>
-          )}
         </div>
       </div>
     </div>
