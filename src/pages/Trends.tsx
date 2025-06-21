@@ -51,13 +51,13 @@ const Trends = () => {
 
   return (
     <AuthenticatedLayout>
-      <div className="space-y-6">
+      <div className="space-y-4 md:space-y-6 p-2 md:p-0">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
-            <TrendingUp className="h-8 w-8 text-blue-600" />
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2 flex items-center gap-2 md:gap-3">
+            <TrendingUp className="h-6 w-6 md:h-8 md:w-8 text-blue-600" />
             Trends
           </h1>
-          <p className="text-gray-600">
+          <p className="text-sm md:text-base text-gray-600">
             Analyze performance trends and identify patterns in your campaigns{getFilteredDescription()}
           </p>
         </div>
@@ -70,20 +70,20 @@ const Trends = () => {
         />
 
         {/* Performance Overview Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
           {performanceMetrics.map((metric) => {
             const Icon = metric.icon;
             return (
-              <Card key={metric.title}>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-gray-600">
+              <Card key={metric.title} className="h-full">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-3 md:px-6 pt-3 md:pt-6">
+                  <CardTitle className="text-xs md:text-sm font-medium text-gray-600 leading-tight">
                     {metric.title}
                   </CardTitle>
-                  <Icon className="h-5 w-5 text-blue-600" />
+                  <Icon className="h-4 w-4 md:h-5 md:w-5 text-blue-600 flex-shrink-0" />
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-gray-900">{metric.value}</div>
-                  <p className={`text-sm font-medium ${metric.color}`}>
+                <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
+                  <div className="text-lg md:text-2xl font-bold text-gray-900">{metric.value}</div>
+                  <p className={`text-xs md:text-sm font-medium ${metric.color} leading-tight`}>
                     {metric.description}
                   </p>
                 </CardContent>
@@ -93,20 +93,35 @@ const Trends = () => {
         </div>
 
         {/* Sales and Spend Trends */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Sales & Spend Trends</CardTitle>
-              <CardDescription>Monthly performance over the last 6 months</CardDescription>
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6">
+          <Card className="h-full">
+            <CardHeader className="px-3 md:px-6 pt-3 md:pt-6">
+              <CardTitle className="text-base md:text-lg">Sales & Spend Trends</CardTitle>
+              <CardDescription className="text-xs md:text-sm">Monthly performance over the last 6 months</CardDescription>
             </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={monthlyTrends}>
+            <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
+              <ResponsiveContainer width="100%" height={250} className="md:h-[300px]">
+                <LineChart data={monthlyTrends} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip formatter={(value, name) => [`$${value.toLocaleString()}`, name]} />
-                  <Legend />
+                  <XAxis 
+                    dataKey="month" 
+                    fontSize={10}
+                    className="md:text-xs"
+                    tick={{ fontSize: 10 }}
+                  />
+                  <YAxis 
+                    fontSize={10}
+                    className="md:text-xs"
+                    tick={{ fontSize: 10 }}
+                  />
+                  <Tooltip 
+                    formatter={(value, name) => [`$${value.toLocaleString()}`, name]}
+                    labelStyle={{ fontSize: '12px' }}
+                    contentStyle={{ fontSize: '12px' }}
+                  />
+                  <Legend 
+                    wrapperStyle={{ fontSize: '12px' }}
+                  />
                   <Line type="monotone" dataKey="sales" stroke="#10b981" strokeWidth={2} name="Sales" />
                   <Line type="monotone" dataKey="spend" stroke="#ef4444" strokeWidth={2} name="Spend" />
                 </LineChart>
@@ -114,18 +129,31 @@ const Trends = () => {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Profit Trends</CardTitle>
-              <CardDescription>Monthly profit after ad costs</CardDescription>
+          <Card className="h-full">
+            <CardHeader className="px-3 md:px-6 pt-3 md:pt-6">
+              <CardTitle className="text-base md:text-lg">Profit Trends</CardTitle>
+              <CardDescription className="text-xs md:text-sm">Monthly profit after ad costs</CardDescription>
             </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={monthlyTrends}>
+            <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
+              <ResponsiveContainer width="100%" height={250} className="md:h-[300px]">
+                <BarChart data={monthlyTrends} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, 'Profit']} />
+                  <XAxis 
+                    dataKey="month" 
+                    fontSize={10}
+                    className="md:text-xs"
+                    tick={{ fontSize: 10 }}
+                  />
+                  <YAxis 
+                    fontSize={10}
+                    className="md:text-xs"
+                    tick={{ fontSize: 10 }}
+                  />
+                  <Tooltip 
+                    formatter={(value) => [`$${value.toLocaleString()}`, 'Profit']}
+                    labelStyle={{ fontSize: '12px' }}
+                    contentStyle={{ fontSize: '12px' }}
+                  />
                   <Bar dataKey="profit" fill="#3b82f6" />
                 </BarChart>
               </ResponsiveContainer>
@@ -135,24 +163,44 @@ const Trends = () => {
 
         {/* ROAS and ACOS Trends */}
         <Card>
-          <CardHeader>
-            <CardTitle>Efficiency Metrics</CardTitle>
-            <CardDescription>ROAS and ACOS trends over time</CardDescription>
+          <CardHeader className="px-3 md:px-6 pt-3 md:pt-6">
+            <CardTitle className="text-base md:text-lg">Efficiency Metrics</CardTitle>
+            <CardDescription className="text-xs md:text-sm">ROAS and ACOS trends over time</CardDescription>
           </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={400}>
-              <LineChart data={monthlyTrends}>
+          <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
+            <ResponsiveContainer width="100%" height={300} className="md:h-[400px]">
+              <LineChart data={monthlyTrends} margin={{ top: 5, right: 30, left: 5, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis yAxisId="left" />
-                <YAxis yAxisId="right" orientation="right" />
+                <XAxis 
+                  dataKey="month" 
+                  fontSize={10}
+                  className="md:text-xs"
+                  tick={{ fontSize: 10 }}
+                />
+                <YAxis 
+                  yAxisId="left" 
+                  fontSize={10}
+                  className="md:text-xs"
+                  tick={{ fontSize: 10 }}
+                />
+                <YAxis 
+                  yAxisId="right" 
+                  orientation="right" 
+                  fontSize={10}
+                  className="md:text-xs"
+                  tick={{ fontSize: 10 }}
+                />
                 <Tooltip 
                   formatter={(value, name) => [
                     name === 'ACOS' ? `${value}%` : `${value}x`,
                     name
-                  ]} 
+                  ]}
+                  labelStyle={{ fontSize: '12px' }}
+                  contentStyle={{ fontSize: '12px' }}
                 />
-                <Legend />
+                <Legend 
+                  wrapperStyle={{ fontSize: '12px' }}
+                />
                 <Line 
                   yAxisId="left" 
                   type="monotone" 
