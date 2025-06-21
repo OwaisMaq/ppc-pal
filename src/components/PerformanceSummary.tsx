@@ -2,46 +2,17 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DollarSign, TrendingUp, Target, ShoppingCart } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle, Loader2 } from "lucide-react";
 import FilterBar from "@/components/FilterBar";
+import { usePerformanceData } from "@/hooks/usePerformanceData";
+import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 
 const PerformanceSummary = () => {
   const [selectedCountry, setSelectedCountry] = useState("all");
   const [selectedAsin, setSelectedAsin] = useState("all");
-
-  const performanceData = [
-    {
-      title: "Total Sales",
-      value: "$124,850",
-      change: "+12.5%",
-      changeType: "increase" as const,
-      icon: ShoppingCart,
-      description: "Revenue from all campaigns"
-    },
-    {
-      title: "Total Ad Spend",
-      value: "$28,420",
-      change: "-3.2%",
-      changeType: "decrease" as const,
-      icon: DollarSign,
-      description: "Amount spent on advertising"
-    },
-    {
-      title: "Total Ad Profit",
-      value: "$96,430",
-      change: "+18.7%",
-      changeType: "increase" as const,
-      icon: TrendingUp,
-      description: "Profit after ad costs"
-    },
-    {
-      title: "Cost per Unit Sold",
-      value: "$8.45",
-      change: "-5.8%",
-      changeType: "decrease" as const,
-      icon: Target,
-      description: "Average cost per unit"
-    }
-  ];
+  const { connections } = useAmazonConnections();
+  const { metrics, loading, hasData } = usePerformanceData();
 
   // Function to get filtered description based on selected filters
   const getFilteredDescription = () => {
@@ -65,6 +36,102 @@ const PerformanceSummary = () => {
     }
     return parts.length > 0 ? ` ${parts.join(" ")}` : "";
   };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(value);
+  };
+
+  const formatPercentage = (value: number) => {
+    return `${value.toFixed(1)}%`;
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Performance Summary</h2>
+          <p className="text-gray-600">Loading your advertising performance metrics...</p>
+        </div>
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!hasData) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Performance Summary</h2>
+          <p className="text-gray-600">
+            Overview of your advertising performance metrics{getFilteredDescription()}
+          </p>
+        </div>
+
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            {connections.length === 0 
+              ? "No Amazon accounts connected yet. Connect your Amazon Ads account to view performance data."
+              : "No campaign data available yet. Sync your Amazon account to import campaign data."
+            }
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  if (!metrics) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Performance Summary</h2>
+          <p className="text-gray-600">Unable to calculate performance metrics</p>
+        </div>
+      </div>
+    );
+  }
+
+  const performanceData = [
+    {
+      title: "Total Sales",
+      value: formatCurrency(metrics.totalSales),
+      change: "+12.5%", // TODO: Calculate actual change when historical data is available
+      changeType: "increase" as const,
+      icon: ShoppingCart,
+      description: "Revenue from all campaigns"
+    },
+    {
+      title: "Total Ad Spend",
+      value: formatCurrency(metrics.totalSpend),
+      change: "-3.2%", // TODO: Calculate actual change when historical data is available
+      changeType: "decrease" as const,
+      icon: DollarSign,
+      description: "Amount spent on advertising"
+    },
+    {
+      title: "Total Ad Profit",
+      value: formatCurrency(metrics.totalProfit),
+      change: "+18.7%", // TODO: Calculate actual change when historical data is available
+      changeType: "increase" as const,
+      icon: TrendingUp,
+      description: "Profit after ad costs"
+    },
+    {
+      title: "Cost per Unit Sold",
+      value: formatCurrency(metrics.averageCostPerUnit),
+      change: "-5.8%", // TODO: Calculate actual change when historical data is available
+      changeType: "decrease" as const,
+      icon: Target,
+      description: "Average cost per unit"
+    }
+  ];
 
   return (
     <div className="space-y-6">
@@ -129,20 +196,20 @@ const PerformanceSummary = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">4.39x</div>
-            <p className="text-sm text-green-600 font-medium">+0.32x vs last month</p>
+            <div className="text-2xl font-bold text-gray-900">{metrics.averageRoas.toFixed(2)}x</div>
+            <p className="text-sm text-green-600 font-medium">Real-time data</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
             <CardTitle className="text-sm font-medium text-gray-600">
-              Average Order Value
+              Average Cost per Click
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">$89.32</div>
-            <p className="text-sm text-green-600 font-medium">+$5.20 vs last month</p>
+            <div className="text-2xl font-bold text-gray-900">{formatCurrency(metrics.averageCpc)}</div>
+            <p className="text-sm text-blue-600 font-medium">CPC across campaigns</p>
           </CardContent>
         </Card>
 
@@ -153,8 +220,8 @@ const PerformanceSummary = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">3.8%</div>
-            <p className="text-sm text-green-600 font-medium">+0.5% vs last month</p>
+            <div className="text-2xl font-bold text-gray-900">{formatPercentage(metrics.conversionRate)}</div>
+            <p className="text-sm text-green-600 font-medium">Orders per click</p>
           </CardContent>
         </Card>
       </div>
