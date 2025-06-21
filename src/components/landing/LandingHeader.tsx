@@ -13,7 +13,11 @@ const LandingHeader = ({ user }: LandingHeaderProps) => {
       <div className="container mx-auto flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-full p-2 shadow-lg shadow-purple-500/30">
-            <Bot className="h-6 w-6 text-white" />
+            <img 
+              src="/lovable-uploads/f599cf68-ce1e-4dc1-9e76-3870678e6772.png" 
+              alt="PPC Pal Logo" 
+              className="h-6 w-6"
+            />
           </div>
           <h1 className="text-2xl font-bold bg-gradient-to-r from-white to-purple-200 bg-clip-text text-transparent">
             PPC Pal

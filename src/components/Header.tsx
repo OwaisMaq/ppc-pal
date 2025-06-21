@@ -14,8 +14,8 @@ const Header = () => {
       <div className="container mx-auto py-4 px-6 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-3">
           <img 
-            src="https://images.unsplash.com/photo-1485827404703-89b55fcc595e" 
-            alt="PPC Pal Robot" 
+            src="/lovable-uploads/f599cf68-ce1e-4dc1-9e76-3870678e6772.png" 
+            alt="PPC Pal Logo" 
             className="w-10 h-10 rounded-lg object-cover"
           />
           <span className="text-2xl font-bold text-blue-600">PPC Pal</span>
