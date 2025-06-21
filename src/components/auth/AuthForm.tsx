@@ -10,6 +10,11 @@ interface AuthFormProps {
     password: string;
     confirmPassword: string;
   };
+  errors?: {
+    email?: string;
+    password?: string;
+    confirmPassword?: string;
+  };
   showPassword: boolean;
   isLoading: boolean;
   onInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -20,6 +25,7 @@ interface AuthFormProps {
 
 const AuthForm = ({
   formData,
+  errors = {},
   showPassword,
   isLoading,
   onInputChange,
@@ -45,6 +51,7 @@ const AuthForm = ({
           <TabsContent value="signin">
             <SignInForm
               formData={formData}
+              errors={errors}
               showPassword={showPassword}
               isLoading={isLoading}
               onInputChange={onInputChange}
@@ -56,6 +63,7 @@ const AuthForm = ({
           <TabsContent value="signup">
             <SignUpForm
               formData={formData}
+              errors={errors}
               showPassword={showPassword}
               isLoading={isLoading}
               onInputChange={onInputChange}

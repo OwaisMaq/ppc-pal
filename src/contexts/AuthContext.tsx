@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, createContext, useContext } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -52,21 +52,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log('AuthProvider: Setting up auth state listener');
+    console.log('AuthProvider: Initializing auth state');
     
     let mounted = true;
     
-    // Set up auth state listener FIRST
+    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         console.log('AuthProvider: Auth event:', event, 'User:', session?.user?.email || 'No user');
-        console.log('AuthProvider: Current path:', window.location.pathname);
         
         if (!mounted) return;
         
         setSession(session);
         setUser(session?.user ?? null);
-        setLoading(false); // Always set loading to false when auth state changes
         
         // Clean up on sign out
         if (event === 'SIGNED_OUT') {
@@ -74,19 +72,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           cleanupAuthState();
         }
         
+        // Set loading to false after any auth state change
+        setLoading(false);
         console.log('AuthProvider: Auth state updated, loading set to false');
       }
     );
 
-    // THEN check for existing session with proper error handling
-    const checkSession = async () => {
+    // Check for existing session
+    const initializeAuth = async () => {
       try {
         console.log('AuthProvider: Checking for existing session...');
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
           console.error('AuthProvider: Error getting session:', error);
-          // Even if there's an error, we should stop loading
           if (mounted) {
             setSession(null);
             setUser(null);
@@ -95,16 +94,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           return;
         }
         
-        console.log('AuthProvider: Existing session check result:', session?.user?.email || 'No existing session');
-        console.log('AuthProvider: Current path during session check:', window.location.pathname);
+        console.log('AuthProvider: Session check result:', session?.user?.email || 'No existing session');
         
         if (mounted) {
           setSession(session);
           setUser(session?.user ?? null);
           setLoading(false);
         }
-        
-        console.log('AuthProvider: Session loaded, loading set to false');
       } catch (error) {
         console.error('AuthProvider: Unexpected error during session check:', error);
         if (mounted) {
@@ -115,7 +111,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     };
 
-    checkSession();
+    initializeAuth();
 
     return () => {
       console.log('AuthProvider: Cleaning up auth state listener');
@@ -127,6 +123,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signOut = async () => {
     try {
       console.log('AuthProvider: Signing out user');
+      setLoading(true);
       
       // Clean up auth state first
       cleanupAuthState();
@@ -134,17 +131,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const { error } = await supabase.auth.signOut({ scope: 'global' });
       if (error) throw error;
       
-      // Navigate to landing page instead of forcing reload
+      // Navigate to landing page
       window.location.href = '/';
     } catch (error) {
       console.error('AuthProvider: Error signing out:', error);
       // Even if sign out fails, clean up and redirect
       cleanupAuthState();
       window.location.href = '/';
+    } finally {
+      setLoading(false);
     }
   };
-
-  console.log('AuthProvider: Rendering with user:', user?.email || 'No user', 'loading:', loading, 'current path:', window.location.pathname);
 
   const value = {
     user,

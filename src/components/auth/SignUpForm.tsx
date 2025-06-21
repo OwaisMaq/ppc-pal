@@ -10,6 +10,11 @@ interface SignUpFormProps {
     password: string;
     confirmPassword: string;
   };
+  errors?: {
+    email?: string;
+    password?: string;
+    confirmPassword?: string;
+  };
   showPassword: boolean;
   isLoading: boolean;
   onInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -19,6 +24,7 @@ interface SignUpFormProps {
 
 const SignUpForm = ({
   formData,
+  errors = {},
   showPassword,
   isLoading,
   onInputChange,
@@ -36,12 +42,13 @@ const SignUpForm = ({
             name="email"
             type="email"
             placeholder="Enter your email"
-            className="pl-10"
+            className={`pl-10 ${errors.email ? 'border-red-500' : ''}`}
             value={formData.email}
             onChange={onInputChange}
             disabled={isLoading}
           />
         </div>
+        {errors.email && <p className="text-sm text-red-500">{errors.email}</p>}
       </div>
       
       <div className="space-y-2">
@@ -53,7 +60,7 @@ const SignUpForm = ({
             name="password"
             type={showPassword ? "text" : "password"}
             placeholder="Create a password"
-            className="pl-10 pr-10"
+            className={`pl-10 pr-10 ${errors.password ? 'border-red-500' : ''}`}
             value={formData.password}
             onChange={onInputChange}
             disabled={isLoading}
@@ -62,10 +69,12 @@ const SignUpForm = ({
             type="button"
             onClick={onTogglePassword}
             className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+            disabled={isLoading}
           >
             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
         </div>
+        {errors.password && <p className="text-sm text-red-500">{errors.password}</p>}
       </div>
       
       <div className="space-y-2">
@@ -77,12 +86,13 @@ const SignUpForm = ({
             name="confirmPassword"
             type="password"
             placeholder="Confirm your password"
-            className="pl-10"
+            className={`pl-10 ${errors.confirmPassword ? 'border-red-500' : ''}`}
             value={formData.confirmPassword}
             onChange={onInputChange}
             disabled={isLoading}
           />
         </div>
+        {errors.confirmPassword && <p className="text-sm text-red-500">{errors.confirmPassword}</p>}
       </div>
       
       <Button type="submit" className="w-full" disabled={isLoading}>

@@ -8,7 +8,6 @@ import { supabase } from "@/integrations/supabase/client";
 const cleanupAuthState = () => {
   console.log('Auth: Cleaning up auth state');
   
-  // Remove all Supabase auth keys from localStorage
   Object.keys(localStorage).forEach((key) => {
     if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
       console.log('Auth: Removing localStorage key:', key);
@@ -16,7 +15,6 @@ const cleanupAuthState = () => {
     }
   });
   
-  // Remove from sessionStorage if in use
   Object.keys(sessionStorage || {}).forEach((key) => {
     if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
       console.log('Auth: Removing sessionStorage key:', key);
@@ -25,31 +23,11 @@ const cleanupAuthState = () => {
   });
 };
 
-export const useAuthHandlers = () => {
+export const useAuthActions = () => {
   const [isLoading, setIsLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-    confirmPassword: ""
-  });
   const navigate = useNavigate();
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.email || !formData.password) {
-      toast.error("Please fill in all fields");
-      return;
-    }
-
+  const signIn = async (email: string, password: string) => {
     setIsLoading(true);
     try {
       console.log('Auth: Starting sign in process');
@@ -65,8 +43,8 @@ export const useAuthHandlers = () => {
       }
 
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: formData.email,
-        password: formData.password,
+        email,
+        password,
       });
 
       if (error) throw error;
@@ -74,34 +52,26 @@ export const useAuthHandlers = () => {
       if (data.user) {
         console.log('Auth: Sign in successful, redirecting to /dashboard');
         toast.success("Welcome back!");
-        // Navigate to dashboard after successful sign in
         navigate("/dashboard", { replace: true });
       }
     } catch (error: any) {
       console.error("Sign in error:", error);
-      toast.error(error.message || "Failed to sign in");
+      let errorMessage = "Failed to sign in";
+      
+      if (error.message.includes("Invalid login credentials")) {
+        errorMessage = "Invalid email or password";
+      } else if (error.message.includes("Email not confirmed")) {
+        errorMessage = "Please check your email and confirm your account";
+      }
+      
+      toast.error(errorMessage);
+      throw error;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.email || !formData.password || !formData.confirmPassword) {
-      toast.error("Please fill in all fields");
-      return;
-    }
-
-    if (formData.password !== formData.confirmPassword) {
-      toast.error("Passwords don't match");
-      return;
-    }
-
-    if (formData.password.length < 6) {
-      toast.error("Password must be at least 6 characters");
-      return;
-    }
-
+  const signUp = async (email: string, password: string) => {
     setIsLoading(true);
     try {
       console.log('Auth: Starting sign up process');
@@ -119,8 +89,8 @@ export const useAuthHandlers = () => {
       const redirectUrl = `${window.location.origin}/dashboard`;
       
       const { data, error } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
+        email,
+        password,
         options: {
           emailRedirectTo: redirectUrl
         }
@@ -131,27 +101,27 @@ export const useAuthHandlers = () => {
       if (data.user) {
         console.log('Auth: Sign up successful');
         toast.success("Account created successfully! Please check your email to confirm your account.");
-        // Don't redirect immediately for signup - wait for email confirmation
       }
     } catch (error: any) {
       console.error("Sign up error:", error);
+      let errorMessage = "Failed to create account";
+      
       if (error.message.includes("already registered")) {
-        toast.error("An account with this email already exists. Please sign in instead.");
-      } else {
-        toast.error(error.message || "Failed to create account");
+        errorMessage = "An account with this email already exists. Please sign in instead.";
+      } else if (error.message.includes("Password should be")) {
+        errorMessage = "Password is too weak. Please choose a stronger password.";
       }
+      
+      toast.error(errorMessage);
+      throw error;
     } finally {
       setIsLoading(false);
     }
   };
 
   return {
-    formData,
-    showPassword,
     isLoading,
-    handleInputChange,
-    handleSignIn,
-    handleSignUp,
-    setShowPassword
+    signIn,
+    signUp
   };
 };

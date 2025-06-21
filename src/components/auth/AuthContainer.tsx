@@ -1,22 +1,40 @@
 
-import { useAuthHandlers } from "@/hooks/useAuthHandlers";
+import { useAuth } from "@/contexts/AuthContext";
+import { useAuthForm } from "@/hooks/useAuthForm";
+import { useAuthActions } from "@/hooks/useAuthActions";
 import { useAuthRedirect } from "@/hooks/useAuthRedirect";
 import AuthHeader from "./AuthHeader";
 import AuthForm from "./AuthForm";
 import AuthFooter from "./AuthFooter";
 
 const AuthContainer = () => {
-  const {
-    formData,
-    showPassword,
-    isLoading,
-    handleInputChange,
-    handleSignIn,
-    handleSignUp,
-    setShowPassword
-  } = useAuthHandlers();
+  const { user, loading } = useAuth();
+  const { location, authTimeout } = useAuthRedirect();
+  const authForm = useAuthForm();
+  const { isLoading, signIn, signUp } = useAuthActions();
 
-  const { user, loading, authTimeout, location } = useAuthRedirect();
+  const handleSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!authForm.validateForm(false)) return;
+    
+    try {
+      await signIn(authForm.formData.email, authForm.formData.password);
+    } catch (error) {
+      // Error is already handled in useAuthActions
+    }
+  };
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!authForm.validateForm(true)) return;
+    
+    try {
+      await signUp(authForm.formData.email, authForm.formData.password);
+      authForm.resetForm();
+    } catch (error) {
+      // Error is already handled in useAuthActions
+    }
+  };
 
   // Show loading only when auth state is actually loading and no timeout
   if (loading && !authTimeout) {
@@ -46,11 +64,12 @@ const AuthContainer = () => {
         <AuthHeader />
         
         <AuthForm
-          formData={formData}
-          showPassword={showPassword}
+          formData={authForm.formData}
+          errors={authForm.errors}
+          showPassword={authForm.showPassword}
           isLoading={isLoading}
-          onInputChange={handleInputChange}
-          onTogglePassword={() => setShowPassword(!showPassword)}
+          onInputChange={authForm.handleInputChange}
+          onTogglePassword={() => authForm.setShowPassword(!authForm.showPassword)}
           onSignIn={handleSignIn}
           onSignUp={handleSignUp}
         />

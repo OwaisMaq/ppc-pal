@@ -1,9 +1,11 @@
+
 import './App.css';
 import {
   BrowserRouter as Router,
   Routes,
   Route,
 } from "react-router-dom";
+import { AuthProvider } from '@/contexts/AuthContext';
 import PublicLanding from './pages/PublicLanding';
 import Auth from './pages/Auth';
 import Dashboard from './pages/Dashboard';
@@ -21,7 +23,8 @@ import AmazonCallbackPage from './pages/AmazonCallbackPage';
 
 function App() {
   return (
-    <Router>
+    <AuthProvider>
+      <Router>
         <Routes>
           {/* Public routes */}
           <Route path="/" element={<PublicLanding />} />
@@ -57,7 +60,8 @@ function App() {
           {/* Catch all route */}
           <Route path="*" element={<NotFound />} />
         </Routes>
-    </Router>
+      </Router>
+    </AuthProvider>
   );
 }
 
