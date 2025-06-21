@@ -21,7 +21,8 @@ import {
   Lightbulb, 
   PieChart,
   Settings,
-  LogOut
+  LogOut,
+  Package
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,11 @@ const navigationItems = [
     title: "Trends",
     url: "/trends",
     icon: TrendingUp,
+  },
+  {
+    title: "Product Setup",
+    url: "/product-setup",
+    icon: Package,
   },
   {
     title: "Optimisation Logs",

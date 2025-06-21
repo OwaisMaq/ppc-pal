@@ -22,6 +22,7 @@ import OptimizationLogs from './pages/OptimizationLogs';
 import KeywordData from './pages/KeywordData';
 import Recommendations from './pages/Recommendations';
 import Reporting from './pages/Reporting';
+import ProductSetup from './pages/ProductSetup';
 
 import Settings from "@/pages/Settings";
 import AmazonCallbackPage from './pages/AmazonCallbackPage';
@@ -54,6 +55,11 @@ function App() {
           <Route path="/trends" element={
             <ProtectedRoute>
               <Trends />
+            </ProtectedRoute>
+          } />
+          <Route path="/product-setup" element={
+            <ProtectedRoute>
+              <ProductSetup />
             </ProtectedRoute>
           } />
           <Route path="/optimization-logs" element={
