@@ -60,12 +60,13 @@ export const useCampaignData = (connectionId?: string) => {
       if (connectionsError) throw connectionsError;
 
       if (!connections || connections.length === 0) {
+        console.log('No Amazon connections found for user');
         setCampaigns([]);
         setLoading(false);
         return;
       }
 
-      // Build query with new historical fields
+      // Build query to fetch campaigns with all necessary fields
       let query = supabase
         .from('campaigns')
         .select(`
@@ -87,7 +88,28 @@ export const useCampaignData = (connectionId?: string) => {
 
       if (error) throw error;
 
-      console.log('Fetched campaigns with historical data:', data?.length || 0);
+      console.log('=== CAMPAIGN DATA FETCH RESULTS ===');
+      console.log(`Total campaigns fetched: ${data?.length || 0}`);
+      
+      if (data && data.length > 0) {
+        const realDataCampaigns = data.filter(c => c.data_source === 'api');
+        const simulatedCampaigns = data.filter(c => c.data_source !== 'api');
+        
+        console.log(`Real API campaigns: ${realDataCampaigns.length}`);
+        console.log(`Simulated campaigns: ${simulatedCampaigns.length}`);
+        
+        // Log sample of real data campaigns for debugging
+        if (realDataCampaigns.length > 0) {
+          console.log('Sample real campaign:', {
+            name: realDataCampaigns[0].name,
+            data_source: realDataCampaigns[0].data_source,
+            sales: realDataCampaigns[0].sales,
+            spend: realDataCampaigns[0].spend,
+            orders: realDataCampaigns[0].orders
+          });
+        }
+      }
+
       setCampaigns(data || []);
     } catch (error) {
       console.error('Error fetching campaigns:', error);

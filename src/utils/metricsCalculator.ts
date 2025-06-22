@@ -3,7 +3,7 @@ import { CampaignData } from '@/hooks/useCampaignData';
 import { PerformanceMetrics } from '@/types/performance';
 
 export const calculateMetrics = (campaigns: CampaignData[]): PerformanceMetrics | null => {
-  console.log('=== CALCULATING REAL DATA METRICS ===');
+  console.log('=== CALCULATING PERFORMANCE METRICS ===');
   console.log('Total campaigns received:', campaigns.length);
   
   if (!campaigns || campaigns.length === 0) {
@@ -11,11 +11,11 @@ export const calculateMetrics = (campaigns: CampaignData[]): PerformanceMetrics 
     return null;
   }
 
-  // STRICT FILTER: Only include campaigns with real API data
+  // STRICT FILTER: Only include campaigns with real API data and meaningful metrics
   const realDataCampaigns = campaigns.filter(campaign => {
     const isRealData = campaign.data_source === 'api';
     
-    // Additional validation: Check if campaign has meaningful metrics
+    // Check if campaign has meaningful metrics (not all zeros)
     const hasMetrics = (campaign.sales || 0) > 0 || 
                       (campaign.spend || 0) > 0 || 
                       (campaign.orders || 0) > 0 ||
@@ -24,8 +24,10 @@ export const calculateMetrics = (campaigns: CampaignData[]): PerformanceMetrics 
     
     const isValid = isRealData && hasMetrics;
     
-    if (!isValid) {
-      console.log(`Excluding campaign ${campaign.name}: data_source=${campaign.data_source}, hasMetrics=${hasMetrics}`);
+    if (!isValid && isRealData) {
+      console.log(`Excluding real campaign ${campaign.name}: no meaningful metrics yet`);
+    } else if (!isRealData) {
+      console.log(`Excluding campaign ${campaign.name}: data_source=${campaign.data_source || 'unknown'}`);
     } else {
       console.log(`✓ Including campaign ${campaign.name}: REAL API data with metrics`);
     }
@@ -33,10 +35,10 @@ export const calculateMetrics = (campaigns: CampaignData[]): PerformanceMetrics 
     return isValid;
   });
 
-  console.log(`Filtered to ${realDataCampaigns.length} campaigns with real API data`);
+  console.log(`Filtered to ${realDataCampaigns.length} campaigns with real API data and metrics`);
   
   if (realDataCampaigns.length === 0) {
-    console.log('❌ NO REAL DATA AVAILABLE - All campaigns are simulated or have no metrics');
+    console.log('❌ NO REAL DATA WITH METRICS AVAILABLE - All campaigns are simulated or have no performance data yet');
     return null;
   }
 
@@ -105,17 +107,17 @@ export const calculateMetrics = (campaigns: CampaignData[]): PerformanceMetrics 
     ordersChange,
     profitChange,
     // Data quality indicators
-    hasSimulatedData: false,
-    dataSourceInfo: `Real API data from ${realDataCampaigns.length} campaigns`
+    hasSimulatedData: false, // We only use real data now
+    dataSourceInfo: `Real Amazon API data from ${realDataCampaigns.length} campaigns`
   };
 
   console.log('✅ REAL DATA METRICS CALCULATED:', {
     campaignsUsed: realDataCampaigns.length,
-    totalSales: metrics.totalSales,
-    totalSpend: metrics.totalSpend,
+    totalSales: metrics.totalSales.toFixed(2),
+    totalSpend: metrics.totalSpend.toFixed(2),
     totalOrders: metrics.totalOrders,
-    averageAcos: metrics.averageAcos?.toFixed(2),
-    averageRoas: metrics.averageRoas?.toFixed(2)
+    averageAcos: metrics.averageAcos.toFixed(2) + '%',
+    averageRoas: metrics.averageRoas.toFixed(2) + 'x'
   });
 
   return metrics;
