@@ -22,6 +22,12 @@ export interface CampaignData {
   acos?: number;
   roas?: number;
   connection_id: string;
+  // Historical tracking fields
+  previous_month_sales?: number;
+  previous_month_spend?: number;
+  previous_month_orders?: number;
+  data_source?: string;
+  metrics_last_calculated?: string;
 }
 
 export const useCampaignData = (connectionId?: string) => {
@@ -59,10 +65,17 @@ export const useCampaignData = (connectionId?: string) => {
         return;
       }
 
-      // Build query
+      // Build query with new historical fields
       let query = supabase
         .from('campaigns')
-        .select('*')
+        .select(`
+          *,
+          previous_month_sales,
+          previous_month_spend,
+          previous_month_orders,
+          data_source,
+          metrics_last_calculated
+        `)
         .in('connection_id', connections.map(c => c.id));
 
       // Filter by specific connection if provided
@@ -74,7 +87,7 @@ export const useCampaignData = (connectionId?: string) => {
 
       if (error) throw error;
 
-      console.log('Fetched campaigns:', data?.length || 0);
+      console.log('Fetched campaigns with historical data:', data?.length || 0);
       setCampaigns(data || []);
     } catch (error) {
       console.error('Error fetching campaigns:', error);

@@ -23,7 +23,7 @@ export async function fetchCampaignReports(
     
     const formatDate = (date: Date) => date.toISOString().split('T')[0];
 
-    // Updated report request structure based on Amazon Advertising API v3
+    // Updated report request with VALID Amazon API columns
     const reportRequest = {
       configuration: {
         adProduct: "SPONSORED_PRODUCTS",
@@ -34,11 +34,9 @@ export async function fetchCampaignReports(
           "clicks",
           "cost",
           "sales14d",
-          "orders14d",
+          "purchases14d", // Using purchases14d instead of orders14d
           "clickThroughRate",
-          "costPerClick",
-          "acos14d",
-          "roas14d"
+          "costPerClick"
         ],
         reportTypeId: "spCampaigns",
         timeUnit: "SUMMARY",
@@ -54,7 +52,7 @@ export async function fetchCampaignReports(
       ]
     };
 
-    console.log('Requesting campaign report with updated payload:', JSON.stringify(reportRequest, null, 2));
+    console.log('Requesting campaign report with corrected columns:', JSON.stringify(reportRequest, null, 2));
 
     const reportResponse = await fetch(`${baseUrl}/reporting/reports`, {
       method: 'POST',
@@ -80,8 +78,25 @@ export async function fetchCampaignReports(
     
     // Check if it's an async report (returns reportId)
     if (reportData.reportId) {
-      console.log('Async report created, falling back to basic metrics for now');
+      console.log('Async report created with ID:', reportData.reportId);
+      // For now, fall back to basic metrics since we need to poll for async results
       return await fetchBasicMetrics(accessToken, clientId, profileId, baseUrl, campaignIds);
+    }
+    
+    // Transform the API response to our expected format
+    if (Array.isArray(reportData)) {
+      return reportData.map(row => ({
+        campaignId: row.campaignId,
+        impressions: row.impressions || 0,
+        clicks: row.clicks || 0,
+        spend: row.cost || 0,
+        sales: row.sales14d || 0,
+        orders: row.purchases14d || 0,
+        ctr: row.clickThroughRate || 0,
+        cpc: row.costPerClick || 0,
+        acos: row.cost && row.sales14d ? (row.cost / row.sales14d) * 100 : 0,
+        roas: row.cost && row.sales14d ? row.sales14d / row.cost : 0
+      }));
     }
     
     return reportData;
@@ -104,7 +119,7 @@ async function tryAlternativeReportsEndpoint(
     // Try the sync reports endpoint with simpler structure
     const syncReportRequest = {
       reportDate: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      metrics: ["impressions", "clicks", "cost", "sales14d", "orders14d"],
+      metrics: ["impressions", "clicks", "cost", "sales14d", "purchases14d"],
       campaignType: "sponsoredProducts"
     };
 
@@ -128,6 +143,7 @@ async function tryAlternativeReportsEndpoint(
     console.warn('Alternative endpoint also failed:', error);
   }
   
-  // Final fallback to basic metrics
+  // Final fallback to basic metrics but mark as simulated
+  console.log('Falling back to simulated metrics due to API failures');
   return await fetchBasicMetrics(accessToken, clientId, profileId, baseUrl, campaignIds);
 }

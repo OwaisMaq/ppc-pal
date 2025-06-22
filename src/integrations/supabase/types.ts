@@ -181,6 +181,59 @@ export type Database = {
           },
         ]
       }
+      campaign_metrics_history: {
+        Row: {
+          acos: number | null
+          campaign_id: string
+          clicks: number | null
+          created_at: string
+          data_source: string | null
+          date: string
+          id: string
+          impressions: number | null
+          orders: number | null
+          roas: number | null
+          sales: number | null
+          spend: number | null
+        }
+        Insert: {
+          acos?: number | null
+          campaign_id: string
+          clicks?: number | null
+          created_at?: string
+          data_source?: string | null
+          date: string
+          id?: string
+          impressions?: number | null
+          orders?: number | null
+          roas?: number | null
+          sales?: number | null
+          spend?: number | null
+        }
+        Update: {
+          acos?: number | null
+          campaign_id?: string
+          clicks?: number | null
+          created_at?: string
+          data_source?: string | null
+          date?: string
+          id?: string
+          impressions?: number | null
+          orders?: number | null
+          roas?: number | null
+          sales?: number | null
+          spend?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_metrics_history_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaigns: {
         Row: {
           acos: number | null
@@ -191,12 +244,20 @@ export type Database = {
           connection_id: string
           created_at: string
           daily_budget: number | null
+          data_source: string | null
           end_date: string | null
           id: string
           impressions: number | null
           last_updated: string | null
+          metrics_last_calculated: string | null
           name: string
           orders: number | null
+          previous_month_orders: number | null
+          previous_month_sales: number | null
+          previous_month_spend: number | null
+          previous_orders: number | null
+          previous_sales: number | null
+          previous_spend: number | null
           roas: number | null
           sales: number | null
           spend: number | null
@@ -213,12 +274,20 @@ export type Database = {
           connection_id: string
           created_at?: string
           daily_budget?: number | null
+          data_source?: string | null
           end_date?: string | null
           id?: string
           impressions?: number | null
           last_updated?: string | null
+          metrics_last_calculated?: string | null
           name: string
           orders?: number | null
+          previous_month_orders?: number | null
+          previous_month_sales?: number | null
+          previous_month_spend?: number | null
+          previous_orders?: number | null
+          previous_sales?: number | null
+          previous_spend?: number | null
           roas?: number | null
           sales?: number | null
           spend?: number | null
@@ -235,12 +304,20 @@ export type Database = {
           connection_id?: string
           created_at?: string
           daily_budget?: number | null
+          data_source?: string | null
           end_date?: string | null
           id?: string
           impressions?: number | null
           last_updated?: string | null
+          metrics_last_calculated?: string | null
           name?: string
           orders?: number | null
+          previous_month_orders?: number | null
+          previous_month_sales?: number | null
+          previous_month_spend?: number | null
+          previous_orders?: number | null
+          previous_sales?: number | null
+          previous_spend?: number | null
           roas?: number | null
           sales?: number | null
           spend?: number | null
@@ -626,6 +703,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_campaign_changes: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       can_user_optimize: {
         Args: { user_uuid: string }
         Returns: boolean

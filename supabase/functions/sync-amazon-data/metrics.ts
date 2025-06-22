@@ -8,34 +8,14 @@ export async function fetchBasicMetrics(
   baseUrl: string,
   campaignIds: string[]
 ): Promise<any[]> {
-  console.log('Generating enhanced sample metrics data...');
+  console.log('Generating SIMULATED metrics data (API unavailable)...');
   
   const metrics = [];
   
   for (const campaignId of campaignIds.slice(0, 10)) { // Process up to 10 campaigns
     try {
-      // Try to get basic campaign info first
-      let campaignData = null;
-      try {
-        const campaignResponse = await fetch(`${baseUrl}/v2/sp/campaigns/${campaignId}`, {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Amazon-Advertising-API-ClientId': clientId,
-            'Amazon-Advertising-API-Scope': profileId,
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (campaignResponse.ok) {
-          campaignData = await campaignResponse.json();
-        }
-      } catch (error) {
-        console.warn(`Failed to fetch campaign data for ${campaignId}:`, error);
-      }
-
-      // Generate realistic sample data
-      const isEnabled = campaignData?.state === 'enabled' || Math.random() > 0.2;
-      const campaignAge = Math.random() * 365; // Days since campaign started
+      // Generate realistic sample data but mark it as simulated
+      const isEnabled = Math.random() > 0.2;
       const performanceMultiplier = isEnabled ? (0.5 + Math.random() * 1.5) : 0.1;
       
       // Base metrics that scale with campaign performance
@@ -62,17 +42,19 @@ export async function fetchBasicMetrics(
         cpc: cpc,
         acos: acos,
         roas: roas,
-        conversionRate: Number(conversionRate.toFixed(2))
+        conversionRate: Number(conversionRate.toFixed(2)),
+        fromAPI: false // Mark as simulated data
       });
 
-      console.log(`Generated metrics for campaign ${campaignId}:`, {
+      console.log(`Generated SIMULATED metrics for campaign ${campaignId}:`, {
         impressions: baseImpressions,
         clicks,
         spend,
         sales,
         orders,
         acos,
-        roas
+        roas,
+        note: 'SIMULATED DATA - API request failed'
       });
 
     } catch (error) {
@@ -80,6 +62,6 @@ export async function fetchBasicMetrics(
     }
   }
   
-  console.log(`Generated ${metrics.length} enhanced metric records`);
+  console.log(`Generated ${metrics.length} SIMULATED metric records (marked as non-API)`);
   return metrics;
 }
