@@ -52,34 +52,46 @@ export const useWeeklyMetrics = (
         return;
       }
 
-      // Filter for campaigns with meaningful metrics
-      const campaignsWithMetrics = filteredCampaigns.filter(campaign => {
-        const hasMetrics = (campaign.sales || 0) > 0 || (campaign.spend || 0) > 0 || (campaign.orders || 0) > 0;
-        return hasMetrics;
+      // Filter for real data campaigns only - no simulated data
+      const realDataCampaigns = filteredCampaigns.filter(campaign => {
+        const isRealSource = campaign.data_source !== 'simulated' && 
+                            campaign.data_source !== 'simulation' &&
+                            campaign.data_source !== 'fake';
+        
+        const hasMetrics = (campaign.sales || 0) > 0 || 
+                          (campaign.spend || 0) > 0 || 
+                          (campaign.orders || 0) > 0 ||
+                          (campaign.clicks || 0) > 0 ||
+                          (campaign.impressions || 0) > 0;
+        
+        return isRealSource && hasMetrics;
       });
 
-      if (!campaignsWithMetrics.length) {
-        console.log('No campaigns with metrics for weekly analysis');
+      if (!realDataCampaigns.length) {
+        console.log('No real data campaigns available for weekly analysis');
         setWeeklyMetrics(null);
         setLoading(false);
         return;
       }
 
-      // Check if we have real data
-      const hasRealData = campaignsWithMetrics.some(campaign => 
-        campaign.data_source !== 'simulated' && campaign.data_source !== 'simulation'
-      );
-
-      const campaignIds = campaignsWithMetrics.map(c => c.id);
+      const campaignIds = realDataCampaigns.map(c => c.id);
       
       // Try to fetch historical data first
       const { currentWeekData, previousWeekData } = await fetchWeeklyHistoricalData(campaignIds);
 
-      // If no historical data, use current campaign metrics
+      // If no historical data, use current campaign metrics (real data only)
       if (currentWeekData.length === 0) {
-        console.log('No historical weekly data found, using current campaign metrics...');
+        console.log('No historical weekly data found, using current real campaign metrics...');
         
-        const currentMetrics = calculateMetricsFromCampaigns(campaignsWithMetrics);
+        const currentMetrics = calculateMetricsFromCampaigns(realDataCampaigns);
+        
+        if (!currentMetrics) {
+          console.log('No valid metrics from real campaigns');
+          setWeeklyMetrics(null);
+          setLoading(false);
+          return;
+        }
+
         const previousMetrics = previousWeekData.length > 0 
           ? calculateMetricsFromData(previousWeekData)
           : null;
@@ -89,18 +101,26 @@ export const useWeeklyMetrics = (
         const weeklyMetricsResult: WeeklyMetrics = {
           ...currentMetrics,
           ...changes,
-          hasRealData,
-          dataSourceInfo: `Based on current campaign metrics (${campaignsWithMetrics.length} campaigns)`
+          hasRealData: true,
+          dataSourceInfo: `Real data from current campaign metrics (${realDataCampaigns.length} campaigns)`
         };
 
-        console.log('Weekly metrics from campaigns:', weeklyMetricsResult);
+        console.log('Weekly metrics from real campaigns:', weeklyMetricsResult);
         setWeeklyMetrics(weeklyMetricsResult);
         setLoading(false);
         return;
       }
 
-      // Use historical data if available
+      // Use historical data if available (already filtered for real data campaigns)
       const currentMetrics = calculateMetricsFromData(currentWeekData);
+      
+      if (!currentMetrics) {
+        console.log('No valid metrics from historical data');
+        setWeeklyMetrics(null);
+        setLoading(false);
+        return;
+      }
+
       const previousMetrics = previousWeekData.length > 0 
         ? calculateMetricsFromData(previousWeekData)
         : null;
@@ -110,11 +130,11 @@ export const useWeeklyMetrics = (
       const weeklyMetricsResult: WeeklyMetrics = {
         ...currentMetrics,
         ...changes,
-        hasRealData,
-        dataSourceInfo: `Based on historical data from last 7 days (${currentWeekData.length} data points)`
+        hasRealData: true,
+        dataSourceInfo: `Real historical data from last 7 days (${currentWeekData.length} data points)`
       };
 
-      console.log('Weekly metrics calculated from historical data:', weeklyMetricsResult);
+      console.log('Weekly metrics calculated from real historical data:', weeklyMetricsResult);
       setWeeklyMetrics(weeklyMetricsResult);
     } catch (error) {
       console.error('Error calculating weekly metrics:', error);

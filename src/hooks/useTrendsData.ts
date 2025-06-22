@@ -2,7 +2,6 @@
 import React from 'react';
 import { CampaignData } from './useCampaignData';
 import { AmazonConnection } from '@/lib/amazon/types';
-import { filterRealDataOnly } from '@/utils/dataFilter';
 
 interface TrendData {
   name: string;
@@ -10,6 +9,23 @@ interface TrendData {
   spend: number;
   profit: number;
 }
+
+// Strict filter for real data only
+const filterRealDataOnly = (campaigns: CampaignData[]): CampaignData[] => {
+  return campaigns.filter(campaign => {
+    const isRealSource = campaign.data_source !== 'simulated' && 
+                        campaign.data_source !== 'simulation' &&
+                        campaign.data_source !== 'fake';
+    
+    const hasMetrics = (campaign.sales || 0) > 0 || 
+                      (campaign.spend || 0) > 0 || 
+                      (campaign.orders || 0) > 0 ||
+                      (campaign.clicks || 0) > 0 ||
+                      (campaign.impressions || 0) > 0;
+    
+    return isRealSource && hasMetrics;
+  });
+};
 
 export const useTrendsData = (
   campaigns: CampaignData[],

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import FilterBar from "@/components/FilterBar";
 import { usePerformanceSummary } from "@/hooks/usePerformanceSummary";
@@ -52,7 +53,7 @@ const PerformanceSummary = () => {
       <div>
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Performance Summary</h2>
         <p className="text-gray-600">
-          Overview of your advertising performance metrics{getFilteredDescription()}
+          Real campaign performance metrics from Amazon API{getFilteredDescription()}
         </p>
       </div>
 
@@ -74,9 +75,9 @@ const PerformanceSummary = () => {
         />
       ) : (
         <NoRealDataAlert 
-          title="No 7-Day Data Available"
-          description="No real campaign data available for the last 7 days. Historical data is required to display weekly performance metrics."
-          showSyncButton={false}
+          title="No Real 7-Day Data Available"
+          description="No real campaign data from Amazon API available for the last 7 days. Only real API data is used for metrics calculation."
+          showSyncButton={true}
         />
       )}
 
@@ -84,12 +85,12 @@ const PerformanceSummary = () => {
       <div className="pt-6 border-t border-gray-200">
         <div className="mb-6">
           <h3 className="text-xl font-bold text-gray-900 mb-2">Monthly Performance Overview</h3>
-          <p className="text-gray-600">Complete campaign performance metrics and trends</p>
+          <p className="text-gray-600">Real campaign performance metrics from Amazon API</p>
         </div>
 
         {!hasRealData ? (
           <NoRealDataAlert 
-            description="No real campaign data available. All current data is simulated. Please sync your Amazon account to get real performance metrics."
+            description="No real campaign data from Amazon API available. Please sync your Amazon account to get real performance metrics. Simulated data is not displayed."
           />
         ) : metrics ? (
           <>
@@ -106,8 +107,8 @@ const PerformanceSummary = () => {
           </>
         ) : (
           <NoRealDataAlert 
-            title="Unable to Calculate Metrics"
-            description="Real data is available but metrics calculation failed. Please check your connection and try again."
+            title="Unable to Calculate Real Metrics"
+            description="No real data from Amazon API meets the criteria for metrics calculation. Please check your connection and sync data."
           />
         )}
       </div>

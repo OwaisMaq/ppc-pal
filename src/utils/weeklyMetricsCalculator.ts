@@ -15,12 +15,31 @@ export interface BaseMetrics {
   conversionRate: number;
 }
 
-export const calculateMetricsFromData = (data: any[]): BaseMetrics => {
-  const totalSales = data.reduce((sum, d) => sum + (d.sales || 0), 0);
-  const totalSpend = data.reduce((sum, d) => sum + (d.spend || 0), 0);
-  const totalOrders = data.reduce((sum, d) => sum + (d.orders || 0), 0);
-  const totalImpressions = data.reduce((sum, d) => sum + (d.impressions || 0), 0);
-  const totalClicks = data.reduce((sum, d) => sum + (d.clicks || 0), 0);
+// Filter function to only allow real data
+const filterRealDataOnly = (data: any[]): any[] => {
+  return data.filter(item => 
+    item.data_source !== 'simulated' && 
+    item.data_source !== 'simulation' &&
+    item.data_source !== 'fake' &&
+    // Ensure we have meaningful metrics from real API data
+    (item.sales > 0 || item.spend > 0 || item.orders > 0 || item.clicks > 0 || item.impressions > 0)
+  );
+};
+
+export const calculateMetricsFromData = (data: any[]): BaseMetrics | null => {
+  // Filter to only real data with actual metrics
+  const realData = filterRealDataOnly(data);
+  
+  if (!realData.length) {
+    console.log('No real data available for metrics calculation');
+    return null;
+  }
+
+  const totalSales = realData.reduce((sum, d) => sum + (d.sales || 0), 0);
+  const totalSpend = realData.reduce((sum, d) => sum + (d.spend || 0), 0);
+  const totalOrders = realData.reduce((sum, d) => sum + (d.orders || 0), 0);
+  const totalImpressions = realData.reduce((sum, d) => sum + (d.impressions || 0), 0);
+  const totalClicks = realData.reduce((sum, d) => sum + (d.clicks || 0), 0);
   
   const totalProfit = totalSales - totalSpend;
   const averageAcos = totalSales > 0 ? (totalSpend / totalSales) * 100 : 0;
@@ -44,12 +63,20 @@ export const calculateMetricsFromData = (data: any[]): BaseMetrics => {
   };
 };
 
-export const calculateMetricsFromCampaigns = (campaigns: any[]): BaseMetrics => {
-  const totalSales = campaigns.reduce((sum, c) => sum + (c.sales || 0), 0);
-  const totalSpend = campaigns.reduce((sum, c) => sum + (c.spend || 0), 0);
-  const totalOrders = campaigns.reduce((sum, c) => sum + (c.orders || 0), 0);
-  const totalImpressions = campaigns.reduce((sum, c) => sum + (c.impressions || 0), 0);
-  const totalClicks = campaigns.reduce((sum, c) => sum + (c.clicks || 0), 0);
+export const calculateMetricsFromCampaigns = (campaigns: any[]): BaseMetrics | null => {
+  // Filter to only real data campaigns with actual metrics
+  const realCampaigns = filterRealDataOnly(campaigns);
+  
+  if (!realCampaigns.length) {
+    console.log('No real campaign data available for metrics calculation');
+    return null;
+  }
+
+  const totalSales = realCampaigns.reduce((sum, c) => sum + (c.sales || 0), 0);
+  const totalSpend = realCampaigns.reduce((sum, c) => sum + (c.spend || 0), 0);
+  const totalOrders = realCampaigns.reduce((sum, c) => sum + (c.orders || 0), 0);
+  const totalImpressions = realCampaigns.reduce((sum, c) => sum + (c.impressions || 0), 0);
+  const totalClicks = realCampaigns.reduce((sum, c) => sum + (c.clicks || 0), 0);
   
   const totalProfit = totalSales - totalSpend;
   const averageAcos = totalSales > 0 ? (totalSpend / totalSales) * 100 : 0;
