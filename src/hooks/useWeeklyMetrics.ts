@@ -1,142 +1,111 @@
 
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useAmazonConnections } from './useAmazonConnections';
 import { useCampaignData } from './useCampaignData';
-import { FilterParams } from '@/types/performance';
-import { filterCampaigns } from '@/utils/campaignFilter';
-import { WeeklyMetrics } from '@/utils/weeklyMetricsCalculator';
-import { 
-  calculateMetricsFromData, 
-  calculateMetricsFromCampaigns, 
-  calculateWeekOverWeekChanges 
-} from '@/utils/weeklyMetricsCalculator';
 import { fetchWeeklyHistoricalData } from '@/services/weeklyDataService';
+import { calculateMetricsFromData, calculateMetricsFromCampaigns, calculateWeekOverWeekChanges } from '@/utils/weeklyMetricsCalculator';
+import { WeeklyMetrics } from '@/types/weeklyMetrics';
 
 export const useWeeklyMetrics = (
-  selectedCountry?: string,
-  selectedCampaign?: string,
+  connectionId?: string,
+  selectedCountry?: string, 
+  selectedCampaign?: string, 
   selectedProduct?: string
 ) => {
-  const { user } = useAuth();
-  const { connections } = useAmazonConnections();
-  const { campaigns } = useCampaignData();
+  const { campaigns, loading: campaignsLoading } = useCampaignData(connectionId);
   const [weeklyMetrics, setWeeklyMetrics] = useState<WeeklyMetrics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hasRealData, setHasRealData] = useState(false);
 
   useEffect(() => {
-    if (!user || !campaigns.length) {
-      setLoading(false);
-      return;
-    }
-    
     calculateWeeklyMetrics();
-  }, [user, campaigns, connections, selectedCountry, selectedCampaign, selectedProduct]);
+  }, [campaigns, campaignsLoading, selectedCountry, selectedCampaign, selectedProduct]);
 
   const calculateWeeklyMetrics = async () => {
+    if (campaignsLoading) return;
+
     try {
       setLoading(true);
-      
-      // Apply filters to campaigns
-      const filters: FilterParams = {
-        selectedCountry,
-        selectedCampaign,
-        selectedProduct
-      };
-      
-      const filteredCampaigns = filterCampaigns(campaigns, connections, filters);
-      
-      if (!filteredCampaigns.length) {
+      console.log('=== CALCULATING WEEKLY METRICS ===');
+      console.log('Available campaigns:', campaigns.length);
+
+      if (campaigns.length === 0) {
+        console.log('No campaigns available for weekly metrics');
         setWeeklyMetrics(null);
+        setHasRealData(false);
         setLoading(false);
         return;
       }
 
-      // Filter for real data campaigns only - no simulated data
-      const realDataCampaigns = filteredCampaigns.filter(campaign => {
-        const isRealSource = campaign.data_source === 'api';
-        
+      // Filter campaigns with real data
+      const realDataCampaigns = campaigns.filter(campaign => {
+        const isRealData = campaign.data_source === 'api';
         const hasMetrics = (campaign.sales || 0) > 0 || 
                           (campaign.spend || 0) > 0 || 
                           (campaign.orders || 0) > 0 ||
                           (campaign.clicks || 0) > 0 ||
                           (campaign.impressions || 0) > 0;
-        
-        return isRealSource && hasMetrics;
+        return isRealData && hasMetrics;
       });
 
-      if (!realDataCampaigns.length) {
-        console.log('No real data campaigns available for weekly analysis');
+      console.log(`Found ${realDataCampaigns.length} campaigns with real data and metrics`);
+
+      if (realDataCampaigns.length === 0) {
+        console.log('No real data campaigns available for weekly metrics');
         setWeeklyMetrics(null);
+        setHasRealData(false);
         setLoading(false);
         return;
       }
 
+      // Try to get historical data first
       const campaignIds = realDataCampaigns.map(c => c.id);
-      
-      // Try to fetch historical data first
-      const { currentWeekData, previousWeekData } = await fetchWeeklyHistoricalData(campaignIds);
+      let metrics: WeeklyMetrics | null = null;
 
-      // If no historical data, use current campaign metrics (real data only)
-      if (currentWeekData.length === 0) {
-        console.log('No historical weekly data found, using current real campaign metrics...');
+      try {
+        const { currentWeekData, previousWeekData } = await fetchWeeklyHistoricalData(campaignIds);
         
-        const currentMetrics = calculateMetricsFromCampaigns(realDataCampaigns);
-        
-        if (!currentMetrics) {
-          console.log('No valid metrics from real campaigns');
-          setWeeklyMetrics(null);
-          setLoading(false);
-          return;
+        if (currentWeekData.length > 0) {
+          console.log(`Using historical data: ${currentWeekData.length} records`);
+          metrics = calculateMetricsFromData(currentWeekData);
+          
+          // Calculate week-over-week changes if we have previous week data
+          if (metrics && previousWeekData.length > 0) {
+            const previousMetrics = calculateMetricsFromData(previousWeekData);
+            if (previousMetrics) {
+              const changes = calculateWeekOverWeekChanges(metrics, previousMetrics);
+              metrics = { ...metrics, ...changes };
+            }
+          }
         }
-
-        const previousMetrics = previousWeekData.length > 0 
-          ? calculateMetricsFromData(previousWeekData)
-          : null;
-
-        const changes = calculateWeekOverWeekChanges(currentMetrics, previousMetrics);
-
-        const weeklyMetricsResult: WeeklyMetrics = {
-          ...currentMetrics,
-          ...changes,
-          hasRealData: true,
-          dataSourceInfo: `Real data from current campaign metrics (${realDataCampaigns.length} campaigns)`
-        };
-
-        console.log('Weekly metrics from real campaigns:', weeklyMetricsResult);
-        setWeeklyMetrics(weeklyMetricsResult);
-        setLoading(false);
-        return;
+      } catch (error) {
+        console.warn('Failed to fetch historical data, falling back to campaign data:', error);
       }
 
-      // Use historical data if available (already filtered for real data campaigns)
-      const currentMetrics = calculateMetricsFromData(currentWeekData);
-      
-      if (!currentMetrics) {
-        console.log('No valid metrics from historical data');
+      // Fallback to current campaign data if no historical data
+      if (!metrics) {
+        console.log('Using current campaign data for weekly metrics');
+        metrics = calculateMetricsFromCampaigns(realDataCampaigns);
+      }
+
+      if (metrics) {
+        console.log('✅ Weekly metrics calculated successfully:', {
+          sales: metrics.totalSales,
+          spend: metrics.totalSpend,
+          orders: metrics.totalOrders,
+          hasRealData: metrics.hasRealData
+        });
+        setWeeklyMetrics(metrics);
+        setHasRealData(true);
+      } else {
+        console.log('❌ Unable to calculate weekly metrics');
         setWeeklyMetrics(null);
-        setLoading(false);
-        return;
+        setHasRealData(false);
       }
 
-      const previousMetrics = previousWeekData.length > 0 
-        ? calculateMetricsFromData(previousWeekData)
-        : null;
-
-      const changes = calculateWeekOverWeekChanges(currentMetrics, previousMetrics);
-
-      const weeklyMetricsResult: WeeklyMetrics = {
-        ...currentMetrics,
-        ...changes,
-        hasRealData: true,
-        dataSourceInfo: `Real historical data from last 7 days (${currentWeekData.length} data points)`
-      };
-
-      console.log('Weekly metrics calculated from real historical data:', weeklyMetricsResult);
-      setWeeklyMetrics(weeklyMetricsResult);
     } catch (error) {
       console.error('Error calculating weekly metrics:', error);
       setWeeklyMetrics(null);
+      setHasRealData(false);
     } finally {
       setLoading(false);
     }
@@ -145,6 +114,6 @@ export const useWeeklyMetrics = (
   return {
     weeklyMetrics,
     loading,
-    hasRealData: weeklyMetrics?.hasRealData || false
+    hasRealData
   };
 };

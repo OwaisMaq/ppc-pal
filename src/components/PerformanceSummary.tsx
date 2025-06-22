@@ -9,6 +9,7 @@ import PerformanceMetricCards from "./performance/PerformanceMetricCards";
 import AdditionalMetrics from "./performance/AdditionalMetrics";
 import WeeklyPerformanceMetrics from "./performance/WeeklyPerformanceMetrics";
 import NoRealDataAlert from "./performance/NoRealDataAlert";
+import DataQualityInsights from "./performance/DataQualityInsights";
 
 const PerformanceSummary = () => {
   const {
@@ -21,6 +22,8 @@ const PerformanceSummary = () => {
     loading,
     hasData,
     hasRealData,
+    dataQuality,
+    recommendations,
     getFilteredDescription,
     formatCurrency,
     formatPercentage
@@ -66,6 +69,14 @@ const PerformanceSummary = () => {
         onProductChange={setSelectedProduct}
       />
 
+      {/* Data Quality Insights */}
+      {dataQuality && (
+        <DataQualityInsights 
+          dataQuality={dataQuality}
+          recommendations={recommendations}
+        />
+      )}
+
       {/* 7-Day Performance Metrics Section */}
       {hasWeeklyRealData && weeklyMetrics ? (
         <WeeklyPerformanceMetrics 
@@ -76,7 +87,7 @@ const PerformanceSummary = () => {
       ) : (
         <NoRealDataAlert 
           title="No Real 7-Day Data Available"
-          description="No real campaign data from Amazon API available for the last 7 days. Only real API data is used for metrics calculation."
+          description="No real campaign data from Amazon API available for the last 7 days. Performance data typically appears 24-48 hours after campaign activity begins."
           showSyncButton={true}
         />
       )}
@@ -90,7 +101,7 @@ const PerformanceSummary = () => {
 
         {!hasRealData ? (
           <NoRealDataAlert 
-            description="No real campaign data from Amazon API available. Please sync your Amazon account to get real performance metrics. Simulated data is not displayed."
+            description="No real campaign data from Amazon API available. Please sync your Amazon account to get real performance metrics. Performance data typically appears 24-48 hours after campaign activity begins."
           />
         ) : metrics ? (
           <>
@@ -108,7 +119,7 @@ const PerformanceSummary = () => {
         ) : (
           <NoRealDataAlert 
             title="Unable to Calculate Real Metrics"
-            description="No real data from Amazon API meets the criteria for metrics calculation. Please check your connection and sync data."
+            description="No real data from Amazon API meets the criteria for metrics calculation. Please check your connection and sync data. Performance metrics require active campaigns with recent activity."
           />
         )}
       </div>

@@ -7,7 +7,14 @@ export const usePerformanceSummary = () => {
   const [selectedCountry, setSelectedCountry] = useState("all");
   const [selectedCampaign, setSelectedCampaign] = useState("all");
   const { connections } = useAmazonConnections();
-  const { metrics, loading, hasData, hasRealData } = usePerformanceData(undefined, selectedCountry, selectedCampaign);
+  const { 
+    metrics, 
+    loading, 
+    hasData, 
+    hasRealData, 
+    dataQuality, 
+    recommendations 
+  } = usePerformanceData(undefined, selectedCountry, selectedCampaign);
 
   const getFilteredDescription = () => {
     const parts = [];
@@ -55,6 +62,8 @@ export const usePerformanceSummary = () => {
     loading,
     hasData,
     hasRealData,
+    dataQuality,
+    recommendations,
     getFilteredDescription,
     formatCurrency,
     formatPercentage
