@@ -3,11 +3,11 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { fetchCampaignReports } from './reports.ts'
 import { updateCampaignMetrics } from './metricsUpdater.ts'
-import { refreshTokenIfNeeded } from './auth.ts'
 import { fetchCampaignsFromRegion, storeCampaigns } from './campaigns.ts'
 import { syncAdGroups } from './adgroups.ts'
 import { validateConnection, validateProfileId } from './validation.ts'
 import { getConnection, updateConnectionStatus, updateLastSyncTime } from './database.ts'
+import { validateAndRefreshConnection, testProfileAccessInAllRegions } from './enhanced-validation.ts'
 import { REGIONS, getBaseUrl } from './types.ts'
 
 const corsHeaders = {
@@ -39,7 +39,7 @@ serve(async (req) => {
     }
 
     const { connectionId } = await req.json()
-    console.log('=== AMAZON DATA SYNC STARTED ===')
+    console.log('=== ENHANCED AMAZON DATA SYNC STARTED ===')
     console.log('Timestamp:', new Date().toISOString())
     console.log('Connection ID:', connectionId)
     console.log('User ID:', user.id)
@@ -50,103 +50,70 @@ serve(async (req) => {
     // Get the connection details
     const connection = await getConnection(connectionId, user.id, supabase)
 
-    // Enhanced connection validation
-    try {
-      validateConnection(connection)
-    } catch (error) {
-      console.error('=== CONNECTION VALIDATION FAILED ===')
-      console.error('Error:', error.message)
-      await updateConnectionStatus(connectionId, 'error', supabase)
-      throw error
-    }
-
     const clientId = Deno.env.get('AMAZON_CLIENT_ID')
     if (!clientId) {
       throw new Error('Amazon Client ID not configured in environment')
     }
 
-    console.log('=== CONNECTION DETAILS ===')
+    console.log('=== ENHANCED CONNECTION VALIDATION ===')
     console.log('Profile ID:', connection.profile_id)
     console.log('Marketplace:', connection.marketplace_id)
     console.log('Status:', connection.status)
     console.log('Last sync:', connection.last_sync_at)
 
-    // Handle token refresh with enhanced error handling
-    console.log('=== TOKEN REFRESH CHECK ===')
-    let accessToken;
-    try {
-      accessToken = await refreshTokenIfNeeded(connection, clientId, supabase)
-    } catch (error) {
-      console.error('Token refresh failed:', error.message)
-      await updateConnectionStatus(connectionId, 'expired', supabase)
-      throw new Error(`Token refresh failed: ${error.message}`)
+    // Enhanced validation and token refresh
+    const validationResult = await validateAndRefreshConnection(connection, clientId, supabase)
+    
+    if (!validationResult.isValid) {
+      console.error('Connection validation failed:', validationResult.errorDetails)
+      await updateConnectionStatus(connectionId, 'error', supabase)
+      throw new Error(validationResult.errorDetails || 'Connection validation failed')
     }
 
-    // Enhanced campaign fetching with detailed region analysis
+    const accessToken = validationResult.accessToken;
+
+    // Test profile access across all regions
+    console.log('=== TESTING PROFILE ACCESS ACROSS REGIONS ===')
+    const regionTests = await testProfileAccessInAllRegions(accessToken, clientId, connection.profile_id)
+    
+    console.log('Region test results:')
+    regionTests.forEach(result => {
+      console.log(`${result.region}: ${result.success ? '✓ SUCCESS' : '✗ FAILED'} ${result.errorDetails || ''}`);
+    });
+
+    const accessibleRegions = regionTests.filter(r => r.success);
+    
+    if (accessibleRegions.length === 0) {
+      const errorDetails = regionTests.map(r => `${r.region}: ${r.errorDetails}`).join('; ');
+      console.error('Profile not accessible in any region:', errorDetails);
+      await updateConnectionStatus(connectionId, 'error', supabase)
+      throw new Error(`Profile ${connection.profile_id} is not accessible in any region. This could indicate: 1) The profile ID is invalid, 2) The account lacks advertising permissions, 3) The profile was moved or deleted. Details: ${errorDetails}`);
+    }
+
+    // Use the first accessible region for campaigns
+    const targetRegion = accessibleRegions[0].region;
+    console.log(`✓ Using ${targetRegion} region for campaign sync`);
+
+    // Enhanced campaign fetching with better error handling
     let campaignsData = []
     let successfulRegion = null
-    let regionResults = []
 
-    console.log('=== FETCHING CAMPAIGNS FROM AMAZON API ===')
-    for (const region of REGIONS) {
-      console.log(`\n--- Trying region: ${region} ---`)
-      
-      const result = await fetchCampaignsFromRegion(
-        accessToken,
-        clientId,
-        connection.profile_id,
-        region
-      )
+    console.log(`=== FETCHING CAMPAIGNS FROM ${targetRegion} REGION ===`)
+    const result = await fetchCampaignsFromRegion(
+      accessToken,
+      clientId,
+      connection.profile_id,
+      targetRegion as any
+    )
 
-      const regionResult = {
-        region,
-        success: false,
-        campaignCount: 0,
-        error: null
-      }
-
-      if (result && result.campaigns.length > 0) {
-        campaignsData = result.campaigns
-        successfulRegion = result.region
-        regionResult.success = true
-        regionResult.campaignCount = result.campaigns.length
-        regionResults.push(regionResult)
-        
-        console.log(`✓ SUCCESS: Found ${campaignsData.length} campaigns in ${region} region`)
-        break
-      } else if (result && result.campaigns.length === 0) {
-        console.log(`⚠ ${region} region returned 0 campaigns`)
-        regionResult.error = 'No campaigns found'
-      } else {
-        console.log(`✗ ${region} region failed completely`)
-        regionResult.error = 'API request failed'
-      }
-      
-      regionResults.push(regionResult)
-    }
-
-    // Enhanced error reporting
-    if (!successfulRegion || campaignsData.length === 0) {
-      console.log('=== CAMPAIGN FETCH ANALYSIS ===')
-      regionResults.forEach(result => {
-        console.log(`${result.region}: ${result.success ? `✓ ${result.campaignCount} campaigns` : `✗ ${result.error}`}`)
-      })
-      
-      const authErrors = regionResults.filter(r => r.error?.includes('auth') || r.error?.includes('UNAUTHORIZED')).length
-      const noDataErrors = regionResults.filter(r => r.error === 'No campaigns found').length
-      
-      let errorMessage = 'No campaigns found in any region. '
-      
-      if (authErrors === REGIONS.length) {
-        errorMessage += 'All regions returned authorization errors. This suggests: 1) The profile ID may be invalid or for a different marketplace, 2) The account lacks Amazon Advertising permissions, 3) The access token has expired, or 4) The profile is not set up for advertising in any of our supported regions.'
-      } else if (noDataErrors > 0) {
-        errorMessage += `Found advertising access in ${noDataErrors} region(s) but no campaigns exist. This is normal for new advertising accounts or accounts that haven't created campaigns yet.`
-      } else {
-        errorMessage += 'All API requests failed due to technical issues. This could be temporary Amazon API issues, network problems, or configuration issues.'
-      }
-      
+    if (result && result.campaigns.length >= 0) {
+      campaignsData = result.campaigns
+      successfulRegion = result.region
+      console.log(`✓ SUCCESS: Found ${campaignsData.length} campaigns in ${targetRegion} region`)
+    } else {
+      console.log(`✗ Failed to fetch campaigns from ${targetRegion} region`)
       await updateConnectionStatus(connectionId, 'error', supabase)
-      throw new Error(errorMessage)
+      throw new Error(`Failed to fetch campaigns from accessible region ${targetRegion}`)
     }
 
     // Store campaigns with enhanced logging
@@ -221,18 +188,19 @@ serve(async (req) => {
     await updateLastSyncTime(connectionId, supabase)
     await updateConnectionStatus(connectionId, 'active', supabase)
 
-    console.log('=== SYNC COMPLETED SUCCESSFULLY ===')
+    console.log('=== ENHANCED SYNC COMPLETED SUCCESSFULLY ===')
     console.log('Summary:')
     console.log(`- Campaigns: ${stored}`)
     console.log(`- Metrics updated: ${metricsUpdated}`)
     console.log(`- Ad groups: ${adGroupsStored}`)
     console.log(`- Region: ${successfulRegion}`)
     console.log(`- Real API data: ${hasRealApiData}`)
+    console.log(`- Profile validation: PASSED`)
 
     // Enhanced success response
     const message = stored > 0 
-      ? `Sync completed successfully! Imported ${stored} campaigns and updated metrics for ${metricsUpdated} campaigns from ${successfulRegion} region.${hasRealApiData ? ' Real Amazon API data was successfully retrieved.' : ' Note: Only simulated data was available - this may indicate API limitations or account permissions.'}`
-      : `Connection verified but no campaigns found. The Amazon Advertising account may be empty or campaigns may be in a different region. Profile ID ${connection.profile_id} is valid for ${successfulRegion} region.`
+      ? `Enhanced sync completed successfully! Imported ${stored} campaigns and updated metrics for ${metricsUpdated} campaigns from ${successfulRegion} region. Profile validation passed in ${accessibleRegions.length} region(s).${hasRealApiData ? ' Real Amazon API data was successfully retrieved.' : ' Note: Only simulated data was available - this may indicate API limitations or account permissions.'}`
+      : `Enhanced connection verification completed! Profile ID ${connection.profile_id} is valid and accessible in ${accessibleRegions.length} region(s), but no campaigns were found. The Amazon Advertising account may be empty or campaigns may be in a different state.`
 
     return new Response(
       JSON.stringify({ 
@@ -244,25 +212,22 @@ serve(async (req) => {
           adGroupsStored,
           region: successfulRegion,
           hasRealData: hasRealApiData,
-          regionResults: regionResults.map(r => ({
-            region: r.region,
-            success: r.success,
-            campaignCount: r.campaignCount
-          }))
+          accessibleRegions: accessibleRegions.length,
+          profileValidation: 'PASSED'
         }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error) {
-    console.error('=== SYNC FAILED ===')
+    console.error('=== ENHANCED SYNC FAILED ===')
     console.error('Error:', error.message)
     console.error('Stack:', error.stack)
     
     return new Response(
       JSON.stringify({ 
         error: error.message,
-        details: 'Sync failed. Check the function logs for detailed error information. Common issues: expired tokens, invalid profile IDs, accounts without campaigns, or insufficient Amazon Advertising permissions.',
+        details: 'Enhanced sync failed. The error has been logged with detailed diagnostics. Common issues: expired tokens, invalid profile IDs, accounts without campaigns, insufficient Amazon Advertising permissions, or regional access problems.',
         timestamp: new Date().toISOString()
       }),
       { 
