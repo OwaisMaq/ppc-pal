@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PerformanceMetrics } from "@/hooks/usePerformanceData";
+import { PerformanceMetrics } from "@/types/performance";
 
 interface AdditionalMetricsProps {
   metrics: PerformanceMetrics;

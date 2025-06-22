@@ -3,7 +3,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DollarSign, TrendingUp, Target, ShoppingCart, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { PerformanceMetrics } from "@/hooks/usePerformanceData";
+import { PerformanceMetrics } from "@/types/performance";
 
 interface PerformanceMetricCardsProps {
   metrics: PerformanceMetrics;
