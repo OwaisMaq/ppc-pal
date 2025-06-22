@@ -34,24 +34,15 @@ export const filterCampaigns = (
 
   // Filter by specific ASIN if selected
   if (filters.selectedProduct && filters.selectedProduct !== 'all') {
-    // Find the campaign index that matches the ASIN pattern
-    const matchingCampaigns = campaigns.filter((campaign, index) => {
-      const asin = `B0${String(index + 1).padStart(7, '0')}`;
-      return asin === filters.selectedProduct;
+    // Filter campaigns that contain the selected ASIN in their name or campaign ID
+    const asinPattern = new RegExp(filters.selectedProduct, 'i');
+    
+    filteredCampaigns = filteredCampaigns.filter(campaign => {
+      // Check if ASIN is in campaign name or amazon_campaign_id
+      return asinPattern.test(campaign.name) || asinPattern.test(campaign.amazon_campaign_id);
     });
     
-    if (matchingCampaigns.length > 0) {
-      // Filter to only include campaigns that match this ASIN
-      const matchingCampaignIds = matchingCampaigns.map(c => c.id);
-      filteredCampaigns = filteredCampaigns.filter(campaign => 
-        matchingCampaignIds.includes(campaign.id)
-      );
-      console.log(`Filtered to ${filteredCampaigns.length} campaigns for ASIN ${filters.selectedProduct}`);
-    } else {
-      // No matching campaigns for this ASIN
-      filteredCampaigns = [];
-      console.log(`No campaigns found for ASIN ${filters.selectedProduct}`);
-    }
+    console.log(`Filtered to ${filteredCampaigns.length} campaigns for ASIN ${filters.selectedProduct}`);
   }
 
   return filteredCampaigns;

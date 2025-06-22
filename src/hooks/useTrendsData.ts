@@ -48,20 +48,11 @@ export const useTrendsData = (
     }
 
     if (selectedProduct !== 'all') {
-      // Filter by ASIN - find campaigns that match this ASIN
-      const matchingCampaigns = realCampaigns.filter((campaign, index) => {
-        const asin = `B0${String(index + 1).padStart(7, '0')}`;
-        return asin === selectedProduct;
+      // Filter by real ASIN - check if ASIN is in campaign name or campaign ID
+      const asinPattern = new RegExp(selectedProduct, 'i');
+      filteredCampaigns = filteredCampaigns.filter(campaign => {
+        return asinPattern.test(campaign.name) || asinPattern.test(campaign.amazon_campaign_id);
       });
-      
-      if (matchingCampaigns.length > 0) {
-        const matchingCampaignIds = matchingCampaigns.map(c => c.id);
-        filteredCampaigns = filteredCampaigns.filter(campaign => 
-          matchingCampaignIds.includes(campaign.id)
-        );
-      } else {
-        filteredCampaigns = [];
-      }
     }
 
     if (!filteredCampaigns.length) {
