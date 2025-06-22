@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -68,22 +67,26 @@ export const useWeeklyMetrics = (
         return;
       }
 
-      // Filter for real data campaigns with actual metrics
-      const realDataCampaigns = filteredCampaigns.filter(campaign => {
-        const hasApiSource = campaign.data_source !== 'simulated' && campaign.data_source !== 'simulation';
-        const hasActualMetrics = (campaign.sales || 0) > 0 || (campaign.spend || 0) > 0 || (campaign.orders || 0) > 0;
-        return hasApiSource && hasActualMetrics;
+      // Filter for campaigns with meaningful metrics
+      const campaignsWithMetrics = filteredCampaigns.filter(campaign => {
+        const hasMetrics = (campaign.sales || 0) > 0 || (campaign.spend || 0) > 0 || (campaign.orders || 0) > 0;
+        return hasMetrics;
       });
 
-      if (!realDataCampaigns.length) {
-        console.log('No real data campaigns with actual metrics for weekly analysis');
+      if (!campaignsWithMetrics.length) {
+        console.log('No campaigns with metrics for weekly analysis');
         setWeeklyMetrics(null);
         setLoading(false);
         return;
       }
 
+      // Check if we have real data
+      const hasRealData = campaignsWithMetrics.some(campaign => 
+        campaign.data_source !== 'simulated' && campaign.data_source !== 'simulation'
+      );
+
       // Get campaign IDs for filtering historical data
-      const campaignIds = realDataCampaigns.map(c => c.id);
+      const campaignIds = campaignsWithMetrics.map(c => c.id);
       
       // Calculate date ranges
       const today = new Date();
@@ -91,25 +94,19 @@ export const useWeeklyMetrics = (
       const previous7DaysStart = new Date(today.getTime() - 14 * 24 * 60 * 60 * 1000);
       const previous7DaysEnd = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-      // Fetch real historical data only (no simulated data)
-      const { data: currentWeekData, error: currentError } = await supabase
+      // Try to fetch historical data first
+      const { data: currentWeekData } = await supabase
         .from('campaign_metrics_history')
         .select('*')
         .in('campaign_id', campaignIds)
         .gte('date', last7DaysStart.toISOString().split('T')[0])
-        .lte('date', today.toISOString().split('T')[0])
-        .neq('data_source', 'simulated')
-        .neq('data_source', 'simulation');
+        .lte('date', today.toISOString().split('T')[0]);
 
-      if (currentError) {
-        console.error('Error fetching current week real data:', currentError);
-      }
-
-      // If no historical data, use current campaign metrics as fallback
+      // If no historical data, use current campaign metrics
       if (!currentWeekData || currentWeekData.length === 0) {
-        console.log('No historical weekly data found, using current real campaign metrics...');
+        console.log('No historical weekly data found, using current campaign metrics...');
         
-        const currentMetrics = calculateMetricsFromCampaigns(realDataCampaigns);
+        const currentMetrics = calculateMetricsFromCampaigns(campaignsWithMetrics);
         
         // Try to get previous week historical data for comparison
         const { data: previousWeekData } = await supabase
@@ -117,9 +114,7 @@ export const useWeeklyMetrics = (
           .select('*')
           .in('campaign_id', campaignIds)
           .gte('date', previous7DaysStart.toISOString().split('T')[0])
-          .lt('date', previous7DaysEnd.toISOString().split('T')[0])
-          .neq('data_source', 'simulated')
-          .neq('data_source', 'simulation');
+          .lt('date', previous7DaysEnd.toISOString().split('T')[0]);
         
         const previousMetrics = previousWeekData && previousWeekData.length > 0 
           ? calculateMetricsFromData(previousWeekData)
@@ -148,29 +143,23 @@ export const useWeeklyMetrics = (
           spendChange,
           ordersChange,
           profitChange,
-          hasRealData: true,
-          dataSourceInfo: `Based on current real campaign metrics (${realDataCampaigns.length} campaigns with actual data)`
+          hasRealData,
+          dataSourceInfo: `Based on current campaign metrics (${campaignsWithMetrics.length} campaigns)`
         };
 
-        console.log('Weekly metrics from real campaigns with actual data:', weeklyMetricsResult);
+        console.log('Weekly metrics from campaigns:', weeklyMetricsResult);
         setWeeklyMetrics(weeklyMetricsResult);
         setLoading(false);
         return;
       }
 
-      // Fetch previous week metrics for comparison (real data only)
-      const { data: previousWeekData, error: previousError } = await supabase
+      // Use historical data if available
+      const { data: previousWeekData } = await supabase
         .from('campaign_metrics_history')
         .select('*')
         .in('campaign_id', campaignIds)
         .gte('date', previous7DaysStart.toISOString().split('T')[0])
-        .lt('date', previous7DaysEnd.toISOString().split('T')[0])
-        .neq('data_source', 'simulated')
-        .neq('data_source', 'simulation');
-
-      if (previousError) {
-        console.error('Error fetching previous week data:', previousError);
-      }
+        .lt('date', previous7DaysEnd.toISOString().split('T')[0]);
 
       // Calculate current week metrics
       const currentMetrics = calculateMetricsFromData(currentWeekData);
@@ -203,11 +192,11 @@ export const useWeeklyMetrics = (
         spendChange,
         ordersChange,
         profitChange,
-        hasRealData: true,
-        dataSourceInfo: `Based on real historical data from last 7 days (${currentWeekData.length} data points)`
+        hasRealData,
+        dataSourceInfo: `Based on historical data from last 7 days (${currentWeekData.length} data points)`
       };
 
-      console.log('Weekly metrics calculated from real data:', weeklyMetricsResult);
+      console.log('Weekly metrics calculated from historical data:', weeklyMetricsResult);
       setWeeklyMetrics(weeklyMetricsResult);
     } catch (error) {
       console.error('Error calculating weekly metrics:', error);
