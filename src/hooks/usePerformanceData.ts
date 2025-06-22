@@ -32,7 +32,7 @@ export const usePerformanceData = (connectionId?: string, selectedCountry?: stri
   }, [campaigns, keywords, campaignsLoading, keywordsLoading, connections, selectedCountry, selectedCampaign]);
 
   const calculateMetrics = () => {
-    console.log('Calculating performance metrics...');
+    console.log('=== Calculating Performance Metrics ===');
     console.log('Available campaigns:', campaigns.length);
     console.log('Available connections:', connections.length);
     
@@ -67,14 +67,19 @@ export const usePerformanceData = (connectionId?: string, selectedCountry?: stri
       console.log(`Filtered to ${filteredCampaigns.length} campaigns for campaign ${selectedCampaign}`);
     }
 
-    console.log('Processing campaigns for metrics:', filteredCampaigns.map(c => ({
-      name: c.name,
-      sales: c.sales,
-      spend: c.spend,
-      orders: c.orders,
-      impressions: c.impressions,
-      clicks: c.clicks
-    })));
+    // Log campaign metrics for debugging
+    console.log('Campaign metrics breakdown:');
+    filteredCampaigns.forEach((campaign, index) => {
+      console.log(`  ${index + 1}. ${campaign.name}:`, {
+        sales: campaign.sales,
+        spend: campaign.spend,
+        orders: campaign.orders,
+        impressions: campaign.impressions,
+        clicks: campaign.clicks,
+        acos: campaign.acos,
+        roas: campaign.roas
+      });
+    });
 
     // Calculate metrics from filtered campaigns
     const totalSales = filteredCampaigns.reduce((sum, c) => sum + (c.sales || 0), 0);
@@ -91,14 +96,17 @@ export const usePerformanceData = (connectionId?: string, selectedCountry?: stri
     const averageCpc = totalClicks > 0 ? totalSpend / totalClicks : 0;
     const conversionRate = totalClicks > 0 ? (totalOrders / totalClicks) * 100 : 0;
 
-    console.log('Calculated metrics:', {
-      totalSales,
-      totalSpend,
-      totalProfit,
+    console.log('=== Final Calculated Metrics ===');
+    console.log({
+      totalSales: `$${totalSales.toFixed(2)}`,
+      totalSpend: `$${totalSpend.toFixed(2)}`,
+      totalProfit: `$${totalProfit.toFixed(2)}`,
       totalOrders,
-      averageAcos,
-      averageRoas,
-      campaignCount: filteredCampaigns.length
+      averageAcos: `${averageAcos.toFixed(2)}%`,
+      averageRoas: `${averageRoas.toFixed(2)}x`,
+      campaignCount: filteredCampaigns.length,
+      totalImpressions,
+      totalClicks
     });
 
     setMetrics({

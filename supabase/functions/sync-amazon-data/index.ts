@@ -39,7 +39,9 @@ serve(async (req) => {
     }
 
     const { connectionId } = await req.json()
-    console.log('Syncing data for connection:', connectionId)
+    console.log('=== Starting Amazon Data Sync ===')
+    console.log('Connection ID:', connectionId)
+    console.log('User ID:', user.id)
 
     // Get the connection details
     const connection = await getConnection(connectionId, user.id, supabase)
@@ -48,6 +50,7 @@ serve(async (req) => {
     try {
       validateConnection(connection)
     } catch (error) {
+      console.error('Connection validation failed:', error.message)
       await updateConnectionStatus(connectionId, 'error', supabase)
       throw error
     }
@@ -58,6 +61,7 @@ serve(async (req) => {
     }
 
     console.log('Using profile ID:', connection.profile_id)
+    console.log('Marketplace:', connection.marketplace_id)
 
     // Handle token refresh if needed
     const accessToken = await refreshTokenIfNeeded(connection, clientId, supabase)
@@ -66,7 +70,9 @@ serve(async (req) => {
     let campaignsData = []
     let successfulRegion = null
 
+    console.log('=== Fetching Campaigns ===')
     for (const region of REGIONS) {
+      console.log(`Trying region: ${region}`)
       const result = await fetchCampaignsFromRegion(
         accessToken,
         clientId,
@@ -77,6 +83,7 @@ serve(async (req) => {
       if (result) {
         campaignsData = result.campaigns
         successfulRegion = result.region
+        console.log(`✓ Successfully fetched ${campaignsData.length} campaigns from ${region} region`)
         break
       }
     }
@@ -87,18 +94,22 @@ serve(async (req) => {
     }
 
     // Store campaigns
+    console.log('=== Storing Campaigns ===')
     const { stored: campaignsStored, campaignIds } = await storeCampaigns(
       campaignsData,
       connectionId,
       supabase
     )
+    console.log(`✓ Stored ${campaignsStored} campaigns`)
 
     // Fetch and update performance metrics
+    console.log('=== Fetching Performance Metrics ===')
     const baseUrl = getBaseUrl(successfulRegion)
+    let metricsUpdated = 0;
     
     if (campaignIds.length > 0) {
       try {
-        console.log('Fetching performance metrics for campaigns...')
+        console.log(`Fetching metrics for ${campaignIds.length} campaigns...`)
         const metricsData = await fetchCampaignReports(
           accessToken,
           clientId,
@@ -108,15 +119,23 @@ serve(async (req) => {
         )
         
         if (metricsData.length > 0) {
+          console.log(`Processing ${metricsData.length} metrics records...`)
           await updateCampaignMetrics(supabase, connectionId, metricsData)
-          console.log(`Updated metrics for ${metricsData.length} campaigns`)
+          metricsUpdated = metricsData.length;
+          console.log(`✓ Updated metrics for ${metricsUpdated} campaigns`)
+        } else {
+          console.warn('No metrics data received from API')
         }
       } catch (error) {
-        console.error('Error fetching campaign metrics:', error)
+        console.error('Error in metrics update process:', error)
+        // Don't fail the entire sync for metrics errors
       }
+    } else {
+      console.log('No campaigns available for metrics update')
     }
 
     // Sync ad groups for each campaign
+    console.log('=== Syncing Ad Groups ===')
     const adGroupsStored = await syncAdGroups(
       accessToken,
       clientId,
@@ -125,26 +144,38 @@ serve(async (req) => {
       connectionId,
       supabase
     )
+    console.log(`✓ Stored ${adGroupsStored} ad groups`)
 
     // Update last sync time and status
     await updateLastSyncTime(connectionId, supabase)
+    await updateConnectionStatus(connectionId, 'active', supabase)
 
-    console.log('Data sync completed successfully')
+    console.log('=== Sync Completed Successfully ===')
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: `Data sync completed successfully. Imported ${campaignsStored} campaigns and ${adGroupsStored} ad groups with performance metrics.`,
-        campaignsStored,
-        adGroupsStored
+        message: `Data sync completed successfully. Imported ${campaignsStored} campaigns, updated metrics for ${metricsUpdated} campaigns, and ${adGroupsStored} ad groups.`,
+        details: {
+          campaignsStored,
+          metricsUpdated,
+          adGroupsStored,
+          region: successfulRegion
+        }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error) {
-    console.error('Sync error:', error)
+    console.error('=== Sync Error ===')
+    console.error('Error details:', error)
+    console.error('Stack trace:', error.stack)
+    
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        details: 'Check the function logs for more information'
+      }),
       { 
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
