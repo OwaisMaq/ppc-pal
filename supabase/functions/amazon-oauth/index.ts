@@ -4,6 +4,7 @@ import { corsHeaders } from './config.ts';
 import { validateUser } from './auth.ts';
 import { handleOAuthInitiate } from './oauth-initiate.ts';
 import { handleOAuthCallback } from './oauth-callback.ts';
+import { retryProfileFetch } from './connections.ts';
 import type { OAuthRequest } from './types.ts';
 
 serve(async (req) => {
@@ -30,6 +31,15 @@ serve(async (req) => {
 
     if (requestData.action === 'callback') {
       const result = await handleOAuthCallback(requestData, user.id);
+      
+      return new Response(
+        JSON.stringify(result),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (requestData.action === 'retry-profiles') {
+      const result = await retryProfileFetch((requestData as any).connectionId);
       
       return new Response(
         JSON.stringify(result),

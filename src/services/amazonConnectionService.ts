@@ -111,5 +111,32 @@ export const amazonConnectionService = {
 
     console.log('Sync completed:', data);
     return data;
+  },
+
+  async retryProfileFetch(connectionId: string) {
+    console.log('Starting profile fetch retry for connection:', connectionId);
+    
+    const session = await supabase.auth.getSession();
+    if (!session.data.session?.access_token) {
+      throw new Error('No valid session found');
+    }
+
+    const { data, error } = await supabase.functions.invoke('amazon-oauth', {
+      body: { 
+        action: 'retry-profiles', 
+        connectionId 
+      },
+      headers: {
+        Authorization: `Bearer ${session.data.session.access_token}`,
+      },
+    });
+
+    if (error) {
+      console.error('Profile retry error:', error);
+      throw error;
+    }
+
+    console.log('Profile retry completed:', data);
+    return data;
   }
 };

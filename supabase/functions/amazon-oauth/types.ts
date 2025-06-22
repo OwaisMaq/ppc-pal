@@ -11,7 +11,12 @@ export interface OAuthCallbackRequest {
   redirectUri: string;
 }
 
-export type OAuthRequest = OAuthInitiateRequest | OAuthCallbackRequest;
+export interface OAuthRetryRequest {
+  action: 'retry-profiles';
+  connectionId: string;
+}
+
+export type OAuthRequest = OAuthInitiateRequest | OAuthCallbackRequest | OAuthRetryRequest;
 
 export interface TokenResponse {
   access_token: string;

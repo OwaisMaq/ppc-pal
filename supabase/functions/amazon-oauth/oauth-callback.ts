@@ -2,7 +2,7 @@
 import type { OAuthCallbackRequest } from './types.ts';
 import { getAmazonCredentials } from './config.ts';
 import { exchangeCodeForTokens } from './token-exchange.ts';
-import { fetchAdvertisingProfiles } from './profiles.ts';
+import { fetchAdvertisingProfiles, validateProfileAccess } from './profiles.ts';
 import { createConnections } from './connections.ts';
 
 export async function handleOAuthCallback(
@@ -40,42 +40,68 @@ export async function handleOAuthCallback(
   const profiles = await fetchAdvertisingProfiles(tokenData.access_token, clientId);
 
   if (profiles.length === 0) {
-    console.warn('No advertising profiles found for this Amazon account');
+    console.warn('No advertising profiles found - this may indicate the account needs Amazon Advertising setup');
     
-    // Create a connection with 'needs_setup' status instead of creating dummy profile
+    // Create a connection with 'needs_setup' status that provides clear guidance
     const connectionsCreated = await createConnections([], tokenData, userId);
     
     return {
       success: true,
       profileCount: 0,
-      warning: "Amazon account connected, but no advertising profiles were found. You may need to set up Amazon Advertising first, or contact support if you believe this is an error.",
-      message: "Connected successfully but requires additional setup."
+      warning: "Your Amazon account was connected successfully, but no Amazon Advertising profiles were found. This usually means:\n\n1. You haven't set up Amazon Advertising yet - please visit advertising.amazon.com to create your advertising account\n2. You may need to wait a few minutes after setting up advertising for profiles to become available\n3. Your advertising account may be pending approval\n\nOnce your advertising account is active, please reconnect to import your campaigns.",
+      message: "Connected - Amazon Advertising setup required"
     };
   }
 
-  // Validate profiles have real profile IDs
-  const validProfiles = profiles.filter(profile => {
+  // Validate profiles have real profile IDs and are accessible
+  const validatedProfiles = [];
+  
+  for (const profile of profiles) {
     const profileId = profile.profileId?.toString();
-    return profileId && !profileId.startsWith('profile_') && profileId !== 'unknown';
-  });
+    
+    if (!profileId || profileId.startsWith('profile_') || profileId === 'unknown') {
+      console.warn('Skipping invalid profile ID:', profileId);
+      continue;
+    }
 
-  if (validProfiles.length === 0) {
-    console.warn('No valid advertising profiles found (all profiles have invalid IDs)');
-    throw new Error('Unable to retrieve valid advertising profile information from Amazon. Please ensure your Amazon Advertising account is properly set up.');
+    // Test if we can actually access this profile
+    console.log('Validating access for profile:', profileId);
+    const hasAccess = await validateProfileAccess(tokenData.access_token, clientId, profileId);
+    
+    if (hasAccess) {
+      validatedProfiles.push(profile);
+      console.log('Profile validated successfully:', profileId);
+    } else {
+      console.warn('Profile validation failed for:', profileId);
+    }
   }
 
-  if (validProfiles.length < profiles.length) {
-    console.warn(`Found ${profiles.length} profiles but only ${validProfiles.length} are valid`);
+  if (validatedProfiles.length === 0) {
+    console.warn('No accessible advertising profiles found after validation');
+    
+    // Create connection with detailed error information
+    const connectionsCreated = await createConnections([], tokenData, userId);
+    
+    return {
+      success: true,
+      profileCount: 0,
+      warning: "Amazon account connected but advertising profiles are not accessible. This could mean:\n\n1. Your advertising account is still being set up\n2. You may not have the necessary permissions\n3. Your advertising account may be suspended or pending review\n\nPlease check your Amazon Advertising account status at advertising.amazon.com and try reconnecting once your account is active.",
+      message: "Connected - profile access validation failed"
+    };
   }
 
-  // Create connection records with valid profiles only
-  const connectionsCreated = await createConnections(validProfiles, tokenData, userId);
+  if (validatedProfiles.length < profiles.length) {
+    console.warn(`Found ${profiles.length} profiles but only ${validatedProfiles.length} are accessible`);
+  }
+
+  // Create connection records with validated profiles only
+  const connectionsCreated = await createConnections(validatedProfiles, tokenData, userId);
 
   console.log('Successfully created connections:', connectionsCreated);
   
   return {
     success: true, 
     profileCount: connectionsCreated,
-    message: `Successfully connected ${connectionsCreated} Amazon Advertising profile(s).`
+    message: `Successfully connected ${connectionsCreated} Amazon Advertising profile(s) with verified access.`
   };
 }
