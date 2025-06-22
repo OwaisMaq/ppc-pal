@@ -5,9 +5,9 @@ import { useAmazonConnections } from './useAmazonConnections';
 
 export const usePerformanceSummary = () => {
   const [selectedCountry, setSelectedCountry] = useState("all");
-  const [selectedAsin, setSelectedAsin] = useState("all");
+  const [selectedCampaign, setSelectedCampaign] = useState("all");
   const { connections } = useAmazonConnections();
-  const { metrics, loading, hasData } = usePerformanceData(undefined, selectedCountry, selectedAsin);
+  const { metrics, loading, hasData } = usePerformanceData(undefined, selectedCountry, selectedCampaign);
 
   const getFilteredDescription = () => {
     const parts = [];
@@ -26,8 +26,8 @@ export const usePerformanceSummary = () => {
       };
       parts.push(`in ${countryLabels[selectedCountry] || selectedCountry}`);
     }
-    if (selectedAsin !== "all") {
-      parts.push(`for ${selectedAsin}`);
+    if (selectedCampaign !== "all") {
+      parts.push(`for selected campaign`);
     }
     return parts.length > 0 ? ` ${parts.join(" ")}` : "";
   };
@@ -48,8 +48,8 @@ export const usePerformanceSummary = () => {
   return {
     selectedCountry,
     setSelectedCountry,
-    selectedAsin,
-    setSelectedAsin,
+    selectedCampaign,
+    setSelectedCampaign,
     connections,
     metrics,
     loading,

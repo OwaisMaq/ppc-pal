@@ -25,6 +25,8 @@ export async function updateCampaignMetrics(
 
       if (error) {
         console.error('Error updating campaign metrics:', error);
+      } else {
+        console.log(`Updated metrics for campaign ${metrics.campaignId}: sales=${metrics.sales}, spend=${metrics.spend}, orders=${metrics.orders}`);
       }
     } catch (error) {
       console.error('Error processing metrics for campaign:', metrics.campaignId, error);

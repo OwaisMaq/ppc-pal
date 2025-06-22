@@ -19,7 +19,7 @@ export interface PerformanceMetrics {
   conversionRate: number;
 }
 
-export const usePerformanceData = (connectionId?: string, selectedCountry?: string, selectedAsin?: string) => {
+export const usePerformanceData = (connectionId?: string, selectedCountry?: string, selectedCampaign?: string) => {
   const { connections } = useAmazonConnections();
   const { campaigns, loading: campaignsLoading } = useCampaignData(connectionId);
   const { keywords, loading: keywordsLoading } = useKeywordData(connectionId);
@@ -29,7 +29,7 @@ export const usePerformanceData = (connectionId?: string, selectedCountry?: stri
     if (campaignsLoading || keywordsLoading) return;
 
     calculateMetrics();
-  }, [campaigns, keywords, campaignsLoading, keywordsLoading, connections, selectedCountry, selectedAsin]);
+  }, [campaigns, keywords, campaignsLoading, keywordsLoading, connections, selectedCountry, selectedCampaign]);
 
   const calculateMetrics = () => {
     console.log('Calculating performance metrics...');
@@ -58,17 +58,13 @@ export const usePerformanceData = (connectionId?: string, selectedCountry?: stri
       console.log(`Filtered to ${filteredCampaigns.length} campaigns for country ${selectedCountry}`);
     }
 
-    // Filter by ASIN if selected (this is a simplified filter - in a real app you'd have ASIN data)
-    if (selectedAsin && selectedAsin !== 'all') {
-      // For now, just filter by campaign name containing the ASIN or randomly select some campaigns
-      // In a real implementation, you'd have ASIN data linked to campaigns
-      const asinSuffix = selectedAsin.replace('B0', '').substring(0, 6);
+    // Filter by specific campaign if selected
+    if (selectedCampaign && selectedCampaign !== 'all') {
       filteredCampaigns = filteredCampaigns.filter(campaign => 
-        campaign.amazon_campaign_id.includes(asinSuffix) ||
-        campaign.name.toLowerCase().includes(selectedAsin.toLowerCase())
+        campaign.id === selectedCampaign
       );
       
-      console.log(`Filtered to ${filteredCampaigns.length} campaigns for ASIN ${selectedAsin}`);
+      console.log(`Filtered to ${filteredCampaigns.length} campaigns for campaign ${selectedCampaign}`);
     }
 
     console.log('Processing campaigns for metrics:', filteredCampaigns.map(c => ({

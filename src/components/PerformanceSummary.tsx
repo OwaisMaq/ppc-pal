@@ -11,8 +11,8 @@ const PerformanceSummary = () => {
   const {
     selectedCountry,
     setSelectedCountry,
-    selectedAsin,
-    setSelectedAsin,
+    selectedCampaign,
+    setSelectedCampaign,
     connections,
     metrics,
     loading,
@@ -57,9 +57,9 @@ const PerformanceSummary = () => {
 
       <FilterBar
         selectedCountry={selectedCountry}
-        selectedAsin={selectedAsin}
+        selectedAsin={selectedCampaign}
         onCountryChange={setSelectedCountry}
-        onAsinChange={setSelectedAsin}
+        onAsinChange={setSelectedCampaign}
       />
 
       <PerformanceMetricCards 

@@ -3,7 +3,7 @@ import React from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Globe, Package } from "lucide-react";
+import { Globe, Target } from "lucide-react";
 import { useCampaignData } from "@/hooks/useCampaignData";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 
@@ -53,33 +53,21 @@ const FilterBar = ({ selectedCountry, selectedAsin, onCountryChange, onAsinChang
     return countryOptions;
   }, [connections]);
 
-  // Extract available products from campaigns
-  const availableProducts = React.useMemo(() => {
-    const products = new Set<string>();
+  // Extract available campaigns
+  const availableCampaigns = React.useMemo(() => {
+    const campaignOptions = [{ value: "all", label: "All Campaigns" }];
     
-    // Generate ASINs based on campaign names and add some realistic variation
-    campaigns.forEach((campaign, index) => {
-      // Create a realistic-looking ASIN based on campaign
-      const asinSuffix = (campaign.amazon_campaign_id.slice(-6) + '000000').substring(0, 7);
-      const asin = `B0${asinSuffix}`;
-      products.add(asin);
-    });
-    
-    const productOptions = [{ value: "all", label: "All Products" }];
-    
-    Array.from(products).forEach(asin => {
-      // Find corresponding campaign for this ASIN
-      const campaignIndex = Array.from(products).indexOf(asin);
-      const campaign = campaigns[campaignIndex];
-      const productName = campaign ? campaign.name.substring(0, 30) : 'Product';
+    campaigns.forEach(campaign => {
+      const statusIndicator = campaign.status === 'enabled' ? '🟢' : 
+                             campaign.status === 'paused' ? '🟡' : '🔴';
       
-      productOptions.push({
-        value: asin,
-        label: `${asin} - ${productName}${productName.length > 30 ? '...' : ''}`
+      campaignOptions.push({
+        value: campaign.id,
+        label: `${statusIndicator} ${campaign.name.substring(0, 40)}${campaign.name.length > 40 ? '...' : ''}`
       });
     });
     
-    return productOptions.slice(0, 9); // Limit to 8 products + "All Products"
+    return campaignOptions.slice(0, 21); // Limit to 20 campaigns + "All Campaigns"
   }, [campaigns]);
 
   return (
@@ -106,24 +94,27 @@ const FilterBar = ({ selectedCountry, selectedAsin, onCountryChange, onAsinChang
             </Select>
           </div>
 
-          {/* Product Filter */}
+          {/* Campaign Filter */}
           <div className="space-y-2">
-            <Label htmlFor="asin-filter" className="text-sm font-medium flex items-center gap-2">
-              <Package className="h-4 w-4 text-blue-600" />
-              Product (ASIN)
+            <Label htmlFor="campaign-filter" className="text-sm font-medium flex items-center gap-2">
+              <Target className="h-4 w-4 text-blue-600" />
+              Campaign
             </Label>
             <Select value={selectedAsin} onValueChange={onAsinChange}>
-              <SelectTrigger id="asin-filter">
-                <SelectValue placeholder="Select product" />
+              <SelectTrigger id="campaign-filter">
+                <SelectValue placeholder="Select campaign" />
               </SelectTrigger>
               <SelectContent>
-                {availableProducts.map((product) => (
-                  <SelectItem key={product.value} value={product.value}>
-                    {product.label}
+                {availableCampaigns.map((campaign) => (
+                  <SelectItem key={campaign.value} value={campaign.value}>
+                    {campaign.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            <p className="text-xs text-gray-500">
+              🟢 Active • 🟡 Paused • 🔴 Archived
+            </p>
           </div>
         </div>
       </CardContent>
