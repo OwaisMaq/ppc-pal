@@ -32,16 +32,25 @@ export const filterCampaigns = (
     console.log(`Filtered to ${filteredCampaigns.length} campaigns for campaign ${filters.selectedCampaign}`);
   }
 
-  // Filter by specific product/ASIN if selected
+  // Filter by specific ASIN if selected
   if (filters.selectedProduct && filters.selectedProduct !== 'all') {
-    // Find campaign index that matches the ASIN pattern
-    const productIndex = campaigns.findIndex((_, index) => 
-      `B0${String(index + 1).padStart(7, '0')}` === filters.selectedProduct
-    );
+    // Find the campaign index that matches the ASIN pattern
+    const matchingCampaigns = campaigns.filter((campaign, index) => {
+      const asin = `B0${String(index + 1).padStart(7, '0')}`;
+      return asin === filters.selectedProduct;
+    });
     
-    if (productIndex >= 0) {
-      filteredCampaigns = filteredCampaigns.filter((_, index) => index === productIndex);
-      console.log(`Filtered to ${filteredCampaigns.length} campaigns for product ${filters.selectedProduct}`);
+    if (matchingCampaigns.length > 0) {
+      // Filter to only include campaigns that match this ASIN
+      const matchingCampaignIds = matchingCampaigns.map(c => c.id);
+      filteredCampaigns = filteredCampaigns.filter(campaign => 
+        matchingCampaignIds.includes(campaign.id)
+      );
+      console.log(`Filtered to ${filteredCampaigns.length} campaigns for ASIN ${filters.selectedProduct}`);
+    } else {
+      // No matching campaigns for this ASIN
+      filteredCampaigns = [];
+      console.log(`No campaigns found for ASIN ${filters.selectedProduct}`);
     }
   }
 

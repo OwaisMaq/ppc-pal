@@ -48,12 +48,19 @@ export const useTrendsData = (
     }
 
     if (selectedProduct !== 'all') {
-      // Filter by specific product/ASIN (using campaign as proxy)
-      const productIndex = realCampaigns.findIndex((_, index) => 
-        `B0${String(index + 1).padStart(7, '0')}` === selectedProduct
-      );
-      if (productIndex >= 0) {
-        filteredCampaigns = [realCampaigns[productIndex]];
+      // Filter by ASIN - find campaigns that match this ASIN
+      const matchingCampaigns = realCampaigns.filter((campaign, index) => {
+        const asin = `B0${String(index + 1).padStart(7, '0')}`;
+        return asin === selectedProduct;
+      });
+      
+      if (matchingCampaigns.length > 0) {
+        const matchingCampaignIds = matchingCampaigns.map(c => c.id);
+        filteredCampaigns = filteredCampaigns.filter(campaign => 
+          matchingCampaignIds.includes(campaign.id)
+        );
+      } else {
+        filteredCampaigns = [];
       }
     }
 
