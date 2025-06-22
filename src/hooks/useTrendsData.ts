@@ -2,6 +2,7 @@
 import React from 'react';
 import { CampaignData } from './useCampaignData';
 import { AmazonConnection } from '@/lib/amazon/types';
+import { filterRealDataOnly } from '@/utils/dataFilter';
 
 interface TrendData {
   name: string;
@@ -20,8 +21,16 @@ export const useTrendsData = (
   const trendsData = React.useMemo(() => {
     if (!campaigns.length) return [];
 
+    // Filter to real data only first
+    const realCampaigns = filterRealDataOnly(campaigns);
+    
+    if (!realCampaigns.length) {
+      console.log('No real data campaigns available for trends');
+      return [];
+    }
+
     // Filter campaigns based on selections
-    let filteredCampaigns = campaigns;
+    let filteredCampaigns = realCampaigns;
     
     if (selectedCountry !== 'all') {
       const countryConnections = connections
@@ -40,15 +49,20 @@ export const useTrendsData = (
 
     if (selectedProduct !== 'all') {
       // Filter by specific product/ASIN (using campaign as proxy)
-      const productIndex = campaigns.findIndex((_, index) => 
+      const productIndex = realCampaigns.findIndex((_, index) => 
         `B0${String(index + 1).padStart(7, '0')}` === selectedProduct
       );
       if (productIndex >= 0) {
-        filteredCampaigns = [campaigns[productIndex]];
+        filteredCampaigns = [realCampaigns[productIndex]];
       }
     }
 
-    // Generate monthly trend data from campaigns
+    if (!filteredCampaigns.length) {
+      console.log('No real data campaigns match the current filters');
+      return [];
+    }
+
+    // Generate monthly trend data from real campaigns only
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
     
     return months.map((month, index) => {

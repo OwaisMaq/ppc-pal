@@ -6,6 +6,7 @@ import PerformanceLoadingState from "./performance/PerformanceLoadingState";
 import PerformanceEmptyState from "./performance/PerformanceEmptyState";
 import PerformanceMetricCards from "./performance/PerformanceMetricCards";
 import AdditionalMetrics from "./performance/AdditionalMetrics";
+import NoRealDataAlert from "./performance/NoRealDataAlert";
 
 const PerformanceSummary = () => {
   const {
@@ -17,6 +18,7 @@ const PerformanceSummary = () => {
     metrics,
     loading,
     hasData,
+    hasRealData,
     getFilteredDescription,
     formatCurrency,
     formatPercentage
@@ -38,17 +40,6 @@ const PerformanceSummary = () => {
     );
   }
 
-  if (!metrics) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Performance Summary</h2>
-          <p className="text-gray-600">Unable to calculate performance metrics</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <div>
@@ -67,16 +58,29 @@ const PerformanceSummary = () => {
         onProductChange={setSelectedProduct}
       />
 
-      <PerformanceMetricCards 
-        metrics={metrics} 
-        formatCurrency={formatCurrency} 
-      />
+      {!hasRealData ? (
+        <NoRealDataAlert 
+          description="No real campaign data available. All current data is simulated. Please sync your Amazon account to get real performance metrics."
+        />
+      ) : metrics ? (
+        <>
+          <PerformanceMetricCards 
+            metrics={metrics} 
+            formatCurrency={formatCurrency} 
+          />
 
-      <AdditionalMetrics 
-        metrics={metrics}
-        formatCurrency={formatCurrency}
-        formatPercentage={formatPercentage}
-      />
+          <AdditionalMetrics 
+            metrics={metrics}
+            formatCurrency={formatCurrency}
+            formatPercentage={formatPercentage}
+          />
+        </>
+      ) : (
+        <NoRealDataAlert 
+          title="Unable to Calculate Metrics"
+          description="Real data is available but metrics calculation failed. Please check your connection and try again."
+        />
+      )}
     </div>
   );
 };
