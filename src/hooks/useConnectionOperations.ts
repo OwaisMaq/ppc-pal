@@ -7,11 +7,12 @@ export const useConnectionOperations = () => {
 
   const syncConnection = async (connectionId: string, onSuccess?: () => void) => {
     try {
-      await amazonConnectionService.syncConnection(connectionId);
+      console.log('Starting manual sync for connection:', connectionId);
+      const result = await amazonConnectionService.syncConnection(connectionId);
       
       toast({
         title: "Success",
-        description: "Campaign data sync started! This may take a few minutes.",
+        description: result?.message || "Campaign data sync completed successfully!",
       });
       
       if (onSuccess) {
@@ -19,9 +20,19 @@ export const useConnectionOperations = () => {
       }
     } catch (error) {
       console.error('Error syncing connection:', error);
+      
+      let errorMessage = "Failed to sync Amazon data";
+      if (error instanceof Error) {
+        if (error.message.includes('expired')) {
+          errorMessage = "Your Amazon token has expired. Please reconnect your account.";
+        } else if (error.message.includes('regions')) {
+          errorMessage = "Unable to connect to Amazon's API. Please try again later.";
+        }
+      }
+      
       toast({
-        title: "Error",
-        description: "Failed to sync Amazon data",
+        title: "Sync Error",
+        description: errorMessage,
         variant: "destructive",
       });
     }

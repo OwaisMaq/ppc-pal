@@ -92,13 +92,24 @@ export const amazonConnectionService = {
   async syncConnection(connectionId: string) {
     console.log('Starting data sync for connection:', connectionId);
     
-    const { error } = await supabase.functions.invoke('sync-amazon-data', {
+    const session = await supabase.auth.getSession();
+    if (!session.data.session?.access_token) {
+      throw new Error('No valid session found');
+    }
+
+    const { data, error } = await supabase.functions.invoke('sync-amazon-data', {
       body: { connectionId },
       headers: {
-        Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        Authorization: `Bearer ${session.data.session.access_token}`,
       },
     });
 
-    if (error) throw error;
+    if (error) {
+      console.error('Sync error:', error);
+      throw error;
+    }
+
+    console.log('Sync completed:', data);
+    return data;
   }
 };

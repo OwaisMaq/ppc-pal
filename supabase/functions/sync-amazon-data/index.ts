@@ -42,6 +42,7 @@ serve(async (req) => {
       .single()
 
     if (connectionError || !connection) {
+      console.error('Connection error:', connectionError)
       throw new Error('Connection not found')
     }
 
@@ -54,6 +55,8 @@ serve(async (req) => {
       throw new Error('Amazon Client ID not configured')
     }
 
+    console.log('Using profile ID:', connection.profile_id)
+
     // Check if token needs refresh
     const now = new Date()
     const expiresAt = new Date(connection.token_expires_at)
@@ -61,61 +64,133 @@ serve(async (req) => {
     let accessToken = connection.access_token
     
     if (now >= expiresAt) {
-      console.log('Token expired, refreshing...')
-      // Refresh token logic would go here
-      // For now, mark as expired
+      console.log('Token expired, attempting refresh...')
+      
+      if (!connection.refresh_token) {
+        await supabase
+          .from('amazon_connections')
+          .update({ status: 'expired' })
+          .eq('id', connectionId)
+        throw new Error('Token expired and no refresh token available')
+      }
+
+      // Try to refresh the token
+      const refreshResponse = await fetch('https://api.amazon.com/auth/o2/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json'
+        },
+        body: new URLSearchParams({
+          grant_type: 'refresh_token',
+          refresh_token: connection.refresh_token,
+          client_id: clientId,
+          client_secret: Deno.env.get('AMAZON_CLIENT_SECRET') ?? '',
+        }),
+      })
+
+      if (!refreshResponse.ok) {
+        console.error('Token refresh failed:', await refreshResponse.text())
+        await supabase
+          .from('amazon_connections')
+          .update({ status: 'expired' })
+          .eq('id', connectionId)
+        throw new Error('Failed to refresh token, please reconnect your account')
+      }
+
+      const refreshData = await refreshResponse.json()
+      accessToken = refreshData.access_token
+
+      // Update the connection with new token
       await supabase
         .from('amazon_connections')
-        .update({ status: 'expired' })
+        .update({
+          access_token: refreshData.access_token,
+          refresh_token: refreshData.refresh_token || connection.refresh_token,
+          token_expires_at: new Date(Date.now() + ((refreshData.expires_in || 3600) * 1000)).toISOString(),
+        })
         .eq('id', connectionId)
+
+      console.log('Token refreshed successfully')
+    }
+
+    // Sync campaigns - try different API regions
+    const regions = ['na', 'eu', 'fe'] // North America, Europe, Far East
+    let campaignsData = []
+    let successfulRegion = null
+
+    for (const region of regions) {
+      const baseUrl = `https://advertising-api${region === 'na' ? '' : '-' + region}.amazon.com`
       
-      throw new Error('Token expired, please reconnect your account')
-    }
-
-    // Sync campaigns
-    console.log('Fetching campaigns...')
-    const campaignsResponse = await fetch(`https://advertising-api.amazon.com/v2/campaigns`, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Amazon-Advertising-API-ClientId': clientId,
-        'Amazon-Advertising-API-Scope': connection.profile_id,
-      },
-    })
-
-    if (!campaignsResponse.ok) {
-      throw new Error('Failed to fetch campaigns')
-    }
-
-    const campaignsData = await campaignsResponse.json()
-    console.log('Retrieved campaigns:', campaignsData.length)
-
-    // Store campaigns
-    for (const campaign of campaignsData) {
-      const { error: campaignError } = await supabase
-        .from('campaigns')
-        .upsert({
-          connection_id: connectionId,
-          amazon_campaign_id: campaign.campaignId.toString(),
-          name: campaign.name,
-          campaign_type: campaign.campaignType,
-          targeting_type: campaign.targetingType,
-          status: campaign.state.toLowerCase(),
-          daily_budget: campaign.dailyBudget,
-          start_date: campaign.startDate,
-          end_date: campaign.endDate,
-          impressions: 0,
-          clicks: 0,
-          spend: 0,
-          sales: 0,
-          orders: 0,
-        }, {
-          onConflict: 'connection_id, amazon_campaign_id'
+      console.log(`Trying to fetch campaigns from ${region} region: ${baseUrl}`)
+      
+      try {
+        const campaignsResponse = await fetch(`${baseUrl}/v2/campaigns`, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Amazon-Advertising-API-ClientId': clientId,
+            'Amazon-Advertising-API-Scope': connection.profile_id,
+            'Content-Type': 'application/json',
+          },
         })
 
-      if (campaignError) {
-        console.error('Error storing campaign:', campaignError)
+        console.log(`Campaigns response status for ${region}:`, campaignsResponse.status)
+
+        if (campaignsResponse.ok) {
+          campaignsData = await campaignsResponse.json()
+          successfulRegion = region
+          console.log(`Successfully retrieved ${campaignsData.length} campaigns from ${region} region`)
+          break
+        } else {
+          const errorText = await campaignsResponse.text()
+          console.log(`Failed to fetch from ${region}:`, errorText)
+        }
+      } catch (error) {
+        console.log(`Error fetching from ${region}:`, error.message)
+        continue
       }
     }
+
+    if (!successfulRegion) {
+      throw new Error('Failed to fetch campaigns from all regions')
+    }
+
+    // Store campaigns
+    let campaignsStored = 0
+    for (const campaign of campaignsData) {
+      try {
+        const { error: campaignError } = await supabase
+          .from('campaigns')
+          .upsert({
+            connection_id: connectionId,
+            amazon_campaign_id: campaign.campaignId.toString(),
+            name: campaign.name,
+            campaign_type: campaign.campaignType,
+            targeting_type: campaign.targetingType,
+            status: campaign.state.toLowerCase(),
+            daily_budget: campaign.dailyBudget,
+            start_date: campaign.startDate,
+            end_date: campaign.endDate,
+            impressions: 0,
+            clicks: 0,
+            spend: 0,
+            sales: 0,
+            orders: 0,
+          }, {
+            onConflict: 'connection_id, amazon_campaign_id'
+          })
+
+        if (!campaignError) {
+          campaignsStored++
+        } else {
+          console.error('Error storing campaign:', campaignError)
+        }
+      } catch (error) {
+        console.error('Error processing campaign:', error)
+      }
+    }
+
+    console.log(`Stored ${campaignsStored} campaigns successfully`)
 
     // Sync ad groups for each campaign
     const { data: storedCampaigns } = await supabase
@@ -123,51 +198,73 @@ serve(async (req) => {
       .select('id, amazon_campaign_id')
       .eq('connection_id', connectionId)
 
-    for (const campaign of storedCampaigns || []) {
-      console.log('Fetching ad groups for campaign:', campaign.amazon_campaign_id)
-      
-      const adGroupsResponse = await fetch(`https://advertising-api.amazon.com/v2/adGroups?campaignIdFilter=${campaign.amazon_campaign_id}`, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Amazon-Advertising-API-ClientId': clientId,
-          'Amazon-Advertising-API-Scope': connection.profile_id,
-        },
-      })
+    let adGroupsStored = 0
+    const baseUrl = `https://advertising-api${successfulRegion === 'na' ? '' : '-' + successfulRegion}.amazon.com`
 
-      if (adGroupsResponse.ok) {
-        const adGroupsData = await adGroupsResponse.json()
+    for (const campaign of storedCampaigns || []) {
+      try {
+        console.log('Fetching ad groups for campaign:', campaign.amazon_campaign_id)
         
-        for (const adGroup of adGroupsData) {
-          await supabase
-            .from('ad_groups')
-            .upsert({
-              campaign_id: campaign.id,
-              amazon_adgroup_id: adGroup.adGroupId.toString(),
-              name: adGroup.name,
-              status: adGroup.state.toLowerCase(),
-              default_bid: adGroup.defaultBid,
-              impressions: 0,
-              clicks: 0,
-              spend: 0,
-              sales: 0,
-              orders: 0,
-            }, {
-              onConflict: 'campaign_id, amazon_adgroup_id'
-            })
+        const adGroupsResponse = await fetch(`${baseUrl}/v2/adGroups?campaignIdFilter=${campaign.amazon_campaign_id}`, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Amazon-Advertising-API-ClientId': clientId,
+            'Amazon-Advertising-API-Scope': connection.profile_id,
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (adGroupsResponse.ok) {
+          const adGroupsData = await adGroupsResponse.json()
+          
+          for (const adGroup of adGroupsData) {
+            const { error: adGroupError } = await supabase
+              .from('ad_groups')
+              .upsert({
+                campaign_id: campaign.id,
+                amazon_adgroup_id: adGroup.adGroupId.toString(),
+                name: adGroup.name,
+                status: adGroup.state.toLowerCase(),
+                default_bid: adGroup.defaultBid,
+                impressions: 0,
+                clicks: 0,
+                spend: 0,
+                sales: 0,
+                orders: 0,
+              }, {
+                onConflict: 'campaign_id, amazon_adgroup_id'
+              })
+
+            if (!adGroupError) {
+              adGroupsStored++
+            }
+          }
         }
+      } catch (error) {
+        console.error('Error fetching ad groups for campaign:', campaign.amazon_campaign_id, error)
       }
     }
 
-    // Update last sync time
+    console.log(`Stored ${adGroupsStored} ad groups successfully`)
+
+    // Update last sync time and status
     await supabase
       .from('amazon_connections')
-      .update({ last_sync_at: new Date().toISOString() })
+      .update({ 
+        last_sync_at: new Date().toISOString(),
+        status: 'active'
+      })
       .eq('id', connectionId)
 
     console.log('Data sync completed successfully')
 
     return new Response(
-      JSON.stringify({ success: true, message: 'Data sync completed' }),
+      JSON.stringify({ 
+        success: true, 
+        message: `Data sync completed successfully. Imported ${campaignsStored} campaigns and ${adGroupsStored} ad groups.`,
+        campaignsStored,
+        adGroupsStored
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
