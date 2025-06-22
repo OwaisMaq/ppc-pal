@@ -1,25 +1,44 @@
 
 import { CampaignData } from '@/hooks/useCampaignData';
 import { PerformanceMetrics } from '@/types/performance';
-import { filterRealDataOnly, getRealDataStats } from './dataFilter';
 
 export const calculateMetrics = (campaigns: CampaignData[]): PerformanceMetrics | null => {
-  console.log('=== Calculating Performance Metrics with Real Data Only ===');
+  console.log('=== Calculating Performance Metrics ===');
   console.log('Total campaigns:', campaigns.length);
   
-  const { realDataCampaigns, realDataCount, simulatedCount, hasRealData } = getRealDataStats(campaigns);
-  
-  console.log('Real data campaigns:', realDataCount);
-  console.log('Simulated campaigns (excluded):', simulatedCount);
-
-  if (!hasRealData) {
-    console.log('No real data available - returning null');
+  if (!campaigns.length) {
+    console.log('No campaigns available - returning null');
     return null;
   }
 
-  // Log real campaign metrics for debugging
-  console.log('Real campaign metrics breakdown:');
-  realDataCampaigns.forEach((campaign, index) => {
+  // Separate real data from simulated data
+  const realDataCampaigns = campaigns.filter(campaign => 
+    campaign.data_source !== 'simulated' && 
+    campaign.data_source !== 'simulation'
+  );
+  
+  const simulatedCampaigns = campaigns.filter(campaign => 
+    campaign.data_source === 'simulated' || 
+    campaign.data_source === 'simulation'
+  );
+
+  console.log('Real data campaigns:', realDataCampaigns.length);
+  console.log('Simulated campaigns:', simulatedCampaigns.length);
+
+  // Use real data if available, otherwise fall back to simulated data
+  const campaignsToUse = realDataCampaigns.length > 0 ? realDataCampaigns : simulatedCampaigns;
+  const hasRealData = realDataCampaigns.length > 0;
+  
+  if (!campaignsToUse.length) {
+    console.log('No usable campaigns available - returning null');
+    return null;
+  }
+
+  console.log(`Using ${campaignsToUse.length} campaigns (${hasRealData ? 'real' : 'simulated'} data)`);
+
+  // Log campaign metrics for debugging
+  console.log('Campaign metrics breakdown:');
+  campaignsToUse.forEach((campaign, index) => {
     console.log(`  ${index + 1}. ${campaign.name} [${campaign.data_source || 'api'}]:`, {
       sales: campaign.sales,
       spend: campaign.spend,
@@ -34,17 +53,17 @@ export const calculateMetrics = (campaigns: CampaignData[]): PerformanceMetrics 
     });
   });
 
-  // Calculate current metrics from real data only
-  const totalSales = realDataCampaigns.reduce((sum, c) => sum + (c.sales || 0), 0);
-  const totalSpend = realDataCampaigns.reduce((sum, c) => sum + (c.spend || 0), 0);
-  const totalOrders = realDataCampaigns.reduce((sum, c) => sum + (c.orders || 0), 0);
-  const totalImpressions = realDataCampaigns.reduce((sum, c) => sum + (c.impressions || 0), 0);
-  const totalClicks = realDataCampaigns.reduce((sum, c) => sum + (c.clicks || 0), 0);
+  // Calculate current metrics
+  const totalSales = campaignsToUse.reduce((sum, c) => sum + (c.sales || 0), 0);
+  const totalSpend = campaignsToUse.reduce((sum, c) => sum + (c.spend || 0), 0);
+  const totalOrders = campaignsToUse.reduce((sum, c) => sum + (c.orders || 0), 0);
+  const totalImpressions = campaignsToUse.reduce((sum, c) => sum + (c.impressions || 0), 0);
+  const totalClicks = campaignsToUse.reduce((sum, c) => sum + (c.clicks || 0), 0);
 
   // Calculate previous month metrics for comparison
-  const previousMonthSales = realDataCampaigns.reduce((sum, c) => sum + (c.previous_month_sales || 0), 0);
-  const previousMonthSpend = realDataCampaigns.reduce((sum, c) => sum + (c.previous_month_spend || 0), 0);
-  const previousMonthOrders = realDataCampaigns.reduce((sum, c) => sum + (c.previous_month_orders || 0), 0);
+  const previousMonthSales = campaignsToUse.reduce((sum, c) => sum + (c.previous_month_sales || 0), 0);
+  const previousMonthSpend = campaignsToUse.reduce((sum, c) => sum + (c.previous_month_spend || 0), 0);
+  const previousMonthOrders = campaignsToUse.reduce((sum, c) => sum + (c.previous_month_orders || 0), 0);
   const previousMonthProfit = previousMonthSales - previousMonthSpend;
 
   const totalProfit = totalSales - totalSpend;
@@ -72,7 +91,7 @@ export const calculateMetrics = (campaigns: CampaignData[]): PerformanceMetrics 
     ? ((totalProfit - previousMonthProfit) / Math.abs(previousMonthProfit)) * 100 
     : 0;
 
-  console.log('=== Final Calculated Metrics with Real Data Only ===');
+  console.log('=== Final Calculated Metrics ===');
   console.log({
     totalSales: `$${totalSales.toFixed(2)}`,
     totalSpend: `$${totalSpend.toFixed(2)}`,
@@ -80,12 +99,12 @@ export const calculateMetrics = (campaigns: CampaignData[]): PerformanceMetrics 
     totalOrders,
     averageAcos: `${averageAcos.toFixed(2)}%`,
     averageRoas: `${averageRoas.toFixed(2)}x`,
-    campaignCount: realDataCount,
+    campaignCount: campaignsToUse.length,
     salesChange: `${salesChange.toFixed(1)}%`,
     spendChange: `${spendChange.toFixed(1)}%`,
     ordersChange: `${ordersChange.toFixed(1)}%`,
     profitChange: `${profitChange.toFixed(1)}%`,
-    dataQuality: 'Real data only'
+    dataQuality: hasRealData ? 'Real data' : 'Simulated data'
   });
 
   return {
@@ -105,7 +124,9 @@ export const calculateMetrics = (campaigns: CampaignData[]): PerformanceMetrics 
     spendChange,
     ordersChange,
     profitChange,
-    hasSimulatedData: false,
-    dataSourceInfo: `Using real data from ${realDataCount} campaigns only`
+    hasSimulatedData: !hasRealData,
+    dataSourceInfo: hasRealData 
+      ? `Using real data from ${campaignsToUse.length} campaigns` 
+      : `Using simulated data from ${campaignsToUse.length} campaigns`
   };
 };

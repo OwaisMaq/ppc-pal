@@ -77,8 +77,8 @@ export const useWeeklyMetrics = (
       const previous7DaysStart = new Date(today.getTime() - 14 * 24 * 60 * 60 * 1000);
       const previous7DaysEnd = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-      // Fetch last 7 days metrics (excluding simulated data)
-      const { data: currentWeekData, error: currentError } = await supabase
+      // First try to fetch real data (non-simulated)
+      const { data: currentWeekRealData, error: currentRealError } = await supabase
         .from('campaign_metrics_history')
         .select('*')
         .in('campaign_id', campaignIds)
@@ -87,33 +87,93 @@ export const useWeeklyMetrics = (
         .neq('data_source', 'simulated')
         .neq('data_source', 'simulation');
 
-      if (currentError) {
-        console.error('Error fetching current week data:', currentError);
-        setWeeklyMetrics(null);
+      if (currentRealError) {
+        console.error('Error fetching current week real data:', currentRealError);
+      }
+
+      // If no real data, try to fetch any data including simulated
+      let currentWeekData = currentWeekRealData;
+      let hasRealData = currentWeekRealData && currentWeekRealData.length > 0;
+
+      if (!hasRealData) {
+        console.log('No real weekly data found, trying simulated data...');
+        const { data: currentWeekSimData, error: currentSimError } = await supabase
+          .from('campaign_metrics_history')
+          .select('*')
+          .in('campaign_id', campaignIds)
+          .gte('date', last7DaysStart.toISOString().split('T')[0])
+          .lte('date', today.toISOString().split('T')[0]);
+
+        if (currentSimError) {
+          console.error('Error fetching current week simulated data:', currentSimError);
+        }
+
+        currentWeekData = currentWeekSimData;
+        hasRealData = false;
+      }
+
+      // If still no data, fall back to current campaign metrics
+      if (!currentWeekData || currentWeekData.length === 0) {
+        console.log('No historical data found, using current campaign metrics...');
+        
+        // Use current campaign metrics as fallback
+        const currentMetrics = calculateMetricsFromCampaigns(filteredCampaigns);
+        
+        // For previous week, try to get some historical data
+        const { data: previousWeekData } = await supabase
+          .from('campaign_metrics_history')
+          .select('*')
+          .in('campaign_id', campaignIds)
+          .gte('date', previous7DaysStart.toISOString().split('T')[0])
+          .lt('date', previous7DaysEnd.toISOString().split('T')[0]);
+        
+        const previousMetrics = previousWeekData && previousWeekData.length > 0 
+          ? calculateMetricsFromData(previousWeekData)
+          : null;
+
+        // Calculate week-over-week changes
+        const salesChange = previousMetrics 
+          ? ((currentMetrics.totalSales - previousMetrics.totalSales) / Math.max(previousMetrics.totalSales, 1)) * 100
+          : 0;
+        
+        const spendChange = previousMetrics 
+          ? ((currentMetrics.totalSpend - previousMetrics.totalSpend) / Math.max(previousMetrics.totalSpend, 1)) * 100
+          : 0;
+        
+        const ordersChange = previousMetrics 
+          ? ((currentMetrics.totalOrders - previousMetrics.totalOrders) / Math.max(previousMetrics.totalOrders, 1)) * 100
+          : 0;
+        
+        const profitChange = previousMetrics 
+          ? ((currentMetrics.totalProfit - previousMetrics.totalProfit) / Math.max(Math.abs(previousMetrics.totalProfit), 1)) * 100
+          : 0;
+
+        const weeklyMetricsResult: WeeklyMetrics = {
+          ...currentMetrics,
+          salesChange,
+          spendChange,
+          ordersChange,
+          profitChange,
+          hasRealData: false,
+          dataSourceInfo: `Based on current campaign metrics (${filteredCampaigns.length} campaigns)`
+        };
+
+        console.log('Weekly metrics from current campaigns:', weeklyMetricsResult);
+        setWeeklyMetrics(weeklyMetricsResult);
         setLoading(false);
         return;
       }
 
-      // Fetch previous 7 days metrics for comparison (excluding simulated data)
+      // Fetch previous week metrics for comparison
       const { data: previousWeekData, error: previousError } = await supabase
         .from('campaign_metrics_history')
         .select('*')
         .in('campaign_id', campaignIds)
         .gte('date', previous7DaysStart.toISOString().split('T')[0])
-        .lt('date', previous7DaysEnd.toISOString().split('T')[0])
-        .neq('data_source', 'simulated')
-        .neq('data_source', 'simulation');
+        .lt('date', previous7DaysEnd.toISOString().split('T')[0]);
 
       if (previousError) {
         console.error('Error fetching previous week data:', previousError);
-      }
-
-      // Check if we have real data
-      if (!currentWeekData || currentWeekData.length === 0) {
-        console.log('No real weekly data available');
-        setWeeklyMetrics(null);
-        setLoading(false);
-        return;
       }
 
       // Calculate current week metrics
@@ -147,8 +207,10 @@ export const useWeeklyMetrics = (
         spendChange,
         ordersChange,
         profitChange,
-        hasRealData: true,
-        dataSourceInfo: `Based on real data from last 7 days (${currentWeekData.length} data points)`
+        hasRealData,
+        dataSourceInfo: hasRealData 
+          ? `Based on real data from last 7 days (${currentWeekData.length} data points)`
+          : `Based on simulated data from last 7 days (${currentWeekData.length} data points)`
       };
 
       console.log('Weekly metrics calculated:', weeklyMetricsResult);
@@ -167,6 +229,35 @@ export const useWeeklyMetrics = (
     const totalOrders = data.reduce((sum, d) => sum + (d.orders || 0), 0);
     const totalImpressions = data.reduce((sum, d) => sum + (d.impressions || 0), 0);
     const totalClicks = data.reduce((sum, d) => sum + (d.clicks || 0), 0);
+    
+    const totalProfit = totalSales - totalSpend;
+    const averageAcos = totalSales > 0 ? (totalSpend / totalSales) * 100 : 0;
+    const averageRoas = totalSpend > 0 ? totalSales / totalSpend : 0;
+    const averageCtr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
+    const averageCpc = totalClicks > 0 ? totalSpend / totalClicks : 0;
+    const conversionRate = totalClicks > 0 ? (totalOrders / totalClicks) * 100 : 0;
+
+    return {
+      totalSales,
+      totalSpend,
+      totalProfit,
+      totalOrders,
+      totalImpressions,
+      totalClicks,
+      averageAcos,
+      averageRoas,
+      averageCtr,
+      averageCpc,
+      conversionRate
+    };
+  };
+
+  const calculateMetricsFromCampaigns = (campaigns: any[]) => {
+    const totalSales = campaigns.reduce((sum, c) => sum + (c.sales || 0), 0);
+    const totalSpend = campaigns.reduce((sum, c) => sum + (c.spend || 0), 0);
+    const totalOrders = campaigns.reduce((sum, c) => sum + (c.orders || 0), 0);
+    const totalImpressions = campaigns.reduce((sum, c) => sum + (c.impressions || 0), 0);
+    const totalClicks = campaigns.reduce((sum, c) => sum + (c.clicks || 0), 0);
     
     const totalProfit = totalSales - totalSpend;
     const averageAcos = totalSales > 0 ? (totalSpend / totalSales) * 100 : 0;
