@@ -16,45 +16,92 @@ export async function fetchCampaignReports(
   }
 
   try {
-    // Calculate date range (last 30 days)
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(endDate.getDate() - 30);
-    
-    const formatDate = (date: Date) => date.toISOString().split('T')[0];
+    // Try the v3 campaigns endpoint first for current metrics
+    console.log('Trying v3 campaigns endpoint for current metrics...');
+    const campaignsResponse = await fetch(`${baseUrl}/v3/sp/campaigns`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Amazon-Advertising-API-ClientId': clientId,
+        'Amazon-Advertising-API-Scope': profileId,
+        'Content-Type': 'application/json',
+      }
+    });
 
-    // Updated report request with VALID Amazon API columns
-    const reportRequest = {
-      configuration: {
-        adProduct: "SPONSORED_PRODUCTS",
-        groupBy: ["campaign"],
-        columns: [
-          "campaignId",
-          "impressions", 
-          "clicks",
-          "cost",
-          "sales14d",
-          "purchases14d", // Using purchases14d instead of orders14d
-          "clickThroughRate",
-          "costPerClick"
-        ],
-        reportTypeId: "spCampaigns",
-        timeUnit: "SUMMARY",
-        format: "JSON"
-      },
-      startDate: formatDate(startDate),
-      endDate: formatDate(endDate),
-      filters: [
-        {
-          field: "campaignId",
-          values: campaignIds.slice(0, 100) // Limit to avoid payload size issues
-        }
-      ]
+    if (campaignsResponse.ok) {
+      const campaignsData = await campaignsResponse.json();
+      console.log('Successfully retrieved campaign data from v3 endpoint:', campaignsData.length);
+      
+      // Transform to our expected format and mark as real API data
+      const realMetrics = campaignsData
+        .filter(campaign => campaignIds.includes(campaign.campaignId.toString()))
+        .map(campaign => ({
+          campaignId: campaign.campaignId,
+          impressions: campaign.impressions || 0,
+          clicks: campaign.clicks || 0,
+          spend: campaign.cost || 0,
+          sales: campaign.sales14d || campaign.attributedSales14d || 0,
+          orders: campaign.purchases14d || campaign.attributedUnitsOrdered14d || 0,
+          ctr: campaign.clickThroughRate || 0,
+          cpc: campaign.costPerClick || 0,
+          acos: campaign.cost && campaign.sales14d ? (campaign.cost / campaign.sales14d) * 100 : 0,
+          roas: campaign.cost && campaign.sales14d ? campaign.sales14d / campaign.cost : 0,
+          fromAPI: true // Mark as real API data
+        }));
+
+      if (realMetrics.length > 0) {
+        console.log(`Successfully processed ${realMetrics.length} real API metrics`);
+        return realMetrics;
+      }
+    }
+
+    // Try alternative v2 campaigns endpoint with extended data
+    console.log('Trying v2 campaigns extended endpoint...');
+    const v2Response = await fetch(`${baseUrl}/v2/sp/campaigns/extended`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Amazon-Advertising-API-ClientId': clientId,
+        'Amazon-Advertising-API-Scope': profileId,
+        'Content-Type': 'application/json',
+      }
+    });
+
+    if (v2Response.ok) {
+      const v2Data = await v2Response.json();
+      console.log('Successfully retrieved extended campaign data:', v2Data.length);
+      
+      // Transform to our expected format and mark as real API data
+      const realMetrics = v2Data
+        .filter(campaign => campaignIds.includes(campaign.campaignId.toString()))
+        .map(campaign => ({
+          campaignId: campaign.campaignId,
+          impressions: campaign.impressions || 0,
+          clicks: campaign.clicks || 0,
+          spend: campaign.cost || 0,
+          sales: campaign.attributedSales14d || 0,
+          orders: campaign.attributedUnitsOrdered14d || 0,
+          ctr: campaign.impressions > 0 ? (campaign.clicks / campaign.impressions) * 100 : 0,
+          cpc: campaign.clicks > 0 ? campaign.cost / campaign.clicks : 0,
+          acos: campaign.cost && campaign.attributedSales14d ? (campaign.cost / campaign.attributedSales14d) * 100 : 0,
+          roas: campaign.cost && campaign.attributedSales14d ? campaign.attributedSales14d / campaign.cost : 0,
+          fromAPI: true // Mark as real API data
+        }));
+
+      if (realMetrics.length > 0) {
+        console.log(`Successfully processed ${realMetrics.length} real API metrics from v2 extended`);
+        return realMetrics;
+      }
+    }
+
+    // Try the performance reports with a simplified request
+    console.log('Trying simplified performance reports...');
+    const simpleReportRequest = {
+      reportDate: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      metrics: "impressions,clicks,cost,attributedSales14d,attributedUnitsOrdered14d"
     };
 
-    console.log('Requesting campaign report with corrected columns:', JSON.stringify(reportRequest, null, 2));
-
-    const reportResponse = await fetch(`${baseUrl}/reporting/reports`, {
+    const simpleReportResponse = await fetch(`${baseUrl}/v2/sp/campaigns/report`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -62,98 +109,43 @@ export async function fetchCampaignReports(
         'Amazon-Advertising-API-Scope': profileId,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(reportRequest)
+      body: JSON.stringify(simpleReportRequest)
     });
 
-    if (!reportResponse.ok) {
-      const errorText = await reportResponse.text();
-      console.warn('Report request failed:', reportResponse.status, errorText);
+    if (simpleReportResponse.ok) {
+      const reportData = await simpleReportResponse.json();
+      console.log('Simple report data received:', reportData);
       
-      // Try alternative sync reports endpoint
-      return await tryAlternativeReportsEndpoint(accessToken, clientId, profileId, baseUrl, campaignIds);
+      if (Array.isArray(reportData)) {
+        const realMetrics = reportData
+          .filter(row => campaignIds.includes(row.campaignId?.toString()))
+          .map(row => ({
+            campaignId: row.campaignId,
+            impressions: row.impressions || 0,
+            clicks: row.clicks || 0,
+            spend: row.cost || 0,
+            sales: row.attributedSales14d || 0,
+            orders: row.attributedUnitsOrdered14d || 0,
+            ctr: row.impressions > 0 ? (row.clicks / row.impressions) * 100 : 0,
+            cpc: row.clicks > 0 ? row.cost / row.clicks : 0,
+            acos: row.cost && row.attributedSales14d ? (row.cost / row.attributedSales14d) * 100 : 0,
+            roas: row.cost && row.attributedSales14d ? row.attributedSales14d / row.cost : 0,
+            fromAPI: true // Mark as real API data
+          }));
+
+        if (realMetrics.length > 0) {
+          console.log(`Successfully processed ${realMetrics.length} real API metrics from simple report`);
+          return realMetrics;
+        }
+      }
     }
 
-    const reportData = await reportResponse.json();
-    console.log('Report response received:', reportData);
-    
-    // Check if it's an async report (returns reportId)
-    if (reportData.reportId) {
-      console.log('Async report created with ID:', reportData.reportId);
-      // For now, fall back to simulated metrics since we need to poll for async results
-      return await fetchBasicMetrics(accessToken, clientId, profileId, baseUrl, campaignIds);
-    }
-    
-    // Transform the API response to our expected format and mark as real API data
-    if (Array.isArray(reportData)) {
-      console.log(`Successfully received ${reportData.length} real API metrics records`);
-      return reportData.map(row => ({
-        campaignId: row.campaignId,
-        impressions: row.impressions || 0,
-        clicks: row.clicks || 0,
-        spend: row.cost || 0,
-        sales: row.sales14d || 0,
-        orders: row.purchases14d || 0,
-        ctr: row.clickThroughRate || 0,
-        cpc: row.costPerClick || 0,
-        acos: row.cost && row.sales14d ? (row.cost / row.sales14d) * 100 : 0,
-        roas: row.cost && row.sales14d ? row.sales14d / row.cost : 0,
-        fromAPI: true // Mark as real API data
-      }));
-    }
-    
-    return reportData;
+    console.log('All API endpoints failed, falling back to simulated data');
+    return await fetchBasicMetrics(accessToken, clientId, profileId, baseUrl, campaignIds);
+
   } catch (error) {
     console.error('Error fetching campaign reports:', error);
+    console.log('Exception occurred, falling back to simulated data');
     return await fetchBasicMetrics(accessToken, clientId, profileId, baseUrl, campaignIds);
   }
-}
-
-async function tryAlternativeReportsEndpoint(
-  accessToken: string,
-  clientId: string,
-  profileId: string,
-  baseUrl: string,
-  campaignIds: string[]
-): Promise<any[]> {
-  console.log('Trying alternative sync reports endpoint...');
-  
-  try {
-    // Try the sync reports endpoint with simpler structure
-    const syncReportRequest = {
-      reportDate: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      metrics: ["impressions", "clicks", "cost", "sales14d", "purchases14d"],
-      campaignType: "sponsoredProducts"
-    };
-
-    const syncResponse = await fetch(`${baseUrl}/v2/sp/campaigns/report`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Amazon-Advertising-API-ClientId': clientId,
-        'Amazon-Advertising-API-Scope': profileId,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(syncReportRequest)
-    });
-
-    if (syncResponse.ok) {
-      const syncData = await syncResponse.json();
-      console.log('Alternative sync report data received:', syncData);
-      
-      // Mark this data as real API data
-      if (Array.isArray(syncData)) {
-        return syncData.map(row => ({
-          ...row,
-          fromAPI: true
-        }));
-      }
-      return syncData;
-    }
-  } catch (error) {
-    console.warn('Alternative endpoint also failed:', error);
-  }
-  
-  // Final fallback to simulated metrics
-  console.log('Falling back to simulated metrics due to API failures');
-  return await fetchBasicMetrics(accessToken, clientId, profileId, baseUrl, campaignIds);
 }

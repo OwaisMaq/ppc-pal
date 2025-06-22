@@ -8,7 +8,7 @@ export async function fetchBasicMetrics(
   baseUrl: string,
   campaignIds: string[]
 ): Promise<any[]> {
-  console.log('API metrics request failed, generating fallback data marked as simulated...');
+  console.log('FALLBACK: Generating simulated metrics because Amazon API requests failed');
   
   const metrics = [];
   
@@ -43,25 +43,16 @@ export async function fetchBasicMetrics(
         acos: acos,
         roas: roas,
         conversionRate: Number(conversionRate.toFixed(2)),
-        fromAPI: false // Mark as simulated data since API failed
+        fromAPI: false // Explicitly mark as simulated data
       });
 
-      console.log(`Generated SIMULATED metrics for campaign ${campaignId}:`, {
-        impressions: baseImpressions,
-        clicks,
-        spend,
-        sales,
-        orders,
-        acos,
-        roas,
-        note: 'SIMULATED DATA - API request failed'
-      });
+      console.log(`Generated SIMULATED metrics for campaign ${campaignId} - This is NOT real Amazon data`);
 
     } catch (error) {
-      console.warn(`Failed to process campaign ${campaignId}:`, error);
+      console.warn(`Failed to generate simulated data for campaign ${campaignId}:`, error);
     }
   }
   
-  console.log(`Generated ${metrics.length} SIMULATED metric records (API unavailable)`);
+  console.log(`Generated ${metrics.length} SIMULATED metric records - Amazon API was unavailable`);
   return metrics;
 }
