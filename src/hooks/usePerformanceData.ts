@@ -27,7 +27,12 @@ export interface PerformanceMetrics {
   dataSourceInfo: string;
 }
 
-export const usePerformanceData = (connectionId?: string, selectedCountry?: string, selectedCampaign?: string) => {
+export const usePerformanceData = (
+  connectionId?: string, 
+  selectedCountry?: string, 
+  selectedCampaign?: string, 
+  selectedProduct?: string
+) => {
   const { connections } = useAmazonConnections();
   const { campaigns, loading: campaignsLoading } = useCampaignData(connectionId);
   const { keywords, loading: keywordsLoading } = useKeywordData(connectionId);
@@ -37,7 +42,7 @@ export const usePerformanceData = (connectionId?: string, selectedCountry?: stri
     if (campaignsLoading || keywordsLoading) return;
 
     calculateMetrics();
-  }, [campaigns, keywords, campaignsLoading, keywordsLoading, connections, selectedCountry, selectedCampaign]);
+  }, [campaigns, keywords, campaignsLoading, keywordsLoading, connections, selectedCountry, selectedCampaign, selectedProduct]);
 
   const calculateMetrics = () => {
     console.log('=== Calculating Performance Metrics with Real Data ===');
@@ -50,7 +55,7 @@ export const usePerformanceData = (connectionId?: string, selectedCountry?: stri
       return;
     }
 
-    // Filter campaigns based on selected country
+    // Filter campaigns based on selections
     let filteredCampaigns = campaigns;
     
     if (selectedCountry && selectedCountry !== 'all') {
@@ -73,6 +78,19 @@ export const usePerformanceData = (connectionId?: string, selectedCountry?: stri
       );
       
       console.log(`Filtered to ${filteredCampaigns.length} campaigns for campaign ${selectedCampaign}`);
+    }
+
+    // Filter by specific product/ASIN if selected
+    if (selectedProduct && selectedProduct !== 'all') {
+      // Find campaign index that matches the ASIN pattern
+      const productIndex = campaigns.findIndex((_, index) => 
+        `B0${String(index + 1).padStart(7, '0')}` === selectedProduct
+      );
+      
+      if (productIndex >= 0) {
+        filteredCampaigns = filteredCampaigns.filter((_, index) => index === productIndex);
+        console.log(`Filtered to ${filteredCampaigns.length} campaigns for product ${selectedProduct}`);
+      }
     }
 
     // Check data sources and quality

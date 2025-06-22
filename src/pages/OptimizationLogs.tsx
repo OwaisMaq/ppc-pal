@@ -4,269 +4,263 @@ import AuthenticatedLayout from '@/components/AuthenticatedLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FileText, TrendingUp, TrendingDown, Minus, Eye, Download } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { 
+  AlertCircle, 
+  Loader2, 
+  Settings, 
+  CheckCircle, 
+  XCircle, 
+  Clock,
+  TrendingUp,
+  TrendingDown,
+  Filter
+} from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import FilterBar from '@/components/FilterBar';
 
-const mockOptimizationLogs = [
-  {
-    id: 1,
-    timestamp: '2024-06-21 09:15:00',
-    campaignName: 'Summer Collection 2024',
-    actionType: 'Bid Adjustment',
-    keyword: 'wireless headphones',
-    oldValue: '$2.50',
-    newValue: '$3.20',
-    reason: 'High conversion rate, low ACOS - increased bid for more visibility',
-    impact: 'positive',
-    estimatedImpact: '+$45.20',
-    status: 'applied'
-  },
-  {
-    id: 2,
-    timestamp: '2024-06-21 08:45:00',
-    campaignName: 'Electronics Bestsellers',
-    actionType: 'Negative Keyword',
-    keyword: 'cheap wireless headphones',
-    oldValue: 'Active',
-    newValue: 'Negative',
-    reason: 'Low quality traffic, high click cost with no conversions',
-    impact: 'positive',
-    estimatedImpact: '+$23.40',
-    status: 'applied'
-  },
-  {
-    id: 3,
-    timestamp: '2024-06-21 08:30:00',
-    campaignName: 'Tech Accessories',
-    actionType: 'Bid Adjustment',
-    keyword: 'bluetooth speakers',
-    oldValue: '$1.80',
-    newValue: '$1.35',
-    reason: 'ACOS above target threshold - reduced bid to improve profitability',
-    impact: 'neutral',
-    estimatedImpact: '-$12.10',
-    status: 'applied'
-  },
-  {
-    id: 4,
-    timestamp: '2024-06-21 07:20:00',
-    campaignName: 'Mobile Accessories',
-    actionType: 'Match Type Change',
-    keyword: 'phone case',
-    oldValue: 'Broad',
-    newValue: 'Phrase',
-    reason: 'Too much irrelevant traffic - tightened match type for better targeting',
-    impact: 'positive',
-    estimatedImpact: '+$18.60',
-    status: 'applied'
-  },
-  {
-    id: 5,
-    timestamp: '2024-06-20 16:45:00',
-    campaignName: 'Gaming Setup',
-    actionType: 'Budget Adjustment',
-    keyword: 'N/A',
-    oldValue: '$150.00',
-    newValue: '$200.00',
-    reason: 'Campaign hitting budget cap early - increased to capture more opportunities',
-    impact: 'positive',
-    estimatedImpact: '+$125.80',
-    status: 'pending'
-  },
-  {
-    id: 6,
-    timestamp: '2024-06-20 14:30:00',
-    campaignName: 'Home Audio',
-    actionType: 'Keyword Addition',
-    keyword: 'smart speakers alexa',
-    oldValue: 'N/A',
-    newValue: '$2.10',
-    reason: 'High search volume keyword with good relevance - added to capture traffic',
-    impact: 'positive',
-    estimatedImpact: '+$67.30',
-    status: 'applied'
-  }
-];
+interface OptimizationLog {
+  id: string;
+  optimization_type: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  total_recommendations: number;
+  total_keywords_analyzed: number;
+  estimated_impact_sales: number;
+  estimated_impact_spend: number;
+  created_at: string;
+  completed_at: string;
+  error_message?: string;
+}
 
 const OptimizationLogs = () => {
-  const [filter, setFilter] = useState('all');
+  const { user } = useAuth();
+  const [selectedCountry, setSelectedCountry] = useState('all');
+  const [selectedCampaign, setSelectedCampaign] = useState('all');
+  const [selectedProduct, setSelectedProduct] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
 
-  const filteredLogs = mockOptimizationLogs.filter(log => {
-    if (filter === 'all') return true;
-    return log.status === filter;
+  const { data: optimizationLogs, isLoading, error } = useQuery({
+    queryKey: ['optimization-logs', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+
+      const { data, error } = await supabase
+        .from('optimization_results')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data as OptimizationLog[];
+    },
+    enabled: !!user,
   });
 
-  const getImpactIcon = (impact: string) => {
-    switch (impact) {
-      case 'positive':
-        return <TrendingUp className="h-4 w-4 text-green-600" />;
-      case 'negative':
-        return <TrendingDown className="h-4 w-4 text-red-600" />;
+  const filteredLogs = React.useMemo(() => {
+    if (!optimizationLogs) return [];
+    
+    return optimizationLogs.filter(log => {
+      if (statusFilter !== 'all' && log.status !== statusFilter) {
+        return false;
+      }
+      return true;
+    });
+  }, [optimizationLogs, statusFilter]);
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return <CheckCircle className="h-4 w-4 text-green-600" />;
+      case 'failed':
+        return <XCircle className="h-4 w-4 text-red-600" />;
+      case 'running':
+        return <Loader2 className="h-4 w-4 text-blue-600 animate-spin" />;
       default:
-        return <Minus className="h-4 w-4 text-gray-600" />;
+        return <Clock className="h-4 w-4 text-yellow-600" />;
     }
   };
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'applied':
-        return <Badge variant="default" className="bg-green-100 text-green-800">Applied</Badge>;
-      case 'pending':
-        return <Badge variant="secondary">Pending</Badge>;
-      case 'rejected':
-        return <Badge variant="destructive">Rejected</Badge>;
-      default:
-        return <Badge variant="outline">Unknown</Badge>;
-    }
+    const variants = {
+      completed: 'bg-green-100 text-green-800',
+      failed: 'bg-red-100 text-red-800',
+      running: 'bg-blue-100 text-blue-800',
+      pending: 'bg-yellow-100 text-yellow-800'
+    };
+
+    return (
+      <Badge className={variants[status as keyof typeof variants] || variants.pending}>
+        {status.charAt(0).toUpperCase() + status.slice(1)}
+      </Badge>
+    );
   };
+
+  if (isLoading) {
+    return (
+      <AuthenticatedLayout>
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-bold">Optimization Logs</h1>
+          </div>
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          </div>
+        </div>
+      </AuthenticatedLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <AuthenticatedLayout>
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-bold">Optimization Logs</h1>
+          </div>
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Failed to load optimization logs. Please try again later.
+            </AlertDescription>
+          </Alert>
+        </div>
+      </AuthenticatedLayout>
+    );
+  }
 
   return (
     <AuthenticatedLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
-            <FileText className="h-8 w-8 text-blue-600" />
-            Optimisation Logs
-          </h1>
-          <p className="text-gray-600">
-            View detailed logs of all optimization activities and their impact on campaign performance
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Optimization Logs</h1>
+            <p className="text-gray-600 mt-2">
+              Track all optimization runs and their results
+            </p>
+          </div>
+          <Button className="flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            Run Optimization
+          </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-green-600" />
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Total Optimizations</p>
-                  <p className="text-2xl font-bold">147</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-blue-600" />
-                <div>
-                  <p className="text-sm font-medium text-gray-600">This Week</p>
-                  <p className="text-2xl font-bold">23</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-green-600" />
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Estimated Savings</p>
-                  <p className="text-2xl font-bold text-green-600">$2,847</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-purple-600" />
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Success Rate</p>
-                  <p className="text-2xl font-bold">94%</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <FilterBar
+          selectedCountry={selectedCountry}
+          selectedAsin={selectedCampaign}
+          selectedProduct={selectedProduct}
+          onCountryChange={setSelectedCountry}
+          onAsinChange={setSelectedCampaign}
+          onProductChange={setSelectedProduct}
+        />
+
+        <div className="flex items-center gap-4 mb-6">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-48">
+              <Filter className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent className="bg-white z-50">
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="running">Running</SelectItem>
+              <SelectItem value="failed">Failed</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Recent Optimizations</CardTitle>
-                <CardDescription>
-                  Track all optimization changes and their impacts on campaign performance
-                </CardDescription>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm">
-                  <Download className="h-4 w-4 mr-2" />
-                  Export
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Tabs value={filter} onValueChange={setFilter} className="mb-4">
-              <TabsList>
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="applied">Applied</TabsTrigger>
-                <TabsTrigger value="pending">Pending</TabsTrigger>
-              </TabsList>
-            </Tabs>
-
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Timestamp</TableHead>
-                    <TableHead>Campaign</TableHead>
-                    <TableHead>Action</TableHead>
-                    <TableHead>Keyword/Target</TableHead>
-                    <TableHead>Change</TableHead>
-                    <TableHead>Impact</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredLogs.map((log) => (
-                    <TableRow key={log.id}>
-                      <TableCell className="font-mono text-sm">
-                        {log.timestamp}
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {log.campaignName}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{log.actionType}</Badge>
-                      </TableCell>
-                      <TableCell>{log.keyword}</TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          <span className="text-gray-500">{log.oldValue}</span>
-                          <span className="mx-2">→</span>
-                          <span className="font-medium">{log.newValue}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {getImpactIcon(log.impact)}
-                          <span className={`text-sm font-medium ${
-                            log.impact === 'positive' ? 'text-green-600' : 
-                            log.impact === 'negative' ? 'text-red-600' : 'text-gray-600'
-                          }`}>
-                            {log.estimatedImpact}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {getStatusBadge(log.status)}
-                      </TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="sm">
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+        {filteredLogs.length === 0 ? (
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              No optimization logs found. Run your first optimization to see results here.
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <div className="space-y-4">
+            {filteredLogs.map((log) => (
+              <Card key={log.id}>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {getStatusIcon(log.status)}
+                      <div>
+                        <CardTitle className="text-lg">
+                          {log.optimization_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())} Optimization
+                        </CardTitle>
+                        <CardDescription>
+                          Started {new Date(log.created_at).toLocaleDateString()} at {new Date(log.created_at).toLocaleTimeString()}
+                        </CardDescription>
+                      </div>
+                    </div>
+                    {getStatusBadge(log.status)}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Settings className="h-4 w-4 text-blue-600" />
+                        <span className="text-sm font-medium">Keywords Analyzed</span>
+                      </div>
+                      <p className="text-2xl font-bold text-blue-600">
+                        {log.total_keywords_analyzed?.toLocaleString() || '0'}
+                      </p>
+                    </div>
+                    
+                    <div className="bg-green-50 p-4 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                        <span className="text-sm font-medium">Recommendations</span>
+                      </div>
+                      <p className="text-2xl font-bold text-green-600">
+                        {log.total_recommendations?.toLocaleString() || '0'}
+                      </p>
+                    </div>
+                    
+                    <div className="bg-purple-50 p-4 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <TrendingUp className="h-4 w-4 text-purple-600" />
+                        <span className="text-sm font-medium">Est. Sales Impact</span>
+                      </div>
+                      <p className="text-2xl font-bold text-purple-600">
+                        ${log.estimated_impact_sales?.toFixed(2) || '0.00'}
+                      </p>
+                    </div>
+                    
+                    <div className="bg-orange-50 p-4 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <TrendingDown className="h-4 w-4 text-orange-600" />
+                        <span className="text-sm font-medium">Est. Spend Impact</span>
+                      </div>
+                      <p className="text-2xl font-bold text-orange-600">
+                        ${log.estimated_impact_spend?.toFixed(2) || '0.00'}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {log.error_message && (
+                    <Alert className="mt-4">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        <strong>Error:</strong> {log.error_message}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  
+                  {log.completed_at && (
+                    <p className="text-sm text-gray-600 mt-4">
+                      Completed on {new Date(log.completed_at).toLocaleDateString()} at {new Date(log.completed_at).toLocaleTimeString()}
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     </AuthenticatedLayout>
   );
