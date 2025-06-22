@@ -2,135 +2,116 @@
 import { CampaignData } from '@/hooks/useCampaignData';
 import { PerformanceMetrics } from '@/types/performance';
 
-// Strict filter for real data only
-const filterRealDataCampaigns = (campaigns: CampaignData[]): CampaignData[] => {
-  return campaigns.filter(campaign => {
-    // Must be from API (not simulated)
-    const isRealSource = campaign.data_source !== 'simulated' && 
-                        campaign.data_source !== 'simulation' &&
-                        campaign.data_source !== 'fake';
+export const calculateMetrics = (campaigns: CampaignData[]): PerformanceMetrics | null => {
+  console.log('=== CALCULATING REAL DATA METRICS ===');
+  console.log('Total campaigns received:', campaigns.length);
+  
+  if (!campaigns || campaigns.length === 0) {
+    console.log('No campaigns provided for metrics calculation');
+    return null;
+  }
+
+  // STRICT FILTER: Only include campaigns with real API data
+  const realDataCampaigns = campaigns.filter(campaign => {
+    const isRealData = campaign.data_source === 'api' && 
+                      campaign.data_source !== 'simulated' && 
+                      campaign.data_source !== 'simulation';
     
-    // Must have actual performance metrics
+    // Additional validation: Check if campaign has meaningful metrics
     const hasMetrics = (campaign.sales || 0) > 0 || 
                       (campaign.spend || 0) > 0 || 
                       (campaign.orders || 0) > 0 ||
                       (campaign.clicks || 0) > 0 ||
                       (campaign.impressions || 0) > 0;
     
-    return isRealSource && hasMetrics;
+    const isValid = isRealData && hasMetrics;
+    
+    if (!isValid) {
+      console.log(`Excluding campaign ${campaign.name}: data_source=${campaign.data_source}, hasMetrics=${hasMetrics}`);
+    } else {
+      console.log(`✓ Including campaign ${campaign.name}: REAL API data with metrics`);
+    }
+    
+    return isValid;
   });
-};
 
-export const calculateMetrics = (campaigns: CampaignData[]): PerformanceMetrics | null => {
-  console.log('=== Calculating Performance Metrics - REAL DATA ONLY ===');
-  console.log('Total campaigns provided:', campaigns.length);
+  console.log(`Filtered to ${realDataCampaigns.length} campaigns with real API data`);
   
-  if (!campaigns.length) {
-    console.log('No campaigns available - returning null');
+  if (realDataCampaigns.length === 0) {
+    console.log('❌ NO REAL DATA AVAILABLE - All campaigns are simulated or have no metrics');
     return null;
   }
 
-  // Filter for real data campaigns only
-  const realDataCampaigns = filterRealDataCampaigns(campaigns);
-  
-  console.log('Real data campaigns found:', realDataCampaigns.length);
+  // Calculate totals from real data only
+  const totals = realDataCampaigns.reduce(
+    (acc, campaign) => ({
+      sales: acc.sales + (campaign.sales || 0),
+      spend: acc.spend + (campaign.spend || 0),
+      orders: acc.orders + (campaign.orders || 0),
+      clicks: acc.clicks + (campaign.clicks || 0),
+      impressions: acc.impressions + (campaign.impressions || 0),
+    }),
+    { sales: 0, spend: 0, orders: 0, clicks: 0, impressions: 0 }
+  );
 
-  if (!realDataCampaigns.length) {
-    console.log('No real data campaigns available - returning null');
-    return null;
-  }
+  // Calculate derived metrics
+  const averageOrderValue = totals.orders > 0 ? totals.sales / totals.orders : 0;
+  const ctr = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
+  const conversionRate = totals.clicks > 0 ? (totals.orders / totals.clicks) * 100 : 0;
+  const acos = totals.sales > 0 ? (totals.spend / totals.sales) * 100 : 0;
+  const roas = totals.spend > 0 ? totals.sales / totals.spend : 0;
 
-  // Log campaign metrics for debugging
-  console.log('Real campaign metrics breakdown:');
-  realDataCampaigns.forEach((campaign, index) => {
-    console.log(`  ${index + 1}. ${campaign.name} [${campaign.data_source || 'api'}]:`, {
-      sales: campaign.sales,
-      spend: campaign.spend,
-      orders: campaign.orders,
-      impressions: campaign.impressions,
-      clicks: campaign.clicks,
-      acos: campaign.acos,
-      roas: campaign.roas,
-      previousMonthSales: campaign.previous_month_sales,
-      previousMonthSpend: campaign.previous_month_spend,
-      previousMonthOrders: campaign.previous_month_orders
-    });
-  });
+  // Calculate previous period metrics for comparison (real data only)
+  const previousTotals = realDataCampaigns.reduce(
+    (acc, campaign) => ({
+      sales: acc.sales + (campaign.previous_month_sales || 0),
+      spend: acc.spend + (campaign.previous_month_spend || 0),
+      orders: acc.orders + (campaign.previous_month_orders || 0),
+    }),
+    { sales: 0, spend: 0, orders: 0 }
+  );
 
-  // Calculate current metrics from real data campaigns only
-  const totalSales = realDataCampaigns.reduce((sum, c) => sum + (c.sales || 0), 0);
-  const totalSpend = realDataCampaigns.reduce((sum, c) => sum + (c.spend || 0), 0);
-  const totalOrders = realDataCampaigns.reduce((sum, c) => sum + (c.orders || 0), 0);
-  const totalImpressions = realDataCampaigns.reduce((sum, c) => sum + (c.impressions || 0), 0);
-  const totalClicks = realDataCampaigns.reduce((sum, c) => sum + (c.clicks || 0), 0);
-
-  // Calculate previous month metrics for comparison (real data only)
-  const previousMonthSales = realDataCampaigns.reduce((sum, c) => sum + (c.previous_month_sales || 0), 0);
-  const previousMonthSpend = realDataCampaigns.reduce((sum, c) => sum + (c.previous_month_spend || 0), 0);
-  const previousMonthOrders = realDataCampaigns.reduce((sum, c) => sum + (c.previous_month_orders || 0), 0);
-  const previousMonthProfit = previousMonthSales - previousMonthSpend;
-
-  const totalProfit = totalSales - totalSpend;
-  const averageAcos = totalSales > 0 ? (totalSpend / totalSales) * 100 : 0;
-  const averageRoas = totalSpend > 0 ? totalSales / totalSpend : 0;
-  const averageCostPerUnit = totalOrders > 0 ? totalSpend / totalOrders : 0;
-  const averageCtr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
-  const averageCpc = totalClicks > 0 ? totalSpend / totalClicks : 0;
-  const conversionRate = totalClicks > 0 ? (totalOrders / totalClicks) * 100 : 0;
-
-  // Calculate month-over-month changes
-  const salesChange = previousMonthSales > 0 
-    ? ((totalSales - previousMonthSales) / previousMonthSales) * 100 
+  // Calculate period changes
+  const salesChange = previousTotals.sales > 0 
+    ? ((totals.sales - previousTotals.sales) / previousTotals.sales) * 100 
     : 0;
-  
-  const spendChange = previousMonthSpend > 0 
-    ? ((totalSpend - previousMonthSpend) / previousMonthSpend) * 100 
+  const spendChange = previousTotals.spend > 0 
+    ? ((totals.spend - previousTotals.spend) / previousTotals.spend) * 100 
     : 0;
-  
-  const ordersChange = previousMonthOrders > 0 
-    ? ((totalOrders - previousMonthOrders) / previousMonthOrders) * 100 
-    : 0;
-  
-  const profitChange = previousMonthProfit !== 0 
-    ? ((totalProfit - previousMonthProfit) / Math.abs(previousMonthProfit)) * 100 
+  const ordersChange = previousTotals.orders > 0 
+    ? ((totals.orders - previousTotals.orders) / previousTotals.orders) * 100 
     : 0;
 
-  const dataSourceInfo = `Real data from ${realDataCampaigns.length} campaigns (Amazon API)`;
-
-  console.log('=== Final Calculated Metrics (Real Data Only) ===');
-  console.log({
-    totalSales: `$${totalSales.toFixed(2)}`,
-    totalSpend: `$${totalSpend.toFixed(2)}`,
-    totalProfit: `$${totalProfit.toFixed(2)}`,
-    totalOrders,
-    averageAcos: `${averageAcos.toFixed(2)}%`,
-    averageRoas: `${averageRoas.toFixed(2)}x`,
-    campaignCount: realDataCampaigns.length,
-    salesChange: `${salesChange.toFixed(1)}%`,
-    spendChange: `${spendChange.toFixed(1)}%`,
-    ordersChange: `${ordersChange.toFixed(1)}%`,
-    profitChange: `${profitChange.toFixed(1)}%`,
-    dataQuality: dataSourceInfo
-  });
-
-  return {
-    totalSales,
-    totalSpend,
-    totalProfit,
-    totalOrders,
-    averageAcos,
-    averageRoas,
-    averageCostPerUnit,
-    totalImpressions,
-    totalClicks,
-    averageCtr,
-    averageCpc,
+  const metrics: PerformanceMetrics = {
+    totalSales: totals.sales,
+    totalSpend: totals.spend,
+    totalOrders: totals.orders,
+    totalClicks: totals.clicks,
+    totalImpressions: totals.impressions,
+    averageOrderValue,
+    clickThroughRate: ctr,
     conversionRate,
+    acos,
+    roas,
+    campaignCount: realDataCampaigns.length,
+    // Period changes
     salesChange,
     spendChange,
     ordersChange,
-    profitChange,
-    hasSimulatedData: false, // Never has simulated data
-    dataSourceInfo
+    // Previous period totals
+    previousSales: previousTotals.sales,
+    previousSpend: previousTotals.spend,
+    previousOrders: previousTotals.orders
   };
+
+  console.log('✅ REAL DATA METRICS CALCULATED:', {
+    campaignsUsed: realDataCampaigns.length,
+    totalSales: metrics.totalSales,
+    totalSpend: metrics.totalSpend,
+    totalOrders: metrics.totalOrders,
+    acos: metrics.acos?.toFixed(2),
+    roas: metrics.roas?.toFixed(2)
+  });
+
+  return metrics;
 };
