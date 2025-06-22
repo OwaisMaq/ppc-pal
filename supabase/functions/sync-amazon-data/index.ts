@@ -46,6 +46,24 @@ serve(async (req) => {
       throw new Error('Connection not found')
     }
 
+    // Check for invalid profile IDs
+    if (connection.profile_id === 'needs_setup' || 
+        connection.profile_id.startsWith('profile_') || 
+        connection.profile_id === 'unknown') {
+      console.error('Invalid profile ID detected:', connection.profile_id)
+      
+      // Update connection status to indicate it needs reconnection
+      await supabase
+        .from('amazon_connections')
+        .update({ 
+          status: 'error',
+          last_sync_at: new Date().toISOString()
+        })
+        .eq('id', connectionId)
+
+      throw new Error('This connection has an invalid profile ID and needs to be reconnected. Please disconnect and reconnect your Amazon account.')
+    }
+
     if (connection.status !== 'active') {
       throw new Error('Connection is not active')
     }
@@ -144,6 +162,19 @@ serve(async (req) => {
         } else {
           const errorText = await campaignsResponse.text()
           console.log(`Failed to fetch from ${region}:`, errorText)
+          
+          // Check for invalid scope error specifically
+          if (errorText.includes('Invalid scope')) {
+            console.error('Invalid scope error detected - profile ID is likely invalid')
+            await supabase
+              .from('amazon_connections')
+              .update({ 
+                status: 'error',
+                last_sync_at: new Date().toISOString()
+              })
+              .eq('id', connectionId)
+            throw new Error('Invalid Amazon profile scope. This connection needs to be reconnected with a valid Amazon Advertising profile.')
+          }
         }
       } catch (error) {
         console.log(`Error fetching from ${region}:`, error.message)
@@ -152,7 +183,16 @@ serve(async (req) => {
     }
 
     if (!successfulRegion) {
-      throw new Error('Failed to fetch campaigns from all regions')
+      // Mark connection as having errors
+      await supabase
+        .from('amazon_connections')
+        .update({ 
+          status: 'error',
+          last_sync_at: new Date().toISOString()
+        })
+        .eq('id', connectionId)
+      
+      throw new Error('Failed to fetch campaigns from all regions. This may indicate an invalid profile ID or insufficient permissions. Please try reconnecting your Amazon account.')
     }
 
     // Store campaigns

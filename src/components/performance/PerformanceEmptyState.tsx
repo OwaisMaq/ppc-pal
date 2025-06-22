@@ -1,8 +1,10 @@
 
 import React from 'react';
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, AlertTriangle, Settings } from "lucide-react";
 import { AmazonConnection } from "@/lib/amazon/types";
+import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 
 interface PerformanceEmptyStateProps {
   connections: AmazonConnection[];
@@ -10,6 +12,62 @@ interface PerformanceEmptyStateProps {
 }
 
 const PerformanceEmptyState = ({ connections, getFilteredDescription }: PerformanceEmptyStateProps) => {
+  const navigate = useNavigate();
+  
+  // Check if any connections need setup or have errors
+  const hasConnectionIssues = connections.some(conn => 
+    conn.profile_id === 'needs_setup' || 
+    conn.profile_id?.startsWith('profile_') || 
+    conn.profile_id === 'unknown' ||
+    conn.status === 'error'
+  );
+
+  const getAlertContent = () => {
+    if (connections.length === 0) {
+      return {
+        icon: <AlertCircle className="h-4 w-4" />,
+        message: "No Amazon accounts connected yet. Connect your Amazon Ads account to view performance data.",
+        action: null
+      };
+    }
+
+    if (hasConnectionIssues) {
+      return {
+        icon: <AlertTriangle className="h-4 w-4" />,
+        message: "Some Amazon connections need attention. Please check your account connections and reconnect if necessary.",
+        action: (
+          <Button 
+            onClick={() => navigate('/settings')}
+            variant="outline" 
+            size="sm" 
+            className="mt-3"
+          >
+            <Settings className="h-4 w-4 mr-2" />
+            Check Connections
+          </Button>
+        )
+      };
+    }
+
+    return {
+      icon: <AlertCircle className="h-4 w-4" />,
+      message: "No campaign data available yet. Sync your Amazon account to import campaign data.",
+      action: (
+        <Button 
+          onClick={() => navigate('/settings')}
+          variant="outline" 
+          size="sm" 
+          className="mt-3"
+        >
+          <Settings className="h-4 w-4 mr-2" />
+          Sync Data
+        </Button>
+      )
+    };
+  };
+
+  const alertContent = getAlertContent();
+
   return (
     <div className="space-y-6">
       <div>
@@ -20,12 +78,12 @@ const PerformanceEmptyState = ({ connections, getFilteredDescription }: Performa
       </div>
 
       <Alert>
-        <AlertCircle className="h-4 w-4" />
+        {alertContent.icon}
         <AlertDescription>
-          {connections.length === 0 
-            ? "No Amazon accounts connected yet. Connect your Amazon Ads account to view performance data."
-            : "No campaign data available yet. Sync your Amazon account to import campaign data."
-          }
+          <div>
+            {alertContent.message}
+            {alertContent.action}
+          </div>
         </AlertDescription>
       </Alert>
     </div>

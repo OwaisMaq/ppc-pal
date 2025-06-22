@@ -2,7 +2,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { LinkIcon, RefreshCw, Trash2, CheckCircle, AlertCircle, Clock } from "lucide-react";
+import { LinkIcon, RefreshCw, Trash2, CheckCircle, AlertCircle, Clock, AlertTriangle } from "lucide-react";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { formatDistanceToNow } from "date-fns";
 
@@ -15,7 +15,12 @@ const AmazonAccountSetup = () => {
     initiateConnection(redirectUri);
   };
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status: string, profileId?: string) => {
+    // Check for invalid profile IDs
+    if (profileId === 'needs_setup' || profileId?.startsWith('profile_') || profileId === 'unknown') {
+      return <AlertTriangle className="h-4 w-4 text-orange-500" />;
+    }
+    
     switch (status) {
       case 'active':
         return <CheckCircle className="h-4 w-4 text-green-500" />;
@@ -30,7 +35,12 @@ const AmazonAccountSetup = () => {
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string, profileId?: string) => {
+    // Check for invalid profile IDs
+    if (profileId === 'needs_setup' || profileId?.startsWith('profile_') || profileId === 'unknown') {
+      return 'bg-orange-100 text-orange-800';
+    }
+    
     switch (status) {
       case 'active':
         return 'bg-green-100 text-green-800';
@@ -43,6 +53,34 @@ const AmazonAccountSetup = () => {
       default:
         return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const getStatusText = (status: string, profileId?: string) => {
+    // Check for invalid profile IDs
+    if (profileId === 'needs_setup' || profileId?.startsWith('profile_') || profileId === 'unknown') {
+      return 'needs setup';
+    }
+    return status;
+  };
+
+  const needsReconnection = (connection: any) => {
+    return connection.profile_id === 'needs_setup' || 
+           connection.profile_id?.startsWith('profile_') || 
+           connection.profile_id === 'unknown' ||
+           connection.status === 'error';
+  };
+
+  const getConnectionMessage = (connection: any) => {
+    if (connection.profile_id === 'needs_setup') {
+      return "No advertising profiles found. Please set up Amazon Advertising first.";
+    }
+    if (connection.profile_id?.startsWith('profile_') || connection.profile_id === 'unknown') {
+      return "Invalid profile ID detected. Please reconnect your account.";
+    }
+    if (connection.status === 'error') {
+      return "Connection error detected. Sync failed - may need reconnection.";
+    }
+    return null;
   };
 
   return (
@@ -77,46 +115,70 @@ const AmazonAccountSetup = () => {
               </div>
             ) : (
               <div className="space-y-3">
-                {connections.map((connection) => (
-                  <div key={connection.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      {getStatusIcon(connection.status)}
-                      <div>
-                        <h4 className="font-medium">{connection.profile_name || 'Amazon Profile'}</h4>
-                        <p className="text-sm text-gray-500">
-                          Profile ID: {connection.profile_id} • Marketplace: {connection.marketplace_id || 'US'}
-                          {connection.last_sync_at && (
-                            <span className="ml-2">
-                              • Last sync: {formatDistanceToNow(new Date(connection.last_sync_at), { addSuffix: true })}
-                            </span>
+                {connections.map((connection) => {
+                  const needsSetup = needsReconnection(connection);
+                  const message = getConnectionMessage(connection);
+                  
+                  return (
+                    <div key={connection.id} className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          {getStatusIcon(connection.status, connection.profile_id)}
+                          <div>
+                            <h4 className="font-medium">{connection.profile_name || 'Amazon Profile'}</h4>
+                            <p className="text-sm text-gray-500">
+                              Profile ID: {connection.profile_id} • Marketplace: {connection.marketplace_id || 'US'}
+                              {connection.last_sync_at && !needsSetup && (
+                                <span className="ml-2">
+                                  • Last sync: {formatDistanceToNow(new Date(connection.last_sync_at), { addSuffix: true })}
+                                </span>
+                              )}
+                            </p>
+                            {message && (
+                              <p className="text-sm text-orange-600 mt-1 font-medium">
+                                {message}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge className={getStatusColor(connection.status, connection.profile_id)}>
+                            {getStatusText(connection.status, connection.profile_id)}
+                          </Badge>
+                          {needsSetup ? (
+                            <Button
+                              onClick={handleConnect}
+                              size="sm"
+                              className="bg-orange-600 hover:bg-orange-700"
+                              title="Reconnect account"
+                            >
+                              <LinkIcon className="h-4 w-4 mr-1" />
+                              Reconnect
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => syncConnection(connection.id)}
+                              disabled={connection.status !== 'active'}
+                              title="Sync campaign data"
+                            >
+                              <RefreshCw className="h-4 w-4" />
+                            </Button>
                           )}
-                        </p>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => deleteConnection(connection.id)}
+                            title="Remove connection"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge className={getStatusColor(connection.status)}>
-                        {connection.status}
-                      </Badge>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => syncConnection(connection.id)}
-                        disabled={connection.status !== 'active'}
-                        title="Sync campaign data"
-                      >
-                        <RefreshCw className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => deleteConnection(connection.id)}
-                        title="Remove connection"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
                 <Button onClick={handleConnect} variant="outline" className="w-full">
                   <LinkIcon className="h-4 w-4 mr-2" />
                   Connect Another Account

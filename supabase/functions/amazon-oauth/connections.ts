@@ -15,11 +15,20 @@ export async function createConnections(
   let connectionsCreated = 0;
   
   if (profiles.length > 0) {
+    // Create connections for valid profiles
     for (const profile of profiles) {
+      const profileId = profile.profileId?.toString();
+      
+      // Additional validation to ensure we don't store invalid profile IDs
+      if (!profileId || profileId.startsWith('profile_') || profileId === 'unknown') {
+        console.warn('Skipping invalid profile:', profile);
+        continue;
+      }
+
       const connectionData: ConnectionData = {
         user_id: userId,
-        profile_id: profile.profileId.toString(),
-        profile_name: profile.accountInfo?.name || `Profile ${profile.profileId}`,
+        profile_id: profileId,
+        profile_name: profile.accountInfo?.name || `Profile ${profileId}`,
         marketplace_id: profile.countryCode || 'US',
         access_token: tokenData.access_token,
         refresh_token: tokenData.refresh_token || '',
@@ -27,7 +36,7 @@ export async function createConnections(
         status: 'active' as const,
       };
 
-      console.log('Creating connection record for profile:', profile.profileId);
+      console.log('Creating connection record for profile:', profileId);
 
       const { error: insertError } = await supabase
         .from('amazon_connections')
@@ -36,23 +45,23 @@ export async function createConnections(
       if (!insertError) {
         connectionsCreated++;
       } else {
-        console.error('Error storing connection for profile:', profile.profileId, insertError);
+        console.error('Error storing connection for profile:', profileId, insertError);
       }
     }
   } else {
-    // Fallback: create a single connection
+    // No valid profiles - create a connection that needs setup
     const connectionData: ConnectionData = {
       user_id: userId,
-      profile_id: 'profile_' + Date.now(),
-      profile_name: 'Amazon Advertising Profile',
+      profile_id: 'needs_setup',
+      profile_name: 'Amazon Account - Setup Required',
       marketplace_id: 'US',
       access_token: tokenData.access_token,
       refresh_token: tokenData.refresh_token || '',
       token_expires_at: new Date(Date.now() + ((tokenData.expires_in || 3600) * 1000)).toISOString(),
-      status: 'active' as const,
+      status: 'error' as const,
     };
 
-    console.log('Creating fallback connection record for user:', userId);
+    console.log('Creating setup-required connection record for user:', userId);
 
     const { error: insertError } = await supabase
       .from('amazon_connections')
@@ -61,7 +70,7 @@ export async function createConnections(
     if (!insertError) {
       connectionsCreated = 1;
     } else {
-      console.error('Error storing fallback connection:', insertError);
+      console.error('Error storing setup-required connection:', insertError);
       throw new Error(`Failed to store connection: ${insertError.message}`);
     }
   }
