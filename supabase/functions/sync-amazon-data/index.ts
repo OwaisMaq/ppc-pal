@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { fetchCampaignReports, updateCampaignMetrics } from './reporting.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -197,6 +198,8 @@ serve(async (req) => {
 
     // Store campaigns
     let campaignsStored = 0
+    const campaignIds = []
+    
     for (const campaign of campaignsData) {
       try {
         const { error: campaignError } = await supabase
@@ -222,6 +225,7 @@ serve(async (req) => {
 
         if (!campaignError) {
           campaignsStored++
+          campaignIds.push(campaign.campaignId.toString())
         } else {
           console.error('Error storing campaign:', campaignError)
         }
@@ -232,6 +236,29 @@ serve(async (req) => {
 
     console.log(`Stored ${campaignsStored} campaigns successfully`)
 
+    // Fetch and update performance metrics
+    const baseUrl = `https://advertising-api${successfulRegion === 'na' ? '' : '-' + successfulRegion}.amazon.com`
+    
+    if (campaignIds.length > 0) {
+      try {
+        console.log('Fetching performance metrics for campaigns...')
+        const metricsData = await fetchCampaignReports(
+          accessToken,
+          clientId,
+          connection.profile_id,
+          baseUrl,
+          campaignIds
+        )
+        
+        if (metricsData.length > 0) {
+          await updateCampaignMetrics(supabase, connectionId, metricsData)
+          console.log(`Updated metrics for ${metricsData.length} campaigns`)
+        }
+      } catch (error) {
+        console.error('Error fetching campaign metrics:', error)
+      }
+    }
+
     // Sync ad groups for each campaign
     const { data: storedCampaigns } = await supabase
       .from('campaigns')
@@ -239,7 +266,6 @@ serve(async (req) => {
       .eq('connection_id', connectionId)
 
     let adGroupsStored = 0
-    const baseUrl = `https://advertising-api${successfulRegion === 'na' ? '' : '-' + successfulRegion}.amazon.com`
 
     for (const campaign of storedCampaigns || []) {
       try {
@@ -301,7 +327,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: `Data sync completed successfully. Imported ${campaignsStored} campaigns and ${adGroupsStored} ad groups.`,
+        message: `Data sync completed successfully. Imported ${campaignsStored} campaigns and ${adGroupsStored} ad groups with performance metrics.`,
         campaignsStored,
         adGroupsStored
       }),

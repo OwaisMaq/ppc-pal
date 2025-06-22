@@ -7,7 +7,7 @@ export const usePerformanceSummary = () => {
   const [selectedCountry, setSelectedCountry] = useState("all");
   const [selectedAsin, setSelectedAsin] = useState("all");
   const { connections } = useAmazonConnections();
-  const { metrics, loading, hasData } = usePerformanceData();
+  const { metrics, loading, hasData } = usePerformanceData(undefined, selectedCountry, selectedAsin);
 
   const getFilteredDescription = () => {
     const parts = [];
@@ -21,7 +21,8 @@ export const usePerformanceSummary = () => {
         "IT": "Italy",
         "ES": "Spain",
         "JP": "Japan",
-        "AU": "Australia"
+        "AU": "Australia",
+        "NL": "Netherlands"
       };
       parts.push(`in ${countryLabels[selectedCountry] || selectedCountry}`);
     }

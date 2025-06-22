@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useCampaignData } from './useCampaignData';
 import { useKeywordData } from './useKeywordData';
+import { useAmazonConnections } from './useAmazonConnections';
 
 export interface PerformanceMetrics {
   totalSales: number;
@@ -18,7 +19,8 @@ export interface PerformanceMetrics {
   conversionRate: number;
 }
 
-export const usePerformanceData = (connectionId?: string) => {
+export const usePerformanceData = (connectionId?: string, selectedCountry?: string, selectedAsin?: string) => {
+  const { connections } = useAmazonConnections();
   const { campaigns, loading: campaignsLoading } = useCampaignData(connectionId);
   const { keywords, loading: keywordsLoading } = useKeywordData(connectionId);
   const [metrics, setMetrics] = useState<PerformanceMetrics | null>(null);
@@ -27,28 +29,81 @@ export const usePerformanceData = (connectionId?: string) => {
     if (campaignsLoading || keywordsLoading) return;
 
     calculateMetrics();
-  }, [campaigns, keywords, campaignsLoading, keywordsLoading]);
+  }, [campaigns, keywords, campaignsLoading, keywordsLoading, connections, selectedCountry, selectedAsin]);
 
   const calculateMetrics = () => {
+    console.log('Calculating performance metrics...');
+    console.log('Available campaigns:', campaigns.length);
+    console.log('Available connections:', connections.length);
+    
     if (!campaigns.length && !keywords.length) {
+      console.log('No campaigns or keywords available');
       setMetrics(null);
       return;
     }
 
-    // Use campaign data as primary source, fallback to keyword aggregation
-    const totalSales = campaigns.reduce((sum, c) => sum + (c.sales || 0), 0);
-    const totalSpend = campaigns.reduce((sum, c) => sum + (c.spend || 0), 0);
-    const totalOrders = campaigns.reduce((sum, c) => sum + (c.orders || 0), 0);
-    const totalImpressions = campaigns.reduce((sum, c) => sum + (c.impressions || 0), 0);
-    const totalClicks = campaigns.reduce((sum, c) => sum + (c.clicks || 0), 0);
+    // Filter campaigns based on selected country
+    let filteredCampaigns = campaigns;
+    
+    if (selectedCountry && selectedCountry !== 'all') {
+      // Find connections for the selected country
+      const countryConnections = connections
+        .filter(conn => conn.marketplace_id === selectedCountry)
+        .map(conn => conn.id);
+      
+      filteredCampaigns = campaigns.filter(campaign => 
+        countryConnections.includes(campaign.connection_id)
+      );
+      
+      console.log(`Filtered to ${filteredCampaigns.length} campaigns for country ${selectedCountry}`);
+    }
+
+    // Filter by ASIN if selected (this is a simplified filter - in a real app you'd have ASIN data)
+    if (selectedAsin && selectedAsin !== 'all') {
+      // For now, just filter by campaign name containing the ASIN or randomly select some campaigns
+      // In a real implementation, you'd have ASIN data linked to campaigns
+      const asinSuffix = selectedAsin.replace('B0', '').substring(0, 6);
+      filteredCampaigns = filteredCampaigns.filter(campaign => 
+        campaign.amazon_campaign_id.includes(asinSuffix) ||
+        campaign.name.toLowerCase().includes(selectedAsin.toLowerCase())
+      );
+      
+      console.log(`Filtered to ${filteredCampaigns.length} campaigns for ASIN ${selectedAsin}`);
+    }
+
+    console.log('Processing campaigns for metrics:', filteredCampaigns.map(c => ({
+      name: c.name,
+      sales: c.sales,
+      spend: c.spend,
+      orders: c.orders,
+      impressions: c.impressions,
+      clicks: c.clicks
+    })));
+
+    // Calculate metrics from filtered campaigns
+    const totalSales = filteredCampaigns.reduce((sum, c) => sum + (c.sales || 0), 0);
+    const totalSpend = filteredCampaigns.reduce((sum, c) => sum + (c.spend || 0), 0);
+    const totalOrders = filteredCampaigns.reduce((sum, c) => sum + (c.orders || 0), 0);
+    const totalImpressions = filteredCampaigns.reduce((sum, c) => sum + (c.impressions || 0), 0);
+    const totalClicks = filteredCampaigns.reduce((sum, c) => sum + (c.clicks || 0), 0);
 
     const totalProfit = totalSales - totalSpend;
-    const averageAcos = totalSpend > 0 ? (totalSpend / totalSales) * 100 : 0;
+    const averageAcos = totalSales > 0 ? (totalSpend / totalSales) * 100 : 0;
     const averageRoas = totalSpend > 0 ? totalSales / totalSpend : 0;
     const averageCostPerUnit = totalOrders > 0 ? totalSpend / totalOrders : 0;
     const averageCtr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
     const averageCpc = totalClicks > 0 ? totalSpend / totalClicks : 0;
     const conversionRate = totalClicks > 0 ? (totalOrders / totalClicks) * 100 : 0;
+
+    console.log('Calculated metrics:', {
+      totalSales,
+      totalSpend,
+      totalProfit,
+      totalOrders,
+      averageAcos,
+      averageRoas,
+      campaignCount: filteredCampaigns.length
+    });
 
     setMetrics({
       totalSales,
