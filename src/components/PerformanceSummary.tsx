@@ -2,10 +2,12 @@
 import React from 'react';
 import FilterBar from "@/components/FilterBar";
 import { usePerformanceSummary } from "@/hooks/usePerformanceSummary";
+import { useWeeklyMetrics } from "@/hooks/useWeeklyMetrics";
 import PerformanceLoadingState from "./performance/PerformanceLoadingState";
 import PerformanceEmptyState from "./performance/PerformanceEmptyState";
 import PerformanceMetricCards from "./performance/PerformanceMetricCards";
 import AdditionalMetrics from "./performance/AdditionalMetrics";
+import WeeklyPerformanceMetrics from "./performance/WeeklyPerformanceMetrics";
 import NoRealDataAlert from "./performance/NoRealDataAlert";
 
 const PerformanceSummary = () => {
@@ -24,10 +26,16 @@ const PerformanceSummary = () => {
     formatPercentage
   } = usePerformanceSummary();
 
-  // Add missing selectedProduct state
   const [selectedProduct, setSelectedProduct] = React.useState('all');
 
-  if (loading) {
+  // Get weekly metrics
+  const { 
+    weeklyMetrics, 
+    loading: weeklyLoading, 
+    hasRealData: hasWeeklyRealData 
+  } = useWeeklyMetrics(selectedCountry, selectedCampaign, selectedProduct);
+
+  if (loading || weeklyLoading) {
     return <PerformanceLoadingState getFilteredDescription={getFilteredDescription} />;
   }
 
@@ -41,7 +49,7 @@ const PerformanceSummary = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Performance Summary</h2>
         <p className="text-gray-600">
@@ -58,29 +66,52 @@ const PerformanceSummary = () => {
         onProductChange={setSelectedProduct}
       />
 
-      {!hasRealData ? (
-        <NoRealDataAlert 
-          description="No real campaign data available. All current data is simulated. Please sync your Amazon account to get real performance metrics."
+      {/* 7-Day Performance Metrics Section */}
+      {hasWeeklyRealData && weeklyMetrics ? (
+        <WeeklyPerformanceMetrics 
+          metrics={weeklyMetrics}
+          formatCurrency={formatCurrency}
+          formatPercentage={formatPercentage}
         />
-      ) : metrics ? (
-        <>
-          <PerformanceMetricCards 
-            metrics={metrics} 
-            formatCurrency={formatCurrency} 
-          />
-
-          <AdditionalMetrics 
-            metrics={metrics}
-            formatCurrency={formatCurrency}
-            formatPercentage={formatPercentage}
-          />
-        </>
       ) : (
         <NoRealDataAlert 
-          title="Unable to Calculate Metrics"
-          description="Real data is available but metrics calculation failed. Please check your connection and try again."
+          title="No 7-Day Data Available"
+          description="No real campaign data available for the last 7 days. Historical data is required to display weekly performance metrics."
+          showSyncButton={false}
         />
       )}
+
+      {/* Monthly Performance Metrics Section */}
+      <div className="pt-6 border-t border-gray-200">
+        <div className="mb-6">
+          <h3 className="text-xl font-bold text-gray-900 mb-2">Monthly Performance Overview</h3>
+          <p className="text-gray-600">Complete campaign performance metrics and trends</p>
+        </div>
+
+        {!hasRealData ? (
+          <NoRealDataAlert 
+            description="No real campaign data available. All current data is simulated. Please sync your Amazon account to get real performance metrics."
+          />
+        ) : metrics ? (
+          <>
+            <PerformanceMetricCards 
+              metrics={metrics} 
+              formatCurrency={formatCurrency} 
+            />
+
+            <AdditionalMetrics 
+              metrics={metrics}
+              formatCurrency={formatCurrency}
+              formatPercentage={formatPercentage}
+            />
+          </>
+        ) : (
+          <NoRealDataAlert 
+            title="Unable to Calculate Metrics"
+            description="Real data is available but metrics calculation failed. Please check your connection and try again."
+          />
+        )}
+      </div>
     </div>
   );
 };
