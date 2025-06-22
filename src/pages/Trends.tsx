@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import AuthenticatedLayout from '@/components/AuthenticatedLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -140,14 +139,14 @@ const Trends = () => {
 
         {metrics && (
           <TrendsKeyMetrics
-            totalRevenue={metrics.totalSales}
+            totalSales={metrics.totalSales}
             totalSpend={metrics.totalSpend}
-            averageRoas={metrics.averageRoas}
-            averageAcos={metrics.averageAcos}
-            revenueChange={metrics.salesChange}
+            totalProfit={metrics.totalProfit}
+            totalOrders={metrics.totalOrders}
+            salesChange={metrics.salesChange}
             spendChange={metrics.spendChange}
-            roasChange={0} // Calculate if needed
-            acosChange={0} // Calculate if needed
+            profitChange={metrics.profitChange}
+            ordersChange={metrics.ordersChange}
           />
         )}
 

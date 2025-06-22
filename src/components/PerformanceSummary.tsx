@@ -22,6 +22,9 @@ const PerformanceSummary = () => {
     formatPercentage
   } = usePerformanceSummary();
 
+  // Add missing selectedProduct state
+  const [selectedProduct, setSelectedProduct] = React.useState('all');
+
   if (loading) {
     return <PerformanceLoadingState getFilteredDescription={getFilteredDescription} />;
   }
@@ -58,8 +61,10 @@ const PerformanceSummary = () => {
       <FilterBar
         selectedCountry={selectedCountry}
         selectedAsin={selectedCampaign}
+        selectedProduct={selectedProduct}
         onCountryChange={setSelectedCountry}
         onAsinChange={setSelectedCampaign}
+        onProductChange={setSelectedProduct}
       />
 
       <PerformanceMetricCards 
