@@ -5,7 +5,7 @@ import { useAmazonConnections } from './useAmazonConnections';
 import { useCampaignData } from './useCampaignData';
 import { FilterParams } from '@/types/performance';
 import { filterCampaigns } from '@/utils/campaignFilter';
-import { WeeklyMetrics } from '@/types/weeklyMetrics';
+import { WeeklyMetrics } from '@/utils/weeklyMetricsCalculator';
 import { 
   calculateMetricsFromData, 
   calculateMetricsFromCampaigns, 
@@ -54,9 +54,7 @@ export const useWeeklyMetrics = (
 
       // Filter for real data campaigns only - no simulated data
       const realDataCampaigns = filteredCampaigns.filter(campaign => {
-        const isRealSource = campaign.data_source !== 'simulated' && 
-                            campaign.data_source !== 'simulation' &&
-                            campaign.data_source !== 'fake';
+        const isRealSource = campaign.data_source === 'api';
         
         const hasMetrics = (campaign.sales || 0) > 0 || 
                           (campaign.spend || 0) > 0 || 

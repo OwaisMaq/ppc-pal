@@ -13,9 +13,7 @@ export const calculateMetrics = (campaigns: CampaignData[]): PerformanceMetrics 
 
   // STRICT FILTER: Only include campaigns with real API data
   const realDataCampaigns = campaigns.filter(campaign => {
-    const isRealData = campaign.data_source === 'api' && 
-                      campaign.data_source !== 'simulated' && 
-                      campaign.data_source !== 'simulation';
+    const isRealData = campaign.data_source === 'api';
     
     // Additional validation: Check if campaign has meaningful metrics
     const hasMetrics = (campaign.sales || 0) > 0 || 
@@ -55,11 +53,13 @@ export const calculateMetrics = (campaigns: CampaignData[]): PerformanceMetrics 
   );
 
   // Calculate derived metrics
-  const averageOrderValue = totals.orders > 0 ? totals.sales / totals.orders : 0;
-  const ctr = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
+  const averageCostPerUnit = totals.orders > 0 ? totals.spend / totals.orders : 0;
+  const averageCtr = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
   const conversionRate = totals.clicks > 0 ? (totals.orders / totals.clicks) * 100 : 0;
-  const acos = totals.sales > 0 ? (totals.spend / totals.sales) * 100 : 0;
-  const roas = totals.spend > 0 ? totals.sales / totals.spend : 0;
+  const averageAcos = totals.sales > 0 ? (totals.spend / totals.sales) * 100 : 0;
+  const averageRoas = totals.spend > 0 ? totals.sales / totals.spend : 0;
+  const averageCpc = totals.clicks > 0 ? totals.spend / totals.clicks : 0;
+  const totalProfit = totals.sales - totals.spend;
 
   // Calculate previous period metrics for comparison (real data only)
   const previousTotals = realDataCampaigns.reduce(
@@ -81,27 +81,32 @@ export const calculateMetrics = (campaigns: CampaignData[]): PerformanceMetrics 
   const ordersChange = previousTotals.orders > 0 
     ? ((totals.orders - previousTotals.orders) / previousTotals.orders) * 100 
     : 0;
+  const previousProfit = previousTotals.sales - previousTotals.spend;
+  const profitChange = previousProfit > 0 
+    ? ((totalProfit - previousProfit) / previousProfit) * 100 
+    : 0;
 
   const metrics: PerformanceMetrics = {
     totalSales: totals.sales,
     totalSpend: totals.spend,
+    totalProfit,
     totalOrders: totals.orders,
-    totalClicks: totals.clicks,
+    averageAcos,
+    averageRoas,
+    averageCostPerUnit,
     totalImpressions: totals.impressions,
-    averageOrderValue,
-    clickThroughRate: ctr,
+    totalClicks: totals.clicks,
+    averageCtr,
+    averageCpc,
     conversionRate,
-    acos,
-    roas,
-    campaignCount: realDataCampaigns.length,
-    // Period changes
+    // Month-over-month changes
     salesChange,
     spendChange,
     ordersChange,
-    // Previous period totals
-    previousSales: previousTotals.sales,
-    previousSpend: previousTotals.spend,
-    previousOrders: previousTotals.orders
+    profitChange,
+    // Data quality indicators
+    hasSimulatedData: false,
+    dataSourceInfo: `Real API data from ${realDataCampaigns.length} campaigns`
   };
 
   console.log('✅ REAL DATA METRICS CALCULATED:', {
@@ -109,8 +114,8 @@ export const calculateMetrics = (campaigns: CampaignData[]): PerformanceMetrics 
     totalSales: metrics.totalSales,
     totalSpend: metrics.totalSpend,
     totalOrders: metrics.totalOrders,
-    acos: metrics.acos?.toFixed(2),
-    roas: metrics.roas?.toFixed(2)
+    averageAcos: metrics.averageAcos?.toFixed(2),
+    averageRoas: metrics.averageRoas?.toFixed(2)
   });
 
   return metrics;

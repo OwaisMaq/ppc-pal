@@ -4,16 +4,21 @@ import { CampaignData } from '@/hooks/useCampaignData';
 export interface WeeklyMetrics {
   totalSales: number;
   totalSpend: number;
+  totalProfit: number;
   totalOrders: number;
-  totalClicks: number;
   totalImpressions: number;
-  acos: number;
-  roas: number;
-  clickThroughRate: number;
+  totalClicks: number;
+  averageAcos: number;
+  averageRoas: number;
+  averageCtr: number;
+  averageCpc: number;
   conversionRate: number;
-  salesChange?: number;
-  spendChange?: number;
-  ordersChange?: number;
+  // Week-over-week changes
+  salesChange: number;
+  spendChange: number;
+  ordersChange: number;
+  profitChange: number;
+  // Data quality
   hasRealData: boolean;
   dataSourceInfo: string;
 }
@@ -27,9 +32,7 @@ export const calculateMetricsFromData = (data: any[]): WeeklyMetrics | null => {
 
   // Filter out simulated data
   const realData = data.filter(record => 
-    record.data_source === 'api' && 
-    record.data_source !== 'simulated' &&
-    record.data_source !== 'simulation'
+    record.data_source === 'api'
   );
 
   console.log(`Filtered to ${realData.length} real data records from ${data.length} total`);
@@ -50,16 +53,24 @@ export const calculateMetricsFromData = (data: any[]): WeeklyMetrics | null => {
     { sales: 0, spend: 0, orders: 0, clicks: 0, impressions: 0 }
   );
 
+  const totalProfit = totals.sales - totals.spend;
+
   return {
     totalSales: totals.sales,
     totalSpend: totals.spend,
+    totalProfit,
     totalOrders: totals.orders,
     totalClicks: totals.clicks,
     totalImpressions: totals.impressions,
-    acos: totals.sales > 0 ? (totals.spend / totals.sales) * 100 : 0,
-    roas: totals.spend > 0 ? totals.sales / totals.spend : 0,
-    clickThroughRate: totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0,
+    averageAcos: totals.sales > 0 ? (totals.spend / totals.sales) * 100 : 0,
+    averageRoas: totals.spend > 0 ? totals.sales / totals.spend : 0,
+    averageCtr: totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0,
+    averageCpc: totals.clicks > 0 ? totals.spend / totals.clicks : 0,
     conversionRate: totals.clicks > 0 ? (totals.orders / totals.clicks) * 100 : 0,
+    salesChange: 0,
+    spendChange: 0,
+    ordersChange: 0,
+    profitChange: 0,
     hasRealData: true,
     dataSourceInfo: `Real historical data (${realData.length} records)`
   };
@@ -74,9 +85,7 @@ export const calculateMetricsFromCampaigns = (campaigns: CampaignData[]): Weekly
 
   // STRICT FILTER: Only real API data campaigns
   const realDataCampaigns = campaigns.filter(campaign => {
-    const isRealData = campaign.data_source === 'api' && 
-                      campaign.data_source !== 'simulated' && 
-                      campaign.data_source !== 'simulation';
+    const isRealData = campaign.data_source === 'api';
     
     const hasMetrics = (campaign.sales || 0) > 0 || 
                       (campaign.spend || 0) > 0 || 
@@ -105,16 +114,24 @@ export const calculateMetricsFromCampaigns = (campaigns: CampaignData[]): Weekly
     { sales: 0, spend: 0, orders: 0, clicks: 0, impressions: 0 }
   );
 
+  const totalProfit = totals.sales - totals.spend;
+
   return {
     totalSales: totals.sales,
     totalSpend: totals.spend,
+    totalProfit,
     totalOrders: totals.orders,
     totalClicks: totals.clicks,
     totalImpressions: totals.impressions,
-    acos: totals.sales > 0 ? (totals.spend / totals.sales) * 100 : 0,
-    roas: totals.spend > 0 ? totals.sales / totals.spend : 0,
-    clickThroughRate: totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0,
+    averageAcos: totals.sales > 0 ? (totals.spend / totals.sales) * 100 : 0,
+    averageRoas: totals.spend > 0 ? totals.sales / totals.spend : 0,
+    averageCtr: totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0,
+    averageCpc: totals.clicks > 0 ? totals.spend / totals.clicks : 0,
     conversionRate: totals.clicks > 0 ? (totals.orders / totals.clicks) * 100 : 0,
+    salesChange: 0,
+    spendChange: 0,
+    ordersChange: 0,
+    profitChange: 0,
     hasRealData: true,
     dataSourceInfo: `Real campaign data (${realDataCampaigns.length} campaigns)`
   };
@@ -128,7 +145,8 @@ export const calculateWeekOverWeekChanges = (
     return {
       salesChange: 0,
       spendChange: 0,
-      ordersChange: 0
+      ordersChange: 0,
+      profitChange: 0
     };
   }
 
@@ -141,6 +159,9 @@ export const calculateWeekOverWeekChanges = (
       : 0,
     ordersChange: previousMetrics.totalOrders > 0 
       ? ((currentMetrics.totalOrders - previousMetrics.totalOrders) / previousMetrics.totalOrders) * 100 
+      : 0,
+    profitChange: previousMetrics.totalProfit > 0 
+      ? ((currentMetrics.totalProfit - previousMetrics.totalProfit) / previousMetrics.totalProfit) * 100 
       : 0
   };
 };
