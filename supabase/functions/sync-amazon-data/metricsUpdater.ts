@@ -12,6 +12,9 @@ export async function updateCampaignMetrics(
   
   for (const metrics of metricsData) {
     try {
+      // Determine data source based on fromAPI flag
+      const dataSource = metrics.fromAPI === true ? 'api' : 'simulated';
+      
       // Map API field names to database field names
       const dbMetrics = {
         impressions: metrics.impressions || 0,
@@ -21,11 +24,11 @@ export async function updateCampaignMetrics(
         orders: metrics.orders || metrics.purchases14d || 0,
         acos: metrics.acos || (metrics.spend && metrics.sales ? (metrics.spend / metrics.sales) * 100 : null),
         roas: metrics.roas || (metrics.spend && metrics.sales ? metrics.sales / metrics.spend : null),
-        data_source: metrics.fromAPI === false ? 'simulated' : 'api', // Track data source
+        data_source: dataSource,
         last_updated: new Date().toISOString()
       };
 
-      console.log(`Updating campaign ${metrics.campaignId} with metrics:`, dbMetrics);
+      console.log(`Updating campaign ${metrics.campaignId} with ${dataSource} metrics:`, dbMetrics);
 
       // Update the campaign with current metrics
       const { data, error } = await supabase
@@ -42,7 +45,7 @@ export async function updateCampaignMetrics(
       }
 
       if (data && data.length > 0) {
-        console.log(`Successfully updated metrics for campaign ${metrics.campaignId}: sales=${dbMetrics.sales}, spend=${dbMetrics.spend}, orders=${dbMetrics.orders}`);
+        console.log(`Successfully updated ${dataSource} metrics for campaign ${metrics.campaignId}: sales=${dbMetrics.sales}, spend=${dbMetrics.spend}, orders=${dbMetrics.orders}`);
         
         // Store daily metrics for historical tracking
         const today = new Date().toISOString().split('T')[0];
@@ -59,7 +62,7 @@ export async function updateCampaignMetrics(
             orders: dbMetrics.orders,
             acos: dbMetrics.acos,
             roas: dbMetrics.roas,
-            data_source: dbMetrics.data_source
+            data_source: dataSource
           }, {
             onConflict: 'campaign_id, date'
           });
@@ -67,7 +70,7 @@ export async function updateCampaignMetrics(
         if (historyError) {
           console.warn(`Failed to store history for campaign ${metrics.campaignId}:`, historyError);
         } else {
-          console.log(`Stored daily metrics history for campaign ${metrics.campaignId}`);
+          console.log(`Stored daily ${dataSource} metrics history for campaign ${metrics.campaignId}`);
         }
 
         successCount++;

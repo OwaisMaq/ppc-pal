@@ -8,13 +8,13 @@ export async function fetchBasicMetrics(
   baseUrl: string,
   campaignIds: string[]
 ): Promise<any[]> {
-  console.log('Generating SIMULATED metrics data (API unavailable)...');
+  console.log('API metrics request failed, generating fallback data marked as simulated...');
   
   const metrics = [];
   
   for (const campaignId of campaignIds.slice(0, 10)) { // Process up to 10 campaigns
     try {
-      // Generate realistic sample data but mark it as simulated
+      // Generate realistic sample data and mark it as simulated
       const isEnabled = Math.random() > 0.2;
       const performanceMultiplier = isEnabled ? (0.5 + Math.random() * 1.5) : 0.1;
       
@@ -43,7 +43,7 @@ export async function fetchBasicMetrics(
         acos: acos,
         roas: roas,
         conversionRate: Number(conversionRate.toFixed(2)),
-        fromAPI: false // Mark as simulated data
+        fromAPI: false // Mark as simulated data since API failed
       });
 
       console.log(`Generated SIMULATED metrics for campaign ${campaignId}:`, {
@@ -62,6 +62,6 @@ export async function fetchBasicMetrics(
     }
   }
   
-  console.log(`Generated ${metrics.length} SIMULATED metric records (marked as non-API)`);
+  console.log(`Generated ${metrics.length} SIMULATED metric records (API unavailable)`);
   return metrics;
 }

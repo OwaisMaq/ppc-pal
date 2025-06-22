@@ -79,12 +79,13 @@ export async function fetchCampaignReports(
     // Check if it's an async report (returns reportId)
     if (reportData.reportId) {
       console.log('Async report created with ID:', reportData.reportId);
-      // For now, fall back to basic metrics since we need to poll for async results
+      // For now, fall back to simulated metrics since we need to poll for async results
       return await fetchBasicMetrics(accessToken, clientId, profileId, baseUrl, campaignIds);
     }
     
-    // Transform the API response to our expected format
+    // Transform the API response to our expected format and mark as real API data
     if (Array.isArray(reportData)) {
+      console.log(`Successfully received ${reportData.length} real API metrics records`);
       return reportData.map(row => ({
         campaignId: row.campaignId,
         impressions: row.impressions || 0,
@@ -95,7 +96,8 @@ export async function fetchCampaignReports(
         ctr: row.clickThroughRate || 0,
         cpc: row.costPerClick || 0,
         acos: row.cost && row.sales14d ? (row.cost / row.sales14d) * 100 : 0,
-        roas: row.cost && row.sales14d ? row.sales14d / row.cost : 0
+        roas: row.cost && row.sales14d ? row.sales14d / row.cost : 0,
+        fromAPI: true // Mark as real API data
       }));
     }
     
@@ -136,14 +138,22 @@ async function tryAlternativeReportsEndpoint(
 
     if (syncResponse.ok) {
       const syncData = await syncResponse.json();
-      console.log('Sync report data received:', syncData);
+      console.log('Alternative sync report data received:', syncData);
+      
+      // Mark this data as real API data
+      if (Array.isArray(syncData)) {
+        return syncData.map(row => ({
+          ...row,
+          fromAPI: true
+        }));
+      }
       return syncData;
     }
   } catch (error) {
     console.warn('Alternative endpoint also failed:', error);
   }
   
-  // Final fallback to basic metrics but mark as simulated
+  // Final fallback to simulated metrics
   console.log('Falling back to simulated metrics due to API failures');
   return await fetchBasicMetrics(accessToken, clientId, profileId, baseUrl, campaignIds);
 }
