@@ -1,6 +1,6 @@
 
 import { Button } from "@/components/ui/button";
-import { Zap, Sparkles } from "lucide-react";
+import { Zap, ArrowRight, TrendingUp } from "lucide-react";
 import { Link } from "react-router-dom";
 
 interface LandingHeroProps {
@@ -9,40 +9,71 @@ interface LandingHeroProps {
 
 const LandingHero = ({ user }: LandingHeroProps) => {
   return (
-    <section className="container mx-auto px-4 py-16 text-center relative z-10">
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-8 relative">
-          <Sparkles className="absolute -top-4 -left-4 h-8 w-8 text-purple-400 animate-pulse" />
-          <Sparkles className="absolute -top-2 -right-6 h-6 w-6 text-blue-400 animate-pulse" style={{ animationDelay: '0.5s' }} />
-          <h1 className="text-5xl font-bold bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent mb-6 leading-tight">
-            Optimize Your Amazon PPC Campaigns with AI
+    <section className="relative py-20 lg:py-32">
+      <div className="container mx-auto px-4">
+        <div className="max-w-4xl mx-auto text-center">
+          {/* Badge */}
+          <div className="inline-flex items-center gap-2 bg-indigo-100 text-indigo-700 px-4 py-2 rounded-full text-sm font-medium mb-8 border border-indigo-200">
+            <TrendingUp className="h-4 w-4" />
+            AI-Powered PPC Optimization
+          </div>
+
+          {/* Main Heading */}
+          <h1 className="text-5xl lg:text-7xl font-bold text-gray-900 mb-6 leading-tight">
+            Transform Your 
+            <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600 bg-clip-text text-transparent block">
+              Amazon PPC
+            </span>
+            Performance
           </h1>
-        </div>
-        <p className="text-xl text-purple-100 mb-8 leading-relaxed opacity-90">
-          PPC Pal uses advanced artificial intelligence to analyze and optimize your Amazon advertising campaigns, 
-          helping you increase sales while reducing wasted ad spend in the vast digital cosmos.
-        </p>
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          {user ? (
-            <Link to="/dashboard">
-              <Button size="lg" className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg shadow-purple-500/40 transition-all duration-300 hover:scale-105 border border-purple-400/30">
-                <Zap className="mr-2 h-5 w-5" />
-                Go to Dashboard
+
+          {/* Subtitle */}
+          <p className="text-xl lg:text-2xl text-gray-600 mb-10 leading-relaxed max-w-3xl mx-auto">
+            Leverage advanced AI to optimize your Amazon advertising campaigns, 
+            increase sales, and reduce wasted ad spend with intelligent automation.
+          </p>
+
+          {/* CTA Buttons */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
+            {user ? (
+              <Link to="/dashboard">
+                <Button size="lg" className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-lg px-8 py-4 h-14 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105 group">
+                  <Zap className="mr-2 h-5 w-5 group-hover:animate-pulse" />
+                  Go to Dashboard
+                  <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                </Button>
+              </Link>
+            ) : (
+              <Link to="/auth">
+                <Button size="lg" className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-lg px-8 py-4 h-14 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105 group">
+                  <Zap className="mr-2 h-5 w-5 group-hover:animate-pulse" />
+                  Start Optimizing Now
+                  <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                </Button>
+              </Link>
+            )}
+            <Link to="/about">
+              <Button variant="outline" size="lg" className="border-2 border-gray-300 text-gray-700 hover:bg-gray-50 text-lg px-8 py-4 h-14 hover:scale-105 transition-all duration-300">
+                Learn More
               </Button>
             </Link>
-          ) : (
-            <Link to="/auth">
-              <Button size="lg" className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg shadow-purple-500/40 transition-all duration-300 hover:scale-105 border border-purple-400/30">
-                <Zap className="mr-2 h-5 w-5" />
-                Start Optimizing Now
-              </Button>
-            </Link>
-          )}
-          <Link to="/about">
-            <Button variant="outline" size="lg" className="w-full sm:w-auto bg-transparent border-purple-400/50 text-purple-200 hover:bg-purple-900/50 hover:text-white transition-all duration-300 hover:scale-105">
-              Learn More
-            </Button>
-          </Link>
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-3 gap-8 max-w-2xl mx-auto">
+            <div className="text-center">
+              <div className="text-3xl lg:text-4xl font-bold text-indigo-600 mb-2">25%</div>
+              <div className="text-gray-600 text-sm lg:text-base">Average ROI Increase</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl lg:text-4xl font-bold text-purple-600 mb-2">40%</div>
+              <div className="text-gray-600 text-sm lg:text-base">Time Saved</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl lg:text-4xl font-bold text-blue-600 mb-2">15%</div>
+              <div className="text-gray-600 text-sm lg:text-base">Cost Reduction</div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
