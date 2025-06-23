@@ -69,6 +69,13 @@ export type Database = {
             referencedRelation: "campaigns"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fk_ad_groups_campaign_id"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
         ]
       }
       amazon_connections: {
@@ -179,6 +186,13 @@ export type Database = {
             referencedRelation: "amazon_connections"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fk_automation_preferences_connection_id"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "amazon_connections"
+            referencedColumns: ["id"]
+          },
         ]
       }
       campaign_metrics_history: {
@@ -227,6 +241,13 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "campaign_metrics_history_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_campaign_metrics_campaign_id"
             columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "campaigns"
@@ -328,6 +349,13 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "campaigns_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "amazon_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_campaigns_connection_id"
             columns: ["connection_id"]
             isOneToOne: false
             referencedRelation: "amazon_connections"
@@ -440,6 +468,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_keywords_adgroup_id"
+            columns: ["adgroup_id"]
+            isOneToOne: false
+            referencedRelation: "ad_groups"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "keywords_adgroup_id_fkey"
             columns: ["adgroup_id"]
             isOneToOne: false
@@ -495,6 +530,13 @@ export type Database = {
           recommended_value?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_optimization_recommendations_result_id"
+            columns: ["optimization_result_id"]
+            isOneToOne: false
+            referencedRelation: "optimization_results"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "optimization_recommendations_optimization_result_id_fkey"
             columns: ["optimization_result_id"]
@@ -554,6 +596,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_optimization_results_connection_id"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "amazon_connections"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "optimization_results_connection_id_fkey"
             columns: ["connection_id"]
