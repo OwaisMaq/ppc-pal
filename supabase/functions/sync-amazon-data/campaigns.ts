@@ -90,8 +90,7 @@ export async function storeCampaigns(
       .from('amazon_connections')
       .update({ 
         status: 'active',
-        last_sync_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        last_sync_at: new Date().toISOString()
       })
       .eq('id', connectionId);
       
@@ -120,6 +119,7 @@ export async function storeCampaigns(
         sales: 0,
         orders: 0,
         data_source: 'api', // CRITICAL: Mark as API data from Amazon
+        created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
 
