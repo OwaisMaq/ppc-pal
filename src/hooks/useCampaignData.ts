@@ -51,7 +51,7 @@ export const useCampaignData = (connectionId?: string) => {
       setLoading(true);
       setError(null);
 
-      console.log('=== FETCHING CAMPAIGNS DEBUG ===');
+      console.log('=== FETCHING CAMPAIGNS DEBUG (ENHANCED) ===');
       console.log('User ID:', user.id);
       console.log('Connection ID filter:', connectionId);
 
@@ -105,52 +105,80 @@ export const useCampaignData = (connectionId?: string) => {
         throw error;
       }
 
-      console.log('=== CAMPAIGN DATA FETCH RESULTS ===');
+      console.log('=== CAMPAIGN DATA FETCH RESULTS (ENHANCED) ===');
       console.log(`Total campaigns fetched: ${data?.length || 0}`);
       
       if (data && data.length > 0) {
-        console.log('Sample campaign data:');
-        data.slice(0, 3).forEach((campaign, index) => {
-          console.log(`Campaign ${index + 1}:`, {
-            id: campaign.id,
-            name: campaign.name,
-            amazon_campaign_id: campaign.amazon_campaign_id,
-            data_source: campaign.data_source,
-            sales: campaign.sales,
-            spend: campaign.spend,
-            orders: campaign.orders,
-            impressions: campaign.impressions,
-            clicks: campaign.clicks,
-            status: campaign.status,
-            connection_id: campaign.connection_id
-          });
-        });
+        console.log('=== DETAILED CAMPAIGN ANALYSIS ===');
         
-        const realDataCampaigns = data.filter(c => c.data_source === 'api');
-        const simulatedCampaigns = data.filter(c => c.data_source !== 'api');
-        
-        console.log(`Real API campaigns: ${realDataCampaigns.length}`);
-        console.log(`Non-API campaigns: ${simulatedCampaigns.length}`);
-        
-        // Show data source breakdown
-        const dataSourceBreakdown = data.reduce((acc, campaign) => {
+        // Analyze campaigns by data source
+        const byDataSource = data.reduce((acc, campaign) => {
           const source = campaign.data_source || 'undefined';
           acc[source] = (acc[source] || 0) + 1;
           return acc;
         }, {} as Record<string, number>);
-        console.log('Data source breakdown:', dataSourceBreakdown);
         
-        // Check for campaigns with performance metrics
-        const campaignsWithMetrics = data.filter(c => 
+        console.log('Campaigns by data source:', byDataSource);
+        
+        // Analyze campaigns by status
+        const byStatus = data.reduce((acc, campaign) => {
+          acc[campaign.status] = (acc[campaign.status] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+        
+        console.log('Campaigns by status:', byStatus);
+        
+        // Check for campaigns with any performance data
+        const withPerformanceData = data.filter(c => 
           (c.sales || 0) > 0 || 
           (c.spend || 0) > 0 || 
           (c.orders || 0) > 0 ||
           (c.clicks || 0) > 0 ||
           (c.impressions || 0) > 0
         );
-        console.log(`Campaigns with performance metrics: ${campaignsWithMetrics.length}`);
+        
+        console.log(`Campaigns with performance data: ${withPerformanceData.length}`);
+        
+        // Sample campaign details
+        console.log('Sample campaign details:');
+        data.slice(0, 3).forEach((campaign, index) => {
+          console.log(`Campaign ${index + 1}:`, {
+            name: campaign.name,
+            amazon_campaign_id: campaign.amazon_campaign_id,
+            data_source: campaign.data_source,
+            status: campaign.status,
+            sales: campaign.sales,
+            spend: campaign.spend,
+            orders: campaign.orders,
+            clicks: campaign.clicks,
+            impressions: campaign.impressions,
+            connection_id: campaign.connection_id,
+            created_at: campaign.created_at
+          });
+        });
+        
+        // Check if we have any API campaigns at all
+        const apiCampaigns = data.filter(c => c.data_source === 'api');
+        console.log(`✅ API Campaigns found: ${apiCampaigns.length}`);
+        
+        if (apiCampaigns.length > 0) {
+          console.log('🎉 SUCCESS: Real Amazon API campaigns are available!');
+          console.log('Sample API campaign:', {
+            name: apiCampaigns[0].name,
+            amazon_campaign_id: apiCampaigns[0].amazon_campaign_id,
+            status: apiCampaigns[0].status
+          });
+        } else {
+          console.log('⚠️ WARNING: No campaigns marked as API source found');
+          console.log('This might indicate a sync issue or data marking problem');
+        }
+        
       } else {
-        console.log('No campaigns found in database');
+        console.log('❌ No campaigns found in database');
+        console.log('This indicates either:');
+        console.log('1. No campaigns exist in Amazon account');
+        console.log('2. Sync has not been run');
+        console.log('3. Sync failed to store campaigns');
       }
 
       setCampaigns(data || []);

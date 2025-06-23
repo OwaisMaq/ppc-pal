@@ -21,60 +21,33 @@ export interface ProcessedPerformanceData {
   recommendations: string[];
 }
 
-// More lenient filter - accept campaigns with API source OR any performance metrics
+// More realistic filter - campaigns from API source are considered valid even without immediate metrics
 const filterValidCampaigns = (campaigns: CampaignData[]): CampaignData[] => {
   return campaigns.filter(campaign => {
-    // Check if campaign has any performance metrics at all
+    // Accept campaigns that are from API source - they're real Amazon campaigns
+    const isFromAPI = campaign.data_source === 'api';
+    
+    // Also accept campaigns with any performance metrics
     const hasAnyMetrics = (campaign.sales || 0) > 0 || 
                          (campaign.spend || 0) > 0 || 
                          (campaign.orders || 0) > 0 ||
                          (campaign.clicks || 0) > 0 ||
                          (campaign.impressions || 0) > 0;
     
-    // Check if it's from API source
-    const isFromAPI = campaign.data_source === 'api';
-    
     console.log(`Campaign ${campaign.name}:`, {
       data_source: campaign.data_source,
       isFromAPI,
       hasAnyMetrics,
-      sales: campaign.sales,
-      spend: campaign.spend,
-      orders: campaign.orders,
-      clicks: campaign.clicks,
-      impressions: campaign.impressions
+      status: campaign.status,
+      amazon_campaign_id: campaign.amazon_campaign_id
     });
     
-    // For now, let's be more lenient and include campaigns that are from API source
-    // even if they don't have metrics yet (they might be new campaigns)
+    // Include all campaigns from API source - they represent real Amazon campaigns
     return isFromAPI || hasAnyMetrics;
   });
 };
 
-// Strict filter for ONLY real API data with actual metrics
-const filterRealApiDataOnly = (campaigns: CampaignData[]): CampaignData[] => {
-  return campaigns.filter(campaign => {
-    // Must be from real Amazon API
-    const isRealApiData = campaign.data_source === 'api';
-    
-    // Must have actual performance metrics (not just zeros)
-    const hasRealMetrics = (campaign.sales || 0) > 0 || 
-                          (campaign.spend || 0) > 0 || 
-                          (campaign.orders || 0) > 0 ||
-                          (campaign.clicks || 0) > 0 ||
-                          (campaign.impressions || 0) > 0;
-    
-    const isValid = isRealApiData && hasRealMetrics;
-    
-    if (isRealApiData && !hasRealMetrics) {
-      console.log(`Campaign ${campaign.name} has real API source but no performance metrics yet`);
-    }
-    
-    return isValid;
-  });
-};
-
-const generateDataQuality = (campaigns: CampaignData[], realDataCampaigns: CampaignData[]): DataQualityInfo => {
+const generateDataQuality = (campaigns: CampaignData[], validCampaigns: CampaignData[]): DataQualityInfo => {
   const dataSourceBreakdown: Record<string, number> = {};
   
   campaigns.forEach(campaign => {
@@ -94,11 +67,15 @@ const generateDataQuality = (campaigns: CampaignData[], realDataCampaigns: Campa
   const campaignsFromAPI = campaigns.filter(c => c.data_source === 'api').length;
   const emptyCampaigns = campaigns.length - campaignsWithMetrics;
 
+  // Real data means we have campaigns from Amazon API
+  const hasRealData = campaignsFromAPI > 0;
+  const realDataCampaigns = campaignsFromAPI; // All API campaigns count as real data
+
   return {
-    hasRealData: realDataCampaigns.length > 0,
-    realDataCampaigns: realDataCampaigns.length,
+    hasRealData,
+    realDataCampaigns,
     totalCampaigns: campaigns.length,
-    simulatedCampaigns: campaigns.length - realDataCampaigns.length,
+    simulatedCampaigns: campaigns.length - campaignsFromAPI,
     dataSourceBreakdown,
     debugInfo: {
       campaignsWithMetrics,
@@ -115,38 +92,45 @@ const generateRecommendations = (dataQuality: DataQualityInfo): string[] => {
     if (dataQuality.totalCampaigns === 0) {
       recommendations.push("No campaigns found. Please ensure you have active campaigns in your Amazon Advertising account.");
       recommendations.push("If you just created campaigns, please wait 24-48 hours for data to appear, then sync again.");
-    } else if (dataQuality.debugInfo?.campaignsFromAPI === 0) {
-      recommendations.push("Campaigns found but none are marked as real API data. Please re-sync your Amazon connection.");
-    } else if (dataQuality.debugInfo?.campaignsWithMetrics === 0) {
-      recommendations.push("Amazon campaigns found but no performance metrics available yet. New campaigns typically take 24-48 hours to show performance data.");
-      recommendations.push("Make sure your campaigns are active and have received impressions/clicks.");
+    } else {
+      recommendations.push("Campaigns found but none are from Amazon API. Please re-sync your Amazon connection.");
     }
     recommendations.push("Check that your Amazon Advertising account has proper permissions and active campaigns.");
-  } else if (dataQuality.simulatedCampaigns > 0) {
-    recommendations.push(`${dataQuality.simulatedCampaigns} campaigns are using simulated data. Sync your account to get real metrics.`);
-  }
-  
-  if (dataQuality.realDataCampaigns > 0 && dataQuality.realDataCampaigns < 5) {
-    recommendations.push("Consider running more campaigns to get better performance insights.");
+  } else {
+    // We have real API campaigns
+    if (dataQuality.debugInfo?.campaignsWithMetrics === 0) {
+      recommendations.push("Amazon campaigns found but no performance metrics available yet. This is normal for new campaigns.");
+      recommendations.push("Performance data typically appears 24-48 hours after campaign activity begins.");
+      recommendations.push("Make sure your campaigns are active and receiving impressions/clicks.");
+    } else if (dataQuality.debugInfo?.campaignsWithMetrics && dataQuality.debugInfo.campaignsWithMetrics < dataQuality.realDataCampaigns) {
+      recommendations.push(`${dataQuality.realDataCampaigns - dataQuality.debugInfo.campaignsWithMetrics} campaigns don't have performance metrics yet. This is normal for new or inactive campaigns.`);
+    }
+    
+    if (dataQuality.realDataCampaigns > 0 && dataQuality.realDataCampaigns < 5) {
+      recommendations.push("Consider running more campaigns to get better performance insights.");
+    }
   }
   
   return recommendations;
 };
 
-const calculateRealApiMetrics = (realDataCampaigns: CampaignData[]): PerformanceMetrics | null => {
-  if (realDataCampaigns.length === 0) {
-    console.log('❌ NO REAL API DATA AVAILABLE - Cannot calculate metrics');
+const calculateMetricsFromApiCampaigns = (campaigns: CampaignData[]): PerformanceMetrics | null => {
+  // Filter to only campaigns from API with any data at all
+  const apiCampaigns = campaigns.filter(c => c.data_source === 'api');
+  
+  if (apiCampaigns.length === 0) {
+    console.log('❌ NO API CAMPAIGNS AVAILABLE - Cannot calculate metrics');
     return null;
   }
 
-  console.log(`✅ Calculating metrics from ${realDataCampaigns.length} real API campaigns`);
+  console.log(`✅ Calculating metrics from ${apiCampaigns.length} Amazon API campaigns`);
 
-  // Calculate totals from real data only
-  const totalSales = realDataCampaigns.reduce((sum, campaign) => sum + (campaign.sales || 0), 0);
-  const totalSpend = realDataCampaigns.reduce((sum, campaign) => sum + (campaign.spend || 0), 0);
-  const totalOrders = realDataCampaigns.reduce((sum, campaign) => sum + (campaign.orders || 0), 0);
-  const totalImpressions = realDataCampaigns.reduce((sum, campaign) => sum + (campaign.impressions || 0), 0);
-  const totalClicks = realDataCampaigns.reduce((sum, campaign) => sum + (campaign.clicks || 0), 0);
+  // Calculate totals from API campaigns (even if metrics are zero)
+  const totalSales = apiCampaigns.reduce((sum, campaign) => sum + (campaign.sales || 0), 0);
+  const totalSpend = apiCampaigns.reduce((sum, campaign) => sum + (campaign.spend || 0), 0);
+  const totalOrders = apiCampaigns.reduce((sum, campaign) => sum + (campaign.orders || 0), 0);
+  const totalImpressions = apiCampaigns.reduce((sum, campaign) => sum + (campaign.impressions || 0), 0);
+  const totalClicks = apiCampaigns.reduce((sum, campaign) => sum + (campaign.clicks || 0), 0);
 
   // Calculate derived metrics
   const totalProfit = totalSales - totalSpend;
@@ -157,10 +141,10 @@ const calculateRealApiMetrics = (realDataCampaigns: CampaignData[]): Performance
   const averageCpc = totalClicks > 0 ? totalSpend / totalClicks : 0;
   const conversionRate = totalClicks > 0 ? (totalOrders / totalClicks) * 100 : 0;
 
-  // Calculate month-over-month changes from real data only
-  const previousSales = realDataCampaigns.reduce((sum, campaign) => sum + (campaign.previous_month_sales || 0), 0);
-  const previousSpend = realDataCampaigns.reduce((sum, campaign) => sum + (campaign.previous_month_spend || 0), 0);
-  const previousOrders = realDataCampaigns.reduce((sum, campaign) => sum + (campaign.previous_month_orders || 0), 0);
+  // Calculate month-over-month changes from API campaigns
+  const previousSales = apiCampaigns.reduce((sum, campaign) => sum + (campaign.previous_month_sales || 0), 0);
+  const previousSpend = apiCampaigns.reduce((sum, campaign) => sum + (campaign.previous_month_spend || 0), 0);
+  const previousOrders = apiCampaigns.reduce((sum, campaign) => sum + (campaign.previous_month_orders || 0), 0);
   const previousProfit = previousSales - previousSpend;
 
   const salesChange = previousSales > 0 ? ((totalSales - previousSales) / previousSales) * 100 : 0;
@@ -168,7 +152,12 @@ const calculateRealApiMetrics = (realDataCampaigns: CampaignData[]): Performance
   const ordersChange = previousOrders > 0 ? ((totalOrders - previousOrders) / previousOrders) * 100 : 0;
   const profitChange = previousProfit > 0 ? ((totalProfit - previousProfit) / previousProfit) * 100 : 0;
 
-  console.log('📊 REAL API METRICS CALCULATED:');
+  // Determine if we have any actual performance data
+  const hasPerformanceData = totalSales > 0 || totalSpend > 0 || totalOrders > 0 || totalClicks > 0 || totalImpressions > 0;
+
+  console.log('📊 API CAMPAIGN METRICS CALCULATED:');
+  console.log(`- API Campaigns: ${apiCampaigns.length}`);
+  console.log(`- Has Performance Data: ${hasPerformanceData}`);
   console.log(`- Sales: $${totalSales.toFixed(2)} (${salesChange.toFixed(1)}% change)`);
   console.log(`- Spend: $${totalSpend.toFixed(2)} (${spendChange.toFixed(1)}% change)`);
   console.log(`- Orders: ${totalOrders} (${ordersChange.toFixed(1)}% change)`);
@@ -191,13 +180,15 @@ const calculateRealApiMetrics = (realDataCampaigns: CampaignData[]): Performance
     spendChange,
     ordersChange,
     profitChange,
-    hasSimulatedData: false, // We only use real data
-    dataSourceInfo: `Real Amazon API data from ${realDataCampaigns.length} campaigns`
+    hasSimulatedData: false, // We only use API data
+    dataSourceInfo: hasPerformanceData 
+      ? `Real Amazon API data from ${apiCampaigns.length} campaigns with performance metrics`
+      : `Real Amazon API campaigns (${apiCampaigns.length}) found but no performance data yet. This is normal for new campaigns.`
   };
 };
 
 export const processPerformanceData = (campaigns: CampaignData[]): ProcessedPerformanceData => {
-  console.log('=== PROCESSING PERFORMANCE DATA (ENHANCED DEBUG) ===');
+  console.log('=== PROCESSING PERFORMANCE DATA (REALISTIC APPROACH) ===');
   console.log(`Total campaigns received: ${campaigns.length}`);
   
   if (!campaigns || campaigns.length === 0) {
@@ -220,28 +211,27 @@ export const processPerformanceData = (campaigns: CampaignData[]): ProcessedPerf
     };
   }
 
-  // Filter to only campaigns with valid data
+  // Filter to campaigns that are valid (from API or have metrics)
   const validCampaigns = filterValidCampaigns(campaigns);
-  const realDataCampaigns = filterRealApiDataOnly(campaigns);
   
-  console.log(`Valid campaigns (any metrics): ${validCampaigns.length}`);
-  console.log(`Real API campaigns with metrics: ${realDataCampaigns.length}`);
+  console.log(`Valid campaigns: ${validCampaigns.length}`);
   console.log(`Total campaigns in database: ${campaigns.length}`);
 
-  // Generate data quality information
-  const dataQuality = generateDataQuality(campaigns, realDataCampaigns);
+  // Generate data quality information based on all campaigns
+  const dataQuality = generateDataQuality(campaigns, validCampaigns);
   
   console.log('Data quality analysis:', dataQuality);
   
-  // Generate recommendations
+  // Generate recommendations based on data quality
   const recommendations = generateRecommendations(dataQuality);
   
-  // Calculate metrics only from real data
-  const metrics = calculateRealApiMetrics(realDataCampaigns);
+  // Calculate metrics from API campaigns
+  const metrics = calculateMetricsFromApiCampaigns(campaigns);
 
   console.log('=== PROCESSING COMPLETE ===');
   console.log(`Metrics calculated: ${metrics !== null}`);
   console.log(`Has real data: ${dataQuality.hasRealData}`);
+  console.log(`API campaigns: ${dataQuality.debugInfo?.campaignsFromAPI}`);
 
   return {
     metrics,

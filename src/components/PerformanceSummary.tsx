@@ -52,8 +52,8 @@ const PerformanceSummary = () => {
     );
   }
 
-  // Show error if data exists but no real API data is available
-  if (hasData && !hasRealData) {
+  // Show main performance summary if we have real data (API campaigns)
+  if (hasRealData) {
     return (
       <div className="space-y-8">
         <div>
@@ -80,16 +80,54 @@ const PerformanceSummary = () => {
           />
         )}
 
-        {/* Main error message for no real data */}
-        <NoRealDataAlert 
-          title="No Real Amazon API Data Available"
-          description="Your Amazon account is connected, but no real performance data from the Amazon API is available. This could be because: 1) Your campaigns are too new (data appears 24-48 hours after activity), 2) No campaigns have performance metrics, or 3) Data sync is not working properly. Only real Amazon API data will be displayed - no simulated data is shown."
-          showSyncButton={true}
-        />
+        {/* 7-Day Performance Metrics Section */}
+        {hasWeeklyRealData && weeklyMetrics ? (
+          <WeeklyPerformanceMetrics 
+            metrics={weeklyMetrics}
+            formatCurrency={formatCurrency}
+            formatPercentage={formatPercentage}
+          />
+        ) : (
+          <NoRealDataAlert 
+            title="No 7-Day Performance Data Available"
+            description="No campaign performance data available for the last 7 days. Performance data typically appears 24-48 hours after campaign activity begins."
+            showSyncButton={false}
+          />
+        )}
+
+        {/* Monthly Performance Metrics Section */}
+        <div className="pt-6 border-t border-gray-200">
+          <div className="mb-6">
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Monthly Performance Overview</h3>
+            <p className="text-gray-600">Campaign performance metrics from Amazon API</p>
+          </div>
+
+          {metrics ? (
+            <>
+              <PerformanceMetricCards 
+                metrics={metrics} 
+                formatCurrency={formatCurrency} 
+              />
+
+              <AdditionalMetrics 
+                metrics={metrics}
+                formatCurrency={formatCurrency}
+                formatPercentage={formatPercentage}
+              />
+            </>
+          ) : (
+            <NoRealDataAlert 
+              title="Campaign Metrics Calculating"
+              description="Your Amazon campaigns are connected successfully. Performance metrics are being calculated and will appear here once available."
+              showSyncButton={false}
+            />
+          )}
+        </div>
       </div>
     );
   }
 
+  // Show error state only if no real API data is available
   return (
     <div className="space-y-8">
       <div>
@@ -116,48 +154,12 @@ const PerformanceSummary = () => {
         />
       )}
 
-      {/* 7-Day Performance Metrics Section */}
-      {hasWeeklyRealData && weeklyMetrics ? (
-        <WeeklyPerformanceMetrics 
-          metrics={weeklyMetrics}
-          formatCurrency={formatCurrency}
-          formatPercentage={formatPercentage}
-        />
-      ) : (
-        <NoRealDataAlert 
-          title="No Real 7-Day Data Available"
-          description="No real campaign data from Amazon API available for the last 7 days. Performance data typically appears 24-48 hours after campaign activity begins."
-          showSyncButton={true}
-        />
-      )}
-
-      {/* Monthly Performance Metrics Section */}
-      <div className="pt-6 border-t border-gray-200">
-        <div className="mb-6">
-          <h3 className="text-xl font-bold text-gray-900 mb-2">Monthly Performance Overview</h3>
-          <p className="text-gray-600">Real campaign performance metrics from Amazon API</p>
-        </div>
-
-        {metrics ? (
-          <>
-            <PerformanceMetricCards 
-              metrics={metrics} 
-              formatCurrency={formatCurrency} 
-            />
-
-            <AdditionalMetrics 
-              metrics={metrics}
-              formatCurrency={formatCurrency}
-              formatPercentage={formatPercentage}
-            />
-          </>
-        ) : (
-          <NoRealDataAlert 
-            title="Unable to Calculate Real Metrics"
-            description="No real data from Amazon API meets the criteria for metrics calculation. Please check your connection and sync data. Performance metrics require active campaigns with recent activity from the Amazon API."
-          />
-        )}
-      </div>
+      {/* Main error message for no real data */}
+      <NoRealDataAlert 
+        title="No Amazon API Campaigns Found"
+        description="No campaigns were found from your Amazon API connection. Please ensure: 1) Your Amazon Advertising account has active campaigns, 2) Your API connection has proper permissions, 3) Try re-syncing your connection from Settings."
+        showSyncButton={true}
+      />
     </div>
   );
 };
