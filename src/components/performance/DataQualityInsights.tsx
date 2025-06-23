@@ -71,7 +71,7 @@ const DataQualityInsights = ({ dataQuality, recommendations }: DataQualityInsigh
                   variant={source === 'api' ? 'default' : 'secondary'}
                   className={source === 'api' ? 'bg-green-100 text-green-800' : ''}
                 >
-                  {source}: {count}
+                  {source}: {Number(count)}
                 </Badge>
               ))}
             </div>
