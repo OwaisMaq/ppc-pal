@@ -60,35 +60,46 @@ export const useKeywordData = (connectionId?: string) => {
         return;
       }
 
-      // Fetch keywords with campaign info
+      // Fetch keywords with campaign info using proper relationship specification
       let query = supabase
         .from('keywords')
         .select(`
           *,
-          ad_groups!inner (
+          ad_groups!keywords_adgroup_id_fkey (
             campaign_id,
-            campaigns!inner (
+            campaigns!ad_groups_campaign_id_fkey (
               name,
               connection_id
             )
           )
-        `)
-        .in('ad_groups.campaigns.connection_id', connections.map(c => c.id));
+        `);
 
-      // Filter by specific connection if provided
-      if (connectionId) {
-        query = query.eq('ad_groups.campaigns.connection_id', connectionId);
-      }
+      // Filter by connection IDs
+      const connectionIds = connections.map(c => c.id);
+      
+      // First get all keywords for user's connections
+      const { data: allKeywords, error: keywordsError } = await query;
 
-      const { data, error } = await query.order('created_at', { ascending: false });
+      if (keywordsError) throw keywordsError;
 
-      if (error) throw error;
+      // Filter keywords that belong to user's connections
+      const filteredKeywords = allKeywords?.filter(keyword => {
+        const campaignConnectionId = keyword.ad_groups?.campaigns?.connection_id;
+        const belongsToUser = connectionIds.includes(campaignConnectionId);
+        
+        // If connectionId is specified, also filter by that
+        if (connectionId && belongsToUser) {
+          return campaignConnectionId === connectionId;
+        }
+        
+        return belongsToUser;
+      }) || [];
 
       // Transform the data to include campaign name
-      const transformedKeywords = data?.map(keyword => ({
+      const transformedKeywords = filteredKeywords.map(keyword => ({
         ...keyword,
         campaign_name: keyword.ad_groups?.campaigns?.name || 'Unknown Campaign'
-      })) || [];
+      }));
 
       console.log('Fetched keywords:', transformedKeywords.length);
       setKeywords(transformedKeywords);
