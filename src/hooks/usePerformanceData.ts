@@ -24,20 +24,28 @@ export const usePerformanceData = (
   useEffect(() => {
     if (campaignsLoading || keywordsLoading) return;
 
+    console.log('=== PERFORMANCE DATA HOOK CALCULATION ===');
+    console.log('Campaigns available:', campaigns.length);
+    console.log('Keywords available:', keywords.length);
+    console.log('Connections available:', connections.length);
+
     calculateAndSetMetrics();
   }, [campaigns, keywords, campaignsLoading, keywordsLoading, connections, selectedCountry, selectedCampaign, selectedProduct]);
 
   const calculateAndSetMetrics = () => {
-    console.log('=== Enhanced Performance Metrics Calculation ===');
-    console.log('Available campaigns:', campaigns.length);
-    console.log('Available connections:', connections.length);
-    
-    if (!campaigns.length && !keywords.length) {
-      console.log('No campaigns or keywords available');
+    // If no campaigns are available, set appropriate state
+    if (!campaigns.length) {
+      console.log('❌ No campaigns available - cannot calculate metrics');
       setMetrics(null);
       setHasRealData(false);
-      setDataQuality(null);
-      setRecommendations([]);
+      setDataQuality({
+        hasRealData: false,
+        realDataCampaigns: 0,
+        totalCampaigns: 0,
+        simulatedCampaigns: 0,
+        dataSourceBreakdown: {}
+      });
+      setRecommendations(['No campaign data available. Please connect your Amazon account and sync data.']);
       return;
     }
 
@@ -49,19 +57,22 @@ export const usePerformanceData = (
     };
     
     const filteredCampaigns = filterCampaigns(campaigns, connections, filters);
+    console.log(`Filtered campaigns: ${filteredCampaigns.length}`);
     
-    // Use enhanced performance data processor
+    // Process performance data with strict real-data-only requirements
     const { metrics: calculatedMetrics, dataQuality: quality, recommendations: recs } = processPerformanceData(filteredCampaigns);
     
+    // Set state based on results
     setMetrics(calculatedMetrics);
-    setHasRealData(calculatedMetrics !== null);
+    setHasRealData(calculatedMetrics !== null && quality.hasRealData);
     setDataQuality(quality);
     setRecommendations(recs);
 
-    console.log('=== Enhanced Metrics Calculation Complete ===');
+    console.log('=== PERFORMANCE DATA HOOK RESULTS ===');
     console.log('Metrics available:', calculatedMetrics !== null);
-    console.log('Has real data:', calculatedMetrics !== null);
-    console.log('Data quality:', quality);
+    console.log('Has real data:', calculatedMetrics !== null && quality.hasRealData);
+    console.log('Real data campaigns:', quality.realDataCampaigns);
+    console.log('Total campaigns:', quality.totalCampaigns);
   };
 
   const loading = campaignsLoading || keywordsLoading;
