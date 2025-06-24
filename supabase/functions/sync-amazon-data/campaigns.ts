@@ -1,147 +1,165 @@
 
-import { CampaignData, Region, getBaseUrl } from './types.ts';
+import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-export async function fetchCampaignsFromRegion(
+export const fetchCampaignsFromRegion = async (
   accessToken: string,
   clientId: string,
   profileId: string,
-  region: Region
-): Promise<{ campaigns: CampaignData[], region: Region } | null> {
-  const baseUrl = getBaseUrl(region);
+  region: string
+) => {
+  const baseUrls: { [key: string]: string } = {
+    'NA': 'https://advertising-api.amazon.com',
+    'EU': 'https://advertising-api-EU.amazon.com',
+    'FE': 'https://advertising-api-FE.amazon.com'
+  }
+
+  const baseUrl = baseUrls[region]
+  if (!baseUrl) {
+    throw new Error(`Invalid region: ${region}`)
+  }
+
+  console.log(`Trying to fetch campaigns from ${region} region: ${baseUrl}`)
+  console.log('Profile ID:', profileId)
+
+  // Try multiple endpoints to fetch campaigns
+  const endpoints = ['/v2/sp/campaigns', '/v2/campaigns']
   
-  console.log(`Trying to fetch campaigns from ${region} region: ${baseUrl}`);
-  console.log(`Profile ID: ${profileId}`);
-  
-  try {
-    // Use the most reliable Amazon API endpoints in order of preference
-    const endpoints = [
-      '/v2/sp/campaigns',
-      '/v2/campaigns'
-    ];
-    
-    for (const endpoint of endpoints) {
-      console.log(`Trying endpoint: ${endpoint}`);
+  for (const endpoint of endpoints) {
+    try {
+      console.log(`Trying endpoint: ${endpoint}`)
       
-      const campaignsResponse = await fetch(`${baseUrl}${endpoint}`, {
+      const response = await fetch(`${baseUrl}${endpoint}`, {
+        method: 'GET',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Amazon-Advertising-API-ClientId': clientId,
           'Amazon-Advertising-API-Scope': profileId,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-      });
+          'Content-Type': 'application/json'
+        }
+      })
 
-      console.log(`${endpoint} response status for ${region}:`, campaignsResponse.status);
+      console.log(`${endpoint} response status for ${region}:`, response.status)
 
-      if (campaignsResponse.ok) {
-        const campaignsData = await campaignsResponse.json();
-        console.log(`Successfully retrieved ${campaignsData.length} campaigns from ${region} region using ${endpoint}`);
+      if (response.ok) {
+        const campaigns = await response.json()
+        console.log(`Successfully retrieved ${campaigns.length} campaigns from ${region} region using ${endpoint}`)
         
-        if (campaignsData.length > 0) {
-          console.log('Sample campaign data:', JSON.stringify(campaignsData[0], null, 2));
-          return { campaigns: campaignsData, region };
-        } else {
-          console.log(`✓ API accessible in ${region} but no campaigns found`);
-          // Return empty campaigns array but mark region as successful
-          return { campaigns: [], region };
+        if (campaigns.length > 0) {
+          console.log('Sample campaign data:', JSON.stringify(campaigns[0], null, 2))
+        }
+        
+        return {
+          campaigns,
+          region
         }
       } else {
-        const errorText = await campaignsResponse.text();
-        console.log(`Failed to fetch from ${region} using ${endpoint}:`, errorText);
+        const errorText = await response.text()
+        console.log(`Failed to fetch from ${region} using ${endpoint}:`, errorText)
         
-        // Enhanced error analysis
-        if (errorText.includes('UNAUTHORIZED') || errorText.includes('Invalid scope')) {
-          console.log(`Profile ${profileId} is not authorized for ${region} region - likely wrong region for this profile`);
-          break; // Don't try other endpoints for this region if unauthorized
-        }
-        
-        if (errorText.includes('NOT_FOUND') || errorText.includes('Method Not Found')) {
-          console.log(`Endpoint ${endpoint} not available in ${region}, trying next...`);
-          continue;
+        if (endpoint === endpoints[endpoints.length - 1]) {
+          throw new Error(`All endpoints failed for ${region}: ${errorText}`)
+        } else {
+          console.log(`Endpoint ${endpoint} not available in ${region}, trying next...`)
         }
       }
+    } catch (error) {
+      console.error(`Error with endpoint ${endpoint} in ${region}:`, error)
+      if (endpoint === endpoints[endpoints.length - 1]) {
+        throw error
+      }
     }
-    
-    console.log(`All endpoints failed or unauthorized for ${region} region`);
-    return null;
-  } catch (error) {
-    console.log(`Network/connection error for ${region}:`, error.message);
-    return null;
   }
+
+  throw new Error(`No working endpoints found for region ${region}`)
 }
 
-export async function storeCampaigns(
-  campaigns: CampaignData[],
+export const storeCampaigns = async (
+  campaigns: any[],
   connectionId: string,
-  supabase: any
-): Promise<{ stored: number, campaignIds: string[] }> {
-  console.log(`Storing ${campaigns.length} campaigns for connection ${connectionId}`);
+  supabase: SupabaseClient
+) => {
+  console.log(`Storing ${campaigns.length} campaigns for connection ${connectionId}`)
   
-  let campaignsStored = 0;
-  const campaignIds = [];
-  
-  // Even if no campaigns, we should mark the connection as having API access
-  if (campaigns.length === 0) {
-    console.log('No campaigns found but API access confirmed - updating connection with API access marker');
-    
-    // Update connection to indicate we have API access but no campaigns
-    await supabase
-      .from('amazon_connections')
-      .update({ 
-        status: 'active',
-        last_sync_at: new Date().toISOString()
-      })
-      .eq('id', connectionId);
-      
-    return { stored: 0, campaignIds: [] };
-  }
-  
+  let stored = 0
+  const campaignIds: string[] = []
+
   for (const campaign of campaigns) {
     try {
-      console.log(`Processing campaign: ${campaign.name} (ID: ${campaign.campaignId})`);
+      console.log(`Processing campaign: ${campaign.name} (ID: ${campaign.campaignId})`)
       
-      // Enhanced campaign data structure with proper defaults and CRITICAL data_source marking
+      // Prepare campaign data for storage - removed updated_at field
       const campaignData = {
-        connection_id: connectionId,
-        amazon_campaign_id: campaign.campaignId.toString(),
+        amazon_campaign_id: campaign.campaignId?.toString(),
         name: campaign.name,
-        campaign_type: campaign.campaignType || 'sponsoredProducts',
-        targeting_type: campaign.targetingType || 'manual',
-        status: (campaign.state || 'enabled').toLowerCase(),
-        daily_budget: campaign.dailyBudget || campaign.budget || 0,
-        start_date: campaign.startDate,
-        end_date: campaign.endDate,
-        // Initialize with zero metrics - will be updated by performance sync
+        campaign_type: campaign.campaignType,
+        targeting_type: campaign.targetingType,
+        status: mapCampaignStatus(campaign.state),
+        daily_budget: campaign.dailyBudget,
+        start_date: campaign.startDate ? formatAmazonDate(campaign.startDate) : null,
+        end_date: campaign.endDate ? formatAmazonDate(campaign.endDate) : null,
+        connection_id: connectionId,
+        data_source: 'api', // Mark as real API data
+        // Initialize metrics to 0 - will be updated later with real data
         impressions: 0,
         clicks: 0,
         spend: 0,
         sales: 0,
         orders: 0,
-        data_source: 'api', // CRITICAL: Mark as API data from Amazon
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
+        last_updated: new Date().toISOString()
+      }
 
-      const { error: campaignError } = await supabase
+      const { data, error } = await supabase
         .from('campaigns')
         .upsert(campaignData, {
-          onConflict: 'connection_id, amazon_campaign_id'
-        });
+          onConflict: 'amazon_campaign_id,connection_id',
+          ignoreDuplicates: false
+        })
+        .select('id')
 
-      if (!campaignError) {
-        campaignsStored++;
-        campaignIds.push(campaign.campaignId.toString());
-        console.log(`✓ Stored campaign: ${campaign.name} with data_source=api`);
+      if (error) {
+        console.error(`Error storing campaign ${campaign.name}:`, error)
       } else {
-        console.error(`Error storing campaign ${campaign.name}:`, campaignError);
+        stored++
+        if (data && data[0]) {
+          campaignIds.push(data[0].id)
+        }
       }
     } catch (error) {
-      console.error(`Error processing campaign ${campaign.name}:`, error);
+      console.error(`Exception storing campaign ${campaign.name}:`, error)
     }
   }
 
-  console.log(`Successfully stored ${campaignsStored} out of ${campaigns.length} campaigns with data_source=api`);
+  console.log(`Successfully stored ${stored} out of ${campaigns.length} campaigns with data_source=api`)
   
-  return { stored: campaignsStored, campaignIds };
+  return {
+    stored,
+    campaignIds
+  }
+}
+
+const mapCampaignStatus = (amazonStatus: string) => {
+  switch (amazonStatus?.toLowerCase()) {
+    case 'enabled':
+      return 'enabled'
+    case 'paused':
+      return 'paused'
+    case 'archived':
+      return 'archived'
+    default:
+      return 'paused'
+  }
+}
+
+const formatAmazonDate = (dateString: string) => {
+  if (!dateString) return null
+  
+  // Amazon date format is YYYYMMDD
+  if (dateString.length === 8) {
+    const year = dateString.substring(0, 4)
+    const month = dateString.substring(4, 6)
+    const day = dateString.substring(6, 8)
+    return `${year}-${month}-${day}`
+  }
+  
+  return dateString
 }
