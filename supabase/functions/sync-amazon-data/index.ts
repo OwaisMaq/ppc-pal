@@ -39,7 +39,7 @@ serve(async (req) => {
     }
 
     const { connectionId } = await req.json()
-    console.log('=== ENHANCED AMAZON DATA SYNC WITH DATABASE CONSTRAINT FIX ===')
+    console.log('=== ENHANCED AMAZON DATA SYNC WITH FIXED CAMPAIGN ID FLOW ===')
     console.log('Timestamp:', new Date().toISOString())
     console.log('Connection ID:', connectionId)
     console.log('User ID:', user.id)
@@ -117,7 +117,7 @@ serve(async (req) => {
     }
 
     // Store campaigns with enhanced error handling and verification
-    console.log('=== STORING CAMPAIGNS WITH ENHANCED VERIFICATION ===')
+    console.log('=== STORING CAMPAIGNS WITH ENHANCED ID EXTRACTION ===')
     const storageResult = await storeCampaigns(
       campaignsData,
       connectionId,
@@ -126,6 +126,7 @@ serve(async (req) => {
     
     const { stored, campaignIds, errors, processingErrors } = storageResult
     console.log(`✓ Stored ${stored} campaigns successfully`)
+    console.log(`🎯 Extracted ${campaignIds.length} campaign UUIDs for metrics fetching`)
     
     if (errors > 0) {
       console.warn(`⚠️ ${errors} campaigns had storage errors`)
@@ -134,37 +135,39 @@ serve(async (req) => {
       }
     }
 
-    // Fetch performance metrics with enhanced real data detection
-    console.log('=== FETCHING PERFORMANCE METRICS ===')
+    // CRITICAL FIX: Enhanced metrics fetching with proper campaign ID handling
+    console.log('=== ENHANCED PERFORMANCE METRICS FETCHING ===')
     let metricsUpdated = 0
     let hasRealApiData = false
     
     if (campaignIds.length > 0) {
       try {
         const baseUrl = getBaseUrl(successfulRegion!)
-        console.log(`Fetching metrics for ${campaignIds.length} campaigns from ${baseUrl}`)
+        console.log(`🚀 Fetching metrics for ${campaignIds.length} campaigns from ${baseUrl}`)
+        console.log(`📊 Campaign UUIDs for metrics:`, campaignIds.slice(0, 3), campaignIds.length > 3 ? '...' : '')
         
         const metricsData = await fetchCampaignReports(
           accessToken,
           clientId,
           connection.profile_id,
           baseUrl,
-          campaignIds
+          campaignIds // Pass our extracted UUIDs
         )
         
         if (metricsData.length > 0) {
           // Check if we got real API data
           hasRealApiData = metricsData.some(metric => metric.fromAPI === true)
           
-          console.log(`Processing ${metricsData.length} metrics records...`)
-          console.log(`Real API data available: ${hasRealApiData}`)
+          console.log(`✓ Processing ${metricsData.length} metrics records...`)
+          console.log(`📊 Real API data available: ${hasRealApiData}`)
+          console.log(`🎭 Simulated data records: ${metricsData.filter(m => !m.fromAPI).length}`)
           
           await updateCampaignMetrics(supabase, connectionId, metricsData)
           metricsUpdated = metricsData.length
           
-          console.log(`✓ Updated metrics for ${metricsUpdated} campaigns`)
+          console.log(`🎉 SUCCESS: Updated metrics for ${metricsUpdated} campaigns`)
         } else {
-          console.warn('No metrics data received from any Amazon API endpoint')
+          console.warn('❌ No metrics data received from any Amazon API endpoint or fallback generation')
         }
       } catch (error) {
         console.error('=== METRICS UPDATE ERROR ===')
@@ -172,7 +175,8 @@ serve(async (req) => {
         // Don't fail the entire sync for metrics errors
       }
     } else {
-      console.warn('⚠️ No campaign IDs available for metrics fetching')
+      console.error('🚨 CRITICAL: No campaign IDs available for metrics fetching')
+      console.error('This indicates the campaign storage process failed to extract UUIDs')
     }
 
     // Sync ad groups
@@ -204,7 +208,7 @@ serve(async (req) => {
     try {
       const { data: finalCampaigns, error: finalError } = await supabase
         .from('campaigns')
-        .select('id, amazon_campaign_id, name, data_source, status')
+        .select('id, amazon_campaign_id, name, data_source, status, sales, spend, orders')
         .eq('connection_id', connectionId)
         .eq('data_source', 'api')
 
@@ -213,9 +217,10 @@ serve(async (req) => {
       } else {
         console.log(`🎉 FINAL RESULT: ${finalCampaigns?.length || 0} API campaigns now in database`)
         if (finalCampaigns && finalCampaigns.length > 0) {
-          console.log('Sample stored campaigns:')
+          console.log('Sample stored campaigns with metrics:')
           finalCampaigns.slice(0, 3).forEach(campaign => {
-            console.log(`  - ${campaign.name} (${campaign.amazon_campaign_id}) - Status: ${campaign.status}`)
+            console.log(`  - ${campaign.name} (${campaign.amazon_campaign_id})`)
+            console.log(`    Sales: $${campaign.sales}, Spend: $${campaign.spend}, Orders: ${campaign.orders}`)
           })
         }
       }
@@ -226,26 +231,35 @@ serve(async (req) => {
     console.log('=== ENHANCED SYNC COMPLETED SUCCESSFULLY ===')
     console.log('Summary:')
     console.log(`- Campaigns: ${stored}`)
+    console.log(`- Campaign UUIDs extracted: ${campaignIds.length}`)
     console.log(`- Storage errors: ${errors}`)
     console.log(`- Metrics updated: ${metricsUpdated}`)
     console.log(`- Ad groups: ${adGroupsStored}`)
     console.log(`- Region: ${successfulRegion}`)
     console.log(`- Real API data: ${hasRealApiData}`)
     console.log(`- Profile validation: PASSED`)
-    console.log(`- Database constraint: FIXED`)
+    console.log(`- Campaign ID extraction: ${campaignIds.length > 0 ? 'FIXED' : 'FAILED'}`)
 
     // Enhanced success response
     const hasStorageIssues = errors > 0 || stored === 0
-    const message = stored > 0 
-      ? `Enhanced sync completed! Successfully imported ${stored} campaigns from ${successfulRegion} region. ${hasStorageIssues ? `Note: ${errors} campaigns had storage issues - check logs for details.` : 'All campaigns stored successfully.'} Database constraint issue has been resolved.`
-      : `Connection verified but no campaigns stored. Found ${campaignsData.length} campaigns from Amazon API but failed to store them in database. Database constraint has been fixed - please try syncing again.`
+    const hasIdExtractionIssues = campaignIds.length === 0 && stored > 0
+    
+    let message = ''
+    if (stored > 0 && campaignIds.length > 0) {
+      message = `🎉 Enhanced sync completed successfully! Imported ${stored} campaigns and extracted ${campaignIds.length} campaign IDs for metrics. ${hasRealApiData ? 'Real Amazon API data' : 'Simulated development data'} has been processed. Monthly performance overview should now populate with data.`
+    } else if (stored > 0 && campaignIds.length === 0) {
+      message = `⚠️ Campaigns stored but ID extraction failed. ${stored} campaigns imported but metrics processing was skipped. This will prevent performance data from appearing in the dashboard.`
+    } else {
+      message = `❌ Sync completed but no campaigns were stored. Found ${campaignsData.length} campaigns from Amazon API but failed to store them. Please check connection permissions and try again.`
+    }
 
     return new Response(
       JSON.stringify({ 
-        success: stored > 0, 
+        success: stored > 0 && campaignIds.length > 0, 
         message,
         details: {
           campaignsStored: stored,
+          campaignIdsExtracted: campaignIds.length,
           storageErrors: errors,
           metricsUpdated,
           adGroupsStored,
@@ -253,7 +267,7 @@ serve(async (req) => {
           hasRealData: hasRealApiData,
           accessibleRegions: accessibleRegions.length,
           profileValidation: 'PASSED',
-          databaseConstraint: 'FIXED'
+          campaignIdExtraction: campaignIds.length > 0 ? 'FIXED' : 'FAILED'
         }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -267,7 +281,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         error: error.message,
-        details: 'Enhanced sync failed with database constraint fix applied. The error has been logged with detailed diagnostics.',
+        details: 'Enhanced sync failed. Campaign ID extraction and metrics processing have been improved. Check logs for detailed diagnostics.',
         timestamp: new Date().toISOString()
       }),
       { 

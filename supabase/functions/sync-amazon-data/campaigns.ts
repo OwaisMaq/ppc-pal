@@ -78,7 +78,7 @@ export const storeCampaigns = async (
   connectionId: string,
   supabase: SupabaseClient
 ) => {
-  console.log('=== ENHANCED CAMPAIGN STORAGE WITH DATABASE CONSTRAINT ===')
+  console.log('=== ENHANCED CAMPAIGN STORAGE WITH FIXED ID EXTRACTION ===')
   console.log(`Processing ${campaigns.length} campaigns for connection ${connectionId}`)
   
   let stored = 0
@@ -176,13 +176,35 @@ export const storeCampaigns = async (
         console.log(`✅ Successfully stored campaign: ${campaign.name}`)
         
         if (data && data[0]) {
-          campaignIds.push(data[0].id)
+          // FIXED: Extract the UUID from the returned data
+          const campaignUuid = data[0].id
+          campaignIds.push(campaignUuid)
+          console.log(`   ✓ Campaign UUID for metrics: ${campaignUuid}`)
           console.log(`   Database ID: ${data[0].id}`)
           console.log(`   Amazon ID: ${data[0].amazon_campaign_id}`)
           console.log(`   Data Source: ${data[0].data_source}`)
           console.log(`   Created/Updated: ${data[0].created_at}`)
         } else {
           console.warn(`⚠️ Campaign stored but no data returned for: ${campaign.name}`)
+          
+          // FALLBACK: Try to get the ID with a separate query if upsert didn't return data
+          try {
+            const { data: fallbackData, error: fallbackError } = await supabase
+              .from('campaigns')
+              .select('id')
+              .eq('amazon_campaign_id', campaign.campaignId.toString())
+              .eq('connection_id', connectionId)
+              .single()
+              
+            if (!fallbackError && fallbackData) {
+              campaignIds.push(fallbackData.id)
+              console.log(`   ✓ Fallback UUID extracted: ${fallbackData.id}`)
+            } else {
+              console.error(`   ❌ Fallback ID extraction failed:`, fallbackError)
+            }
+          } catch (fallbackError) {
+            console.error(`   ❌ Exception in fallback ID extraction:`, fallbackError)
+          }
         }
       }
     } catch (error) {
@@ -212,6 +234,18 @@ export const storeCampaigns = async (
         storedCampaigns.slice(0, 5).forEach(campaign => {
           console.log(`  - ${campaign.name} (${campaign.amazon_campaign_id}) - ${campaign.status}`)
         })
+        
+        // ADDITIONAL FIX: Ensure we have all campaign IDs for metrics fetching
+        const verifiedIds = storedCampaigns.map(c => c.id)
+        console.log(`🔍 Verified campaign IDs for metrics: ${verifiedIds.length}`)
+        
+        // Add any missing IDs to our collection
+        verifiedIds.forEach(id => {
+          if (!campaignIds.includes(id)) {
+            campaignIds.push(id)
+            console.log(`   ✓ Added missing campaign ID: ${id}`)
+          }
+        })
       }
     }
   } catch (verificationError) {
@@ -222,6 +256,7 @@ export const storeCampaigns = async (
   console.log(`✅ Successfully stored: ${stored} campaigns`)
   console.log(`❌ Errors encountered: ${errors} campaigns`)
   console.log(`🔍 Campaign IDs generated: ${campaignIds.length}`)
+  console.log(`📊 Campaign IDs for metrics:`, campaignIds)
   
   if (processingErrors.length > 0) {
     console.log('❌ Processing errors:')
@@ -234,7 +269,30 @@ export const storeCampaigns = async (
     throw new Error(`Failed to store any of ${campaigns.length} campaigns. Check database constraints and permissions.`)
   }
 
+  if (campaignIds.length === 0 && stored > 0) {
+    console.error('🚨 CRITICAL: CAMPAIGNS STORED BUT NO IDs EXTRACTED!')
+    console.error('This will prevent metrics fetching from working.')
+    
+    // Emergency ID recovery attempt
+    try {
+      const { data: emergencyData, error: emergencyError } = await supabase
+        .from('campaigns')
+        .select('id')
+        .eq('connection_id', connectionId)
+        .eq('data_source', 'api')
+        
+      if (!emergencyError && emergencyData && emergencyData.length > 0) {
+        const emergencyIds = emergencyData.map(c => c.id)
+        campaignIds.push(...emergencyIds)
+        console.log(`🚨 EMERGENCY RECOVERY: Extracted ${emergencyIds.length} campaign IDs`)
+      }
+    } catch (emergencyError) {
+      console.error('🚨 EMERGENCY RECOVERY FAILED:', emergencyError)
+    }
+  }
+
   console.log(`🎉 SUCCESS: Stored ${stored} campaigns with data_source=api`)
+  console.log(`🎯 FINAL CAMPAIGN IDS COUNT: ${campaignIds.length}`)
   
   return {
     stored,

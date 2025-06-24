@@ -24,7 +24,7 @@ export const usePerformanceData = (
   useEffect(() => {
     if (campaignsLoading || keywordsLoading) return;
 
-    console.log('=== PERFORMANCE DATA HOOK CALCULATION (FIXED) ===');
+    console.log('=== PERFORMANCE DATA HOOK CALCULATION (ENHANCED) ===');
     console.log('Input parameters:');
     console.log('- connectionId:', connectionId);
     console.log('- selectedCountry:', selectedCountry);
@@ -34,6 +34,28 @@ export const usePerformanceData = (
     console.log('- Campaigns:', campaigns.length);
     console.log('- Keywords:', keywords.length);
     console.log('- Connections:', connections.length);
+
+    // Log campaign data quality
+    if (campaigns.length > 0) {
+      const withMetrics = campaigns.filter(c => 
+        (c.sales || 0) > 0 || (c.spend || 0) > 0 || (c.orders || 0) > 0
+      );
+      const apiCampaigns = campaigns.filter(c => c.data_source === 'api');
+      console.log('Campaign data quality:');
+      console.log(`- Total campaigns: ${campaigns.length}`);
+      console.log(`- API campaigns: ${apiCampaigns.length}`);
+      console.log(`- Campaigns with metrics: ${withMetrics.length}`);
+      
+      if (withMetrics.length > 0) {
+        console.log('Sample campaign with metrics:', {
+          name: withMetrics[0].name,
+          sales: withMetrics[0].sales,
+          spend: withMetrics[0].spend,
+          orders: withMetrics[0].orders,
+          data_source: withMetrics[0].data_source
+        });
+      }
+    }
 
     calculateAndSetMetrics();
   }, [campaigns, keywords, campaignsLoading, keywordsLoading, connections, selectedCountry, selectedCampaign, selectedProduct]);
@@ -72,7 +94,12 @@ export const usePerformanceData = (
     if (filteredCampaigns.length > 0) {
       console.log('Sample filtered campaigns:');
       filteredCampaigns.slice(0, 3).forEach((campaign, index) => {
-        console.log(`  ${index + 1}. ${campaign.name} (${campaign.data_source}) - Sales: ${campaign.sales}, Status: ${campaign.status}`);
+        console.log(`  ${index + 1}. ${campaign.name} (${campaign.data_source})`, {
+          sales: campaign.sales,
+          spend: campaign.spend,
+          orders: campaign.orders,
+          status: campaign.status
+        });
       });
     }
     
@@ -85,18 +112,24 @@ export const usePerformanceData = (
     setDataQuality(quality);
     setRecommendations(recs);
 
-    console.log('=== PERFORMANCE DATA HOOK RESULTS (FIXED) ===');
+    console.log('=== PERFORMANCE DATA HOOK RESULTS (ENHANCED) ===');
     console.log('Metrics calculated:', calculatedMetrics !== null);
     console.log('Has real data:', calculatedMetrics !== null && quality.hasRealData);
     console.log('Real data campaigns:', quality.realDataCampaigns);
     console.log('Total filtered campaigns:', quality.totalCampaigns);
     
     if (calculatedMetrics) {
-      console.log('Sample metrics:', {
+      console.log('✓ METRICS SUCCESSFULLY CALCULATED:', {
         totalSales: calculatedMetrics.totalSales,
         totalSpend: calculatedMetrics.totalSpend,
-        totalProfit: calculatedMetrics.totalProfit
+        totalProfit: calculatedMetrics.totalProfit,
+        totalOrders: calculatedMetrics.totalOrders,
+        activeCampaigns: calculatedMetrics.activeCampaigns,
+        averageAcos: calculatedMetrics.averageAcos,
+        averageRoas: calculatedMetrics.averageRoas
       });
+    } else {
+      console.log('❌ NO METRICS CALCULATED - Check campaign data and filters');
     }
   };
 
