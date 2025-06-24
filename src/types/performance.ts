@@ -13,6 +13,19 @@ export interface PerformanceMetrics {
   averageCtr: number;
   averageCpc: number;
   conversionRate: number;
+  
+  // Change percentages (month-over-month comparison)
+  salesChange: number;
+  spendChange: number;
+  profitChange: number;
+  ordersChange: number;
+  
+  // Additional calculated metrics
+  averageCostPerUnit: number;
+  
+  // Data quality indicators
+  hasSimulatedData: boolean;
+  dataSourceInfo: string;
 }
 
 export interface FilterParams {

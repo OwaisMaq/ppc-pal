@@ -77,12 +77,18 @@ export const processPerformanceData = (
     };
   }
 
-  // Calculate metrics from campaigns with data
+  // Calculate current metrics
   const totalSales = campaignsWithData.reduce((sum, campaign) => sum + (campaign.sales || 0), 0);
   const totalSpend = campaignsWithData.reduce((sum, campaign) => sum + (campaign.spend || 0), 0);
   const totalOrders = campaignsWithData.reduce((sum, campaign) => sum + (campaign.orders || 0), 0);
   const totalClicks = campaignsWithData.reduce((sum, campaign) => sum + (campaign.clicks || 0), 0);
   const totalImpressions = campaignsWithData.reduce((sum, campaign) => sum + (campaign.impressions || 0), 0);
+
+  // Calculate previous month metrics for comparison
+  const previousSales = campaignsWithData.reduce((sum, campaign) => sum + (campaign.previous_month_sales || 0), 0);
+  const previousSpend = campaignsWithData.reduce((sum, campaign) => sum + (campaign.previous_month_spend || 0), 0);
+  const previousOrders = campaignsWithData.reduce((sum, campaign) => sum + (campaign.previous_month_orders || 0), 0);
+  const previousProfit = previousSales - previousSpend;
 
   // Count active campaigns (enabled status)
   const activeCampaigns = campaigns.filter(campaign => campaign.status === 'enabled').length;
@@ -94,6 +100,20 @@ export const processPerformanceData = (
   const averageCtr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
   const averageCpc = totalClicks > 0 ? totalSpend / totalClicks : 0;
   const conversionRate = totalClicks > 0 ? (totalOrders / totalClicks) * 100 : 0;
+  const averageCostPerUnit = totalOrders > 0 ? totalSpend / totalOrders : 0;
+
+  // Calculate change percentages
+  const salesChange = previousSales > 0 ? ((totalSales - previousSales) / previousSales) * 100 : 0;
+  const spendChange = previousSpend > 0 ? ((totalSpend - previousSpend) / previousSpend) * 100 : 0;
+  const profitChange = previousProfit !== 0 ? ((totalProfit - previousProfit) / Math.abs(previousProfit)) * 100 : 0;
+  const ordersChange = previousOrders > 0 ? ((totalOrders - previousOrders) / previousOrders) * 100 : 0;
+
+  // Create data source info string
+  const dataSourceInfo = simulatedCampaigns > 0 && realDataCampaigns > 0 
+    ? `${realDataCampaigns} campaigns with real data, ${simulatedCampaigns} simulated`
+    : simulatedCampaigns > 0 
+    ? `All ${simulatedCampaigns} campaigns are simulated for development`
+    : `All ${realDataCampaigns} campaigns have real Amazon API data`;
 
   const metrics: PerformanceMetrics = {
     totalSales: Number(totalSales.toFixed(2)),
@@ -108,7 +128,14 @@ export const processPerformanceData = (
     totalImpressions,
     averageCtr: Number(averageCtr.toFixed(2)),
     averageCpc: Number(averageCpc.toFixed(2)),
-    conversionRate: Number(conversionRate.toFixed(2))
+    conversionRate: Number(conversionRate.toFixed(2)),
+    salesChange: Number(salesChange.toFixed(1)),
+    spendChange: Number(spendChange.toFixed(1)),
+    profitChange: Number(profitChange.toFixed(1)),
+    ordersChange: Number(ordersChange.toFixed(1)),
+    averageCostPerUnit: Number(averageCostPerUnit.toFixed(2)),
+    hasSimulatedData: simulatedCampaigns > 0,
+    dataSourceInfo
   };
 
   // Generate recommendations
