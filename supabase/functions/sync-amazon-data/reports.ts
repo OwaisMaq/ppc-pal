@@ -10,10 +10,10 @@ export async function fetchCampaignReports(
 ): Promise<any[]> {
   console.log('=== ENHANCED AMAZON API PERFORMANCE METRICS FETCHING ===');
   console.log(`Attempting to fetch performance data for ${campaignIds.length} campaigns`);
-  console.log('Campaign IDs received:', campaignIds);
+  console.log('Campaign UUIDs received:', campaignIds);
   
   if (campaignIds.length === 0) {
-    console.log('❌ No campaigns to fetch reports for - this indicates a campaign storage issue');
+    console.log('❌ No campaign UUIDs provided - this indicates a campaign storage issue');
     return [];
   }
 
@@ -67,8 +67,8 @@ export async function fetchCampaignReports(
         if (Array.isArray(data) && data.length > 0) {
           console.log('Sample API response:', JSON.stringify(data[0], null, 2));
           
-          // Transform all campaigns to metrics format regardless of whether they match our IDs
-          // This is because we need to get performance data for whatever campaigns exist
+          // Transform all campaigns to metrics format with Amazon campaign IDs
+          // Note: These will be Amazon campaign IDs, not our UUIDs
           const transformedMetrics = data.map(item => {
             // Handle different API response formats for performance metrics
             const campaignId = (item.campaignId || item.campaign_id || item.id)?.toString();
@@ -142,6 +142,6 @@ export async function fetchCampaignReports(
   console.log('3. Profile lacks advertising permissions');
   console.log('Generating enhanced fallback data for development...');
   
-  // Generate enhanced fallback data that uses our actual campaign IDs
+  // Generate enhanced fallback data that uses our actual campaign UUIDs
   return await fetchBasicMetrics(accessToken, clientId, profileId, baseUrl, campaignIds);
 }

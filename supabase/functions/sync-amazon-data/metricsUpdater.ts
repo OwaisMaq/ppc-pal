@@ -4,7 +4,7 @@ export async function updateCampaignMetrics(
   connectionId: string,
   metricsData: any[]
 ): Promise<void> {
-  console.log('=== ENHANCED CAMPAIGN METRICS UPDATE WITH PROPER MAPPING ===');
+  console.log('=== FIXED CAMPAIGN METRICS UPDATE WITH PROPER ID MAPPING ===');
   console.log(`Processing ${metricsData.length} metrics records for connection ${connectionId}`);
   
   let successCount = 0;
@@ -28,6 +28,7 @@ export async function updateCampaignMetrics(
 
       if (isRealData) {
         // For real API data, the campaignId is the Amazon campaign ID
+        // We need to find our campaign by amazon_campaign_id
         const { data: campaign, error: campaignError } = await supabase
           .from('campaigns')
           .select('id, name, amazon_campaign_id')

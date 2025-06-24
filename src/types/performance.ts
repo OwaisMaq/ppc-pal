@@ -4,26 +4,27 @@ export interface PerformanceMetrics {
   totalSpend: number;
   totalProfit: number;
   totalOrders: number;
+  activeCampaigns: number;
+  totalCampaigns: number;
   averageAcos: number;
   averageRoas: number;
-  averageCostPerUnit: number;
-  totalImpressions: number;
   totalClicks: number;
+  totalImpressions: number;
   averageCtr: number;
   averageCpc: number;
   conversionRate: number;
-  // Month-over-month changes
-  salesChange: number;
-  spendChange: number;
-  ordersChange: number;
-  profitChange: number;
-  // Data quality indicators
-  hasSimulatedData: boolean;
-  dataSourceInfo: string;
 }
 
 export interface FilterParams {
   selectedCountry?: string;
   selectedCampaign?: string;
   selectedProduct?: string;
+}
+
+export interface DataQualityInfo {
+  hasRealData: boolean;
+  realDataCampaigns: number;
+  totalCampaigns: number;
+  simulatedCampaigns: number;
+  dataSourceBreakdown: Record<string, number>;
 }

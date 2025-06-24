@@ -1,4 +1,3 @@
-
 import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 export const fetchCampaignsFromRegion = async (
@@ -78,7 +77,7 @@ export const storeCampaigns = async (
   connectionId: string,
   supabase: SupabaseClient
 ) => {
-  console.log('=== ENHANCED CAMPAIGN STORAGE WITH FIXED ID EXTRACTION ===')
+  console.log('=== FIXED CAMPAIGN STORAGE WITH GUARANTEED ID EXTRACTION ===')
   console.log(`Processing ${campaigns.length} campaigns for connection ${connectionId}`)
   
   let stored = 0
@@ -152,61 +151,63 @@ export const storeCampaigns = async (
         status: campaignData.status
       })
 
-      // Use the new unique constraint for proper upsert
-      const { data, error } = await supabase
+      // CRITICAL FIX: Use insert/select pattern to guarantee ID extraction
+      const { data: existingCampaign, error: selectError } = await supabase
         .from('campaigns')
-        .upsert(campaignData, {
-          onConflict: 'amazon_campaign_id,connection_id', // Use the new unique constraint
-          ignoreDuplicates: false // Ensure updates happen
-        })
-        .select('id, amazon_campaign_id, name, data_source, created_at')
+        .select('id')
+        .eq('amazon_campaign_id', campaign.campaignId.toString())
+        .eq('connection_id', connectionId)
+        .maybeSingle()
 
-      if (error) {
-        console.error(`❌ Database error storing campaign ${campaign.name}:`, error)
-        console.error('Error details:', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code
-        })
-        errors++
-        processingErrors.push(`Campaign "${campaign.name}": ${error.message}`)
-      } else {
-        stored++
-        console.log(`✅ Successfully stored campaign: ${campaign.name}`)
-        
-        if (data && data[0]) {
-          // FIXED: Extract the UUID from the returned data
-          const campaignUuid = data[0].id
-          campaignIds.push(campaignUuid)
-          console.log(`   ✓ Campaign UUID for metrics: ${campaignUuid}`)
-          console.log(`   Database ID: ${data[0].id}`)
-          console.log(`   Amazon ID: ${data[0].amazon_campaign_id}`)
-          console.log(`   Data Source: ${data[0].data_source}`)
-          console.log(`   Created/Updated: ${data[0].created_at}`)
-        } else {
-          console.warn(`⚠️ Campaign stored but no data returned for: ${campaign.name}`)
-          
-          // FALLBACK: Try to get the ID with a separate query if upsert didn't return data
-          try {
-            const { data: fallbackData, error: fallbackError } = await supabase
-              .from('campaigns')
-              .select('id')
-              .eq('amazon_campaign_id', campaign.campaignId.toString())
-              .eq('connection_id', connectionId)
-              .single()
-              
-            if (!fallbackError && fallbackData) {
-              campaignIds.push(fallbackData.id)
-              console.log(`   ✓ Fallback UUID extracted: ${fallbackData.id}`)
-            } else {
-              console.error(`   ❌ Fallback ID extraction failed:`, fallbackError)
-            }
-          } catch (fallbackError) {
-            console.error(`   ❌ Exception in fallback ID extraction:`, fallbackError)
-          }
+      let campaignUuid: string
+
+      if (existingCampaign) {
+        // Update existing campaign
+        const { error: updateError } = await supabase
+          .from('campaigns')
+          .update(campaignData)
+          .eq('id', existingCampaign.id)
+
+        if (updateError) {
+          console.error(`❌ Database error updating campaign ${campaign.name}:`, updateError)
+          errors++
+          processingErrors.push(`Campaign "${campaign.name}": ${updateError.message}`)
+          continue
         }
+
+        campaignUuid = existingCampaign.id
+        console.log(`✅ Updated existing campaign: ${campaign.name} with UUID: ${campaignUuid}`)
+      } else {
+        // Insert new campaign
+        const { data: insertedCampaign, error: insertError } = await supabase
+          .from('campaigns')
+          .insert(campaignData)
+          .select('id')
+          .single()
+
+        if (insertError) {
+          console.error(`❌ Database error inserting campaign ${campaign.name}:`, insertError)
+          errors++
+          processingErrors.push(`Campaign "${campaign.name}": ${insertError.message}`)
+          continue
+        }
+
+        if (!insertedCampaign?.id) {
+          console.error(`❌ No ID returned for campaign ${campaign.name}`)
+          errors++
+          processingErrors.push(`Campaign "${campaign.name}": No ID returned`)
+          continue
+        }
+
+        campaignUuid = insertedCampaign.id
+        console.log(`✅ Inserted new campaign: ${campaign.name} with UUID: ${campaignUuid}`)
       }
+
+      // GUARANTEED: We now have a campaign UUID
+      campaignIds.push(campaignUuid)
+      stored++
+      console.log(`   ✓ Campaign UUID added to metrics list: ${campaignUuid}`)
+
     } catch (error) {
       console.error(`❌ Exception processing campaign ${campaign.name}:`, error)
       errors++
@@ -234,18 +235,6 @@ export const storeCampaigns = async (
         storedCampaigns.slice(0, 5).forEach(campaign => {
           console.log(`  - ${campaign.name} (${campaign.amazon_campaign_id}) - ${campaign.status}`)
         })
-        
-        // ADDITIONAL FIX: Ensure we have all campaign IDs for metrics fetching
-        const verifiedIds = storedCampaigns.map(c => c.id)
-        console.log(`🔍 Verified campaign IDs for metrics: ${verifiedIds.length}`)
-        
-        // Add any missing IDs to our collection
-        verifiedIds.forEach(id => {
-          if (!campaignIds.includes(id)) {
-            campaignIds.push(id)
-            console.log(`   ✓ Added missing campaign ID: ${id}`)
-          }
-        })
       }
     }
   } catch (verificationError) {
@@ -272,27 +261,11 @@ export const storeCampaigns = async (
   if (campaignIds.length === 0 && stored > 0) {
     console.error('🚨 CRITICAL: CAMPAIGNS STORED BUT NO IDs EXTRACTED!')
     console.error('This will prevent metrics fetching from working.')
-    
-    // Emergency ID recovery attempt
-    try {
-      const { data: emergencyData, error: emergencyError } = await supabase
-        .from('campaigns')
-        .select('id')
-        .eq('connection_id', connectionId)
-        .eq('data_source', 'api')
-        
-      if (!emergencyError && emergencyData && emergencyData.length > 0) {
-        const emergencyIds = emergencyData.map(c => c.id)
-        campaignIds.push(...emergencyIds)
-        console.log(`🚨 EMERGENCY RECOVERY: Extracted ${emergencyIds.length} campaign IDs`)
-      }
-    } catch (emergencyError) {
-      console.error('🚨 EMERGENCY RECOVERY FAILED:', emergencyError)
-    }
+    throw new Error(`Campaign storage succeeded but ID extraction failed for ${stored} campaigns.`)
   }
 
   console.log(`🎉 SUCCESS: Stored ${stored} campaigns with data_source=api`)
-  console.log(`🎯 FINAL CAMPAIGN IDS COUNT: ${campaignIds.length}`)
+  console.log(`🎯 GUARANTEED CAMPAIGN IDS COUNT: ${campaignIds.length}`)
   
   return {
     stored,
