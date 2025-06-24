@@ -8,41 +8,75 @@ export const filterCampaigns = (
   connections: AmazonConnection[],
   filters: FilterParams
 ): CampaignData[] => {
-  let filteredCampaigns = campaigns;
+  console.log('=== CAMPAIGN FILTERING DEBUG ===');
+  console.log('Input campaigns:', campaigns.length);
+  console.log('Available connections:', connections.length);
+  console.log('Filters applied:', filters);
   
-  if (filters.selectedCountry && filters.selectedCountry !== 'all') {
+  let filteredCampaigns = [...campaigns];
+  
+  // Filter by country/marketplace
+  if (filters.selectedCountry) {
+    console.log(`Filtering by country: ${filters.selectedCountry}`);
+    
     // Find connections for the selected country
     const countryConnections = connections
-      .filter(conn => conn.marketplace_id === filters.selectedCountry)
+      .filter(conn => {
+        console.log(`Connection ${conn.id}: marketplace ${conn.marketplace_id}`);
+        return conn.marketplace_id === filters.selectedCountry;
+      })
       .map(conn => conn.id);
     
-    filteredCampaigns = filteredCampaigns.filter(campaign => 
-      countryConnections.includes(campaign.connection_id)
-    );
+    console.log(`Found ${countryConnections.length} connections for country ${filters.selectedCountry}:`, countryConnections);
     
-    console.log(`Filtered to ${filteredCampaigns.length} campaigns for country ${filters.selectedCountry}`);
+    if (countryConnections.length > 0) {
+      filteredCampaigns = filteredCampaigns.filter(campaign => {
+        const matches = countryConnections.includes(campaign.connection_id);
+        if (!matches) {
+          console.log(`Campaign ${campaign.name} filtered out - connection ${campaign.connection_id} not in country connections`);
+        }
+        return matches;
+      });
+    } else {
+      console.log(`⚠️ No connections found for country ${filters.selectedCountry}, returning empty results`);
+      filteredCampaigns = [];
+    }
+    
+    console.log(`After country filter: ${filteredCampaigns.length} campaigns`);
   }
 
   // Filter by specific campaign if selected
-  if (filters.selectedCampaign && filters.selectedCampaign !== 'all') {
+  if (filters.selectedCampaign) {
+    console.log(`Filtering by campaign: ${filters.selectedCampaign}`);
     filteredCampaigns = filteredCampaigns.filter(campaign => 
       campaign.id === filters.selectedCampaign
     );
-    
-    console.log(`Filtered to ${filteredCampaigns.length} campaigns for campaign ${filters.selectedCampaign}`);
+    console.log(`After campaign filter: ${filteredCampaigns.length} campaigns`);
   }
 
   // Filter by specific ASIN if selected
-  if (filters.selectedProduct && filters.selectedProduct !== 'all') {
-    // Filter campaigns that contain the selected ASIN in their name or campaign ID
+  if (filters.selectedProduct) {
+    console.log(`Filtering by product/ASIN: ${filters.selectedProduct}`);
     const asinPattern = new RegExp(filters.selectedProduct, 'i');
     
     filteredCampaigns = filteredCampaigns.filter(campaign => {
-      // Check if ASIN is in campaign name or amazon_campaign_id
-      return asinPattern.test(campaign.name) || asinPattern.test(campaign.amazon_campaign_id);
+      const matches = asinPattern.test(campaign.name) || asinPattern.test(campaign.amazon_campaign_id);
+      if (!matches) {
+        console.log(`Campaign ${campaign.name} filtered out - doesn't match ASIN pattern`);
+      }
+      return matches;
     });
-    
-    console.log(`Filtered to ${filteredCampaigns.length} campaigns for ASIN ${filters.selectedProduct}`);
+    console.log(`After ASIN filter: ${filteredCampaigns.length} campaigns`);
+  }
+
+  console.log(`✓ Final filtered campaigns: ${filteredCampaigns.length}`);
+  
+  // Log sample of final results
+  if (filteredCampaigns.length > 0) {
+    console.log('Sample filtered results:');
+    filteredCampaigns.slice(0, 3).forEach((campaign, index) => {
+      console.log(`  ${index + 1}. ${campaign.name} - Sales: ${campaign.sales}, Data Source: ${campaign.data_source}`);
+    });
   }
 
   return filteredCampaigns;

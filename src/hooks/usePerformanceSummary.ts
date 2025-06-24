@@ -7,6 +7,8 @@ export const usePerformanceSummary = () => {
   const [selectedCountry, setSelectedCountry] = useState("all");
   const [selectedCampaign, setSelectedCampaign] = useState("all");
   const { connections } = useAmazonConnections();
+  
+  // FIXED: Do not pass selectedCountry as connectionId
   const { 
     metrics, 
     loading, 
@@ -15,6 +17,12 @@ export const usePerformanceSummary = () => {
     dataQuality, 
     recommendations 
   } = usePerformanceData(undefined, selectedCountry, selectedCampaign);
+
+  console.log('=== PERFORMANCE SUMMARY HOOK DEBUG ===');
+  console.log('Selected filters:', { selectedCountry, selectedCampaign });
+  console.log('Has data:', hasData);
+  console.log('Has real data:', hasRealData);
+  console.log('Metrics available:', metrics !== null);
 
   const getFilteredDescription = () => {
     const parts = [];

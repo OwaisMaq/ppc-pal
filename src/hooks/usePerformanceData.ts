@@ -24,10 +24,16 @@ export const usePerformanceData = (
   useEffect(() => {
     if (campaignsLoading || keywordsLoading) return;
 
-    console.log('=== PERFORMANCE DATA HOOK CALCULATION ===');
-    console.log('Campaigns available:', campaigns.length);
-    console.log('Keywords available:', keywords.length);
-    console.log('Connections available:', connections.length);
+    console.log('=== PERFORMANCE DATA HOOK CALCULATION (FIXED) ===');
+    console.log('Input parameters:');
+    console.log('- connectionId:', connectionId);
+    console.log('- selectedCountry:', selectedCountry);
+    console.log('- selectedCampaign:', selectedCampaign);
+    console.log('- selectedProduct:', selectedProduct);
+    console.log('Data available:');
+    console.log('- Campaigns:', campaigns.length);
+    console.log('- Keywords:', keywords.length);
+    console.log('- Connections:', connections.length);
 
     calculateAndSetMetrics();
   }, [campaigns, keywords, campaignsLoading, keywordsLoading, connections, selectedCountry, selectedCampaign, selectedProduct]);
@@ -49,17 +55,28 @@ export const usePerformanceData = (
       return;
     }
 
-    // Filter campaigns based on selections
+    // Build proper filter parameters - DO NOT pass country as connectionId
     const filters: FilterParams = {
-      selectedCountry,
-      selectedCampaign,
-      selectedProduct
+      selectedCountry: selectedCountry !== 'all' ? selectedCountry : undefined,
+      selectedCampaign: selectedCampaign !== 'all' ? selectedCampaign : undefined,
+      selectedProduct: selectedProduct !== 'all' ? selectedProduct : undefined
     };
     
-    const filteredCampaigns = filterCampaigns(campaigns, connections, filters);
-    console.log(`Filtered campaigns: ${filteredCampaigns.length}`);
+    console.log('Applying filters:', filters);
     
-    // Process performance data with strict real-data-only requirements
+    // Filter campaigns based on selections
+    const filteredCampaigns = filterCampaigns(campaigns, connections, filters);
+    console.log(`✓ Filtered campaigns: ${filteredCampaigns.length} (from ${campaigns.length} total)`);
+    
+    // Log sample filtered campaigns for debugging
+    if (filteredCampaigns.length > 0) {
+      console.log('Sample filtered campaigns:');
+      filteredCampaigns.slice(0, 3).forEach((campaign, index) => {
+        console.log(`  ${index + 1}. ${campaign.name} (${campaign.data_source}) - Sales: ${campaign.sales}, Status: ${campaign.status}`);
+      });
+    }
+    
+    // Process performance data with filtered campaigns
     const { metrics: calculatedMetrics, dataQuality: quality, recommendations: recs } = processPerformanceData(filteredCampaigns);
     
     // Set state based on results
@@ -68,11 +85,19 @@ export const usePerformanceData = (
     setDataQuality(quality);
     setRecommendations(recs);
 
-    console.log('=== PERFORMANCE DATA HOOK RESULTS ===');
-    console.log('Metrics available:', calculatedMetrics !== null);
+    console.log('=== PERFORMANCE DATA HOOK RESULTS (FIXED) ===');
+    console.log('Metrics calculated:', calculatedMetrics !== null);
     console.log('Has real data:', calculatedMetrics !== null && quality.hasRealData);
     console.log('Real data campaigns:', quality.realDataCampaigns);
-    console.log('Total campaigns:', quality.totalCampaigns);
+    console.log('Total filtered campaigns:', quality.totalCampaigns);
+    
+    if (calculatedMetrics) {
+      console.log('Sample metrics:', {
+        totalSales: calculatedMetrics.totalSales,
+        totalSpend: calculatedMetrics.totalSpend,
+        totalProfit: calculatedMetrics.totalProfit
+      });
+    }
   };
 
   const loading = campaignsLoading || keywordsLoading;

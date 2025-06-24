@@ -38,12 +38,19 @@ const PerformanceSummary = () => {
     hasRealData: hasWeeklyRealData 
   } = useWeeklyMetrics(selectedCountry, selectedCampaign, selectedProduct);
 
+  console.log('=== PERFORMANCE SUMMARY RENDER DEBUG ===');
+  console.log('Loading states:', { loading, weeklyLoading });
+  console.log('Data states:', { hasData, hasRealData });
+  console.log('Metrics available:', metrics !== null);
+  console.log('Current filters:', { selectedCountry, selectedCampaign, selectedProduct });
+
   if (loading || weeklyLoading) {
     return <PerformanceLoadingState getFilteredDescription={getFilteredDescription} />;
   }
 
   // Show empty state if no data at all
   if (!hasData) {
+    console.log('Showing empty state - no data available');
     return (
       <PerformanceEmptyState 
         connections={connections} 
@@ -53,7 +60,8 @@ const PerformanceSummary = () => {
   }
 
   // Show main performance summary if we have real data (API campaigns)
-  if (hasRealData) {
+  if (hasRealData && metrics) {
+    console.log('✅ Showing performance summary with real data');
     return (
       <div className="space-y-8">
         <div>
@@ -102,32 +110,23 @@ const PerformanceSummary = () => {
             <p className="text-gray-600">Campaign performance metrics from Amazon API</p>
           </div>
 
-          {metrics ? (
-            <>
-              <PerformanceMetricCards 
-                metrics={metrics} 
-                formatCurrency={formatCurrency} 
-              />
+          <PerformanceMetricCards 
+            metrics={metrics} 
+            formatCurrency={formatCurrency} 
+          />
 
-              <AdditionalMetrics 
-                metrics={metrics}
-                formatCurrency={formatCurrency}
-                formatPercentage={formatPercentage}
-              />
-            </>
-          ) : (
-            <NoRealDataAlert 
-              title="Campaign Metrics Calculating"
-              description="Your Amazon campaigns are connected successfully. Performance metrics are being calculated and will appear here once available."
-              showSyncButton={false}
-            />
-          )}
+          <AdditionalMetrics 
+            metrics={metrics}
+            formatCurrency={formatCurrency}
+            formatPercentage={formatPercentage}
+          />
         </div>
       </div>
     );
   }
 
-  // Show error state only if no real API data is available
+  // Show state when we have campaigns but no performance data
+  console.log('Showing fallback state - campaigns available but no metrics calculated');
   return (
     <div className="space-y-8">
       <div>
@@ -154,10 +153,10 @@ const PerformanceSummary = () => {
         />
       )}
 
-      {/* Main error message for no real data */}
+      {/* Main message for available campaigns but no calculated metrics */}
       <NoRealDataAlert 
-        title="No Amazon API Campaigns Found"
-        description="No campaigns were found from your Amazon API connection. Please ensure: 1) Your Amazon Advertising account has active campaigns, 2) Your API connection has proper permissions, 3) Try re-syncing your connection from Settings."
+        title="Calculating Performance Metrics"
+        description={`Found ${dataQuality?.totalCampaigns || 0} campaigns from your Amazon API connection. Performance metrics are being calculated and will appear here once processing is complete. If this persists, try re-syncing your connection from Settings.`}
         showSyncButton={true}
       />
     </div>
