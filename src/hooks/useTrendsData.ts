@@ -2,6 +2,7 @@
 import React from 'react';
 import { CampaignData } from './useCampaignData';
 import { AmazonConnection } from '@/lib/amazon/types';
+import { filterRealDataOnly } from '@/utils/dataFilter';
 
 interface TrendData {
   name: string;
@@ -9,23 +10,6 @@ interface TrendData {
   spend: number;
   profit: number;
 }
-
-// Strict filter for real data only
-const filterRealDataOnly = (campaigns: CampaignData[]): CampaignData[] => {
-  return campaigns.filter(campaign => {
-    const isRealSource = campaign.data_source !== 'simulated' && 
-                        campaign.data_source !== 'simulation' &&
-                        campaign.data_source !== 'fake';
-    
-    const hasMetrics = (campaign.sales || 0) > 0 || 
-                      (campaign.spend || 0) > 0 || 
-                      (campaign.orders || 0) > 0 ||
-                      (campaign.clicks || 0) > 0 ||
-                      (campaign.impressions || 0) > 0;
-    
-    return isRealSource && hasMetrics;
-  });
-};
 
 export const useTrendsData = (
   campaigns: CampaignData[],
@@ -37,13 +21,15 @@ export const useTrendsData = (
   const trendsData = React.useMemo(() => {
     if (!campaigns.length) return [];
 
-    // Filter to real data only first
+    // STRICT: Filter to real API data only
     const realCampaigns = filterRealDataOnly(campaigns);
     
     if (!realCampaigns.length) {
-      console.log('No real data campaigns available for trends');
+      console.log('❌ No real API data campaigns available for trends');
       return [];
     }
+
+    console.log('📈 Generating trends from', realCampaigns.length, 'real API campaigns');
 
     // Filter campaigns based on selections
     let filteredCampaigns = realCampaigns;
@@ -72,9 +58,11 @@ export const useTrendsData = (
     }
 
     if (!filteredCampaigns.length) {
-      console.log('No real data campaigns match the current filters');
+      console.log('❌ No real API campaigns match the current filters');
       return [];
     }
+
+    console.log('✅ Generating trends from', filteredCampaigns.length, 'filtered real API campaigns');
 
     // Generate monthly trend data from real campaigns only
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];

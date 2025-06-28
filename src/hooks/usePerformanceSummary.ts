@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useCampaignData } from './useCampaignData';
 import { useAmazonConnections } from './useAmazonConnections';
+import { filterRealDataOnly } from '@/utils/dataFilter';
 
 interface PerformanceMetrics {
   totalSales: number;
@@ -33,15 +34,21 @@ export const usePerformanceSummary = () => {
   const { connections } = useAmazonConnections();
   const { campaigns, loading } = useCampaignData();
 
-  console.log('=== PERFORMANCE SUMMARY HOOK DEBUG ===');
+  console.log('=== STRICT PERFORMANCE SUMMARY - NO SIMULATION DATA ===');
   console.log('Connections:', connections.length);
-  console.log('Campaigns:', campaigns.length);
+  console.log('Total campaigns:', campaigns.length);
   console.log('Loading state:', loading);
 
-  // Enhanced data quality analysis
+  // STRICT: Only work with real API data
+  const realApiCampaigns = useMemo(() => {
+    const filtered = filterRealDataOnly(campaigns);
+    console.log('Real API campaigns after strict filtering:', filtered.length);
+    return filtered;
+  }, [campaigns]);
+
+  // Enhanced data quality analysis - STRICT mode
   const dataQuality: DataQuality = useMemo(() => {
-    const realDataCampaigns = campaigns.filter(c => c.data_source === 'api');
-    const simulatedCampaigns = campaigns.filter(c => c.data_source === 'simulated' || !c.data_source);
+    const simulatedCampaigns = campaigns.filter(c => c.data_source !== 'api');
     
     const dataSourceBreakdown = campaigns.reduce((acc, campaign) => {
       const source = campaign.data_source || 'unknown';
@@ -49,20 +56,21 @@ export const usePerformanceSummary = () => {
       return acc;
     }, {} as Record<string, number>);
 
-    // Determine API data quality
+    // Determine API data quality - STRICT
     let apiDataQuality: 'excellent' | 'good' | 'poor' | 'none' = 'none';
-    const realDataPercentage = campaigns.length > 0 ? (realDataCampaigns.length / campaigns.length) * 100 : 0;
-    
-    if (realDataPercentage >= 80) {
-      apiDataQuality = 'excellent';
-    } else if (realDataPercentage >= 50) {
-      apiDataQuality = 'good';
-    } else if (realDataPercentage > 0) {
-      apiDataQuality = 'poor';
+    if (realApiCampaigns.length > 0) {
+      const realDataPercentage = campaigns.length > 0 ? (realApiCampaigns.length / campaigns.length) * 100 : 0;
+      if (realDataPercentage >= 80) {
+        apiDataQuality = 'excellent';
+      } else if (realDataPercentage >= 50) {
+        apiDataQuality = 'good';
+      } else {
+        apiDataQuality = 'poor';
+      }
     }
 
     // Find most recent real data update
-    const lastRealDataUpdate = realDataCampaigns
+    const lastRealDataUpdate = realApiCampaigns
       .filter(c => c.last_updated)
       .sort((a, b) => new Date(b.last_updated!).getTime() - new Date(a.last_updated!).getTime())[0]?.last_updated;
 
@@ -71,15 +79,15 @@ export const usePerformanceSummary = () => {
     if (connections.length > 0 && campaigns.length === 0) {
       syncIssues.push('Amazon connection exists but no campaigns found');
     }
-    if (realDataCampaigns.length === 0 && campaigns.length > 0) {
+    if (realApiCampaigns.length === 0 && campaigns.length > 0) {
       syncIssues.push('All campaigns are using simulated data - API sync may have failed');
     }
     if (connections.some(c => c.status === 'error')) {
       syncIssues.push('One or more Amazon connections have errors');
     }
 
-    console.log('📊 Data Quality Analysis:', {
-      realDataCampaigns: realDataCampaigns.length,
+    console.log('📊 STRICT Data Quality Analysis:', {
+      realDataCampaigns: realApiCampaigns.length,
       totalCampaigns: campaigns.length,
       apiDataQuality,
       dataSourceBreakdown,
@@ -87,8 +95,8 @@ export const usePerformanceSummary = () => {
     });
 
     return {
-      hasRealData: realDataCampaigns.length > 0,
-      realDataCampaigns: realDataCampaigns.length,
+      hasRealData: realApiCampaigns.length > 0,
+      realDataCampaigns: realApiCampaigns.length,
       totalCampaigns: campaigns.length,
       simulatedCampaigns: simulatedCampaigns.length,
       dataSourceBreakdown,
@@ -96,14 +104,17 @@ export const usePerformanceSummary = () => {
       lastRealDataUpdate,
       syncIssues
     };
-  }, [campaigns, connections]);
+  }, [campaigns, connections, realApiCampaigns]);
 
-  // Performance metrics calculation
+  // Performance metrics calculation - ONLY from real API data
   const metrics: PerformanceMetrics | null = useMemo(() => {
-    if (!campaigns.length) return null;
+    if (!realApiCampaigns.length) {
+      console.log('❌ No real API campaigns - returning null metrics');
+      return null;
+    }
 
-    // Filter campaigns based on selection
-    let filteredCampaigns = campaigns;
+    // Filter campaigns based on selection - only real API campaigns
+    let filteredCampaigns = realApiCampaigns;
     
     if (selectedCountry !== 'all') {
       filteredCampaigns = filteredCampaigns.filter(campaign => {
@@ -116,7 +127,7 @@ export const usePerformanceSummary = () => {
       filteredCampaigns = filteredCampaigns.filter(campaign => campaign.id === selectedCampaign);
     }
 
-    console.log('📈 Calculating metrics for', filteredCampaigns.length, 'filtered campaigns');
+    console.log('📈 Calculating metrics for', filteredCampaigns.length, 'real API campaigns only');
 
     const totals = filteredCampaigns.reduce(
       (acc, campaign) => ({
@@ -162,19 +173,19 @@ export const usePerformanceSummary = () => {
       conversionRate,
     };
 
-    console.log('📊 Final calculated metrics:', calculatedMetrics);
+    console.log('📊 REAL API METRICS CALCULATED:', calculatedMetrics);
     return calculatedMetrics;
-  }, [campaigns, selectedCountry, selectedCampaign]);
+  }, [realApiCampaigns, selectedCountry, selectedCampaign]);
 
-  // Enhanced recommendations
+  // Enhanced recommendations - STRICT mode
   const recommendations = useMemo(() => {
     const recs: string[] = [];
     
     if (dataQuality.apiDataQuality === 'none') {
-      recs.push('Connect your Amazon Advertising account to get real performance data');
+      recs.push('No real Amazon API data available - please sync your Amazon connection');
       recs.push('Ensure your Amazon account has active advertising campaigns');
     } else if (dataQuality.apiDataQuality === 'poor') {
-      recs.push('Re-sync your Amazon connection to improve data quality');
+      recs.push('Limited real data available - re-sync your Amazon connection to improve data quality');
       recs.push('Check if all your advertising profiles are properly connected');
     } else if (dataQuality.syncIssues && dataQuality.syncIssues.length > 0) {
       recs.push('Review and resolve sync issues in your Amazon connections');
@@ -187,14 +198,14 @@ export const usePerformanceSummary = () => {
     return recs;
   }, [dataQuality, connections.length]);
 
-  const hasData = campaigns.length > 0;
+  const hasData = realApiCampaigns.length > 0; // Only count real data
   const hasRealData = dataQuality.hasRealData;
 
   const getFilteredDescription = () => {
     const parts = [];
     if (selectedCountry !== 'all') parts.push(`in ${selectedCountry}`);
     if (selectedCampaign !== 'all') {
-      const campaign = campaigns.find(c => c.id === selectedCampaign);
+      const campaign = realApiCampaigns.find(c => c.id === selectedCampaign);
       if (campaign) parts.push(`for campaign "${campaign.name}"`);
     }
     return parts.length > 0 ? ` ${parts.join(' ')}` : '';
@@ -217,7 +228,7 @@ export const usePerformanceSummary = () => {
     selectedCampaign,
     setSelectedCampaign,
     connections,
-    campaigns,
+    campaigns: realApiCampaigns, // Only return real API campaigns
     metrics,
     loading,
     hasData,
