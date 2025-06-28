@@ -78,7 +78,7 @@ export const storeCampaigns = async (
   connectionId: string,
   supabase: SupabaseClient
 ) => {
-  console.log('=== ENHANCED CAMPAIGN STORAGE WITH GUARANTEED ID EXTRACTION ===')
+  console.log('=== FIXED CAMPAIGN STORAGE WITH GUARANTEED UUID EXTRACTION ===')
   console.log(`Processing ${campaigns.length} campaigns for connection ${connectionId}`)
   
   let stored = 0
@@ -86,7 +86,7 @@ export const storeCampaigns = async (
   const campaignIds: string[] = []
   const processingErrors: string[] = []
 
-  // First, let's test if we can access the campaigns table
+  // Enhanced database connectivity test
   try {
     const { count, error: countError } = await supabase
       .from('campaigns')
@@ -98,21 +98,22 @@ export const storeCampaigns = async (
       throw new Error(`Database access error: ${countError.message}`)
     }
 
-    console.log(`✓ Database access confirmed. Existing campaigns for this connection: ${count}`)
+    console.log(`✅ Database access confirmed. Existing campaigns for this connection: ${count}`)
   } catch (error) {
     console.error('❌ CRITICAL: Database connection failed:', error)
     throw error
   }
 
+  // Process each campaign with enhanced UUID extraction
   for (const campaign of campaigns) {
     try {
-      console.log(`Processing campaign: ${campaign.name} (Amazon ID: ${campaign.campaignId})`)
+      console.log(`🔄 Processing campaign: ${campaign.name} (Amazon ID: ${campaign.campaignId})`)
       
-      // Validate required fields
+      // Enhanced validation for required fields
       if (!campaign.campaignId) {
         console.error(`❌ Campaign missing campaignId:`, campaign)
         errors++
-        processingErrors.push(`Campaign "${campaign.name}" missing campaignId`)
+        processingErrors.push(`Campaign "${campaign.name || 'unknown'}" missing campaignId`)
         continue
       }
 
@@ -123,19 +124,19 @@ export const storeCampaigns = async (
         continue
       }
 
-      // Prepare campaign data with enhanced validation and defaults
+      // Prepare campaign data with EXPLICIT API source marking
       const campaignData = {
         amazon_campaign_id: campaign.campaignId.toString(),
-        name: campaign.name || 'Unnamed Campaign',
-        campaign_type: campaign.campaignType || 'unknown',
-        targeting_type: campaign.targetingType || 'unknown',
+        name: campaign.name,
+        campaign_type: campaign.campaignType || 'sponsored-products',
+        targeting_type: campaign.targetingType || 'manual',
         status: mapCampaignStatus(campaign.state),
         daily_budget: campaign.dailyBudget ? parseFloat(campaign.dailyBudget) : null,
         start_date: campaign.startDate ? formatAmazonDate(campaign.startDate) : null,
         end_date: campaign.endDate ? formatAmazonDate(campaign.endDate) : null,
         connection_id: connectionId,
         data_source: 'api', // CRITICAL: Mark as real API data
-        // Initialize metrics to 0 - will be updated later with real data
+        // Initialize metrics to 0 - will be updated with real metrics
         impressions: 0,
         clicks: 0,
         spend: 0,
@@ -144,16 +145,15 @@ export const storeCampaigns = async (
         last_updated: new Date().toISOString()
       }
 
-      console.log('Prepared campaign data:', {
+      console.log(`📝 Upserting campaign data:`, {
         amazon_campaign_id: campaignData.amazon_campaign_id,
         name: campaignData.name,
-        connection_id: campaignData.connection_id,
         data_source: campaignData.data_source,
         status: campaignData.status
       })
 
-      // ENHANCED FIX: Use upsert with explicit select to guarantee ID extraction
-      const { data: upsertedCampaign, error: upsertError } = await supabase
+      // CRITICAL FIX: Use proper upsert with guaranteed UUID return
+      const { data: upsertResult, error: upsertError } = await supabase
         .from('campaigns')
         .upsert(
           campaignData,
@@ -162,7 +162,7 @@ export const storeCampaigns = async (
             ignoreDuplicates: false
           }
         )
-        .select('id')
+        .select('id, amazon_campaign_id, name')
         .single()
 
       if (upsertError) {
@@ -172,17 +172,34 @@ export const storeCampaigns = async (
         continue
       }
 
-      if (!upsertedCampaign?.id) {
-        console.error(`❌ No ID returned for campaign ${campaign.name} after upsert`)
-        errors++
-        processingErrors.push(`Campaign "${campaign.name}": No ID returned after upsert`)
+      if (!upsertResult?.id) {
+        console.error(`❌ CRITICAL: No UUID returned for campaign ${campaign.name}`)
+        
+        // FALLBACK: Try to fetch the campaign by Amazon ID
+        const { data: existingCampaign, error: fetchError } = await supabase
+          .from('campaigns')
+          .select('id, amazon_campaign_id, name')
+          .eq('amazon_campaign_id', campaign.campaignId.toString())
+          .eq('connection_id', connectionId)
+          .single()
+
+        if (fetchError || !existingCampaign) {
+          console.error(`❌ FALLBACK FAILED: Cannot retrieve UUID for campaign ${campaign.name}`)
+          errors++
+          processingErrors.push(`Campaign UUID extraction failed for "${campaign.name}"`)
+          continue
+        }
+
+        console.log(`✅ FALLBACK SUCCESS: Retrieved UUID ${existingCampaign.id} for campaign ${campaign.name}`)
+        campaignIds.push(existingCampaign.id)
+        stored++
         continue
       }
 
-      // GUARANTEED: We now have a campaign UUID
-      campaignIds.push(upsertedCampaign.id)
+      // SUCCESS: We have the UUID
+      campaignIds.push(upsertResult.id)
       stored++
-      console.log(`✅ Successfully processed campaign: ${campaign.name} with UUID: ${upsertedCampaign.id}`)
+      console.log(`✅ SUCCESS: Campaign "${campaign.name}" stored with UUID: ${upsertResult.id}`)
 
     } catch (error) {
       console.error(`❌ Exception processing campaign ${campaign.name}:`, error)
@@ -191,9 +208,37 @@ export const storeCampaigns = async (
     }
   }
 
-  // Final verification: Check what was actually stored
+  // CRITICAL VERIFICATION: Ensure we have UUIDs for metrics
+  if (stored > 0 && campaignIds.length === 0) {
+    console.error('🚨 CRITICAL ERROR: Campaigns stored but NO UUIDs extracted!')
+    console.error('This will prevent metrics fetching. Attempting recovery...')
+    
+    // Emergency UUID recovery
+    try {
+      const { data: allCampaigns, error: recoveryError } = await supabase
+        .from('campaigns')
+        .select('id, amazon_campaign_id, name, data_source')
+        .eq('connection_id', connectionId)
+        .eq('data_source', 'api')
+        .order('created_at', { ascending: false })
+        .limit(stored)
+
+      if (!recoveryError && allCampaigns && allCampaigns.length > 0) {
+        const recoveredIds = allCampaigns.map(c => c.id)
+        campaignIds.push(...recoveredIds)
+        console.log(`🔄 RECOVERY SUCCESS: Retrieved ${recoveredIds.length} UUIDs`)
+        allCampaigns.forEach(c => {
+          console.log(`   - ${c.name} (${c.amazon_campaign_id}): ${c.id}`)
+        })
+      }
+    } catch (recoveryError) {
+      console.error('❌ UUID recovery failed:', recoveryError)
+    }
+  }
+
+  // Final storage verification
   try {
-    const { data: storedCampaigns, error: verifyError } = await supabase
+    const { data: verificationData, error: verifyError } = await supabase
       .from('campaigns')
       .select('id, amazon_campaign_id, name, data_source, status, created_at')
       .eq('connection_id', connectionId)
@@ -201,47 +246,46 @@ export const storeCampaigns = async (
       .order('created_at', { ascending: false })
 
     if (verifyError) {
-      console.error('❌ Error verifying stored campaigns:', verifyError)
+      console.error('❌ Verification query failed:', verifyError)
     } else {
-      console.log('=== STORAGE VERIFICATION ===')
-      console.log(`✅ Total API campaigns in database for this connection: ${storedCampaigns?.length || 0}`)
-      
-      if (storedCampaigns && storedCampaigns.length > 0) {
-        console.log('Recently stored campaigns:')
-        storedCampaigns.slice(0, 5).forEach(campaign => {
-          console.log(`  - ${campaign.name} (${campaign.amazon_campaign_id}) - ${campaign.status}`)
+      console.log(`✅ VERIFICATION: ${verificationData?.length || 0} API campaigns in database`)
+      if (verificationData && verificationData.length > 0) {
+        verificationData.slice(0, 3).forEach(c => {
+          console.log(`   ✓ ${c.name} (${c.amazon_campaign_id}) - Status: ${c.status}`)
         })
       }
     }
   } catch (verificationError) {
-    console.error('❌ Failed to verify stored campaigns:', verificationError)
+    console.error('❌ Verification failed:', verificationError)
   }
 
-  console.log('=== CAMPAIGN STORAGE SUMMARY ===')
-  console.log(`✅ Successfully stored: ${stored} campaigns`)
-  console.log(`❌ Errors encountered: ${errors} campaigns`)
-  console.log(`🔍 Campaign IDs generated: ${campaignIds.length}`)
-  console.log(`📊 Campaign IDs for metrics:`, campaignIds.slice(0, 5))
+  console.log('=== ENHANCED CAMPAIGN STORAGE SUMMARY ===')
+  console.log(`✅ Campaigns stored: ${stored}`)
+  console.log(`❌ Storage errors: ${errors}`)
+  console.log(`🎯 UUIDs extracted: ${campaignIds.length}`)
+  console.log(`📊 Success rate: ${campaigns.length > 0 ? ((stored / campaigns.length) * 100).toFixed(1) : 'N/A'}%`)
+  
+  if (campaignIds.length > 0) {
+    console.log(`🔑 Campaign UUIDs for metrics:`, campaignIds.slice(0, 5))
+  }
   
   if (processingErrors.length > 0) {
     console.log('❌ Processing errors:')
-    processingErrors.forEach(error => console.log(`   - ${error}`))
+    processingErrors.slice(0, 5).forEach(error => console.log(`   - ${error}`))
   }
 
+  // Enhanced error handling
   if (stored === 0 && campaigns.length > 0) {
     console.error('🚨 CRITICAL: NO CAMPAIGNS STORED despite having campaign data!')
-    console.error('This indicates a serious database storage issue.')
-    throw new Error(`Failed to store any of ${campaigns.length} campaigns. Check database constraints and permissions.`)
+    throw new Error(`Failed to store any of ${campaigns.length} campaigns. Check database permissions and constraints.`)
   }
 
   if (campaignIds.length === 0 && stored > 0) {
-    console.error('🚨 CRITICAL: CAMPAIGNS STORED BUT NO IDs EXTRACTED!')
-    console.error('This will prevent metrics fetching from working.')
-    throw new Error(`Campaign storage succeeded but ID extraction failed for ${stored} campaigns.`)
+    console.error('🚨 CRITICAL: CAMPAIGNS STORED BUT NO UUIDs EXTRACTED!')
+    throw new Error(`Campaign storage succeeded but UUID extraction failed for ${stored} campaigns. Metrics fetching will not work.`)
   }
 
-  console.log(`🎉 SUCCESS: Stored ${stored} campaigns with data_source=api`)
-  console.log(`🎯 GUARANTEED CAMPAIGN IDS COUNT: ${campaignIds.length}`)
+  console.log(`🎉 PIPELINE SUCCESS: ${stored} campaigns stored with ${campaignIds.length} UUIDs ready for metrics`)
   
   return {
     stored,
