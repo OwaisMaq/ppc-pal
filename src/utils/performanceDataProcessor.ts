@@ -9,6 +9,7 @@ interface DataQuality {
   apiDataQuality: 'excellent' | 'good' | 'poor' | 'none';
   averageDataAge: string;
   lastRealDataUpdate?: string;
+  dataSourceBreakdown: Record<string, number>;
 }
 
 export const processPerformanceData = (campaigns: CampaignData[]) => {
@@ -24,6 +25,13 @@ export const processPerformanceData = (campaigns: CampaignData[]) => {
   
   console.log(`Real API campaigns: ${realApiCampaigns.length}`);
   
+  // Calculate data source breakdown
+  const dataSourceBreakdown = campaigns.reduce((acc, campaign) => {
+    const source = campaign.data_source || 'unknown';
+    acc[source] = (acc[source] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+  
   // If no real API campaigns, return null metrics
   if (realApiCampaigns.length === 0) {
     console.log('❌ NO REAL API DATA AVAILABLE - Returning null metrics');
@@ -33,7 +41,8 @@ export const processPerformanceData = (campaigns: CampaignData[]) => {
       realDataCampaigns: 0,
       totalCampaigns: campaigns.length,
       apiDataQuality: 'none',
-      averageDataAge: '0 hours'
+      averageDataAge: '0 hours',
+      dataSourceBreakdown
     };
     
     return {
@@ -111,7 +120,8 @@ export const processPerformanceData = (campaigns: CampaignData[]) => {
     totalCampaigns: campaigns.length,
     apiDataQuality: 'excellent',
     averageDataAge: '0 hours',
-    lastRealDataUpdate: realApiCampaigns[0]?.last_updated
+    lastRealDataUpdate: realApiCampaigns[0]?.last_updated,
+    dataSourceBreakdown
   };
 
   console.log('✅ REAL API METRICS CALCULATED:', {
