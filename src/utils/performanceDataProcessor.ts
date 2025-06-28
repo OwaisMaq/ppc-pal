@@ -94,13 +94,20 @@ export const processPerformanceData = (campaigns: CampaignData[]) => {
     totalImpressions: totals.impressions,
     totalClicks: totals.clicks,
     activeCampaigns: totals.activeCampaigns,
+    totalCampaigns: realApiCampaigns.length,
     averageAcos,
     averageRoas,
     clickThroughRate,
+    averageCtr: clickThroughRate,
+    averageCpc: totals.clicks > 0 ? totals.spend / totals.clicks : 0,
     conversionRate,
     salesChange: 0, // Would need historical data
     spendChange: 0, // Would need historical data
     profitChange: 0, // Would need historical data
+    ordersChange: 0, // Would need historical data
+    averageCostPerUnit: totals.orders > 0 ? totals.spend / totals.orders : 0,
+    hasSimulatedData: false,
+    dataSourceInfo: 'real-api-data'
   };
 
   const dataQuality: DataQuality = {

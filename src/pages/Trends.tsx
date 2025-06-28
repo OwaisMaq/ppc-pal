@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import AuthenticatedLayout from '@/components/AuthenticatedLayout';
 import FilterBar from '@/components/FilterBar';
@@ -111,6 +110,7 @@ const Trends = () => {
               salesChange={metrics.salesChange || 0}
               spendChange={metrics.spendChange || 0}
               profitChange={metrics.profitChange || 0}
+              ordersChange={metrics.ordersChange || 0}
             />
 
             <TrendsChart data={trendsData} />

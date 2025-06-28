@@ -10,6 +10,7 @@ export interface PerformanceMetrics {
   averageRoas: number;
   totalClicks: number;
   totalImpressions: number;
+  clickThroughRate: number;
   averageCtr: number;
   averageCpc: number;
   conversionRate: number;
