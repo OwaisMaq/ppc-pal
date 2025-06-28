@@ -1,3 +1,4 @@
+
 import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 export const fetchCampaignsFromRegion = async (
@@ -77,7 +78,7 @@ export const storeCampaigns = async (
   connectionId: string,
   supabase: SupabaseClient
 ) => {
-  console.log('=== FIXED CAMPAIGN STORAGE WITH GUARANTEED ID EXTRACTION ===')
+  console.log('=== ENHANCED CAMPAIGN STORAGE WITH GUARANTEED ID EXTRACTION ===')
   console.log(`Processing ${campaigns.length} campaigns for connection ${connectionId}`)
   
   let stored = 0
@@ -151,62 +152,37 @@ export const storeCampaigns = async (
         status: campaignData.status
       })
 
-      // CRITICAL FIX: Use insert/select pattern to guarantee ID extraction
-      const { data: existingCampaign, error: selectError } = await supabase
+      // ENHANCED FIX: Use upsert with explicit select to guarantee ID extraction
+      const { data: upsertedCampaign, error: upsertError } = await supabase
         .from('campaigns')
+        .upsert(
+          campaignData,
+          {
+            onConflict: 'amazon_campaign_id,connection_id',
+            ignoreDuplicates: false
+          }
+        )
         .select('id')
-        .eq('amazon_campaign_id', campaign.campaignId.toString())
-        .eq('connection_id', connectionId)
-        .maybeSingle()
+        .single()
 
-      let campaignUuid: string
+      if (upsertError) {
+        console.error(`❌ Database error upserting campaign ${campaign.name}:`, upsertError)
+        errors++
+        processingErrors.push(`Campaign "${campaign.name}": ${upsertError.message}`)
+        continue
+      }
 
-      if (existingCampaign) {
-        // Update existing campaign
-        const { error: updateError } = await supabase
-          .from('campaigns')
-          .update(campaignData)
-          .eq('id', existingCampaign.id)
-
-        if (updateError) {
-          console.error(`❌ Database error updating campaign ${campaign.name}:`, updateError)
-          errors++
-          processingErrors.push(`Campaign "${campaign.name}": ${updateError.message}`)
-          continue
-        }
-
-        campaignUuid = existingCampaign.id
-        console.log(`✅ Updated existing campaign: ${campaign.name} with UUID: ${campaignUuid}`)
-      } else {
-        // Insert new campaign
-        const { data: insertedCampaign, error: insertError } = await supabase
-          .from('campaigns')
-          .insert(campaignData)
-          .select('id')
-          .single()
-
-        if (insertError) {
-          console.error(`❌ Database error inserting campaign ${campaign.name}:`, insertError)
-          errors++
-          processingErrors.push(`Campaign "${campaign.name}": ${insertError.message}`)
-          continue
-        }
-
-        if (!insertedCampaign?.id) {
-          console.error(`❌ No ID returned for campaign ${campaign.name}`)
-          errors++
-          processingErrors.push(`Campaign "${campaign.name}": No ID returned`)
-          continue
-        }
-
-        campaignUuid = insertedCampaign.id
-        console.log(`✅ Inserted new campaign: ${campaign.name} with UUID: ${campaignUuid}`)
+      if (!upsertedCampaign?.id) {
+        console.error(`❌ No ID returned for campaign ${campaign.name} after upsert`)
+        errors++
+        processingErrors.push(`Campaign "${campaign.name}": No ID returned after upsert`)
+        continue
       }
 
       // GUARANTEED: We now have a campaign UUID
-      campaignIds.push(campaignUuid)
+      campaignIds.push(upsertedCampaign.id)
       stored++
-      console.log(`   ✓ Campaign UUID added to metrics list: ${campaignUuid}`)
+      console.log(`✅ Successfully processed campaign: ${campaign.name} with UUID: ${upsertedCampaign.id}`)
 
     } catch (error) {
       console.error(`❌ Exception processing campaign ${campaign.name}:`, error)
@@ -245,7 +221,7 @@ export const storeCampaigns = async (
   console.log(`✅ Successfully stored: ${stored} campaigns`)
   console.log(`❌ Errors encountered: ${errors} campaigns`)
   console.log(`🔍 Campaign IDs generated: ${campaignIds.length}`)
-  console.log(`📊 Campaign IDs for metrics:`, campaignIds)
+  console.log(`📊 Campaign IDs for metrics:`, campaignIds.slice(0, 5))
   
   if (processingErrors.length > 0) {
     console.log('❌ Processing errors:')

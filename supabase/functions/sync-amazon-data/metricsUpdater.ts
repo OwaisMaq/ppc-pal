@@ -4,9 +4,8 @@ export async function updateCampaignMetrics(
   connectionId: string,
   metricsData: any[]
 ): Promise<void> {
-  console.log('=== ENHANCED CAMPAIGN METRICS UPDATE WITH DETAILED LOGGING ===');
-  console.log(`🔄 Processing ${metricsData.length} metrics records for connection ${connectionId}`);
-  console.log(`⏰ Update started at: ${new Date().toISOString()}`);
+  console.log('=== ENHANCED CAMPAIGN METRICS UPDATE ===');
+  console.log(`🔄 Processing ${metricsData.length} metrics for connection ${connectionId}`);
   
   let successCount = 0;
   let errorCount = 0;
@@ -14,7 +13,7 @@ export async function updateCampaignMetrics(
   let simulatedDataCount = 0;
   const processingLog: string[] = [];
 
-  // Pre-flight check: Verify database connectivity
+  // Verify database connectivity
   try {
     const { count, error: countError } = await supabase
       .from('campaigns')
@@ -22,13 +21,13 @@ export async function updateCampaignMetrics(
       .eq('connection_id', connectionId);
 
     if (countError) {
-      console.error('❌ CRITICAL: Cannot access campaigns table:', countError);
+      console.error('❌ Cannot access campaigns table:', countError);
       throw new Error(`Database access error: ${countError.message}`);
     }
 
-    console.log(`✅ Database connectivity verified. Found ${count} existing campaigns for connection.`);
+    console.log(`✅ Database verified. Found ${count} campaigns for connection.`);
   } catch (error) {
-    console.error('💥 Database connectivity test failed:', error);
+    console.error('💥 Database connectivity failed:', error);
     throw error;
   }
 
@@ -39,29 +38,17 @@ export async function updateCampaignMetrics(
       
       if (isRealData) {
         realDataCount++;
-        console.log(`🎯 Processing REAL API metric for Amazon campaign ${metric.campaignId}`);
-        console.log(`🔍 Source endpoint: ${metric.sourceEndpoint || 'Unknown'}`);
+        console.log(`🎯 Processing REAL API data for Amazon campaign ${metric.campaignId}`);
       } else {
         simulatedDataCount++;
-        console.log(`🎭 Processing SIMULATED metric for campaign UUID ${metric.campaignId}`);
-        console.log(`🔍 Performance profile: ${metric.performanceProfile || 'Standard'}`);
+        console.log(`🎭 Processing SIMULATED data for campaign UUID ${metric.campaignId}`);
       }
-
-      console.log(`📈 Metric values:`, {
-        sales: metric.sales,
-        spend: metric.spend,
-        orders: metric.orders,
-        clicks: metric.clicks,
-        impressions: metric.impressions,
-        acos: metric.acos,
-        roas: metric.roas
-      });
 
       let campaignRecord = null;
 
       if (isRealData) {
-        // For real API data, the campaignId is the Amazon campaign ID
-        console.log(`🔍 Looking up campaign by Amazon campaign ID: ${metric.campaignId}`);
+        // For real API data, lookup by Amazon campaign ID
+        console.log(`🔍 Looking up by Amazon campaign ID: ${metric.campaignId}`);
         
         const { data: campaign, error: campaignError } = await supabase
           .from('campaigns')
@@ -71,17 +58,16 @@ export async function updateCampaignMetrics(
           .single();
 
         if (campaignError || !campaign) {
-          console.error(`❌ Campaign not found for Amazon ID ${metric.campaignId}:`, campaignError);
-          processingLog.push(`❌ Campaign lookup failed for Amazon ID ${metric.campaignId}: ${campaignError?.message || 'Not found'}`);
+          console.error(`❌ Campaign not found for Amazon ID ${metric.campaignId}`);
           errorCount++;
           continue;
         }
         
         campaignRecord = campaign;
-        console.log(`✅ Found campaign: ${campaign.name} (UUID: ${campaign.id}) for Amazon ID: ${campaign.amazon_campaign_id}`);
+        console.log(`✅ Found campaign: ${campaign.name} (UUID: ${campaign.id})`);
       } else {
-        // For simulated data, the campaignId is already our UUID
-        console.log(`🔍 Looking up campaign by UUID: ${metric.campaignId}`);
+        // For simulated data, lookup by UUID
+        console.log(`🔍 Looking up by UUID: ${metric.campaignId}`);
         
         const { data: campaign, error: campaignError } = await supabase
           .from('campaigns')
@@ -91,17 +77,16 @@ export async function updateCampaignMetrics(
           .single();
 
         if (campaignError || !campaign) {
-          console.error(`❌ Campaign not found for UUID ${metric.campaignId}:`, campaignError);
-          processingLog.push(`❌ Campaign lookup failed for UUID ${metric.campaignId}: ${campaignError?.message || 'Not found'}`);
+          console.error(`❌ Campaign not found for UUID ${metric.campaignId}`);
           errorCount++;
           continue;
         }
         
         campaignRecord = campaign;
-        console.log(`✅ Found campaign: ${campaign.name} (UUID: ${campaign.id}) for simulated data`);
+        console.log(`✅ Found campaign: ${campaign.name}`);
       }
 
-      // Prepare update data with enhanced validation
+      // Prepare enhanced update data
       const updateData = {
         impressions: Math.max(0, metric.impressions || 0),
         clicks: Math.max(0, metric.clicks || 0),
@@ -110,31 +95,35 @@ export async function updateCampaignMetrics(
         orders: Math.max(0, metric.orders || 0),
         acos: Math.max(0, metric.acos || 0),
         roas: Math.max(0, metric.roas || 0),
-        data_source: isRealData ? 'api' : 'simulated', // CRITICAL: Mark data source correctly
+        data_source: isRealData ? 'api' : 'simulated',
         last_updated: new Date().toISOString()
       };
 
-      console.log(`📝 Prepared update data:`, updateData);
+      console.log(`📝 Update data:`, {
+        sales: updateData.sales,
+        spend: updateData.spend,
+        orders: updateData.orders,
+        dataSource: updateData.data_source
+      });
 
-      // Update campaign with performance metrics
+      // Update campaign metrics
       const { error: updateError } = await supabase
         .from('campaigns')
         .update(updateData)
         .eq('id', campaignRecord.id);
 
       if (updateError) {
-        console.error(`❌ Database error updating campaign ${campaignRecord.name}:`, updateError);
-        processingLog.push(`❌ Update failed for ${campaignRecord.name}: ${updateError.message}`);
+        console.error(`❌ Update failed for ${campaignRecord.name}:`, updateError);
         errorCount++;
         continue;
       }
 
-      console.log(`✅ Successfully updated campaign metrics in database`);
+      console.log(`✅ Successfully updated campaign metrics`);
 
-      // Store historical metrics with proper data source marking
+      // Store historical metrics
       const historicalData = {
         campaign_id: campaignRecord.id,
-        date: new Date().toISOString().split('T')[0], // Today's date
+        date: new Date().toISOString().split('T')[0],
         impressions: updateData.impressions,
         clicks: updateData.clicks,
         spend: updateData.spend,
@@ -142,78 +131,44 @@ export async function updateCampaignMetrics(
         orders: updateData.orders,
         acos: updateData.acos,
         roas: updateData.roas,
-        data_source: updateData.data_source, // CRITICAL: Mark historical data source
+        data_source: updateData.data_source,
         created_at: new Date().toISOString()
       };
 
-      console.log(`💾 Storing historical metrics:`, {
-        campaign_id: historicalData.campaign_id,
-        date: historicalData.date,
-        data_source: historicalData.data_source
-      });
-
       const { error: historyError } = await supabase
         .from('campaign_metrics_history')
-        .upsert(historicalData, {
-          onConflict: 'campaign_id, date'
-        });
+        .upsert(historicalData, { onConflict: 'campaign_id, date' });
 
       if (historyError) {
-        console.error(`⚠️ Error storing historical metrics for campaign ${campaignRecord.name}:`, historyError);
-        processingLog.push(`⚠️ History storage failed for ${campaignRecord.name}: ${historyError.message}`);
+        console.error(`⚠️ History storage failed:`, historyError);
       } else {
-        console.log(`💾 Successfully stored historical metrics`);
+        console.log(`💾 Historical metrics stored`);
       }
 
-      const logEntry = `✅ Updated ${isRealData ? 'REAL' : 'SIMULATED'} metrics for campaign ${campaignRecord.name}: Sales $${updateData.sales}, Spend $${updateData.spend}, Orders ${updateData.orders}`;
-      console.log(logEntry);
+      const logEntry = `✅ Updated ${isRealData ? 'REAL' : 'SIMULATED'} metrics for ${campaignRecord.name}`;
       processingLog.push(logEntry);
-
       successCount++;
+
     } catch (error) {
-      console.error(`💥 Exception processing metric ${index + 1}:`, {
-        error: error.message,
-        metric: {
-          campaignId: metric.campaignId,
-          fromAPI: metric.fromAPI,
-          sales: metric.sales,
-          spend: metric.spend
-        }
-      });
-      processingLog.push(`💥 Exception for metric ${index + 1}: ${error.message}`);
+      console.error(`💥 Exception processing metric ${index + 1}:`, error.message);
       errorCount++;
     }
   }
 
   console.log('\n=== METRICS UPDATE SUMMARY ===');
-  console.log(`⏰ Update completed at: ${new Date().toISOString()}`);
-  console.log(`✅ Successfully processed: ${successCount} campaigns`);
-  console.log(`❌ Errors encountered: ${errorCount} campaigns`);
-  console.log(`📊 Real API data: ${realDataCount} campaigns`);
-  console.log(`🎭 Simulated data: ${simulatedDataCount} campaigns`);
+  console.log(`✅ Successfully processed: ${successCount}`);
+  console.log(`❌ Errors: ${errorCount}`);
+  console.log(`📊 Real API data: ${realDataCount}`);
+  console.log(`🎭 Simulated data: ${simulatedDataCount}`);
   console.log(`📈 Success rate: ${((successCount / (successCount + errorCount)) * 100).toFixed(1)}%`);
   
   if (realDataCount > 0) {
-    console.log(`🎉 SUCCESS: ${realDataCount} campaigns now have REAL Amazon API data!`);
-    console.log(`🎯 This means the Amazon API is working and returning performance metrics`);
-  } else if (simulatedDataCount > 0) {
-    console.log(`⚠️ NOTICE: Using ${simulatedDataCount} simulated metrics for development.`);
-    console.log(`🔍 To get real data, ensure campaigns have recent activity and proper API permissions`);
+    console.log(`🎉 SUCCESS: ${realDataCount} campaigns have REAL Amazon data!`);
   } else {
-    console.log(`❌ WARNING: No metrics were processed successfully.`);
-    console.log(`🚨 This indicates a serious issue with the metrics processing pipeline`);
-  }
-
-  // Log processing summary for debugging
-  if (processingLog.length > 0) {
-    console.log('\n📋 DETAILED PROCESSING LOG:');
-    processingLog.forEach((entry, index) => {
-      console.log(`${index + 1}. ${entry}`);
-    });
+    console.log(`⚠️ Using simulated data for development`);
   }
 
   if (errorCount > 0 && successCount === 0) {
-    console.error('🚨 CRITICAL: No metrics were successfully processed!');
-    throw new Error(`Metrics update failed completely. Processed ${metricsData.length} records with ${errorCount} errors.`);
+    throw new Error(`Metrics update failed. Processed ${metricsData.length} records with ${errorCount} errors.`);
   }
 }
