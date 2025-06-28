@@ -227,16 +227,35 @@ function processWeeklyData(
     clicks: acc.clicks + (record.clicks || 0)
   }), { sales: 0, spend: 0, orders: 0, impressions: 0, clicks: 0 });
 
+  const totalProfit = totals.sales - totals.spend;
+  const averageAcos = totals.sales > 0 ? (totals.spend / totals.sales) * 100 : 0;
+  const averageRoas = totals.spend > 0 ? totals.sales / totals.spend : 0;
+  const clickThroughRate = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
+  const conversionRate = totals.clicks > 0 ? (totals.orders / totals.clicks) * 100 : 0;
+  const averageCpc = totals.clicks > 0 ? totals.spend / totals.clicks : 0;
+
   return {
     totalSales: totals.sales,
     totalSpend: totals.spend,
+    totalProfit,
     totalOrders: totals.orders,
-    totalImpressions: totals.impressions,
+    activeCampaigns: filteredData.length,
+    totalCampaigns: filteredData.length,
+    averageAcos,
+    averageRoas,
     totalClicks: totals.clicks,
-    averageAcos: totals.sales > 0 ? (totals.spend / totals.sales) * 100 : 0,
-    averageRoas: totals.spend > 0 ? totals.sales / totals.spend : 0,
-    clickThroughRate: totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0,
-    conversionRate: totals.clicks > 0 ? (totals.orders / totals.clicks) * 100 : 0
+    totalImpressions: totals.impressions,
+    clickThroughRate,
+    averageCtr: clickThroughRate,
+    averageCpc,
+    conversionRate,
+    salesChange: 0,
+    spendChange: 0,
+    profitChange: 0,
+    ordersChange: 0,
+    averageCostPerUnit: totals.orders > 0 ? totals.spend / totals.orders : 0,
+    hasSimulatedData: false,
+    dataSourceInfo: `Real API data (${filteredData.length} records)`
   };
 }
 
@@ -251,15 +270,34 @@ function calculateAggregatedMetrics(campaigns: any[]): PerformanceMetrics | null
     clicks: acc.clicks + (campaign.clicks || 0)
   }), { sales: 0, spend: 0, orders: 0, impressions: 0, clicks: 0 });
 
+  const totalProfit = totals.sales - totals.spend;
+  const averageAcos = totals.sales > 0 ? (totals.spend / totals.sales) * 100 : 0;
+  const averageRoas = totals.spend > 0 ? totals.sales / totals.spend : 0;
+  const clickThroughRate = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
+  const conversionRate = totals.clicks > 0 ? (totals.orders / totals.clicks) * 100 : 0;
+  const averageCpc = totals.clicks > 0 ? totals.spend / totals.clicks : 0;
+
   return {
     totalSales: totals.sales,
     totalSpend: totals.spend,
+    totalProfit,
     totalOrders: totals.orders,
-    totalImpressions: totals.impressions,
+    activeCampaigns: campaigns.filter(c => c.status === 'enabled').length,
+    totalCampaigns: campaigns.length,
+    averageAcos,
+    averageRoas,
     totalClicks: totals.clicks,
-    averageAcos: totals.sales > 0 ? (totals.spend / totals.sales) * 100 : 0,
-    averageRoas: totals.spend > 0 ? totals.sales / totals.spend : 0,
-    clickThroughRate: totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0,
-    conversionRate: totals.clicks > 0 ? (totals.orders / totals.clicks) * 100 : 0
+    totalImpressions: totals.impressions,
+    clickThroughRate,
+    averageCtr: clickThroughRate,
+    averageCpc,
+    conversionRate,
+    salesChange: 0,
+    spendChange: 0,
+    profitChange: 0,
+    ordersChange: 0,
+    averageCostPerUnit: totals.orders > 0 ? totals.spend / totals.orders : 0,
+    hasSimulatedData: false,
+    dataSourceInfo: `Real campaign data (${campaigns.length} campaigns)`
   };
 }
