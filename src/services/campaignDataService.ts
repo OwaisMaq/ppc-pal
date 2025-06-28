@@ -19,11 +19,7 @@ export interface CampaignData {
   acos?: number;
   roas?: number;
   connection_id: string;
-  previous_month_sales?: number;
-  previous_month_spend?: number;
-  previous_month_orders?: number;
   data_source?: string;
-  metrics_last_calculated?: string;
   last_updated?: string;
 }
 
@@ -45,14 +41,7 @@ export const campaignDataService = {
   async fetchCampaigns(connectionIds: string[], specificConnectionId?: string) {
     let query = supabase
       .from('campaigns')
-      .select(`
-        *,
-        previous_month_sales,
-        previous_month_spend,
-        previous_month_orders,
-        data_source,
-        metrics_last_calculated
-      `)
+      .select('*')
       .in('connection_id', connectionIds);
 
     if (specificConnectionId) {

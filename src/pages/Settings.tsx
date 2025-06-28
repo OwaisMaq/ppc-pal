@@ -1,4 +1,5 @@
 
+import React from 'react';
 import AmazonAccountSetup from "@/components/AmazonAccountSetup";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Settings as SettingsIcon } from "lucide-react";
@@ -19,12 +20,10 @@ const Settings = () => {
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
-          {/* Amazon Integration */}
           <div className="lg:col-span-2">
             <AmazonAccountSetup />
           </div>
 
-          {/* Additional Settings Placeholder */}
           <div>
             <Card>
               <CardHeader>

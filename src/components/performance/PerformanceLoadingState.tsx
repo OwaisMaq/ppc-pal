@@ -17,14 +17,12 @@ const PerformanceLoadingState = ({ getFilteredDescription }: PerformanceLoadingS
         </p>
       </div>
 
-      {/* Filter bar skeleton */}
       <div className="flex gap-4 flex-wrap">
         <Skeleton className="h-10 w-48" />
         <Skeleton className="h-10 w-48" />
         <Skeleton className="h-10 w-48" />
       </div>
 
-      {/* Main metrics cards skeleton */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         {[...Array(5)].map((_, index) => (
           <Card key={index} className="animate-pulse">
@@ -39,7 +37,6 @@ const PerformanceLoadingState = ({ getFilteredDescription }: PerformanceLoadingS
         ))}
       </div>
 
-      {/* Additional metrics skeleton */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {[...Array(4)].map((_, index) => (
           <Card key={index} className="animate-pulse">
@@ -54,7 +51,6 @@ const PerformanceLoadingState = ({ getFilteredDescription }: PerformanceLoadingS
         ))}
       </div>
 
-      {/* Loading message */}
       <div className="text-center py-8">
         <div className="inline-flex items-center gap-2 text-gray-500">
           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-500"></div>
