@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -28,6 +27,7 @@ export interface CampaignData {
   previous_month_orders?: number;
   data_source?: string;
   metrics_last_calculated?: string;
+  last_updated?: string; // Add this property to match what the processor expects
 }
 
 export const useCampaignData = (connectionId?: string) => {
