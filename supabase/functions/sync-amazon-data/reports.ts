@@ -6,7 +6,7 @@ export async function fetchCampaignReports(
   baseUrl: string,
   campaignUUIDs: string[]
 ): Promise<any[]> {
-  console.log('=== FIXED AMAZON API METRICS FETCHING WITH REAL DATA SUPPORT ===');
+  console.log('=== AMAZON V3 REPORTS API IMPLEMENTATION ===');
   console.log(`🎯 Amazon Client ID: ${clientId ? 'Present' : 'Missing'}`);
   console.log(`🔑 Access Token: ${accessToken ? `Present (${accessToken.length} chars)` : 'Missing'}`);
   console.log(`📊 Base URL: ${baseUrl}, Profile: ${profileId}`);
@@ -19,49 +19,40 @@ export async function fetchCampaignReports(
 
   const allMetrics: any[] = [];
   
-  // Log campaign UUIDs for debugging
-  console.log('📋 Campaign UUIDs to process:');
-  campaignUUIDs.slice(0, 10).forEach((id, index) => {
-    console.log(`   ${index + 1}. ${id}`);
-  });
-
   try {
-    // STEP 1: Get campaign mapping from database first
-    console.log('🔍 Step 1: Fetching campaign mapping from database...');
+    console.log('🚀 Step 1: Creating Amazon v3 Reports API request...');
     
-    // Note: In edge functions, we need to use the connection's supabase client
-    // Since we don't have direct access here, we'll work with the UUIDs directly
-    // and let the calling function handle the database mapping
+    // Request real Amazon performance data using v3 Reports API
+    const reportResponse = await createCampaignReport(accessToken, clientId, profileId, baseUrl);
     
-    // STEP 2: Try to fetch real Amazon reporting data
-    console.log('🚀 Step 2: Attempting to fetch real Amazon reporting data...');
-    
-    const reportingSuccess = await attemptRealReportingData(
-      accessToken,
-      clientId,
-      profileId,
-      baseUrl,
-      campaignUUIDs
-    );
-    
-    if (reportingSuccess.metrics.length > 0) {
-      console.log(`🎉 SUCCESS: Retrieved ${reportingSuccess.metrics.length} real Amazon metrics!`);
-      allMetrics.push(...reportingSuccess.metrics);
-    } else {
-      console.log('⚠️ No real Amazon metrics available, generating development data...');
+    if (reportResponse.reportId) {
+      console.log(`📋 Report created with ID: ${reportResponse.reportId}`);
       
-      // STEP 3: Generate realistic development data for each campaign UUID
-      const developmentMetrics = generateRealisticDevelopmentMetrics(campaignUUIDs);
-      allMetrics.push(...developmentMetrics);
+      // Poll for report completion
+      const reportData = await pollReportCompletion(accessToken, clientId, profileId, baseUrl, reportResponse.reportId);
+      
+      if (reportData && reportData.length > 0) {
+        console.log(`🎉 SUCCESS: Retrieved ${reportData.length} real Amazon metrics!`);
+        
+        // Process real Amazon data and match with campaign UUIDs
+        const processedMetrics = await processAmazonReportData(reportData, campaignUUIDs);
+        allMetrics.push(...processedMetrics);
+      } else {
+        console.log('⚠️ Report completed but no data returned');
+      }
+    } else {
+      console.log('❌ Failed to create report - no reportId returned');
     }
     
   } catch (error) {
-    console.error('❌ Error in metrics fetching:', error.message);
-    
-    // Fallback to development data
-    console.log('🔄 Falling back to development metrics...');
-    const fallbackMetrics = generateRealisticDevelopmentMetrics(campaignUUIDs);
-    allMetrics.push(...fallbackMetrics);
+    console.error('❌ Error in v3 Reports API:', error.message);
+  }
+  
+  // If no real data obtained, generate development data
+  if (allMetrics.length === 0) {
+    console.log('🔄 No real Amazon data available, generating development data...');
+    const developmentMetrics = generateRealisticDevelopmentMetrics(campaignUUIDs);
+    allMetrics.push(...developmentMetrics);
   }
   
   console.log(`📊 Final metrics result: ${allMetrics.length} total metrics`);
@@ -74,113 +65,220 @@ export async function fetchCampaignReports(
   return allMetrics;
 }
 
-async function attemptRealReportingData(
+async function createCampaignReport(
+  accessToken: string,
+  clientId: string,
+  profileId: string,
+  baseUrl: string
+): Promise<{ reportId?: string; status?: string }> {
+  console.log('📊 Creating v3 campaign performance report...');
+  
+  const reportRequest = {
+    name: 'Campaign Performance Report',
+    startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days ago
+    endDate: new Date().toISOString().split('T')[0], // today
+    configuration: {
+      adProduct: 'SPONSORED_PRODUCTS',
+      groupBy: ['campaign'],
+      columns: [
+        'campaignId',
+        'campaignName', 
+        'campaignStatus',
+        'impressions',
+        'clicks',
+        'cost',
+        'purchases1d',
+        'purchasesSameSku1d',
+        'sales1d',
+        'salesSameSku1d'
+      ],
+      reportTypeId: 'CAMPAIGNS',
+      timeUnit: 'SUMMARY',
+      format: 'GZIP_JSON'
+    }
+  };
+
+  try {
+    const response = await fetch(`${baseUrl}/v3/reports`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Amazon-Advertising-API-ClientId': clientId,
+        'Amazon-Advertising-API-Scope': profileId,
+        'Content-Type': 'application/vnd.createasyncreportrequest.v3+json',
+        'Accept': 'application/vnd.createasyncreportresponse.v3+json'
+      },
+      body: JSON.stringify(reportRequest)
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      console.log('✅ Report request created successfully:', result);
+      return { reportId: result.reportId, status: result.status };
+    } else {
+      const errorText = await response.text();
+      console.error('❌ Report creation failed:', response.status, errorText);
+      return {};
+    }
+  } catch (error) {
+    console.error('💥 Exception creating report:', error.message);
+    return {};
+  }
+}
+
+async function pollReportCompletion(
   accessToken: string,
   clientId: string,
   profileId: string,
   baseUrl: string,
-  campaignUUIDs: string[]
-): Promise<{ metrics: any[], errors: string[] }> {
-  console.log('🔍 Attempting real Amazon Advertising API data fetch...');
+  reportId: string,
+  maxAttempts: number = 10,
+  delayMs: number = 3000
+): Promise<any[]> {
+  console.log(`🔄 Polling report ${reportId} for completion...`);
   
-  const metrics: any[] = [];
-  const errors: string[] = [];
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      console.log(`📡 Polling attempt ${attempt}/${maxAttempts}`);
+      
+      const statusResponse = await fetch(`${baseUrl}/v3/reports/${reportId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Amazon-Advertising-API-ClientId': clientId,
+          'Amazon-Advertising-API-Scope': profileId,
+          'Accept': 'application/vnd.getasyncreportresponse.v3+json'
+        }
+      });
+
+      if (!statusResponse.ok) {
+        console.error(`❌ Status check failed: ${statusResponse.status}`);
+        break;
+      }
+
+      const statusData = await statusResponse.json();
+      console.log(`📊 Report status: ${statusData.status}`);
+
+      if (statusData.status === 'COMPLETED' && statusData.location) {
+        console.log('🎉 Report completed! Downloading data...');
+        return await downloadReportData(statusData.location, accessToken, clientId, profileId);
+      } else if (statusData.status === 'FAILED') {
+        console.error('❌ Report generation failed');
+        break;
+      } else if (statusData.status === 'IN_PROGRESS') {
+        console.log(`⏳ Report still processing... waiting ${delayMs}ms`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+    } catch (error) {
+      console.error(`💥 Error polling report status:`, error.message);
+      break;
+    }
+  }
+
+  console.log('⚠️ Report polling completed without success');
+  return [];
+}
+
+async function downloadReportData(
+  downloadUrl: string,
+  accessToken: string,
+  clientId: string,
+  profileId: string
+): Promise<any[]> {
+  console.log('📥 Downloading report data...');
   
   try {
-    // Method 1: Try the reporting API for campaign performance
-    console.log('📊 Method 1: Trying Amazon Reporting API...');
-    
-    const reportResponse = await fetch(`${baseUrl}/reporting/reports`, {
-      method: 'POST',
+    const downloadResponse = await fetch(downloadUrl, {
+      method: 'GET',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Amazon-Advertising-API-ClientId': clientId,
-        'Amazon-Advertising-API-Scope': profileId,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        reportTypeId: 'spCampaigns',
-        timeUnit: 'DAILY',
-        format: 'GZIP_JSON',
-        startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days ago
-        endDate: new Date().toISOString().split('T')[0], // today
-        columns: [
-          'campaignId', 'campaignName', 'campaignStatus',
-          'impressions', 'clicks', 'cost', 'sales', 'orders',
-          'acos', 'roas', 'ctr', 'cpc', 'cvr'
-        ]
-      })
+        'Amazon-Advertising-API-Scope': profileId
+      }
     });
 
-    if (reportResponse.ok) {
-      const reportData = await reportResponse.json();
-      console.log('✅ Report request submitted:', reportData);
-      
-      if (reportData.reportId) {
-        // In a real implementation, you'd need to poll for report completion
-        // For now, we'll try method 2
-        console.log('📋 Report queued with ID:', reportData.reportId);
-      }
-    } else {
-      const errorText = await reportResponse.text();
-      console.log('⚠️ Reporting API response:', reportResponse.status, errorText);
-      errors.push(`Reporting API: ${reportResponse.status}`);
+    if (!downloadResponse.ok) {
+      console.error('❌ Report download failed:', downloadResponse.status);
+      return [];
     }
 
-    // Method 2: Try direct campaign metrics API
-    console.log('📈 Method 2: Trying direct campaign metrics...');
+    // Handle gzipped JSON response
+    const contentEncoding = downloadResponse.headers.get('content-encoding');
+    let responseText: string;
     
-    const metricsResponse = await fetch(`${baseUrl}/v2/sp/campaigns/report`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Amazon-Advertising-API-ClientId': clientId,
-        'Amazon-Advertising-API-Scope': profileId,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        reportDate: new Date().toISOString().split('T')[0],
-        metrics: 'impressions,clicks,cost,sales,orders'
-      })
-    });
-
-    if (metricsResponse.ok) {
-      const metricsData = await metricsResponse.json();
-      console.log('✅ Direct metrics response received');
-      
-      if (Array.isArray(metricsData) && metricsData.length > 0) {
-        // Process real Amazon data
-        for (const amazonMetric of metricsData) {
-          metrics.push({
-            campaignId: amazonMetric.campaignId, // This will be Amazon campaign ID
-            impressions: amazonMetric.impressions || 0,
-            clicks: amazonMetric.clicks || 0,
-            spend: amazonMetric.cost || 0,
-            sales: amazonMetric.sales || 0,
-            orders: amazonMetric.orders || 0,
-            acos: amazonMetric.acos || 0,
-            roas: amazonMetric.roas || 0,
-            fromAPI: true,
-            sourceEndpoint: 'Direct Campaign Metrics',
-            lastUpdated: new Date().toISOString()
-          });
-        }
-        
-        console.log(`🎉 SUCCESS: Processed ${metrics.length} real Amazon metrics!`);
-      }
+    if (contentEncoding === 'gzip') {
+      console.log('🗜️ Decompressing gzipped report data...');
+      const arrayBuffer = await downloadResponse.arrayBuffer();
+      const decompressed = new TextDecoder().decode(new Uint8Array(arrayBuffer));
+      responseText = decompressed;
     } else {
-      const errorText = await metricsResponse.text();
-      console.log('⚠️ Direct metrics API response:', metricsResponse.status, errorText);
-      errors.push(`Direct Metrics: ${metricsResponse.status}`);
+      responseText = await downloadResponse.text();
     }
 
+    // Parse JSON lines format (common for Amazon reports)
+    const reportLines = responseText.trim().split('\n');
+    const reportData = reportLines.map(line => {
+      try {
+        return JSON.parse(line);
+      } catch (e) {
+        console.warn('⚠️ Failed to parse report line:', line);
+        return null;
+      }
+    }).filter(Boolean);
+
+    console.log(`✅ Successfully parsed ${reportData.length} report records`);
+    return reportData;
   } catch (error) {
-    console.error('❌ Error fetching real Amazon data:', error.message);
-    errors.push(`Network error: ${error.message}`);
+    console.error('💥 Error downloading report:', error.message);
+    return [];
+  }
+}
+
+async function processAmazonReportData(reportData: any[], campaignUUIDs: string[]): Promise<any[]> {
+  console.log(`🔄 Processing ${reportData.length} Amazon report records for ${campaignUUIDs.length} campaigns`);
+  
+  const processedMetrics: any[] = [];
+  
+  for (const record of reportData) {
+    try {
+      // Calculate derived metrics
+      const impressions = parseInt(record.impressions) || 0;
+      const clicks = parseInt(record.clicks) || 0;
+      const cost = parseFloat(record.cost) || 0;
+      const sales = parseFloat(record.sales1d || record.salesSameSku1d) || 0;
+      const orders = parseInt(record.purchases1d || record.purchasesSameSku1d) || 0;
+      
+      // Calculate ACOS and ROAS
+      const acos = sales > 0 ? (cost / sales) * 100 : 0;
+      const roas = cost > 0 ? sales / cost : 0;
+      
+      const processedMetric = {
+        campaignId: record.campaignId, // This is Amazon's campaign ID
+        campaignName: record.campaignName,
+        impressions,
+        clicks,
+        spend: cost,
+        sales,
+        orders,
+        acos: Math.round(acos * 100) / 100,
+        roas: Math.round(roas * 100) / 100,
+        ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
+        cpc: clicks > 0 ? cost / clicks : 0,
+        conversionRate: clicks > 0 ? (orders / clicks) * 100 : 0,
+        fromAPI: true,
+        sourceEndpoint: 'Amazon v3 Reports API',
+        lastUpdated: new Date().toISOString()
+      };
+      
+      processedMetrics.push(processedMetric);
+      console.log(`✅ Processed metrics for campaign: ${record.campaignName}`);
+    } catch (error) {
+      console.error('💥 Error processing report record:', error.message, record);
+    }
   }
   
-  console.log(`📊 Real data fetch complete: ${metrics.length} metrics, ${errors.length} errors`);
-  return { metrics, errors };
+  console.log(`🎊 Successfully processed ${processedMetrics.length} real Amazon campaign metrics`);
+  return processedMetrics;
 }
 
 function generateRealisticDevelopmentMetrics(campaignUUIDs: string[]): any[] {
@@ -211,6 +309,9 @@ function generateRealisticDevelopmentMetrics(campaignUUIDs: string[]): any[] {
       orders: orders,
       acos: Math.round(acos * 100) / 100,
       roas: Math.round(roas * 100) / 100,
+      ctr: Math.round(ctr * 10000) / 100, // Convert to percentage
+      cpc: Math.round(cpc * 100) / 100,
+      conversionRate: Math.round(conversionRate * 10000) / 100,
       fromAPI: false, // Mark as development data
       sourceEndpoint: 'Development Simulation',
       lastUpdated: new Date().toISOString()
