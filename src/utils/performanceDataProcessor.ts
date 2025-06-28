@@ -1,26 +1,28 @@
 
 import { CampaignData } from '@/hooks/useCampaignData';
 import { PerformanceMetrics } from '@/types/performance';
-import { filterRealDataOnly } from './dataFilter';
 
 interface DataQuality {
   hasRealData: boolean;
   realDataCampaigns: number;
   totalCampaigns: number;
-  simulatedCampaigns: number;
-  dataSourceBreakdown: Record<string, number>;
   apiDataQuality: 'excellent' | 'good' | 'poor' | 'none';
   averageDataAge: string;
   lastRealDataUpdate?: string;
 }
 
 export const processPerformanceData = (campaigns: CampaignData[]) => {
-  console.log('=== STRICT PERFORMANCE DATA PROCESSING - NO SIMULATION DATA ===');
+  console.log('=== PROCESSING REAL API DATA ONLY ===');
   console.log(`Input campaigns: ${campaigns.length}`);
   
-  // STRICT: Only process real API data
-  const realApiCampaigns = filterRealDataOnly(campaigns);
-  console.log(`Real API campaigns after strict filtering: ${realApiCampaigns.length}`);
+  // Filter to only real API campaigns with actual data
+  const realApiCampaigns = campaigns.filter(campaign => {
+    return campaign.data_source === 'api' && 
+           campaign.amazon_campaign_id && 
+           campaign.name;
+  });
+  
+  console.log(`Real API campaigns: ${realApiCampaigns.length}`);
   
   // If no real API campaigns, return null metrics
   if (realApiCampaigns.length === 0) {
@@ -30,12 +32,6 @@ export const processPerformanceData = (campaigns: CampaignData[]) => {
       hasRealData: false,
       realDataCampaigns: 0,
       totalCampaigns: campaigns.length,
-      simulatedCampaigns: campaigns.length,
-      dataSourceBreakdown: campaigns.reduce((acc, c) => {
-        const source = c.data_source || 'unknown';
-        acc[source] = (acc[source] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>),
       apiDataQuality: 'none',
       averageDataAge: '0 hours'
     };
@@ -45,8 +41,7 @@ export const processPerformanceData = (campaigns: CampaignData[]) => {
       dataQuality,
       recommendations: [
         'No real Amazon API data available',
-        'All current data is simulated - please sync your Amazon connection',
-        'Ensure your Amazon account has active campaigns with performance data'
+        'Please sync your Amazon connection to get actual campaign data'
       ]
     };
   }
@@ -101,10 +96,10 @@ export const processPerformanceData = (campaigns: CampaignData[]) => {
     averageCtr: clickThroughRate,
     averageCpc: totals.clicks > 0 ? totals.spend / totals.clicks : 0,
     conversionRate,
-    salesChange: 0, // Would need historical data
-    spendChange: 0, // Would need historical data
-    profitChange: 0, // Would need historical data
-    ordersChange: 0, // Would need historical data
+    salesChange: 0,
+    spendChange: 0,
+    profitChange: 0,
+    ordersChange: 0,
     averageCostPerUnit: totals.orders > 0 ? totals.spend / totals.orders : 0,
     hasSimulatedData: false,
     dataSourceInfo: 'real-api-data'
@@ -114,12 +109,6 @@ export const processPerformanceData = (campaigns: CampaignData[]) => {
     hasRealData: true,
     realDataCampaigns: realApiCampaigns.length,
     totalCampaigns: campaigns.length,
-    simulatedCampaigns: campaigns.length - realApiCampaigns.length,
-    dataSourceBreakdown: campaigns.reduce((acc, c) => {
-      const source = c.data_source || 'unknown';
-      acc[source] = (acc[source] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>),
     apiDataQuality: 'excellent',
     averageDataAge: '0 hours',
     lastRealDataUpdate: realApiCampaigns[0]?.last_updated

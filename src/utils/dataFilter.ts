@@ -1,27 +1,22 @@
 
 import { CampaignData } from '@/hooks/useCampaignData';
 
-// Ultra-strict filter for real data only - absolutely no simulated data allowed
+// Strict filter for real API data only - no simulated data allowed
 export const filterRealDataOnly = (campaigns: CampaignData[]): CampaignData[] => {
   return campaigns.filter(campaign => {
-    // Must be from API source explicitly - reject anything that's not API
+    // Must be from API source explicitly
     const isRealApiSource = campaign.data_source === 'api';
     
-    // Additional safety check - reject any campaign that looks like simulation
+    // Must have Amazon campaign ID and name (basic validation)
+    const hasRequiredFields = campaign.amazon_campaign_id && campaign.name;
+    
+    // Reject any campaign that has simulation markers
     const hasSimulationMarkers = campaign.data_source?.toLowerCase().includes('simulat') ||
                                 campaign.data_source?.toLowerCase().includes('fake') ||
                                 campaign.data_source?.toLowerCase().includes('test') ||
                                 campaign.data_source?.toLowerCase().includes('mock');
     
-    // Must have real performance metrics AND be from API source
-    const hasRealMetrics = (campaign.sales || 0) > 0 || 
-                          (campaign.spend || 0) > 0 || 
-                          (campaign.orders || 0) > 0 ||
-                          (campaign.clicks || 0) > 0 ||
-                          (campaign.impressions || 0) > 0;
-    
-    // STRICT: Only allow if it's explicitly from API and has no simulation markers
-    return isRealApiSource && !hasSimulationMarkers && hasRealMetrics;
+    return isRealApiSource && hasRequiredFields && !hasSimulationMarkers;
   });
 };
 

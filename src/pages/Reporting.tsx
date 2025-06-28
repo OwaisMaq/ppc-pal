@@ -5,10 +5,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { PieChart, Download, RefreshCw } from 'lucide-react';
+import { PieChart, Download, RefreshCw, AlertCircle } from 'lucide-react';
 import { useCampaignData } from '@/hooks/useCampaignData';
 import { useAmazonConnections } from '@/hooks/useAmazonConnections';
 import FilterBar from '@/components/FilterBar';
+import { filterRealDataOnly } from '@/utils/dataFilter';
 
 const Reporting = () => {
   const [selectedCountry, setSelectedCountry] = useState('all');
@@ -25,8 +26,11 @@ const Reporting = () => {
     return new Date(dateString).toLocaleDateString();
   };
 
-  // Filter campaigns based on selections
-  let filteredCampaigns = campaigns;
+  // Filter to only real API campaigns - NO SIMULATED DATA
+  const realApiCampaigns = filterRealDataOnly(campaigns);
+  
+  // Apply additional filters
+  let filteredCampaigns = realApiCampaigns;
   
   if (selectedCountry !== 'all') {
     const countryConnections = connections
@@ -43,11 +47,11 @@ const Reporting = () => {
     );
   }
 
-  console.log('=== REPORTING PAGE DEBUG ===');
-  console.log('Total campaigns:', campaigns.length);
-  console.log('Filtered campaigns:', filteredCampaigns.length);
+  console.log('=== REPORTING PAGE - REAL DATA ONLY ===');
+  console.log('Total campaigns from API:', campaigns.length);
+  console.log('Real API campaigns (filtered):', realApiCampaigns.length);
+  console.log('Final filtered campaigns:', filteredCampaigns.length);
   console.log('Loading:', loading);
-  console.log('Sample campaign data:', campaigns.slice(0, 2));
 
   return (
     <AuthenticatedLayout>
@@ -58,7 +62,7 @@ const Reporting = () => {
             Campaign Data Report
           </h1>
           <p className="text-gray-600">
-            Complete view of all Amazon Ads campaign data pulled from the API
+            Real Amazon Ads campaign data from API - no simulated data included
           </p>
         </div>
 
@@ -74,14 +78,30 @@ const Reporting = () => {
               Refresh Data
             </Button>
             <div className="text-sm text-gray-600">
-              Showing {filteredCampaigns.length} of {campaigns.length} campaigns
+              Showing {filteredCampaigns.length} real API campaigns
             </div>
           </div>
           <Button variant="outline" size="sm">
             <Download className="h-4 w-4 mr-2" />
-            Export All Data
+            Export Real Data
           </Button>
         </div>
+
+        {realApiCampaigns.length === 0 && (
+          <Card className="border-orange-200 bg-orange-50">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <AlertCircle className="h-5 w-5 text-orange-600" />
+                <div>
+                  <h3 className="font-semibold text-orange-800">No Real Campaign Data Available</h3>
+                  <p className="text-sm text-orange-700">
+                    No real Amazon API data found. Please sync your Amazon connection to get actual campaign data.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <FilterBar
           selectedCountry={selectedCountry}
@@ -94,9 +114,9 @@ const Reporting = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>All Campaign Data</CardTitle>
+            <CardTitle>Real Campaign Data Only</CardTitle>
             <CardDescription>
-              Raw data from Amazon Advertising API - all fields and metrics as received
+              Amazon Advertising API data - simulated data excluded, empty fields shown when no data available
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -107,9 +127,9 @@ const Reporting = () => {
               </div>
             ) : filteredCampaigns.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-gray-500">No campaign data available</p>
+                <p className="text-gray-500">No real campaign data available</p>
                 <p className="text-sm text-gray-400 mt-2">
-                  Make sure your Amazon connection is synced and active
+                  Sync your Amazon connection to get actual campaign performance data
                 </p>
               </div>
             ) : (
@@ -141,11 +161,11 @@ const Reporting = () => {
                       <TableRow key={campaign.id}>
                         <TableCell className="font-medium max-w-xs">
                           <div className="truncate" title={campaign.name}>
-                            {campaign.name}
+                            {campaign.name || '-'}
                           </div>
                         </TableCell>
                         <TableCell className="font-mono text-sm">
-                          {campaign.amazon_campaign_id}
+                          {campaign.amazon_campaign_id || '-'}
                         </TableCell>
                         <TableCell>
                           <Badge 
@@ -154,25 +174,25 @@ const Reporting = () => {
                               campaign.status === 'paused' ? 'secondary' : 'destructive'
                             }
                           >
-                            {campaign.status}
+                            {campaign.status || 'unknown'}
                           </Badge>
                         </TableCell>
-                        <TableCell>{campaign.campaign_type || 'N/A'}</TableCell>
-                        <TableCell>{campaign.targeting_type || 'N/A'}</TableCell>
+                        <TableCell>{campaign.campaign_type || '-'}</TableCell>
+                        <TableCell>{campaign.targeting_type || '-'}</TableCell>
                         <TableCell>
-                          {campaign.daily_budget ? formatCurrency(campaign.daily_budget) : 'N/A'}
+                          {campaign.daily_budget ? formatCurrency(campaign.daily_budget) : '-'}
                         </TableCell>
-                        <TableCell>{formatDate(campaign.start_date)}</TableCell>
-                        <TableCell>{formatDate(campaign.end_date) || 'No end date'}</TableCell>
-                        <TableCell>{campaign.impressions.toLocaleString()}</TableCell>
-                        <TableCell>{campaign.clicks.toLocaleString()}</TableCell>
+                        <TableCell>{campaign.start_date ? formatDate(campaign.start_date) : '-'}</TableCell>
+                        <TableCell>{campaign.end_date ? formatDate(campaign.end_date) : '-'}</TableCell>
+                        <TableCell>{campaign.impressions ? campaign.impressions.toLocaleString() : '0'}</TableCell>
+                        <TableCell>{campaign.clicks ? campaign.clicks.toLocaleString() : '0'}</TableCell>
                         <TableCell className="font-semibold">
-                          {formatCurrency(campaign.spend)}
+                          {campaign.spend ? formatCurrency(campaign.spend) : '$0.00'}
                         </TableCell>
                         <TableCell className="font-semibold text-green-600">
-                          {formatCurrency(campaign.sales)}
+                          {campaign.sales ? formatCurrency(campaign.sales) : '$0.00'}
                         </TableCell>
-                        <TableCell>{campaign.orders}</TableCell>
+                        <TableCell>{campaign.orders || '0'}</TableCell>
                         <TableCell className={
                           campaign.acos && campaign.acos < 30 ? 'text-green-600' : 
                           campaign.acos && campaign.acos > 40 ? 'text-red-600' : 'text-yellow-600'
@@ -183,14 +203,14 @@ const Reporting = () => {
                           {campaign.roas ? `${campaign.roas.toFixed(2)}x` : '-'}
                         </TableCell>
                         <TableCell>
-                          <Badge variant={campaign.data_source === 'api' ? 'default' : 'secondary'}>
-                            {campaign.data_source || 'unknown'}
+                          <Badge variant="default">
+                            {campaign.data_source === 'api' ? 'API' : 'Unknown'}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-sm text-gray-500">
                           {campaign.last_updated 
                             ? new Date(campaign.last_updated).toLocaleString()
-                            : 'Never'
+                            : '-'
                           }
                         </TableCell>
                       </TableRow>
@@ -202,7 +222,7 @@ const Reporting = () => {
           </CardContent>
         </Card>
 
-        {/* Summary Statistics */}
+        {/* Summary Statistics - Only for real data */}
         {filteredCampaigns.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card>
@@ -210,7 +230,7 @@ const Reporting = () => {
                 <div className="text-2xl font-bold text-blue-600">
                   {filteredCampaigns.length}
                 </div>
-                <p className="text-sm text-gray-600">Total Campaigns</p>
+                <p className="text-sm text-gray-600">Real API Campaigns</p>
               </CardContent>
             </Card>
             

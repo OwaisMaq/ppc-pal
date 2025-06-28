@@ -21,7 +21,7 @@ export const useTrendsData = (
   const trendsData = React.useMemo(() => {
     if (!campaigns.length) return [];
 
-    // STRICT: Filter to real API data only
+    // Filter to real API data only - NO SIMULATED DATA
     const realCampaigns = filterRealDataOnly(campaigns);
     
     if (!realCampaigns.length) {
@@ -50,7 +50,6 @@ export const useTrendsData = (
     }
 
     if (selectedProduct !== 'all') {
-      // Filter by real ASIN - check if ASIN is in campaign name or campaign ID
       const asinPattern = new RegExp(selectedProduct, 'i');
       filteredCampaigns = filteredCampaigns.filter(campaign => {
         return asinPattern.test(campaign.name) || asinPattern.test(campaign.amazon_campaign_id);
@@ -64,26 +63,34 @@ export const useTrendsData = (
 
     console.log('✅ Generating trends from', filteredCampaigns.length, 'filtered real API campaigns');
 
-    // Generate monthly trend data from real campaigns only
+    // If we have real data, create trend data based on actual metrics
+    // For now, we'll show current period data - in the future this could be enhanced with historical data
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
     
-    return months.map((month, index) => {
-      const monthMultiplier = 0.6 + (index * 0.1); // Growing trend
-      
-      const sales = filteredCampaigns.reduce((sum, c) => 
-        sum + (c.sales || 0) * monthMultiplier, 0
-      );
-      const spend = filteredCampaigns.reduce((sum, c) => 
-        sum + (c.spend || 0) * monthMultiplier, 0
-      );
-      const profit = sales - spend;
+    const totalSales = filteredCampaigns.reduce((sum, c) => sum + (c.sales || 0), 0);
+    const totalSpend = filteredCampaigns.reduce((sum, c) => sum + (c.spend || 0), 0);
+    const totalProfit = totalSales - totalSpend;
 
-      return {
-        name: month,
-        sales: Math.round(sales),
-        spend: Math.round(spend),
-        profit: Math.round(profit)
-      };
+    // For real trend data, we would need historical data from the database
+    // For now, show the current month's data and zeros for previous months
+    return months.map((month, index) => {
+      if (index === months.length - 1) {
+        // Current month - show actual data
+        return {
+          name: month,
+          sales: Math.round(totalSales),
+          spend: Math.round(totalSpend),
+          profit: Math.round(totalProfit)
+        };
+      } else {
+        // Previous months - show zero (would need historical data)
+        return {
+          name: month,
+          sales: 0,
+          spend: 0,
+          profit: 0
+        };
+      }
     });
   }, [campaigns, connections, selectedCountry, selectedCampaign, selectedProduct]);
 
