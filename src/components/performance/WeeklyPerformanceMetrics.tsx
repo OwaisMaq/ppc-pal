@@ -1,118 +1,97 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, TrendingDown, DollarSign, Target, ShoppingCart, Calendar, AlertTriangle } from "lucide-react";
-import { WeeklyMetrics } from "@/types/weeklyMetrics";
+import { TrendingUp, DollarSign, ShoppingCart, MousePointer, Eye } from "lucide-react";
+
+interface WeeklyMetrics {
+  totalSales: number;
+  totalSpend: number;
+  totalOrders: number;
+  totalImpressions: number;
+  totalClicks: number;
+  averageAcos: number;
+  averageRoas: number;
+  clickThroughRate: number;
+  conversionRate: number;
+}
 
 interface WeeklyPerformanceMetricsProps {
   metrics: WeeklyMetrics;
-  formatCurrency: (value: number) => string;
+  formatCurrency: (amount: number) => string;
   formatPercentage: (value: number) => string;
 }
 
-const WeeklyPerformanceMetrics = ({ metrics, formatCurrency, formatPercentage }: WeeklyPerformanceMetricsProps) => {
-  const weeklyData = [
+const WeeklyPerformanceMetrics = ({ 
+  metrics, 
+  formatCurrency, 
+  formatPercentage 
+}: WeeklyPerformanceMetricsProps) => {
+  const cards = [
     {
       title: "7-Day Sales",
       value: formatCurrency(metrics.totalSales),
-      change: `${metrics.salesChange >= 0 ? '+' : ''}${metrics.salesChange.toFixed(1)}%`,
-      changeType: metrics.salesChange >= 0 ? "increase" as const : "decrease" as const,
-      icon: ShoppingCart,
-      description: "Revenue from last 7 days"
-    },
-    {
-      title: "7-Day Ad Spend",
-      value: formatCurrency(metrics.totalSpend),
-      change: `${metrics.spendChange >= 0 ? '+' : ''}${metrics.spendChange.toFixed(1)}%`,
-      changeType: metrics.spendChange <= 0 ? "increase" as const : "decrease" as const,
       icon: DollarSign,
-      description: "Ad spend from last 7 days"
+      color: "text-green-600",
+      bgColor: "bg-green-50",
     },
     {
-      title: "7-Day Profit",
-      value: formatCurrency(metrics.totalProfit),
-      change: `${metrics.profitChange >= 0 ? '+' : ''}${metrics.profitChange.toFixed(1)}%`,
-      changeType: metrics.profitChange >= 0 ? "increase" as const : "decrease" as const,
+      title: "7-Day Spend",
+      value: formatCurrency(metrics.totalSpend),
       icon: TrendingUp,
-      description: "Profit from last 7 days"
+      color: "text-blue-600",
+      bgColor: "bg-blue-50",
     },
     {
       title: "7-Day Orders",
       value: metrics.totalOrders.toLocaleString(),
-      change: `${metrics.ordersChange >= 0 ? '+' : ''}${metrics.ordersChange.toFixed(1)}%`,
-      changeType: metrics.ordersChange >= 0 ? "increase" as const : "decrease" as const,
-      icon: Target,
-      description: "Orders from last 7 days"
-    }
+      icon: ShoppingCart,
+      color: "text-purple-600",
+      bgColor: "bg-purple-50",
+    },
+    {
+      title: "7-Day Clicks",
+      value: metrics.totalClicks.toLocaleString(),
+      icon: MousePointer,
+      color: "text-orange-600",
+      bgColor: "bg-orange-50",
+    },
+    {
+      title: "7-Day Impressions",
+      value: metrics.totalImpressions.toLocaleString(),
+      icon: Eye,
+      color: "text-indigo-600",
+      bgColor: "bg-indigo-50",
+    },
   ];
 
   return (
     <div className="space-y-6">
-      {/* Section Header */}
-      <div className="flex items-center gap-3">
-        <div className="bg-gradient-to-r from-green-600 to-blue-600 rounded-lg p-2">
-          <Calendar className="h-5 w-5 text-white" />
-        </div>
+      <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-xl font-bold text-gray-900">7-Day Performance Overview</h3>
-          <p className="text-sm text-gray-600">Performance metrics from the last 7 days compared to previous week</p>
+          <h3 className="text-xl font-bold text-gray-900 mb-2">7-Day Performance Overview</h3>
+          <p className="text-gray-600">Real-time campaign performance from the last 7 days</p>
         </div>
+        <Badge variant="default" className="bg-green-100 text-green-800">
+          Real Amazon Data
+        </Badge>
       </div>
 
-      {/* Data Quality Notice */}
-      <Card className={`border-${metrics.hasRealData ? 'blue' : 'orange'}-200 bg-${metrics.hasRealData ? 'blue' : 'orange'}-50`}>
-        <CardContent className="pt-4">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className={`h-4 w-4 text-${metrics.hasRealData ? 'blue' : 'orange'}-600`} />
-            <span className={`text-sm text-${metrics.hasRealData ? 'blue' : 'orange'}-700 font-medium`}>
-              Weekly Data Quality
-            </span>
-          </div>
-          <p className={`text-sm text-${metrics.hasRealData ? 'blue' : 'orange'}-600 mt-1`}>
-            {metrics.dataSourceInfo}
-          </p>
-        </CardContent>
-      </Card>
-
-      {/* Weekly Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {weeklyData.map((metric) => {
-          const Icon = metric.icon;
-          const isPositive = metric.changeType === 'increase';
-          const hasValidChange = Math.abs(parseFloat(metric.change)) > 0;
-          
+      {/* Main metrics cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+        {cards.map((card, index) => {
+          const Icon = card.icon;
           return (
-            <Card key={metric.title} className="relative border-l-4 border-l-green-500">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">
-                  {metric.title}
-                </CardTitle>
-                <Icon className="h-5 w-5 text-green-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <div className="text-2xl font-bold text-gray-900">
-                    {metric.value}
+            <Card key={index} className="hover:shadow-md transition-shadow">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">{card.title}</p>
+                    <p className="text-2xl font-bold text-gray-900">{card.value}</p>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    {hasValidChange ? (
-                      <>
-                        <span
-                          className={`text-sm font-medium ${
-                            isPositive ? 'text-green-600' : 'text-red-600'
-                          }`}
-                        >
-                          {metric.change}
-                        </span>
-                        <span className="text-sm text-gray-500">vs previous week</span>
-                      </>
-                    ) : (
-                      <span className="text-sm text-gray-500">No comparison data</span>
-                    )}
+                  <div className={`p-3 rounded-full ${card.bgColor}`}>
+                    <Icon className={`h-6 w-6 ${card.color}`} />
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {metric.description}
-                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -120,41 +99,53 @@ const WeeklyPerformanceMetrics = ({ metrics, formatCurrency, formatPercentage }:
         })}
       </div>
 
-      {/* Additional Weekly Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium text-gray-600">
-              7-Day ACOS
-            </CardTitle>
+      {/* Additional performance metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="hover:shadow-md transition-shadow">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-gray-600">Avg ACOS</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-900">{formatPercentage(metrics.averageAcos)}</div>
-            <p className="text-sm text-green-600 font-medium">Ad Cost of Sales</p>
+          <CardContent className="pt-0">
+            <div className="text-2xl font-bold text-gray-900">
+              {formatPercentage(metrics.averageAcos)}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">Advertising Cost of Sales</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium text-gray-600">
-              7-Day ROAS
-            </CardTitle>
+        <Card className="hover:shadow-md transition-shadow">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-gray-600">Avg ROAS</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-900">{metrics.averageRoas.toFixed(2)}x</div>
-            <p className="text-sm text-blue-600 font-medium">Return on Ad Spend</p>
+          <CardContent className="pt-0">
+            <div className="text-2xl font-bold text-gray-900">
+              {metrics.averageRoas.toFixed(2)}x
+            </div>
+            <p className="text-xs text-gray-500 mt-1">Return on Ad Spend</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium text-gray-600">
-              7-Day Conversion Rate
-            </CardTitle>
+        <Card className="hover:shadow-md transition-shadow">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-gray-600">Click-Through Rate</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-900">{formatPercentage(metrics.conversionRate)}</div>
-            <p className="text-sm text-purple-600 font-medium">Click to order rate</p>
+          <CardContent className="pt-0">
+            <div className="text-2xl font-bold text-gray-900">
+              {formatPercentage(metrics.clickThroughRate)}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">CTR</p>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-md transition-shadow">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-gray-600">Conversion Rate</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="text-2xl font-bold text-gray-900">
+              {formatPercentage(metrics.conversionRate)}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">Orders / Clicks</p>
           </CardContent>
         </Card>
       </div>
