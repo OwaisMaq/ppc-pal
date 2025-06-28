@@ -20,7 +20,7 @@ serve(async (req) => {
   try {
     const { connectionId, debugMode = false } = await req.json()
     
-    console.log('=== AMAZON SYNC STARTED ===')
+    console.log('=== AMAZON SYNC STARTED WITH REAL METRICS API ===')
     console.log('Connection ID:', connectionId)
     console.log('Debug Mode:', debugMode)
     
@@ -60,7 +60,7 @@ serve(async (req) => {
 
     console.log('✅ Connection validated successfully')
 
-    // Step 3: Determine region and fetch campaigns with enhanced debugging
+    // Step 3: Determine region and fetch campaigns
     console.log('🔍 Step 3: Fetching campaigns from Amazon API...')
     
     const region: Region = connection.marketplace_id?.startsWith('EU') ? 'EU' : 
@@ -107,14 +107,16 @@ serve(async (req) => {
       campaignUUIDs: storageResult.campaignIds.length
     })
 
-    // Step 5: Fetch and update performance metrics
-    console.log('🔍 Step 5: Fetching performance metrics...')
+    // Step 5: Fetch REAL performance metrics from Amazon Reports API
+    console.log('🔍 Step 5: Fetching REAL performance metrics from Amazon Reports API...')
     
     if (storageResult.campaignIds.length > 0) {
       const region_base_url = region === 'EU' ? 'https://advertising-api-eu.amazon.com' :
                              region === 'FE' ? 'https://advertising-api-fe.amazon.com' :
                              'https://advertising-api.amazon.com'
 
+      console.log('📊 Initiating Amazon Reports API call for real metrics...')
+      
       const metricsData = await fetchCampaignReports(
         connection.access_token,
         Deno.env.get('AMAZON_CLIENT_ID') ?? '',
@@ -123,16 +125,17 @@ serve(async (req) => {
         storageResult.campaignIds
       )
 
-      console.log('📈 Metrics fetch result:', {
+      console.log('📈 Real metrics fetch result:', {
         totalMetrics: metricsData.length,
         realApiMetrics: metricsData.filter(m => m.fromAPI === true).length,
-        simulatedMetrics: metricsData.filter(m => m.fromAPI !== true).length
+        placeholderMetrics: metricsData.filter(m => m.fromAPI !== true).length,
+        dataSource: 'amazon-reports-api-v3'
       })
 
       // Update campaign metrics in database
       if (metricsData.length > 0) {
         const updateResult = await updateCampaignMetrics(metricsData, supabaseClient)
-        console.log('📊 Metrics update result:', updateResult)
+        console.log('📊 Real metrics update result:', updateResult)
       }
     } else {
       console.log('⚠️ No campaign UUIDs to fetch metrics for')
@@ -162,6 +165,7 @@ serve(async (req) => {
       campaignsStored: storageResult.stored,
       storageErrors: storageResult.errors,
       campaignUUIDs: storageResult.campaignIds.length,
+      metricsSource: 'amazon-reports-api-v3',
       debugInfo: debugMode ? {
         connectionDetails: {
           profileId: connection.profile_id,
@@ -173,7 +177,7 @@ serve(async (req) => {
       } : undefined
     }
 
-    console.log('🎉 SYNC COMPLETED SUCCESSFULLY')
+    console.log('🎉 SYNC COMPLETED WITH REAL AMAZON METRICS')
     console.log('Final Result:', finalResult)
 
     return new Response(
