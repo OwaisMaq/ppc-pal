@@ -95,7 +95,7 @@ export const processPerformanceData = (campaigns: CampaignData[]): ProcessingRes
   const averageRoas = totalSpend > 0 ? totalSales / totalSpend : 0;
   const averageCpc = totalClicks > 0 ? totalSpend / totalClicks : 0;
   const conversionRate = totalClicks > 0 ? (totalOrders / totalClicks) * 100 : 0;
-  const ctr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
+  const averageCtr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
 
   // Count active campaigns (enabled status)
   const activeCampaigns = campaignsWithMetrics.filter(c => c.status === 'enabled').length;
@@ -111,11 +111,19 @@ export const processPerformanceData = (campaigns: CampaignData[]): ProcessingRes
     totalClicks,
     totalImpressions,
     activeCampaigns,
+    totalCampaigns: campaignsWithMetrics.length,
     averageAcos,
     averageRoas,
     averageCpc,
+    averageCtr,
     conversionRate,
-    ctr
+    salesChange: 0,
+    spendChange: 0,
+    profitChange: 0,
+    ordersChange: 0,
+    averageCostPerUnit: totalOrders > 0 ? totalSpend / totalOrders : 0,
+    hasSimulatedData: dataQuality.simulatedCampaigns > 0,
+    dataSourceInfo: `${dataQuality.realDataCampaigns} real, ${dataQuality.simulatedCampaigns} simulated`
   };
 
   console.log('✅ ENHANCED METRICS CALCULATED:', {
