@@ -49,9 +49,24 @@ serve(async (req) => {
       status: connection.status
     })
 
-    // Step 2: Validate connection credentials
+    // Step 2: Validate connection credentials with detailed error handling
     console.log('🔍 Step 2: Validating connection...')
-    const validationResult = await validateConnection(connection)
+    console.log('🔒 Checking access token and profile ID validation...')
+    
+    let validationResult;
+    try {
+      validationResult = await validateConnection(connection)
+      console.log('✅ Validation function completed, result:', validationResult)
+    } catch (validationError) {
+      console.error('❌ Validation function threw error:', validationError)
+      throw new Error(`Validation failed: ${validationError.message}`)
+    }
+    
+    // FIXED: Check if validationResult exists and has isValid property
+    if (!validationResult || validationResult.isValid === undefined) {
+      console.error('❌ Validation result is malformed:', validationResult)
+      throw new Error('Validation function returned invalid result')
+    }
     
     if (!validationResult.isValid) {
       console.error('❌ Connection validation failed:', validationResult.error)
@@ -68,12 +83,19 @@ serve(async (req) => {
     
     console.log(`📍 Using region: ${region} for marketplace: ${connection.marketplace_id}`)
     
-    const campaignResult = await fetchCampaignsFromRegion(
-      connection.access_token,
-      Deno.env.get('AMAZON_CLIENT_ID') ?? '',
-      connection.profile_id,
-      region
-    )
+    let campaignResult;
+    try {
+      campaignResult = await fetchCampaignsFromRegion(
+        connection.access_token,
+        Deno.env.get('AMAZON_CLIENT_ID') ?? '',
+        connection.profile_id,
+        region
+      )
+      console.log('✅ Campaign fetch successful')
+    } catch (campaignError) {
+      console.error('❌ Campaign fetch failed:', campaignError)
+      throw new Error(`Failed to fetch campaigns: ${campaignError.message}`)
+    }
 
     console.log('📊 Campaign fetch result:', {
       region: campaignResult.region,
@@ -95,11 +117,18 @@ serve(async (req) => {
     // Step 4: Store campaigns in database
     console.log('🔍 Step 4: Storing campaigns in database...')
     
-    const storageResult = await storeCampaigns(
-      campaignResult.campaigns,
-      connectionId,
-      supabaseClient
-    )
+    let storageResult;
+    try {
+      storageResult = await storeCampaigns(
+        campaignResult.campaigns,
+        connectionId,
+        supabaseClient
+      )
+      console.log('✅ Campaign storage successful')
+    } catch (storageError) {
+      console.error('❌ Campaign storage failed:', storageError)
+      throw new Error(`Failed to store campaigns: ${storageError.message}`)
+    }
 
     console.log('💾 Storage result:', {
       stored: storageResult.stored,
@@ -116,14 +145,30 @@ serve(async (req) => {
                              'https://advertising-api.amazon.com'
 
       console.log('📊 Initiating Amazon Reports API call for real metrics...')
+      console.log('🔒 API Headers will include:')
+      console.log(`   - Authorization: Bearer ${connection.access_token.substring(0, 20)}...`)
+      console.log(`   - Amazon-Advertising-API-Scope: ${connection.profile_id}`)
+      console.log(`   - Base URL: ${region_base_url}`)
       
-      const metricsData = await fetchCampaignReports(
-        connection.access_token,
-        Deno.env.get('AMAZON_CLIENT_ID') ?? '',
-        connection.profile_id,
-        region_base_url,
-        storageResult.campaignIds
-      )
+      let metricsData;
+      try {
+        metricsData = await fetchCampaignReports(
+          connection.access_token,
+          Deno.env.get('AMAZON_CLIENT_ID') ?? '',
+          connection.profile_id,
+          region_base_url,
+          storageResult.campaignIds
+        )
+        console.log('✅ Metrics fetch successful')
+      } catch (metricsError) {
+        console.error('❌ Metrics fetch failed:', metricsError)
+        console.error('❌ Full error details:', {
+          message: metricsError.message,
+          stack: metricsError.stack,
+          cause: metricsError.cause
+        })
+        throw new Error(`Failed to fetch metrics: ${metricsError.message}`)
+      }
 
       console.log('📈 Real metrics fetch result:', {
         totalMetrics: metricsData.length,
@@ -134,8 +179,14 @@ serve(async (req) => {
 
       // Update campaign metrics in database
       if (metricsData.length > 0) {
-        const updateResult = await updateCampaignMetrics(metricsData, supabaseClient)
-        console.log('📊 Real metrics update result:', updateResult)
+        try {
+          const updateResult = await updateCampaignMetrics(metricsData, supabaseClient)
+          console.log('📊 Real metrics update result:', updateResult)
+        } catch (updateError) {
+          console.error('❌ Metrics update failed:', updateError)
+          // Don't throw here, as we still want to return success for campaign sync
+          console.warn('⚠️ Continuing despite metrics update failure')
+        }
       }
     } else {
       console.log('⚠️ No campaign UUIDs to fetch metrics for')
@@ -190,11 +241,17 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('💥 SYNC FAILED:', error)
+    console.error('💥 Error stack trace:', error.stack)
+    console.error('💥 Error cause:', error.cause)
     
     const errorResult = {
       success: false,
       error: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      debugInfo: {
+        errorType: error.constructor.name,
+        errorStack: error.stack?.substring(0, 500), // Truncate for readability
+      }
     }
 
     return new Response(
