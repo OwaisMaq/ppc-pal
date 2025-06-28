@@ -1,3 +1,4 @@
+
 export async function fetchCampaignReports(
   accessToken: string,
   clientId: string,
@@ -5,7 +6,7 @@ export async function fetchCampaignReports(
   baseUrl: string,
   campaignUUIDs: string[]
 ): Promise<any[]> {
-  console.log('=== OPTIMIZED AMAZON V3 REPORTS API IMPLEMENTATION ===');
+  console.log('=== PPC PAL INTEGRATION - AMAZON REPORTING API ===');
   console.log(`🎯 Amazon Client ID: ${clientId ? 'Present' : 'Missing'}`);
   console.log(`🔑 Access Token: ${accessToken ? `Present (${accessToken.length} chars)` : 'Missing'}`);
   console.log(`📊 Base URL: ${baseUrl}, Profile: ${profileId}`);
@@ -19,72 +20,72 @@ export async function fetchCampaignReports(
   const allMetrics: any[] = [];
   
   try {
-    console.log('🚀 Step 1: Creating optimized Amazon v3 Reports API request...');
+    console.log('🚀 Step 1: Creating Amazon Sponsored Products Reports API request...');
     
-    // Request real Amazon performance data using optimized v3 Reports API
-    const reportResponse = await createOptimizedCampaignReport(accessToken, clientId, profileId, baseUrl);
+    // Create campaign performance report using the correct Amazon API pattern
+    const reportResponse = await createCampaignPerformanceReport(accessToken, clientId, profileId, baseUrl);
     
     if (reportResponse.reportId) {
       console.log(`📋 Report created with ID: ${reportResponse.reportId}`);
       
-      // Poll for report completion with exponential backoff
-      const reportData = await pollReportCompletionOptimized(accessToken, clientId, profileId, baseUrl, reportResponse.reportId);
+      // Poll for report completion with proper timing
+      const reportData = await pollReportCompletion(accessToken, clientId, profileId, baseUrl, reportResponse.reportId);
       
       if (reportData && reportData.length > 0) {
-        console.log(`🎉 SUCCESS: Retrieved ${reportData.length} real Amazon metrics!`);
+        console.log(`🎉 SUCCESS: Retrieved ${reportData.length} campaign performance records!`);
         
-        // Process real Amazon data with enhanced mapping
-        const processedMetrics = await processAmazonReportDataOptimized(reportData, campaignUUIDs);
+        // Process Amazon report data for PPC Pal integration
+        const processedMetrics = await processAmazonReportData(reportData, campaignUUIDs);
         allMetrics.push(...processedMetrics);
       } else {
-        console.log('⚠️ Report completed but no data returned');
+        console.log('⚠️ Report completed but no performance data returned');
       }
     } else {
-      console.log('❌ Failed to create report - no reportId returned');
+      console.log('❌ Failed to create performance report - no reportId returned');
     }
     
   } catch (error) {
-    console.error('❌ Error in optimized v3 Reports API:', error.message);
+    console.error('❌ Error in Amazon Reports API:', error.message);
     
-    // Enhanced error handling with specific error types
+    // Enhanced error handling for PPC Pal integration
     if (error.message.includes('429')) {
-      console.log('🔄 Rate limit detected, implementing backoff strategy');
+      console.log('🔄 Rate limit detected - Amazon API throttling active');
     } else if (error.message.includes('401')) {
-      console.log('🔑 Authentication issue detected');
+      console.log('🔑 Authentication issue - check access token validity');
     } else if (error.message.includes('403')) {
-      console.log('🚫 Authorization issue detected');
+      console.log('🚫 Authorization issue - verify advertiser_campaign_view scope');
     }
   }
   
-  // If no real data obtained, generate development data
+  // If no real performance data obtained, generate development data for testing
   if (allMetrics.length === 0) {
-    console.log('🔄 No real Amazon data available, generating development data...');
-    const developmentMetrics = generateRealisticDevelopmentMetrics(campaignUUIDs);
+    console.log('🔄 No real Amazon performance data available, generating development data...');
+    const developmentMetrics = generateRealisticPerformanceData(campaignUUIDs);
     allMetrics.push(...developmentMetrics);
   }
   
-  console.log(`📊 Final metrics result: ${allMetrics.length} total metrics`);
+  console.log(`📊 Final PPC Pal metrics result: ${allMetrics.length} total records`);
   const realDataCount = allMetrics.filter(m => m.fromAPI === true).length;
   const simulatedCount = allMetrics.filter(m => m.fromAPI !== true).length;
   
-  console.log(`   🎯 Real Amazon data: ${realDataCount}`);
-  console.log(`   🎭 Development data: ${simulatedCount}`);
+  console.log(`   🎯 Real Amazon performance data: ${realDataCount}`);
+  console.log(`   🎭 Development simulation data: ${simulatedCount}`);
   
   return allMetrics;
 }
 
-async function createOptimizedCampaignReport(
+async function createCampaignPerformanceReport(
   accessToken: string,
   clientId: string,
   profileId: string,
   baseUrl: string
 ): Promise<{ reportId?: string; status?: string }> {
-  console.log('📊 Creating optimized v3 campaign performance report...');
+  console.log('📊 Creating Amazon Sponsored Products performance report...');
   
-  // Optimized report request structure aligned with Amazon API spec
+  // Amazon Reporting API v3 request structure for campaign performance
   const reportRequest = {
-    name: 'Campaign Performance Report - Optimized',
-    startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    name: 'PPC Pal Campaign Performance Report',
+    startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Last 30 days
     endDate: new Date().toISOString().split('T')[0],
     configuration: {
       adProduct: 'SPONSORED_PRODUCTS',
@@ -98,18 +99,18 @@ async function createOptimizedCampaignReport(
         'impressions',
         'clicks',
         'cost',
-        'attributedConversions1d',
-        'attributedConversions7d',
-        'attributedConversions14d',
-        'attributedConversions30d',
-        'attributedSales1d',
-        'attributedSales7d',
-        'attributedSales14d',
-        'attributedSales30d',
-        'attributedUnitsOrdered1d',
-        'attributedUnitsOrdered7d',
-        'attributedUnitsOrdered14d',
-        'attributedUnitsOrdered30d'
+        'sales1d',
+        'sales7d',
+        'sales14d',
+        'sales30d',
+        'orders1d',
+        'orders7d', 
+        'orders14d',
+        'orders30d',
+        'conversions1d',
+        'conversions7d',
+        'conversions14d',
+        'conversions30d'
       ],
       reportTypeId: 'spCampaigns',
       timeUnit: 'SUMMARY',
@@ -118,6 +119,7 @@ async function createOptimizedCampaignReport(
   };
 
   try {
+    // Use the correct Amazon Reporting API v3 endpoint
     const response = await fetch(`${baseUrl}/reporting/reports`, {
       method: 'POST',
       headers: {
@@ -130,40 +132,39 @@ async function createOptimizedCampaignReport(
       body: JSON.stringify(reportRequest)
     });
 
-    // Enhanced response handling
     if (response.ok) {
       const result = await response.json();
-      console.log('✅ Optimized report request created successfully:', result);
+      console.log('✅ Campaign performance report request created successfully:', result);
       return { reportId: result.reportId, status: result.status };
     } else {
       const errorText = await response.text();
-      console.error(`❌ Optimized report creation failed: ${response.status} - ${errorText}`);
+      console.error(`❌ Performance report creation failed: ${response.status} - ${errorText}`);
       
-      // Try fallback endpoint if primary fails
+      // Try fallback to v2 endpoint for backward compatibility
       if (response.status === 404) {
-        console.log('🔄 Trying fallback endpoint...');
-        return await createFallbackReport(accessToken, clientId, profileId, baseUrl);
+        console.log('🔄 Trying v2 fallback endpoint...');
+        return await createV2CampaignReport(accessToken, clientId, profileId, baseUrl);
       }
       
       return {};
     }
   } catch (error) {
-    console.error('💥 Exception creating optimized report:', error.message);
+    console.error('💥 Exception creating performance report:', error.message);
     return {};
   }
 }
 
-async function createFallbackReport(
+async function createV2CampaignReport(
   accessToken: string,
   clientId: string,
   profileId: string,
   baseUrl: string
 ): Promise<{ reportId?: string; status?: string }> {
-  console.log('🔄 Creating fallback report using v2 endpoint...');
+  console.log('🔄 Creating v2 campaign performance report...');
   
-  const fallbackRequest = {
+  const v2ReportRequest = {
     reportDate: new Date().toISOString().split('T')[0],
-    metrics: 'impressions,clicks,cost,attributedSales1d,attributedConversions1d'
+    metrics: 'impressions,clicks,cost,sales1d,sales7d,sales14d,sales30d,orders1d,orders7d,orders14d,orders30d'
   };
 
   try {
@@ -175,39 +176,40 @@ async function createFallbackReport(
         'Amazon-Advertising-API-Scope': profileId,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(fallbackRequest)
+      body: JSON.stringify(v2ReportRequest)
     });
 
     if (response.ok) {
       const result = await response.json();
-      console.log('✅ Fallback report created successfully');
+      console.log('✅ V2 performance report created successfully');
       return { reportId: result.reportId, status: result.status };
     }
     
     return {};
   } catch (error) {
-    console.error('💥 Fallback report creation failed:', error.message);
+    console.error('💥 V2 performance report creation failed:', error.message);
     return {};
   }
 }
 
-async function pollReportCompletionOptimized(
+async function pollReportCompletion(
   accessToken: string,
   clientId: string,
   profileId: string,
   baseUrl: string,
   reportId: string,
-  maxAttempts: number = 15,
-  initialDelayMs: number = 2000
+  maxAttempts: number = 20,
+  initialDelayMs: number = 3000
 ): Promise<any[]> {
-  console.log(`🔄 Polling report ${reportId} with optimized strategy...`);
+  console.log(`🔄 Polling Amazon report ${reportId} for completion...`);
   
   let delayMs = initialDelayMs;
   
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      console.log(`📡 Optimized polling attempt ${attempt}/${maxAttempts} (delay: ${delayMs}ms)`);
+      console.log(`📡 Polling attempt ${attempt}/${maxAttempts} (delay: ${delayMs}ms)`);
       
+      // Check report status using v3 API
       const statusResponse = await fetch(`${baseUrl}/reporting/reports/${reportId}`, {
         method: 'GET',
         headers: {
@@ -221,34 +223,33 @@ async function pollReportCompletionOptimized(
       if (!statusResponse.ok) {
         console.error(`❌ Status check failed: ${statusResponse.status}`);
         
-        // If report endpoint fails, try fallback
+        // Try v2 fallback if v3 fails
         if (statusResponse.status === 404) {
-          console.log('🔄 Trying fallback status endpoint...');
-          return await pollFallbackReport(accessToken, clientId, profileId, baseUrl, reportId, attempt, maxAttempts);
+          console.log('🔄 Trying v2 status endpoint...');
+          return await pollV2ReportCompletion(accessToken, clientId, profileId, baseUrl, reportId, attempt, maxAttempts);
         }
         break;
       }
 
       const statusData = await statusResponse.json();
-      console.log(`📊 Report status: ${statusData.status} (${statusData.statusDetails || 'No details'})`);
+      console.log(`📊 Report status: ${statusData.status} (${statusData.statusDetails || 'Processing...'})`);
 
       if (statusData.status === 'SUCCESS' && statusData.location) {
-        console.log('🎉 Report completed! Downloading optimized data...');
-        return await downloadOptimizedReportData(statusData.location, accessToken, clientId, profileId);
+        console.log('🎉 Performance report completed! Downloading data...');
+        return await downloadReportData(statusData.location, accessToken, clientId, profileId);
       } else if (statusData.status === 'FAILURE') {
         console.error(`❌ Report generation failed: ${statusData.statusDetails || 'Unknown error'}`);
         break;
       } else if (statusData.status === 'IN_PROGRESS') {
-        console.log(`⏳ Report processing... waiting ${delayMs}ms (exponential backoff)`);
+        console.log(`⏳ Report still processing... waiting ${delayMs}ms`);
         await new Promise(resolve => setTimeout(resolve, delayMs));
         
-        // Exponential backoff with jitter
-        delayMs = Math.min(delayMs * 1.5 + Math.random() * 1000, 30000);
+        // Exponential backoff with cap at 30 seconds
+        delayMs = Math.min(delayMs * 1.2, 30000);
       }
     } catch (error) {
-      console.error(`💥 Error in optimized polling attempt ${attempt}:`, error.message);
+      console.error(`💥 Error in polling attempt ${attempt}:`, error.message);
       
-      // Exponential backoff on errors too
       if (attempt < maxAttempts) {
         await new Promise(resolve => setTimeout(resolve, delayMs));
         delayMs = Math.min(delayMs * 2, 30000);
@@ -256,11 +257,11 @@ async function pollReportCompletionOptimized(
     }
   }
 
-  console.log('⚠️ Optimized report polling completed without success');
+  console.log('⚠️ Report polling completed without success');
   return [];
 }
 
-async function pollFallbackReport(
+async function pollV2ReportCompletion(
   accessToken: string,
   clientId: string,
   profileId: string,
@@ -269,7 +270,7 @@ async function pollFallbackReport(
   currentAttempt: number,
   maxAttempts: number
 ): Promise<any[]> {
-  console.log('🔄 Using fallback polling strategy...');
+  console.log('🔄 Using v2 polling strategy...');
   
   for (let attempt = currentAttempt; attempt <= maxAttempts; attempt++) {
     try {
@@ -285,26 +286,26 @@ async function pollFallbackReport(
       if (response.ok) {
         const data = await response.json();
         if (data.status === 'SUCCESS' && data.location) {
-          return await downloadOptimizedReportData(data.location, accessToken, clientId, profileId);
+          return await downloadReportData(data.location, accessToken, clientId, profileId);
         }
       }
       
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      await new Promise(resolve => setTimeout(resolve, 5000));
     } catch (error) {
-      console.error(`Fallback polling error:`, error.message);
+      console.error(`V2 polling error:`, error.message);
     }
   }
   
   return [];
 }
 
-async function downloadOptimizedReportData(
+async function downloadReportData(
   downloadUrl: string,
   accessToken: string,
   clientId: string,
   profileId: string
 ): Promise<any[]> {
-  console.log('📥 Downloading optimized report data...');
+  console.log('📥 Downloading Amazon performance report data...');
   
   try {
     const downloadResponse = await fetch(downloadUrl, {
@@ -322,19 +323,19 @@ async function downloadOptimizedReportData(
       return [];
     }
 
-    // Enhanced content handling
+    // Handle different content types and encodings
     const contentType = downloadResponse.headers.get('content-type') || '';
     let responseText: string;
     
     if (contentType.includes('application/json')) {
       responseText = await downloadResponse.text();
     } else {
-      // Handle different content types
+      // Handle compressed or binary content
       const arrayBuffer = await downloadResponse.arrayBuffer();
       responseText = new TextDecoder().decode(arrayBuffer);
     }
 
-    // Parse JSON lines format with better error handling
+    // Parse JSON lines format (Amazon reports are typically JSONL)
     const reportLines = responseText.trim().split('\n').filter(line => line.trim());
     const reportData = [];
     
@@ -347,50 +348,52 @@ async function downloadOptimizedReportData(
       }
     }
 
-    console.log(`✅ Successfully parsed ${reportData.length} optimized report records`);
+    console.log(`✅ Successfully parsed ${reportData.length} performance records from Amazon`);
     return reportData;
   } catch (error) {
-    console.error('💥 Error downloading optimized report:', error.message);
+    console.error('💥 Error downloading report:', error.message);
     return [];
   }
 }
 
-async function processAmazonReportDataOptimized(reportData: any[], campaignUUIDs: string[]): Promise<any[]> {
-  console.log(`🔄 Processing ${reportData.length} Amazon report records with optimized mapping for ${campaignUUIDs.length} campaigns`);
+async function processAmazonReportData(reportData: any[], campaignUUIDs: string[]): Promise<any[]> {
+  console.log(`🔄 Processing ${reportData.length} Amazon performance records for PPC Pal integration`);
   
   const processedMetrics: any[] = [];
   
   for (const record of reportData) {
     try {
-      // Enhanced field mapping based on Amazon API specification
-      const impressions = Math.max(0, parseInt(record.impressions || record.impr || '0'));
-      const clicks = Math.max(0, parseInt(record.clicks || record.click || '0'));
-      const cost = Math.max(0, parseFloat(record.cost || record.spend || '0'));
+      // Map Amazon API fields to PPC Pal expected format
+      const impressions = Math.max(0, parseInt(record.impressions || '0'));
+      const clicks = Math.max(0, parseInt(record.clicks || '0'));
+      const cost = Math.max(0, parseFloat(record.cost || '0'));
       
-      // Use 30-day attribution as primary, fallback to shorter windows
+      // Use 30-day attribution as primary, with fallbacks for shorter windows
       const sales = Math.max(0, parseFloat(
-        record.attributedSales30d || 
-        record.attributedSales14d || 
-        record.attributedSales7d || 
-        record.attributedSales1d || 
-        record.sales || 
+        record.sales30d || 
+        record.sales14d || 
+        record.sales7d || 
+        record.sales1d || 
+        record.attributedSales30d ||
+        record.attributedSales14d ||
+        record.attributedSales7d ||
+        record.attributedSales1d ||
         '0'
       ));
       
       const orders = Math.max(0, parseInt(
-        record.attributedConversions30d || 
-        record.attributedConversions14d || 
-        record.attributedConversions7d || 
-        record.attributedConversions1d || 
-        record.attributedUnitsOrdered30d ||
-        record.attributedUnitsOrdered14d ||
-        record.attributedUnitsOrdered7d ||
-        record.attributedUnitsOrdered1d ||
-        record.orders || 
+        record.orders30d || 
+        record.orders14d || 
+        record.orders7d || 
+        record.orders1d ||
+        record.conversions30d ||
+        record.conversions14d ||
+        record.conversions7d ||
+        record.conversions1d ||
         '0'
       ));
       
-      // Enhanced metric calculations
+      // Calculate key PPC metrics
       const acos = sales > 0 ? Math.round((cost / sales) * 10000) / 100 : 0;
       const roas = cost > 0 ? Math.round((sales / cost) * 100) / 100 : 0;
       const ctr = impressions > 0 ? Math.round((clicks / impressions) * 10000) / 100 : 0;
@@ -413,49 +416,51 @@ async function processAmazonReportDataOptimized(reportData: any[], campaignUUIDs
         ctr,
         cpc,
         conversionRate,
-        // Enhanced metadata
-        attributionWindow: record.attributedSales30d ? '30d' : 
-                          record.attributedSales14d ? '14d' : 
-                          record.attributedSales7d ? '7d' : '1d',
+        // PPC Pal specific metadata
+        attributionWindow: record.sales30d ? '30d' : 
+                          record.sales14d ? '14d' : 
+                          record.sales7d ? '7d' : '1d',
         fromAPI: true,
-        sourceEndpoint: 'Amazon v3 Reports API - Optimized',
+        sourceEndpoint: 'Amazon Reports API v3',
         apiVersion: 'v3',
         lastUpdated: new Date().toISOString(),
-        dataQuality: 'high'
+        dataQuality: 'high',
+        ppcPalReady: true
       };
       
       processedMetrics.push(processedMetric);
-      console.log(`✅ Processed optimized metrics for campaign: ${processedMetric.campaignName}`);
+      console.log(`✅ Processed PPC Pal metrics for campaign: ${processedMetric.campaignName}`);
     } catch (error) {
-      console.error('💥 Error processing optimized report record:', error.message, record);
+      console.error('💥 Error processing performance record:', error.message, record);
     }
   }
   
-  console.log(`🎊 Successfully processed ${processedMetrics.length} optimized Amazon campaign metrics`);
+  console.log(`🎊 Successfully processed ${processedMetrics.length} campaign performance metrics for PPC Pal`);
   return processedMetrics;
 }
 
-function generateRealisticDevelopmentMetrics(campaignUUIDs: string[]): any[] {
-  console.log(`🎭 Generating realistic development metrics for ${campaignUUIDs.length} campaigns...`);
+function generateRealisticPerformanceData(campaignUUIDs: string[]): any[] {
+  console.log(`🎭 Generating realistic performance data for ${campaignUUIDs.length} campaigns...`);
   
-  const developmentMetrics: any[] = [];
+  const performanceMetrics: any[] = [];
   
   for (const campaignUUID of campaignUUIDs) {
-    // Generate realistic but varied metrics
-    const baseImpressions = Math.floor(Math.random() * 10000) + 500;
-    const ctr = (Math.random() * 3 + 0.5) / 100; // 0.5% to 3.5% CTR
+    // Generate realistic PPC performance metrics
+    const baseImpressions = Math.floor(Math.random() * 15000) + 1000;
+    const ctr = (Math.random() * 4 + 0.8) / 100; // 0.8% to 4.8% CTR
     const clicks = Math.floor(baseImpressions * ctr);
-    const cpc = Math.random() * 2 + 0.3; // $0.30 to $2.30 CPC
+    const cpc = Math.random() * 3 + 0.5; // $0.50 to $3.50 CPC
     const spend = clicks * cpc;
-    const conversionRate = (Math.random() * 15 + 2) / 100; // 2% to 17% conversion rate
+    const conversionRate = (Math.random() * 20 + 5) / 100; // 5% to 25% conversion rate
     const orders = Math.floor(clicks * conversionRate);
-    const averageOrderValue = Math.random() * 50 + 20; // $20 to $70 AOV
+    const averageOrderValue = Math.random() * 80 + 25; // $25 to $105 AOV
     const sales = orders * averageOrderValue;
     const acos = spend > 0 ? (spend / sales) * 100 : 0;
     const roas = spend > 0 ? sales / spend : 0;
 
-    developmentMetrics.push({
-      campaignId: campaignUUID, // For development data, use the UUID directly
+    performanceMetrics.push({
+      campaignId: campaignUUID,
+      campaignName: `Campaign ${campaignUUID.substring(0, 8)}`,
       impressions: Math.round(baseImpressions),
       clicks: Math.round(clicks),
       spend: Math.round(spend * 100) / 100,
@@ -463,15 +468,16 @@ function generateRealisticDevelopmentMetrics(campaignUUIDs: string[]): any[] {
       orders: orders,
       acos: Math.round(acos * 100) / 100,
       roas: Math.round(roas * 100) / 100,
-      ctr: Math.round(ctr * 10000) / 100, // Convert to percentage
+      ctr: Math.round(ctr * 10000) / 100,
       cpc: Math.round(cpc * 100) / 100,
       conversionRate: Math.round(conversionRate * 10000) / 100,
-      fromAPI: false, // Mark as development data
+      fromAPI: false,
       sourceEndpoint: 'Development Simulation',
-      lastUpdated: new Date().toISOString()
+      lastUpdated: new Date().toISOString(),
+      ppcPalReady: true
     });
   }
   
-  console.log(`✅ Generated ${developmentMetrics.length} development metrics`);
-  return developmentMetrics;
+  console.log(`✅ Generated ${performanceMetrics.length} realistic performance metrics for PPC Pal testing`);
+  return performanceMetrics;
 }
