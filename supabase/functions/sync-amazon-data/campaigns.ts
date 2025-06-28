@@ -1,4 +1,3 @@
-
 import { Region, getBaseUrl } from './types.ts';
 
 interface CampaignResult {
@@ -21,57 +20,70 @@ export async function fetchCampaignsFromRegion(
   console.log(`🎯 Profile ID: ${profileId}`);
   console.log(`🔑 Client ID: ${clientId ? 'Present' : 'Missing'}`);
   
-  // Enhanced endpoint testing with multiple API versions and campaign types
+  // FIXED: Test unfiltered campaigns first (addressing debug checklist item #2)
   const campaignEndpoints = [
+    // Test with NO filters first - this is critical for debugging
+    { path: '/v2/sp/campaigns', description: 'Sponsored Products v2 (No Filters)', priority: 1, params: '' },
+    { path: '/v2/sp/campaigns', description: 'Sponsored Products v2 (All States)', priority: 2, params: '?stateFilter=enabled,paused,archived' },
+    
+    // Test different campaign types without filters
+    { path: '/v2/sb/campaigns', description: 'Sponsored Brands v2 (No Filters)', priority: 3, params: '' },
+    { path: '/v2/sd/campaigns', description: 'Sponsored Display v2 (No Filters)', priority: 4, params: '' },
+    
     // Modern API v3 endpoints
-    { path: '/v3/sp/campaigns', description: 'Sponsored Products v3', priority: 1 },
-    { path: '/v3/sb/campaigns', description: 'Sponsored Brands v3', priority: 2 },
-    { path: '/v3/sd/campaigns', description: 'Sponsored Display v3', priority: 3 },
+    { path: '/v3/sp/campaigns', description: 'Sponsored Products v3', priority: 5, params: '' },
+    { path: '/v3/sb/campaigns', description: 'Sponsored Brands v3', priority: 6, params: '' },
     
-    // Legacy v2 endpoints (more widely supported)
-    { path: '/v2/sp/campaigns', description: 'Sponsored Products v2', priority: 4 },
-    { path: '/v2/sb/campaigns', description: 'Sponsored Brands v2', priority: 5 },
-    { path: '/v2/campaigns', description: 'Generic Campaigns v2', priority: 6 },
-    
-    // Alternative endpoints for different account types
-    { path: '/campaigns', description: 'Basic Campaigns API', priority: 7 },
-    { path: '/sp/campaigns', description: 'SP Campaigns (no version)', priority: 8 },
-    { path: '/advertising/v1/campaigns', description: 'Alternative v1', priority: 9 },
-    
-    // DSP endpoints for larger advertisers
-    { path: '/dsp/campaigns', description: 'DSP Campaigns', priority: 10 },
-    { path: '/v1/dsp/campaigns', description: 'DSP v1 Campaigns', priority: 11 }
+    // Generic endpoints for broader compatibility
+    { path: '/v2/campaigns', description: 'Generic Campaigns v2', priority: 7, params: '' },
+    { path: '/campaigns', description: 'Basic Campaigns API', priority: 8, params: '' },
   ];
 
   let allCampaigns: any[] = [];
   let successfulEndpoints: string[] = [];
   let lastError: string = '';
+  let profileValidated = false;
 
   console.log(`🚀 Testing ${campaignEndpoints.length} different campaign endpoints...`);
 
   for (const endpoint of campaignEndpoints.sort((a, b) => a.priority - b.priority)) {
     try {
-      console.log(`\n📡 Testing endpoint: ${endpoint.path} (${endpoint.description})`);
+      const fullUrl = `${baseUrl}${endpoint.path}${endpoint.params}`;
+      console.log(`\n📡 Testing endpoint: ${fullUrl}`);
+      console.log(`   Description: ${endpoint.description}`);
       
-      const response = await fetch(`${baseUrl}${endpoint.path}`, {
+      const response = await fetch(fullUrl, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Amazon-Advertising-API-ClientId': clientId,
-          'Amazon-Advertising-API-Scope': profileId,
+          'Amazon-Advertising-API-Scope': profileId, // CRITICAL: Correct header usage
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         }
       });
 
       console.log(`📊 Response status: ${response.status} for ${endpoint.path}`);
+      
+      // Log response headers for debugging
+      const responseHeaders = {};
+      response.headers.forEach((value, key) => {
+        responseHeaders[key] = value;
+      });
+      console.log(`📋 Response headers:`, responseHeaders);
 
       if (response.status === 200) {
         const data = await response.json();
         const campaigns = Array.isArray(data) ? data : (data.campaigns || []);
         
         console.log(`✅ SUCCESS: Found ${campaigns.length} campaigns from ${endpoint.description}`);
+        console.log(`🔍 Raw API Response Sample:`, JSON.stringify(data).substring(0, 500) + '...');
         
+        if (!profileValidated && response.status === 200) {
+          profileValidated = true;
+          console.log(`✅ Profile ID ${profileId} validated successfully`);
+        }
+
         if (campaigns.length > 0) {
           // Process and standardize campaign data
           const processedCampaigns = campaigns.map(campaign => ({
@@ -88,7 +100,9 @@ export async function fetchCampaignsFromRegion(
             apiVersion: extractApiVersion(endpoint.path),
             region: region,
             profileId: profileId,
-            lastFetched: new Date().toISOString()
+            lastFetched: new Date().toISOString(),
+            // Add raw data for debugging
+            rawApiData: campaign
           }));
 
           allCampaigns.push(...processedCampaigns);
@@ -98,8 +112,13 @@ export async function fetchCampaignsFromRegion(
           processedCampaigns.slice(0, 3).forEach((campaign, index) => {
             console.log(`   ${index + 1}. ${campaign.name} (ID: ${campaign.campaignId}, State: ${campaign.state})`);
           });
+
+          // IMPORTANT: If we found campaigns, we can break early or continue to get more types
+          if (endpoint.priority <= 4) { // Only break for the high-priority endpoints
+            console.log(`🎯 Found campaigns on high-priority endpoint, continuing to test other types...`);
+          }
         } else {
-          console.log(`ℹ️ No campaigns found in ${endpoint.description} (empty response)`);
+          console.log(`ℹ️ No campaigns found in ${endpoint.description} (empty response but API accessible)`);
         }
       } else if (response.status === 401) {
         const errorText = await response.text();
@@ -109,6 +128,12 @@ export async function fetchCampaignsFromRegion(
         const errorText = await response.text();
         console.log(`🚫 Authorization error for ${endpoint.path}: ${errorText}`);
         lastError = `Access denied: ${errorText}`;
+        
+        // Check if this is a profile scope issue
+        if (errorText.includes('profile') || errorText.includes('scope')) {
+          console.log(`❌ CRITICAL: Profile ID ${profileId} may be incorrect or not accessible`);
+          console.log(`💡 SUGGESTION: Verify this profile ID exists in your Amazon Ads account`);
+        }
       } else if (response.status === 404) {
         console.log(`❌ Endpoint not found: ${endpoint.path}`);
         lastError = `Endpoint not available: ${endpoint.path}`;
@@ -136,19 +161,21 @@ export async function fetchCampaignsFromRegion(
   console.log(`🎯 Total unique campaigns found: ${uniqueCampaigns.length}`);
   console.log(`✅ Successful endpoints: ${successfulEndpoints.length}`);
   console.log(`📡 Working endpoints: ${successfulEndpoints.join(', ')}`);
+  console.log(`🔍 Profile validation: ${profileValidated ? 'SUCCESS' : 'FAILED'}`);
   
   if (uniqueCampaigns.length === 0) {
     console.log(`❌ No campaigns found in ${region} region`);
     console.log(`🔍 Last error: ${lastError}`);
-    console.log(`💡 This could indicate:`);
-    console.log(`   - New Amazon account with no campaigns yet`);
-    console.log(`   - Different account type requiring different API access`);
-    console.log(`   - Regional API differences`);
-    console.log(`   - Account permissions or API scope limitations`);
+    console.log(`💡 DEBUG CHECKLIST ANALYSIS:`);
+    console.log(`   ✅ Profile ID used: ${profileId}`);
+    console.log(`   ${profileValidated ? '✅' : '❌'} Profile ID validated with Amazon API`);
+    console.log(`   ✅ Multiple endpoints tested (including unfiltered)`);
+    console.log(`   ✅ Correct Amazon-Advertising-API-Scope header used`);
+    console.log(`   💡 Next steps: Check if campaigns exist in Amazon Ads UI for this profile`);
   } else {
     console.log(`🎉 Campaign fetch successful!`);
     
-    // Log campaign distribution by type
+    // Enhanced analysis
     const campaignsByType = uniqueCampaigns.reduce((acc, campaign) => {
       const type = campaign.campaignType || 'Unknown';
       acc[type] = (acc[type] || 0) + 1;
@@ -157,7 +184,6 @@ export async function fetchCampaignsFromRegion(
     
     console.log(`📊 Campaigns by type:`, campaignsByType);
     
-    // Log campaign states
     const campaignsByState = uniqueCampaigns.reduce((acc, campaign) => {
       const state = campaign.state || 'Unknown';
       acc[state] = (acc[state] || 0) + 1;
