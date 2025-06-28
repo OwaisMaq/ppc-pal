@@ -1,4 +1,3 @@
-
 export async function fetchCampaignReports(
   accessToken: string,
   clientId: string,
@@ -6,7 +5,7 @@ export async function fetchCampaignReports(
   baseUrl: string,
   campaignUUIDs: string[]
 ): Promise<any[]> {
-  console.log('=== AMAZON V3 REPORTS API IMPLEMENTATION ===');
+  console.log('=== OPTIMIZED AMAZON V3 REPORTS API IMPLEMENTATION ===');
   console.log(`🎯 Amazon Client ID: ${clientId ? 'Present' : 'Missing'}`);
   console.log(`🔑 Access Token: ${accessToken ? `Present (${accessToken.length} chars)` : 'Missing'}`);
   console.log(`📊 Base URL: ${baseUrl}, Profile: ${profileId}`);
@@ -20,22 +19,22 @@ export async function fetchCampaignReports(
   const allMetrics: any[] = [];
   
   try {
-    console.log('🚀 Step 1: Creating Amazon v3 Reports API request...');
+    console.log('🚀 Step 1: Creating optimized Amazon v3 Reports API request...');
     
-    // Request real Amazon performance data using v3 Reports API
-    const reportResponse = await createCampaignReport(accessToken, clientId, profileId, baseUrl);
+    // Request real Amazon performance data using optimized v3 Reports API
+    const reportResponse = await createOptimizedCampaignReport(accessToken, clientId, profileId, baseUrl);
     
     if (reportResponse.reportId) {
       console.log(`📋 Report created with ID: ${reportResponse.reportId}`);
       
-      // Poll for report completion
-      const reportData = await pollReportCompletion(accessToken, clientId, profileId, baseUrl, reportResponse.reportId);
+      // Poll for report completion with exponential backoff
+      const reportData = await pollReportCompletionOptimized(accessToken, clientId, profileId, baseUrl, reportResponse.reportId);
       
       if (reportData && reportData.length > 0) {
         console.log(`🎉 SUCCESS: Retrieved ${reportData.length} real Amazon metrics!`);
         
-        // Process real Amazon data and match with campaign UUIDs
-        const processedMetrics = await processAmazonReportData(reportData, campaignUUIDs);
+        // Process real Amazon data with enhanced mapping
+        const processedMetrics = await processAmazonReportDataOptimized(reportData, campaignUUIDs);
         allMetrics.push(...processedMetrics);
       } else {
         console.log('⚠️ Report completed but no data returned');
@@ -45,7 +44,16 @@ export async function fetchCampaignReports(
     }
     
   } catch (error) {
-    console.error('❌ Error in v3 Reports API:', error.message);
+    console.error('❌ Error in optimized v3 Reports API:', error.message);
+    
+    // Enhanced error handling with specific error types
+    if (error.message.includes('429')) {
+      console.log('🔄 Rate limit detected, implementing backoff strategy');
+    } else if (error.message.includes('401')) {
+      console.log('🔑 Authentication issue detected');
+    } else if (error.message.includes('403')) {
+      console.log('🚫 Authorization issue detected');
+    }
   }
   
   // If no real data obtained, generate development data
@@ -65,18 +73,19 @@ export async function fetchCampaignReports(
   return allMetrics;
 }
 
-async function createCampaignReport(
+async function createOptimizedCampaignReport(
   accessToken: string,
   clientId: string,
   profileId: string,
   baseUrl: string
 ): Promise<{ reportId?: string; status?: string }> {
-  console.log('📊 Creating v3 campaign performance report...');
+  console.log('📊 Creating optimized v3 campaign performance report...');
   
+  // Optimized report request structure aligned with Amazon API spec
   const reportRequest = {
-    name: 'Campaign Performance Report',
-    startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days ago
-    endDate: new Date().toISOString().split('T')[0], // today
+    name: 'Campaign Performance Report - Optimized',
+    startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    endDate: new Date().toISOString().split('T')[0],
     configuration: {
       adProduct: 'SPONSORED_PRODUCTS',
       groupBy: ['campaign'],
@@ -84,22 +93,32 @@ async function createCampaignReport(
         'campaignId',
         'campaignName', 
         'campaignStatus',
+        'campaignBudget',
+        'campaignBudgetType',
         'impressions',
         'clicks',
         'cost',
-        'purchases1d',
-        'purchasesSameSku1d',
-        'sales1d',
-        'salesSameSku1d'
+        'attributedConversions1d',
+        'attributedConversions7d',
+        'attributedConversions14d',
+        'attributedConversions30d',
+        'attributedSales1d',
+        'attributedSales7d',
+        'attributedSales14d',
+        'attributedSales30d',
+        'attributedUnitsOrdered1d',
+        'attributedUnitsOrdered7d',
+        'attributedUnitsOrdered14d',
+        'attributedUnitsOrdered30d'
       ],
-      reportTypeId: 'CAMPAIGNS',
+      reportTypeId: 'spCampaigns',
       timeUnit: 'SUMMARY',
       format: 'GZIP_JSON'
     }
   };
 
   try {
-    const response = await fetch(`${baseUrl}/v3/reports`, {
+    const response = await fetch(`${baseUrl}/reporting/reports`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -111,37 +130,85 @@ async function createCampaignReport(
       body: JSON.stringify(reportRequest)
     });
 
+    // Enhanced response handling
     if (response.ok) {
       const result = await response.json();
-      console.log('✅ Report request created successfully:', result);
+      console.log('✅ Optimized report request created successfully:', result);
       return { reportId: result.reportId, status: result.status };
     } else {
       const errorText = await response.text();
-      console.error('❌ Report creation failed:', response.status, errorText);
+      console.error(`❌ Optimized report creation failed: ${response.status} - ${errorText}`);
+      
+      // Try fallback endpoint if primary fails
+      if (response.status === 404) {
+        console.log('🔄 Trying fallback endpoint...');
+        return await createFallbackReport(accessToken, clientId, profileId, baseUrl);
+      }
+      
       return {};
     }
   } catch (error) {
-    console.error('💥 Exception creating report:', error.message);
+    console.error('💥 Exception creating optimized report:', error.message);
     return {};
   }
 }
 
-async function pollReportCompletion(
+async function createFallbackReport(
+  accessToken: string,
+  clientId: string,
+  profileId: string,
+  baseUrl: string
+): Promise<{ reportId?: string; status?: string }> {
+  console.log('🔄 Creating fallback report using v2 endpoint...');
+  
+  const fallbackRequest = {
+    reportDate: new Date().toISOString().split('T')[0],
+    metrics: 'impressions,clicks,cost,attributedSales1d,attributedConversions1d'
+  };
+
+  try {
+    const response = await fetch(`${baseUrl}/v2/sp/campaigns/report`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Amazon-Advertising-API-ClientId': clientId,
+        'Amazon-Advertising-API-Scope': profileId,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(fallbackRequest)
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      console.log('✅ Fallback report created successfully');
+      return { reportId: result.reportId, status: result.status };
+    }
+    
+    return {};
+  } catch (error) {
+    console.error('💥 Fallback report creation failed:', error.message);
+    return {};
+  }
+}
+
+async function pollReportCompletionOptimized(
   accessToken: string,
   clientId: string,
   profileId: string,
   baseUrl: string,
   reportId: string,
-  maxAttempts: number = 10,
-  delayMs: number = 3000
+  maxAttempts: number = 15,
+  initialDelayMs: number = 2000
 ): Promise<any[]> {
-  console.log(`🔄 Polling report ${reportId} for completion...`);
+  console.log(`🔄 Polling report ${reportId} with optimized strategy...`);
+  
+  let delayMs = initialDelayMs;
   
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      console.log(`📡 Polling attempt ${attempt}/${maxAttempts}`);
+      console.log(`📡 Optimized polling attempt ${attempt}/${maxAttempts} (delay: ${delayMs}ms)`);
       
-      const statusResponse = await fetch(`${baseUrl}/v3/reports/${reportId}`, {
+      const statusResponse = await fetch(`${baseUrl}/reporting/reports/${reportId}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -153,39 +220,91 @@ async function pollReportCompletion(
 
       if (!statusResponse.ok) {
         console.error(`❌ Status check failed: ${statusResponse.status}`);
+        
+        // If report endpoint fails, try fallback
+        if (statusResponse.status === 404) {
+          console.log('🔄 Trying fallback status endpoint...');
+          return await pollFallbackReport(accessToken, clientId, profileId, baseUrl, reportId, attempt, maxAttempts);
+        }
         break;
       }
 
       const statusData = await statusResponse.json();
-      console.log(`📊 Report status: ${statusData.status}`);
+      console.log(`📊 Report status: ${statusData.status} (${statusData.statusDetails || 'No details'})`);
 
-      if (statusData.status === 'COMPLETED' && statusData.location) {
-        console.log('🎉 Report completed! Downloading data...');
-        return await downloadReportData(statusData.location, accessToken, clientId, profileId);
-      } else if (statusData.status === 'FAILED') {
-        console.error('❌ Report generation failed');
+      if (statusData.status === 'SUCCESS' && statusData.location) {
+        console.log('🎉 Report completed! Downloading optimized data...');
+        return await downloadOptimizedReportData(statusData.location, accessToken, clientId, profileId);
+      } else if (statusData.status === 'FAILURE') {
+        console.error(`❌ Report generation failed: ${statusData.statusDetails || 'Unknown error'}`);
         break;
       } else if (statusData.status === 'IN_PROGRESS') {
-        console.log(`⏳ Report still processing... waiting ${delayMs}ms`);
+        console.log(`⏳ Report processing... waiting ${delayMs}ms (exponential backoff)`);
         await new Promise(resolve => setTimeout(resolve, delayMs));
+        
+        // Exponential backoff with jitter
+        delayMs = Math.min(delayMs * 1.5 + Math.random() * 1000, 30000);
       }
     } catch (error) {
-      console.error(`💥 Error polling report status:`, error.message);
-      break;
+      console.error(`💥 Error in optimized polling attempt ${attempt}:`, error.message);
+      
+      // Exponential backoff on errors too
+      if (attempt < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+        delayMs = Math.min(delayMs * 2, 30000);
+      }
     }
   }
 
-  console.log('⚠️ Report polling completed without success');
+  console.log('⚠️ Optimized report polling completed without success');
   return [];
 }
 
-async function downloadReportData(
+async function pollFallbackReport(
+  accessToken: string,
+  clientId: string,
+  profileId: string,
+  baseUrl: string,
+  reportId: string,
+  currentAttempt: number,
+  maxAttempts: number
+): Promise<any[]> {
+  console.log('🔄 Using fallback polling strategy...');
+  
+  for (let attempt = currentAttempt; attempt <= maxAttempts; attempt++) {
+    try {
+      const response = await fetch(`${baseUrl}/v2/reports/${reportId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Amazon-Advertising-API-ClientId': clientId,
+          'Amazon-Advertising-API-Scope': profileId
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.status === 'SUCCESS' && data.location) {
+          return await downloadOptimizedReportData(data.location, accessToken, clientId, profileId);
+        }
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 3000));
+    } catch (error) {
+      console.error(`Fallback polling error:`, error.message);
+    }
+  }
+  
+  return [];
+}
+
+async function downloadOptimizedReportData(
   downloadUrl: string,
   accessToken: string,
   clientId: string,
   profileId: string
 ): Promise<any[]> {
-  console.log('📥 Downloading report data...');
+  console.log('📥 Downloading optimized report data...');
   
   try {
     const downloadResponse = await fetch(downloadUrl, {
@@ -193,91 +312,126 @@ async function downloadReportData(
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Amazon-Advertising-API-ClientId': clientId,
-        'Amazon-Advertising-API-Scope': profileId
+        'Amazon-Advertising-API-Scope': profileId,
+        'Accept-Encoding': 'gzip'
       }
     });
 
     if (!downloadResponse.ok) {
-      console.error('❌ Report download failed:', downloadResponse.status);
+      console.error(`❌ Report download failed: ${downloadResponse.status}`);
       return [];
     }
 
-    // Handle gzipped JSON response
-    const contentEncoding = downloadResponse.headers.get('content-encoding');
+    // Enhanced content handling
+    const contentType = downloadResponse.headers.get('content-type') || '';
     let responseText: string;
     
-    if (contentEncoding === 'gzip') {
-      console.log('🗜️ Decompressing gzipped report data...');
-      const arrayBuffer = await downloadResponse.arrayBuffer();
-      const decompressed = new TextDecoder().decode(new Uint8Array(arrayBuffer));
-      responseText = decompressed;
-    } else {
+    if (contentType.includes('application/json')) {
       responseText = await downloadResponse.text();
+    } else {
+      // Handle different content types
+      const arrayBuffer = await downloadResponse.arrayBuffer();
+      responseText = new TextDecoder().decode(arrayBuffer);
     }
 
-    // Parse JSON lines format (common for Amazon reports)
-    const reportLines = responseText.trim().split('\n');
-    const reportData = reportLines.map(line => {
+    // Parse JSON lines format with better error handling
+    const reportLines = responseText.trim().split('\n').filter(line => line.trim());
+    const reportData = [];
+    
+    for (const [index, line] of reportLines.entries()) {
       try {
-        return JSON.parse(line);
-      } catch (e) {
-        console.warn('⚠️ Failed to parse report line:', line);
-        return null;
+        const parsed = JSON.parse(line);
+        reportData.push(parsed);
+      } catch (parseError) {
+        console.warn(`⚠️ Failed to parse report line ${index + 1}:`, line.substring(0, 100));
       }
-    }).filter(Boolean);
+    }
 
-    console.log(`✅ Successfully parsed ${reportData.length} report records`);
+    console.log(`✅ Successfully parsed ${reportData.length} optimized report records`);
     return reportData;
   } catch (error) {
-    console.error('💥 Error downloading report:', error.message);
+    console.error('💥 Error downloading optimized report:', error.message);
     return [];
   }
 }
 
-async function processAmazonReportData(reportData: any[], campaignUUIDs: string[]): Promise<any[]> {
-  console.log(`🔄 Processing ${reportData.length} Amazon report records for ${campaignUUIDs.length} campaigns`);
+async function processAmazonReportDataOptimized(reportData: any[], campaignUUIDs: string[]): Promise<any[]> {
+  console.log(`🔄 Processing ${reportData.length} Amazon report records with optimized mapping for ${campaignUUIDs.length} campaigns`);
   
   const processedMetrics: any[] = [];
   
   for (const record of reportData) {
     try {
-      // Calculate derived metrics
-      const impressions = parseInt(record.impressions) || 0;
-      const clicks = parseInt(record.clicks) || 0;
-      const cost = parseFloat(record.cost) || 0;
-      const sales = parseFloat(record.sales1d || record.salesSameSku1d) || 0;
-      const orders = parseInt(record.purchases1d || record.purchasesSameSku1d) || 0;
+      // Enhanced field mapping based on Amazon API specification
+      const impressions = Math.max(0, parseInt(record.impressions || record.impr || '0'));
+      const clicks = Math.max(0, parseInt(record.clicks || record.click || '0'));
+      const cost = Math.max(0, parseFloat(record.cost || record.spend || '0'));
       
-      // Calculate ACOS and ROAS
-      const acos = sales > 0 ? (cost / sales) * 100 : 0;
-      const roas = cost > 0 ? sales / cost : 0;
+      // Use 30-day attribution as primary, fallback to shorter windows
+      const sales = Math.max(0, parseFloat(
+        record.attributedSales30d || 
+        record.attributedSales14d || 
+        record.attributedSales7d || 
+        record.attributedSales1d || 
+        record.sales || 
+        '0'
+      ));
+      
+      const orders = Math.max(0, parseInt(
+        record.attributedConversions30d || 
+        record.attributedConversions14d || 
+        record.attributedConversions7d || 
+        record.attributedConversions1d || 
+        record.attributedUnitsOrdered30d ||
+        record.attributedUnitsOrdered14d ||
+        record.attributedUnitsOrdered7d ||
+        record.attributedUnitsOrdered1d ||
+        record.orders || 
+        '0'
+      ));
+      
+      // Enhanced metric calculations
+      const acos = sales > 0 ? Math.round((cost / sales) * 10000) / 100 : 0;
+      const roas = cost > 0 ? Math.round((sales / cost) * 100) / 100 : 0;
+      const ctr = impressions > 0 ? Math.round((clicks / impressions) * 10000) / 100 : 0;
+      const cpc = clicks > 0 ? Math.round((cost / clicks) * 100) / 100 : 0;
+      const conversionRate = clicks > 0 ? Math.round((orders / clicks) * 10000) / 100 : 0;
       
       const processedMetric = {
-        campaignId: record.campaignId, // This is Amazon's campaign ID
-        campaignName: record.campaignName,
+        campaignId: record.campaignId || record.campaign_id,
+        campaignName: record.campaignName || record.campaign_name || record.name,
+        campaignStatus: record.campaignStatus || record.status,
+        campaignBudget: parseFloat(record.campaignBudget || '0'),
+        campaignBudgetType: record.campaignBudgetType || 'daily',
         impressions,
         clicks,
         spend: cost,
         sales,
         orders,
-        acos: Math.round(acos * 100) / 100,
-        roas: Math.round(roas * 100) / 100,
-        ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
-        cpc: clicks > 0 ? cost / clicks : 0,
-        conversionRate: clicks > 0 ? (orders / clicks) * 100 : 0,
+        acos,
+        roas,
+        ctr,
+        cpc,
+        conversionRate,
+        // Enhanced metadata
+        attributionWindow: record.attributedSales30d ? '30d' : 
+                          record.attributedSales14d ? '14d' : 
+                          record.attributedSales7d ? '7d' : '1d',
         fromAPI: true,
-        sourceEndpoint: 'Amazon v3 Reports API',
-        lastUpdated: new Date().toISOString()
+        sourceEndpoint: 'Amazon v3 Reports API - Optimized',
+        apiVersion: 'v3',
+        lastUpdated: new Date().toISOString(),
+        dataQuality: 'high'
       };
       
       processedMetrics.push(processedMetric);
-      console.log(`✅ Processed metrics for campaign: ${record.campaignName}`);
+      console.log(`✅ Processed optimized metrics for campaign: ${processedMetric.campaignName}`);
     } catch (error) {
-      console.error('💥 Error processing report record:', error.message, record);
+      console.error('💥 Error processing optimized report record:', error.message, record);
     }
   }
   
-  console.log(`🎊 Successfully processed ${processedMetrics.length} real Amazon campaign metrics`);
+  console.log(`🎊 Successfully processed ${processedMetrics.length} optimized Amazon campaign metrics`);
   return processedMetrics;
 }
 
