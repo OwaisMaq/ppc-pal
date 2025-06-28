@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -6,7 +5,7 @@ import { campaignDataService, CampaignData } from '@/services/campaignDataServic
 import { campaignDataAnalyzer } from '@/utils/campaignDataAnalyzer';
 import { useCampaignFilter } from './useCampaignFilter';
 
-export { CampaignData } from '@/services/campaignDataService';
+export type { CampaignData } from '@/services/campaignDataService';
 
 export const useCampaignData = (connectionId?: string) => {
   const { user } = useAuth();
