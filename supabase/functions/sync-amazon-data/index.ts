@@ -2,6 +2,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { validateConnection } from './validation.ts'
+import { refreshTokenIfNeeded } from './auth.ts'
 import { fetchCampaignsFromRegion, storeCampaigns } from './campaigns.ts'
 import { fetchCampaignReports } from './reports.ts'
 import { updateCampaignMetrics } from './metricsUpdater.ts'
@@ -20,7 +21,7 @@ serve(async (req) => {
   try {
     const { connectionId, debugMode = false } = await req.json()
     
-    console.log('=== AMAZON SYNC STARTED WITH REAL METRICS API ===')
+    console.log('=== AMAZON SYNC STARTED WITH TOKEN REFRESH & REAL METRICS API ===')
     console.log('Connection ID:', connectionId)
     console.log('Debug Mode:', debugMode)
     
@@ -29,7 +30,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Step 1: Get and validate connection
+    // Step 1: Get connection details
     console.log('🔍 Step 1: Fetching connection details...')
     const { data: connection, error: connectionError } = await supabaseClient
       .from('amazon_connections')
@@ -49,31 +50,65 @@ serve(async (req) => {
       status: connection.status
     })
 
-    // Step 2: Validate connection credentials with detailed error handling
-    console.log('🔍 Step 2: Validating connection...')
-    console.log('🔒 Checking access token and profile ID validation...')
+    // Step 2: Validate connection and refresh token if needed
+    console.log('🔍 Step 2: Validating connection and refreshing token if needed...')
     
-    let validationResult;
-    try {
-      validationResult = await validateConnection(connection)
-      console.log('✅ Validation function completed, result:', validationResult)
-    } catch (validationError) {
-      console.error('❌ Validation function threw error:', validationError)
-      throw new Error(`Validation failed: ${validationError.message}`)
+    let validationResult = validateConnection(connection)
+    console.log('Initial validation result:', validationResult)
+    
+    // If token is expired, attempt to refresh it
+    if (!validationResult.isValid && validationResult.error?.includes('expired')) {
+      console.log('🔄 Token expired, attempting refresh...')
+      
+      try {
+        const refreshedToken = await refreshTokenIfNeeded(
+          connection,
+          Deno.env.get('AMAZON_CLIENT_ID') ?? '',
+          supabaseClient
+        )
+        
+        console.log('✅ Token refresh successful')
+        
+        // Re-fetch connection with updated token
+        const { data: refreshedConnection, error: refetchError } = await supabaseClient
+          .from('amazon_connections')
+          .select('*')
+          .eq('id', connectionId)
+          .single()
+        
+        if (refetchError) {
+          console.error('❌ Failed to refetch connection after token refresh:', refetchError)
+          throw new Error('Failed to refetch connection after token refresh')
+        }
+        
+        // Re-validate with refreshed connection
+        validationResult = validateConnection(refreshedConnection)
+        connection.access_token = refreshedToken
+        
+        console.log('✅ Connection re-validated after token refresh:', validationResult)
+      } catch (refreshError) {
+        console.error('❌ Token refresh failed:', refreshError)
+        
+        // Mark connection as expired
+        await supabaseClient
+          .from('amazon_connections')
+          .update({ 
+            status: 'expired',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', connectionId)
+        
+        throw new Error(`Token refresh failed: ${refreshError.message}. Please reconnect your Amazon account.`)
+      }
     }
     
-    // FIXED: Check if validationResult exists and has isValid property
-    if (!validationResult || validationResult.isValid === undefined) {
-      console.error('❌ Validation result is malformed:', validationResult)
-      throw new Error('Validation function returned invalid result')
-    }
-    
+    // Final validation check
     if (!validationResult.isValid) {
-      console.error('❌ Connection validation failed:', validationResult.error)
-      throw new Error(`Connection invalid: ${validationResult.error}`)
+      console.error('❌ Final validation failed:', validationResult.error)
+      throw new Error(`Connection validation failed: ${validationResult.error}`)
     }
 
-    console.log('✅ Connection validated successfully')
+    console.log('✅ Connection validated and ready for API calls')
 
     // Step 3: Determine region and fetch campaigns
     console.log('🔍 Step 3: Fetching campaigns from Amazon API...')
@@ -192,14 +227,15 @@ serve(async (req) => {
       console.log('⚠️ No campaign UUIDs to fetch metrics for')
     }
 
-    // Step 6: Update connection sync timestamp
-    console.log('🔍 Step 6: Updating sync timestamp...')
+    // Step 6: Update connection sync timestamp and status
+    console.log('🔍 Step 6: Updating sync timestamp and connection status...')
     
     const { error: updateError } = await supabaseClient
       .from('amazon_connections')
       .update({ 
         last_sync_at: new Date().toISOString(),
-        status: 'active'
+        status: 'active',
+        updated_at: new Date().toISOString()
       })
       .eq('id', connectionId)
 
@@ -217,6 +253,7 @@ serve(async (req) => {
       storageErrors: storageResult.errors,
       campaignUUIDs: storageResult.campaignIds.length,
       metricsSource: 'amazon-reports-api-v3',
+      tokenRefreshed: validationResult.error?.includes('expired') ? true : false,
       debugInfo: debugMode ? {
         connectionDetails: {
           profileId: connection.profile_id,
@@ -228,7 +265,7 @@ serve(async (req) => {
       } : undefined
     }
 
-    console.log('🎉 SYNC COMPLETED WITH REAL AMAZON METRICS')
+    console.log('🎉 SYNC COMPLETED WITH REAL AMAZON METRICS & TOKEN REFRESH')
     console.log('Final Result:', finalResult)
 
     return new Response(
