@@ -19,33 +19,53 @@ interface CampaignFetchResult {
   endpoint?: string;
 }
 
-// Enhanced region detection with better marketplace mapping
+// Enhanced region detection with better UK handling
 function determineRegion(marketplaceId: string): Region {
   console.log(`🌍 Determining region for marketplace: ${marketplaceId}`);
   
-  // European marketplaces
-  const europeanMarketplaces = ['UK', 'DE', 'FR', 'IT', 'ES', 'NL', 'SE', 'PL', 'BE', 'TR'];
+  // Normalize marketplace ID for comparison
+  const normalizedMarketplace = marketplaceId?.toUpperCase() || '';
+  
+  // European marketplaces - UK is definitely in EU region
+  const europeanMarketplaces = ['UK', 'GB', 'DE', 'FR', 'IT', 'ES', 'NL', 'SE', 'PL', 'BE', 'TR'];
   // Far East marketplaces  
   const farEastMarketplaces = ['JP', 'AU', 'SG', 'AE', 'IN'];
   // North American marketplaces
   const northAmericanMarketplaces = ['US', 'CA', 'MX', 'BR'];
   
-  if (europeanMarketplaces.some(market => marketplaceId?.includes(market))) {
-    console.log(`✅ Mapped ${marketplaceId} to EU region`);
+  // Check for exact matches first
+  if (europeanMarketplaces.includes(normalizedMarketplace)) {
+    console.log(`✅ Mapped ${marketplaceId} to EU region (exact match)`);
     return 'EU';
   }
   
-  if (farEastMarketplaces.some(market => marketplaceId?.includes(market))) {
-    console.log(`✅ Mapped ${marketplaceId} to FE region`);
+  if (farEastMarketplaces.includes(normalizedMarketplace)) {
+    console.log(`✅ Mapped ${marketplaceId} to FE region (exact match)`);
     return 'FE';
   }
   
-  if (northAmericanMarketplaces.some(market => marketplaceId?.includes(market))) {
-    console.log(`✅ Mapped ${marketplaceId} to NA region`);
+  if (northAmericanMarketplaces.includes(normalizedMarketplace)) {
+    console.log(`✅ Mapped ${marketplaceId} to NA region (exact match)`);
     return 'NA';
   }
   
-  // Default to EU for unknown European-sounding marketplaces
+  // Check for partial matches (in case marketplace ID contains additional info)
+  if (europeanMarketplaces.some(market => normalizedMarketplace.includes(market))) {
+    console.log(`✅ Mapped ${marketplaceId} to EU region (partial match)`);
+    return 'EU';
+  }
+  
+  if (farEastMarketplaces.some(market => normalizedMarketplace.includes(market))) {
+    console.log(`✅ Mapped ${marketplaceId} to FE region (partial match)`);
+    return 'FE';
+  }
+  
+  if (northAmericanMarketplaces.some(market => normalizedMarketplace.includes(market))) {
+    console.log(`✅ Mapped ${marketplaceId} to NA region (partial match)`);
+    return 'NA';
+  }
+  
+  // Default to EU for UK and unknown European marketplaces
   console.log(`⚠️ Unknown marketplace ${marketplaceId}, defaulting to EU region`);
   return 'EU';
 }
@@ -59,59 +79,65 @@ export async function fetchCampaignsFromRegion(
   const region = determineRegion(marketplaceId);
   const baseUrl = getBaseUrl(region);
   
-  console.log(`=== AMAZON ADVERTISING API PROPER AUTH FORMAT ===`);
-  console.log(`🌍 Marketplace: ${marketplaceId} -> Region: ${region}`);
+  console.log(`=== ENHANCED AMAZON ADVERTISING API - UK CAMPAIGNS FOCUS ===`);
+  console.log(`🇬🇧 Marketplace: ${marketplaceId} -> Region: ${region}`);
   console.log(`🔗 Base URL: ${baseUrl}`);
   console.log(`👤 Profile ID: ${profileId}`);
   console.log(`🔒 Access Token: ${accessToken.substring(0, 20)}...`);
   console.log(`🆔 Client ID: ${clientId}`);
+  console.log(`⏰ Current time: ${new Date().toISOString()}`);
 
-  // Amazon Advertising API endpoints (corrected)
+  // Amazon Advertising API endpoints with enhanced debugging
   const endpoints = [
     {
       url: `${baseUrl}/v2/sp/campaigns`,
-      description: 'Sponsored Products v2',
+      description: 'Sponsored Products v2 - Default',
       method: 'GET'
     },
     {
       url: `${baseUrl}/v2/sp/campaigns?stateFilter=enabled,paused,archived`,
-      description: 'Sponsored Products v2 (All States)',
+      description: 'Sponsored Products v2 - All States (UK Focus)',
       method: 'GET'
     },
     {
       url: `${baseUrl}/v3/sp/campaigns`,
-      description: 'Sponsored Products v3',
+      description: 'Sponsored Products v3 - Latest API',
       method: 'GET'
     },
     {
       url: `${baseUrl}/v2/sb/campaigns`,
       description: 'Sponsored Brands v2',
       method: 'GET'
+    },
+    {
+      url: `${baseUrl}/v2/hsa/campaigns`,
+      description: 'Sponsored Display v2 (HSA)',
+      method: 'GET'
     }
   ];
 
-  // CRITICAL: Amazon Advertising API uses Bearer token format with proper headers
+  // Enhanced token validation for UK campaigns
   const cleanAccessToken = accessToken.trim();
   
   const headers = {
-    'Authorization': `Bearer ${cleanAccessToken}`, // Amazon Ads API DOES use Bearer prefix
+    'Authorization': cleanAccessToken, // Amazon Ads API does NOT use Bearer prefix
     'Amazon-Advertising-API-ClientId': clientId.trim(),
     'Amazon-Advertising-API-Scope': profileId.trim(),
     'Accept': 'application/json',
     'Content-Type': 'application/json',
-    'User-Agent': 'PPC-Pal/1.0'
+    'User-Agent': 'PPC-Pal-UK/1.0'
   };
 
-  console.log('🔒 PROPER Amazon Ads API headers (sanitized):', {
-    'Authorization': `Bearer ${cleanAccessToken.substring(0, 20)}...`,
+  console.log('🔒 Enhanced Amazon Ads API headers for UK campaigns (sanitized):', {
+    'Authorization': `${cleanAccessToken.substring(0, 20)}...`,
     'Amazon-Advertising-API-ClientId': clientId,
     'Amazon-Advertising-API-Scope': profileId,
     'Accept': 'application/json',
     'Content-Type': 'application/json',
-    'User-Agent': 'PPC-Pal/1.0'
+    'User-Agent': 'PPC-Pal-UK/1.0'
   });
 
-  // Additional validation of token format
+  // Enhanced token format validation
   if (!cleanAccessToken.startsWith('Atza|') && !cleanAccessToken.startsWith('Atc|')) {
     console.error('❌ INVALID TOKEN FORMAT - Amazon tokens should start with Atza| or Atc|');
     console.error('🔍 Token preview:', cleanAccessToken.substring(0, 30));
@@ -121,23 +147,31 @@ export async function fetchCampaignsFromRegion(
   let allCampaigns: (CampaignResponse & { sourceEndpoint?: string })[] = [];
   let successfulEndpoints: string[] = [];
   let lastError: Error | null = null;
+  let detailedErrors: { endpoint: string; status: number; error: string }[] = [];
 
-  // Test each endpoint with proper Authorization format
+  // Test each endpoint with detailed UK-focused logging
   for (const endpoint of endpoints) {
     try {
-      console.log(`\n📡 Testing Amazon Ads API: ${endpoint.url}`);
+      console.log(`\n📡 Testing UK Amazon Ads API: ${endpoint.url}`);
       console.log(`   Description: ${endpoint.description}`);
+      console.log(`   Expected for UK marketplace: ${marketplaceId}`);
       
       const response = await fetch(endpoint.url, {
         method: endpoint.method,
         headers: headers
       });
 
-      console.log(`📡 Response: ${response.status} ${response.statusText}`);
+      console.log(`📡 Response Status: ${response.status} ${response.statusText}`);
+      console.log(`📡 Response Headers:`, Object.fromEntries(response.headers.entries()));
 
       if (response.ok) {
         const data = await response.json();
         console.log(`✅ SUCCESS! Found ${data.length || 0} campaigns from Amazon Ads API`);
+        console.log(`📊 Raw response structure:`, {
+          isArray: Array.isArray(data),
+          dataType: typeof data,
+          firstItemKeys: data.length > 0 ? Object.keys(data[0]) : 'No items'
+        });
         
         if (data && Array.isArray(data) && data.length > 0) {
           const campaignsWithSource = data.map((campaign: CampaignResponse) => ({
@@ -148,36 +182,58 @@ export async function fetchCampaignsFromRegion(
           allCampaigns = [...allCampaigns, ...campaignsWithSource];
           successfulEndpoints.push(endpoint.url);
           
-          console.log(`📊 Campaign sample:`, data.slice(0, 2).map((c: CampaignResponse) => ({
+          console.log(`📊 UK Campaign sample (first 3):`, data.slice(0, 3).map((c: CampaignResponse) => ({
             campaignId: c.campaignId,
             name: c.name,
             state: c.state,
-            campaignType: c.campaignType
+            campaignType: c.campaignType,
+            servingStatus: c.servingStatus
           })));
+        } else if (data && data.length === 0) {
+          console.log(`⚠️ API call successful but returned empty array for UK marketplace`);
+          successfulEndpoints.push(endpoint.url);
         }
       } else {
         const errorText = await response.text();
         console.error(`❌ HTTP ${response.status}: ${errorText}`);
         
-        // Enhanced error logging for authorization issues
+        detailedErrors.push({
+          endpoint: endpoint.url,
+          status: response.status,
+          error: errorText
+        });
+        
+        // Enhanced error analysis for UK campaigns
         if (response.status === 403) {
-          console.error('🔍 AUTHORIZATION ERROR DETAILS:');
+          console.error('🔍 UK AUTHORIZATION ERROR ANALYSIS:');
           console.error('   - Token format:', cleanAccessToken.substring(0, 30) + '...');
           console.error('   - Token length:', cleanAccessToken.length);
           console.error('   - Profile ID:', profileId);
           console.error('   - Client ID:', clientId);
+          console.error('   - Marketplace ID:', marketplaceId);
+          console.error('   - Region determined:', region);
+          console.error('   - Base URL used:', baseUrl);
           
-          // Check if this is a scope/permission issue
           if (errorText.includes('Invalid scope') || errorText.includes('unauthorized')) {
-            console.error('   - SCOPE ISSUE: This profile may not have advertising permissions');
-            console.error('   - Check if this profile has active campaigns in Amazon Seller Central');
+            console.error('   - SCOPE ISSUE: UK profile may not have advertising permissions');
+            console.error('   - Check if this UK profile has active campaigns in Amazon Seller Central');
+            console.error('   - Verify the profile ID corresponds to the UK marketplace');
           }
+        } else if (response.status === 401) {
+          console.error('🔍 UK TOKEN ISSUE: Access token may be expired or invalid');
+        } else if (response.status === 400) {
+          console.error('🔍 UK REQUEST ISSUE: Malformed request for UK marketplace');
         }
         
         lastError = new Error(`HTTP ${response.status}: ${errorText}`);
       }
     } catch (error) {
-      console.error(`💥 Network error for ${endpoint.url}:`, error.message);
+      console.error(`💥 Network error for UK endpoint ${endpoint.url}:`, error.message);
+      detailedErrors.push({
+        endpoint: endpoint.url,
+        status: 0,
+        error: error.message
+      });
       lastError = error as Error;
     }
   }
@@ -187,33 +243,47 @@ export async function fetchCampaignsFromRegion(
     index === self.findIndex(c => c.campaignId === campaign.campaignId)
   );
 
-  console.log(`\n=== AMAZON ADVERTISING API CAMPAIGN FETCH RESULTS ===`);
+  console.log(`\n=== UK AMAZON ADVERTISING API CAMPAIGN FETCH RESULTS ===`);
+  console.log(`🇬🇧 Marketplace: ${marketplaceId}`);
+  console.log(`🌍 Region: ${region}`);
   console.log(`🎯 Total unique campaigns: ${uniqueCampaigns.length}`);
   console.log(`✅ Successful endpoints: ${successfulEndpoints.length}`);
   console.log(`📡 Working endpoints: ${successfulEndpoints.join(', ')}`);
+  console.log(`❌ Failed endpoints: ${detailedErrors.length}`);
+  
+  if (detailedErrors.length > 0) {
+    console.log(`🔍 Error breakdown:`);
+    detailedErrors.forEach(err => {
+      console.log(`   - ${err.endpoint}: HTTP ${err.status} - ${err.error.substring(0, 100)}`);
+    });
+  }
   
   if (uniqueCampaigns.length === 0) {
-    console.log(`❌ No campaigns found in ${region} region`);
-    if (lastError) {
-      console.log(`🔍 Last error: ${lastError.message}`);
-    }
+    console.log(`❌ No campaigns found for UK marketplace ${marketplaceId}`);
     
-    console.log(`💡 TROUBLESHOOTING - NO CAMPAIGNS FOUND:`);
+    console.log(`💡 UK MARKETPLACE TROUBLESHOOTING:`);
     console.log(`   🔍 Profile ID: ${profileId}`);
     console.log(`   🔍 Region: ${region} (${baseUrl})`);
     console.log(`   🔍 Token valid: ${cleanAccessToken.length > 100 ? 'Yes' : 'Short/Invalid'}`);
+    console.log(`   🔍 Successful API calls: ${successfulEndpoints.length}`);
     console.log(`   `);
-    console.log(`   ❓ POSSIBLE CAUSES:`);
-    console.log(`   1. This Amazon Seller account has no active advertising campaigns`);
-    console.log(`   2. The advertising profile doesn't have Sponsored Products campaigns`);
-    console.log(`   3. The access token doesn't have advertising API permissions`);
-    console.log(`   4. The profile is for a different marketplace region`);
+    console.log(`   ❓ POSSIBLE CAUSES FOR UK CAMPAIGNS:`);
+    console.log(`   1. UK Amazon Seller account has no active advertising campaigns`);
+    console.log(`   2. Campaigns exist but are in 'draft' status (not enabled/paused/archived)`);
+    console.log(`   3. Profile ID doesn't match the UK marketplace campaigns`);
+    console.log(`   4. Access token doesn't have permissions for UK advertising campaigns`);
+    console.log(`   5. Campaigns are Sponsored Brands/Display only (not Sponsored Products)`);
+    console.log(`   6. UK marketplace ID mapping issue`);
     console.log(`   `);
-    console.log(`   💡 NEXT STEPS:`);
-    console.log(`   - Log into Amazon Seller Central and verify active advertising campaigns exist`);
-    console.log(`   - Check if campaigns are in "draft" status (not enabled/paused/archived)`);
-    console.log(`   - Verify this profile has Sponsored Products (not just Sponsored Brands)`);
-    console.log(`   - Consider checking Amazon Advertising Console directly`);
+    console.log(`   💡 NEXT STEPS FOR UK:`);
+    console.log(`   - Verify active campaigns exist in Amazon UK Advertising Console`);
+    console.log(`   - Check campaign types (Sponsored Products vs Brands vs Display)`);
+    console.log(`   - Confirm the profile ID corresponds to UK marketplace operations`);
+    console.log(`   - Ensure campaigns have generated impressions/clicks (not zero activity)`);
+  } else {
+    console.log(`🎉 Successfully found ${uniqueCampaigns.length} UK campaigns!`);
+    console.log(`📊 Campaign types found:`, [...new Set(uniqueCampaigns.map(c => c.campaignType))]);
+    console.log(`📊 Campaign states:`, [...new Set(uniqueCampaigns.map(c => c.state))]);
   }
 
   return {
