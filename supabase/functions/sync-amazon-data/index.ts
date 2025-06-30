@@ -6,7 +6,6 @@ import { refreshTokenIfNeeded } from './auth.ts'
 import { fetchCampaignsFromRegion, storeCampaigns } from './campaigns.ts'
 import { fetchCampaignReports } from './reports.ts'
 import { updateCampaignMetrics } from './metricsUpdater.ts'
-import { Region } from './types.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -21,7 +20,7 @@ serve(async (req) => {
   try {
     const { connectionId, debugMode = false } = await req.json()
     
-    console.log('=== AMAZON SYNC STARTED WITH TOKEN REFRESH & REAL METRICS API ===')
+    console.log('=== AMAZON SYNC STARTED WITH ENHANCED REGION DETECTION ===')
     console.log('Connection ID:', connectionId)
     console.log('Debug Mode:', debugMode)
     
@@ -110,13 +109,8 @@ serve(async (req) => {
 
     console.log('✅ Connection validated and ready for API calls')
 
-    // Step 3: Determine region and fetch campaigns
-    console.log('🔍 Step 3: Fetching campaigns from Amazon API...')
-    
-    const region: Region = connection.marketplace_id?.startsWith('EU') ? 'EU' : 
-                          connection.marketplace_id?.startsWith('FE') ? 'FE' : 'NA'
-    
-    console.log(`📍 Using region: ${region} for marketplace: ${connection.marketplace_id}`)
+    // Step 3: Fetch campaigns with enhanced region detection
+    console.log('🔍 Step 3: Fetching campaigns from Amazon API with enhanced region detection...')
     
     let campaignResult;
     try {
@@ -124,7 +118,7 @@ serve(async (req) => {
         connection.access_token,
         Deno.env.get('AMAZON_CLIENT_ID') ?? '',
         connection.profile_id,
-        region
+        connection.marketplace_id || 'US'
       )
       console.log('✅ Campaign fetch successful')
     } catch (campaignError) {
@@ -175,8 +169,8 @@ serve(async (req) => {
     console.log('🔍 Step 5: Fetching REAL performance metrics from Amazon Reports API...')
     
     if (storageResult.campaignIds.length > 0) {
-      const region_base_url = region === 'EU' ? 'https://advertising-api-eu.amazon.com' :
-                             region === 'FE' ? 'https://advertising-api-fe.amazon.com' :
+      const region_base_url = campaignResult.region === 'EU' ? 'https://advertising-api-eu.amazon.com' :
+                             campaignResult.region === 'FE' ? 'https://advertising-api-fe.amazon.com' :
                              'https://advertising-api.amazon.com'
 
       console.log('📊 Initiating Amazon Reports API call for real metrics...')
@@ -247,7 +241,7 @@ serve(async (req) => {
       success: true,
       connectionId,
       profileId: connection.profile_id,
-      region,
+      region: campaignResult.region,
       campaignsFetched: campaignResult.campaigns.length,
       campaignsStored: storageResult.stored,
       storageErrors: storageResult.errors,
@@ -265,7 +259,7 @@ serve(async (req) => {
       } : undefined
     }
 
-    console.log('🎉 SYNC COMPLETED WITH REAL AMAZON METRICS & TOKEN REFRESH')
+    console.log('🎉 SYNC COMPLETED WITH ENHANCED REGION DETECTION')
     console.log('Final Result:', finalResult)
 
     return new Response(
