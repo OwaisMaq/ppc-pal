@@ -1,4 +1,3 @@
-
 import { Region, getBaseUrl } from './types.ts'
 
 interface CampaignResponse {
@@ -60,14 +59,14 @@ export async function fetchCampaignsFromRegion(
   const region = determineRegion(marketplaceId);
   const baseUrl = getBaseUrl(region);
   
-  console.log(`=== AMAZON API HEADER FORMAT FIX ===`);
+  console.log(`=== AMAZON ADVERTISING API PROPER AUTH FORMAT ===`);
   console.log(`🌍 Marketplace: ${marketplaceId} -> Region: ${region}`);
   console.log(`🔗 Base URL: ${baseUrl}`);
   console.log(`👤 Profile ID: ${profileId}`);
   console.log(`🔒 Access Token: ${accessToken.substring(0, 20)}...`);
   console.log(`🆔 Client ID: ${clientId}`);
 
-  // Enhanced endpoint testing with CORRECTED authorization header format
+  // Amazon Advertising API endpoints (corrected)
   const endpoints = [
     {
       url: `${baseUrl}/v2/sp/campaigns`,
@@ -88,19 +87,14 @@ export async function fetchCampaignsFromRegion(
       url: `${baseUrl}/v2/sb/campaigns`,
       description: 'Sponsored Brands v2',
       method: 'GET'
-    },
-    {
-      url: `${baseUrl}/v3/sb/campaigns`,
-      description: 'Sponsored Brands v3',
-      method: 'GET'
     }
   ];
 
-  // CRITICAL FIX: Amazon Advertising API uses different header names
+  // CRITICAL: Amazon Advertising API uses Bearer token format with proper headers
   const cleanAccessToken = accessToken.trim();
   
   const headers = {
-    'Authorization': cleanAccessToken, // NO "Bearer " prefix for Amazon Ads API
+    'Authorization': `Bearer ${cleanAccessToken}`, // Amazon Ads API DOES use Bearer prefix
     'Amazon-Advertising-API-ClientId': clientId.trim(),
     'Amazon-Advertising-API-Scope': profileId.trim(),
     'Accept': 'application/json',
@@ -108,8 +102,8 @@ export async function fetchCampaignsFromRegion(
     'User-Agent': 'PPC-Pal/1.0'
   };
 
-  console.log('🔒 CORRECTED Request headers (sanitized):', {
-    'Authorization': `${cleanAccessToken.substring(0, 20)}...`,
+  console.log('🔒 PROPER Amazon Ads API headers (sanitized):', {
+    'Authorization': `Bearer ${cleanAccessToken.substring(0, 20)}...`,
     'Amazon-Advertising-API-ClientId': clientId,
     'Amazon-Advertising-API-Scope': profileId,
     'Accept': 'application/json',
@@ -128,10 +122,10 @@ export async function fetchCampaignsFromRegion(
   let successfulEndpoints: string[] = [];
   let lastError: Error | null = null;
 
-  // Test each endpoint with CORRECTED headers
+  // Test each endpoint with proper Authorization format
   for (const endpoint of endpoints) {
     try {
-      console.log(`\n📡 Testing CORRECTED: ${endpoint.url}`);
+      console.log(`\n📡 Testing Amazon Ads API: ${endpoint.url}`);
       console.log(`   Description: ${endpoint.description}`);
       
       const response = await fetch(endpoint.url, {
@@ -143,7 +137,7 @@ export async function fetchCampaignsFromRegion(
 
       if (response.ok) {
         const data = await response.json();
-        console.log(`✅ SUCCESS! Found ${data.length || 0} campaigns with CORRECTED headers`);
+        console.log(`✅ SUCCESS! Found ${data.length || 0} campaigns from Amazon Ads API`);
         
         if (data && Array.isArray(data) && data.length > 0) {
           const campaignsWithSource = data.map((campaign: CampaignResponse) => ({
@@ -172,7 +166,12 @@ export async function fetchCampaignsFromRegion(
           console.error('   - Token length:', cleanAccessToken.length);
           console.error('   - Profile ID:', profileId);
           console.error('   - Client ID:', clientId);
-          console.error('   - Headers sent:', JSON.stringify(headers, null, 2));
+          
+          // Check if this is a scope/permission issue
+          if (errorText.includes('Invalid scope') || errorText.includes('unauthorized')) {
+            console.error('   - SCOPE ISSUE: This profile may not have advertising permissions');
+            console.error('   - Check if this profile has active campaigns in Amazon Seller Central');
+          }
         }
         
         lastError = new Error(`HTTP ${response.status}: ${errorText}`);
@@ -188,25 +187,33 @@ export async function fetchCampaignsFromRegion(
     index === self.findIndex(c => c.campaignId === campaign.campaignId)
   );
 
-  console.log(`\n=== CORRECTED AUTHORIZATION CAMPAIGN FETCH RESULTS ===`);
+  console.log(`\n=== AMAZON ADVERTISING API CAMPAIGN FETCH RESULTS ===`);
   console.log(`🎯 Total unique campaigns: ${uniqueCampaigns.length}`);
   console.log(`✅ Successful endpoints: ${successfulEndpoints.length}`);
   console.log(`📡 Working endpoints: ${successfulEndpoints.join(', ')}`);
   
   if (uniqueCampaigns.length === 0) {
-    console.log(`❌ No campaigns found in ${region} region with CORRECTED headers`);
+    console.log(`❌ No campaigns found in ${region} region`);
     if (lastError) {
       console.log(`🔍 Last error: ${lastError.message}`);
     }
     
-    console.log(`💡 ENHANCED TROUBLESHOOTING CHECKLIST:`);
-    console.log(`   ✅ Profile ID validated: ${profileId}`);
-    console.log(`   ✅ Authorization header format CORRECTED (no Bearer prefix)`);
-    console.log(`   ✅ Multiple endpoints tested`);
-    console.log(`   ✅ Token format validated`);
-    console.log(`   💡 Next steps: Check if campaigns exist in Amazon Ads UI for this profile`);
-    console.log(`   💡 Verify profile has Sponsored Products campaigns specifically`);
-    console.log(`   💡 Check if the access token has the correct permissions/scope`);
+    console.log(`💡 TROUBLESHOOTING - NO CAMPAIGNS FOUND:`);
+    console.log(`   🔍 Profile ID: ${profileId}`);
+    console.log(`   🔍 Region: ${region} (${baseUrl})`);
+    console.log(`   🔍 Token valid: ${cleanAccessToken.length > 100 ? 'Yes' : 'Short/Invalid'}`);
+    console.log(`   `);
+    console.log(`   ❓ POSSIBLE CAUSES:`);
+    console.log(`   1. This Amazon Seller account has no active advertising campaigns`);
+    console.log(`   2. The advertising profile doesn't have Sponsored Products campaigns`);
+    console.log(`   3. The access token doesn't have advertising API permissions`);
+    console.log(`   4. The profile is for a different marketplace region`);
+    console.log(`   `);
+    console.log(`   💡 NEXT STEPS:`);
+    console.log(`   - Log into Amazon Seller Central and verify active advertising campaigns exist`);
+    console.log(`   - Check if campaigns are in "draft" status (not enabled/paused/archived)`);
+    console.log(`   - Verify this profile has Sponsored Products (not just Sponsored Brands)`);
+    console.log(`   - Consider checking Amazon Advertising Console directly`);
   }
 
   return {
