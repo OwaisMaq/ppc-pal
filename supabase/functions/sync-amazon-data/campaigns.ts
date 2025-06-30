@@ -1,3 +1,4 @@
+
 import { Region, getBaseUrl } from './types.ts'
 
 interface CampaignResponse {
@@ -59,14 +60,14 @@ export async function fetchCampaignsFromRegion(
   const region = determineRegion(marketplaceId);
   const baseUrl = getBaseUrl(region);
   
-  console.log(`=== FIXED AUTHORIZATION HEADER CAMPAIGN FETCHING ===`);
+  console.log(`=== AMAZON API HEADER FORMAT FIX ===`);
   console.log(`🌍 Marketplace: ${marketplaceId} -> Region: ${region}`);
   console.log(`🔗 Base URL: ${baseUrl}`);
   console.log(`👤 Profile ID: ${profileId}`);
   console.log(`🔒 Access Token: ${accessToken.substring(0, 20)}...`);
   console.log(`🆔 Client ID: ${clientId}`);
 
-  // Enhanced endpoint testing with FIXED authorization header
+  // Enhanced endpoint testing with CORRECTED authorization header format
   const endpoints = [
     {
       url: `${baseUrl}/v2/sp/campaigns`,
@@ -95,12 +96,11 @@ export async function fetchCampaignsFromRegion(
     }
   ];
 
-  // FIXED: Ensure proper authorization header formatting
+  // CRITICAL FIX: Amazon Advertising API uses different header names
   const cleanAccessToken = accessToken.trim();
   
-  // CRITICAL FIX: Proper Authorization header format for Amazon API
   const headers = {
-    'Authorization': `Bearer ${cleanAccessToken}`,
+    'Authorization': cleanAccessToken, // NO "Bearer " prefix for Amazon Ads API
     'Amazon-Advertising-API-ClientId': clientId.trim(),
     'Amazon-Advertising-API-Scope': profileId.trim(),
     'Accept': 'application/json',
@@ -108,8 +108,8 @@ export async function fetchCampaignsFromRegion(
     'User-Agent': 'PPC-Pal/1.0'
   };
 
-  console.log('🔒 FIXED Request headers (sanitized):', {
-    'Authorization': `Bearer ${cleanAccessToken.substring(0, 20)}...`,
+  console.log('🔒 CORRECTED Request headers (sanitized):', {
+    'Authorization': `${cleanAccessToken.substring(0, 20)}...`,
     'Amazon-Advertising-API-ClientId': clientId,
     'Amazon-Advertising-API-Scope': profileId,
     'Accept': 'application/json',
@@ -128,10 +128,10 @@ export async function fetchCampaignsFromRegion(
   let successfulEndpoints: string[] = [];
   let lastError: Error | null = null;
 
-  // Test each endpoint with FIXED headers
+  // Test each endpoint with CORRECTED headers
   for (const endpoint of endpoints) {
     try {
-      console.log(`\n📡 Testing FIXED: ${endpoint.url}`);
+      console.log(`\n📡 Testing CORRECTED: ${endpoint.url}`);
       console.log(`   Description: ${endpoint.description}`);
       
       const response = await fetch(endpoint.url, {
@@ -143,7 +143,7 @@ export async function fetchCampaignsFromRegion(
 
       if (response.ok) {
         const data = await response.json();
-        console.log(`✅ SUCCESS! Found ${data.length || 0} campaigns with FIXED headers`);
+        console.log(`✅ SUCCESS! Found ${data.length || 0} campaigns with CORRECTED headers`);
         
         if (data && Array.isArray(data) && data.length > 0) {
           const campaignsWithSource = data.map((campaign: CampaignResponse) => ({
@@ -188,24 +188,25 @@ export async function fetchCampaignsFromRegion(
     index === self.findIndex(c => c.campaignId === campaign.campaignId)
   );
 
-  console.log(`\n=== FIXED AUTHORIZATION CAMPAIGN FETCH RESULTS ===`);
+  console.log(`\n=== CORRECTED AUTHORIZATION CAMPAIGN FETCH RESULTS ===`);
   console.log(`🎯 Total unique campaigns: ${uniqueCampaigns.length}`);
   console.log(`✅ Successful endpoints: ${successfulEndpoints.length}`);
   console.log(`📡 Working endpoints: ${successfulEndpoints.join(', ')}`);
   
   if (uniqueCampaigns.length === 0) {
-    console.log(`❌ No campaigns found in ${region} region with FIXED headers`);
+    console.log(`❌ No campaigns found in ${region} region with CORRECTED headers`);
     if (lastError) {
       console.log(`🔍 Last error: ${lastError.message}`);
     }
     
     console.log(`💡 ENHANCED TROUBLESHOOTING CHECKLIST:`);
     console.log(`   ✅ Profile ID validated: ${profileId}`);
-    console.log(`   ✅ Authorization header format FIXED`);
+    console.log(`   ✅ Authorization header format CORRECTED (no Bearer prefix)`);
     console.log(`   ✅ Multiple endpoints tested`);
     console.log(`   ✅ Token format validated`);
     console.log(`   💡 Next steps: Check if campaigns exist in Amazon Ads UI for this profile`);
     console.log(`   💡 Verify profile has Sponsored Products campaigns specifically`);
+    console.log(`   💡 Check if the access token has the correct permissions/scope`);
   }
 
   return {
