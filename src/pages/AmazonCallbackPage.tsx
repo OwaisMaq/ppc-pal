@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAmazonConnections } from '@/hooks/useAmazonConnections';
@@ -19,6 +18,8 @@ const AmazonCallbackPage = () => {
       const code = searchParams.get('code');
       const state = searchParams.get('state');
       const error = searchParams.get('error');
+
+      console.log('Processing Amazon OAuth callback:', { code: !!code, state: !!state, error });
 
       if (error) {
         console.error('OAuth error:', error);
@@ -48,6 +49,7 @@ const AmazonCallbackPage = () => {
         console.log('Processing Amazon OAuth callback...');
         const result = await handleOAuthCallback(code, state);
         
+        console.log('OAuth callback result:', result);
         setProfileCount(result.profileCount);
         setStatus('success');
         
@@ -64,7 +66,11 @@ const AmazonCallbackPage = () => {
           });
         }
         
-        setTimeout(() => navigate('/settings'), 3000);
+        // Wait a bit longer before redirecting to ensure data is fully synced
+        setTimeout(() => {
+          console.log('Redirecting to settings page...');
+          navigate('/settings');
+        }, 2000);
       } catch (err) {
         console.error('Error processing callback:', err);
         setStatus('error');

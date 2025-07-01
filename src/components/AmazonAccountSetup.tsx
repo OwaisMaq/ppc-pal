@@ -1,11 +1,10 @@
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LinkIcon, RefreshCw, Trash2, CheckCircle, AlertCircle, Clock, AlertTriangle, RotateCcw, Check } from "lucide-react";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { formatDistanceToNow } from "date-fns";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { amazonConnectionService } from "@/services/amazonConnectionService";
 
@@ -13,6 +12,26 @@ const AmazonAccountSetup = () => {
   const { connections, loading, initiateConnection, syncConnection, deleteConnection, refreshConnections } = useAmazonConnections();
   const [retryingConnections, setRetryingConnections] = useState<Set<string>>(new Set());
   const { toast } = useToast();
+
+  // Add an effect to periodically refresh connections in case of missed updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      console.log('Periodic refresh of Amazon connections...');
+      refreshConnections();
+    }, 10000); // Refresh every 10 seconds
+
+    return () => clearInterval(interval);
+  }, [refreshConnections]);
+
+  // Add a manual refresh button for debugging
+  const handleManualRefresh = async () => {
+    console.log('Manual refresh triggered by user');
+    toast({
+      title: "Refreshing",
+      description: "Checking for updated connection status...",
+    });
+    await refreshConnections();
+  };
 
   const handleConnect = () => {
     const redirectUri = `${window.location.origin}/auth/amazon/callback`;
@@ -175,6 +194,15 @@ const AmazonAccountSetup = () => {
         <CardTitle className="flex items-center gap-2 text-lg">
           <LinkIcon className="h-4 w-4 text-blue-600" />
           Amazon Ads Account Setup
+          <Button 
+            onClick={handleManualRefresh} 
+            variant="ghost" 
+            size="sm"
+            className="ml-auto"
+            title="Refresh connection status"
+          >
+            <RefreshCw className="h-3 w-3" />
+          </Button>
         </CardTitle>
         <CardDescription className="text-sm">
           Connect your Amazon Advertising accounts to enable automated PPC optimization.

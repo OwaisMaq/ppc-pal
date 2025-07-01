@@ -24,9 +24,13 @@ export const useAmazonConnections = () => {
 
   const fetchConnections = async () => {
     if (!user) {
+      console.log('No user found, skipping connection fetch');
       setLoading(false);
       return;
     }
+
+    console.log('Fetching Amazon connections for user:', user.id);
+    setLoading(true);
 
     try {
       // Use any type to bypass TypeScript issues with new tables
@@ -35,20 +39,27 @@ export const useAmazonConnections = () => {
         .select('*')
         .eq('user_id', user.id);
 
+      console.log('Amazon connections query result:', { data, error });
+
       if (error) throw error;
 
-      const formattedConnections: AmazonConnection[] = (data || []).map((conn: any) => ({
-        id: conn.id,
-        status: conn.status === 'active' ? 'connected' : 'disconnected',
-        profileName: conn.profile_name || 'Amazon Profile',
-        connectedAt: conn.created_at,
-        marketplace_id: conn.marketplace_id,
-        profile_id: conn.profile_id,
-        profile_name: conn.profile_name,
-        last_sync_at: conn.last_sync_at
-      }));
+      const formattedConnections: AmazonConnection[] = (data || []).map((conn: any) => {
+        console.log('Processing connection:', conn);
+        return {
+          id: conn.id,
+          status: conn.status === 'active' ? 'connected' : 'disconnected',
+          profileName: conn.profile_name || 'Amazon Profile',
+          connectedAt: conn.created_at,
+          marketplace_id: conn.marketplace_id,
+          profile_id: conn.profile_id,
+          profile_name: conn.profile_name,
+          last_sync_at: conn.last_sync_at
+        };
+      });
 
+      console.log('Formatted connections:', formattedConnections);
       setConnections(formattedConnections);
+      setError(null);
     } catch (err) {
       console.error('Error fetching connections:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch connections');
@@ -62,6 +73,7 @@ export const useAmazonConnections = () => {
   }, [user]);
 
   const refreshConnections = async () => {
+    console.log('Manually refreshing connections...');
     await fetchConnections();
   };
 
@@ -73,9 +85,12 @@ export const useAmazonConnections = () => {
         body: { redirectUri }
       });
 
+      console.log('OAuth init response:', { data, error });
+
       if (error) throw error;
 
       if (data?.authUrl) {
+        console.log('Redirecting to Amazon OAuth URL:', data.authUrl);
         window.location.href = data.authUrl;
       } else {
         throw new Error('No authorization URL received');
@@ -118,6 +133,8 @@ export const useAmazonConnections = () => {
 
   const deleteConnection = async (connectionId: string) => {
     try {
+      console.log('Deleting connection:', connectionId);
+      
       const { error } = await (supabase as any)
         .from('amazon_connections')
         .delete()
@@ -143,15 +160,19 @@ export const useAmazonConnections = () => {
 
   const handleOAuthCallback = async (code: string, state: string) => {
     try {
-      console.log('Handling OAuth callback:', code, state);
+      console.log('Handling OAuth callback with code:', code, 'state:', state);
       
       const { data, error } = await supabase.functions.invoke('amazon-oauth-callback', {
         body: { code, state }
       });
 
+      console.log('OAuth callback response:', { data, error });
+
       if (error) throw error;
 
-      await refreshConnections();
+      // Force refresh connections after successful callback
+      console.log('OAuth callback successful, refreshing connections...');
+      await fetchConnections();
       
       return { profileCount: data?.profileCount || 0 };
     } catch (err) {
