@@ -59,23 +59,23 @@ const AmazonAccountSetup = () => {
   const getStatusIcon = (status: string, profileId?: string) => {
     // Check for setup required profiles
     if (profileId?.includes('setup_required') || profileId?.includes('needs_setup')) {
-      return <AlertTriangle className="h-4 w-4 text-orange-500" />;
+      return <AlertTriangle className="h-3 w-3 text-orange-500" />;
     }
     
     // Check for invalid profile IDs (legacy)
     if (profileId?.startsWith('profile_') || profileId === 'unknown') {
-      return <AlertTriangle className="h-4 w-4 text-orange-500" />;
+      return <AlertTriangle className="h-3 w-3 text-orange-500" />;
     }
     
     switch (status) {
       case 'connected':
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
+        return <CheckCircle className="h-3 w-3 text-green-500" />;
       case 'error':
-        return <AlertCircle className="h-4 w-4 text-red-500" />;
+        return <AlertCircle className="h-3 w-3 text-red-500" />;
       case 'disconnected':
-        return <AlertCircle className="h-4 w-4 text-orange-500" />;
+        return <AlertCircle className="h-3 w-3 text-orange-500" />;
       default:
-        return <AlertCircle className="h-4 w-4 text-gray-500" />;
+        return <AlertCircle className="h-3 w-3 text-gray-500" />;
     }
   };
 
@@ -147,36 +147,32 @@ const AmazonAccountSetup = () => {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <LinkIcon className="h-5 w-5 text-blue-600" />
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-lg">
+          <LinkIcon className="h-4 w-4 text-blue-600" />
           Amazon Ads Account Setup
         </CardTitle>
-        <CardDescription>
-          Connect your Amazon Advertising accounts to enable automated optimization. 
-          Your API credentials are configured and ready to use.
+        <CardDescription className="text-sm">
+          Connect your Amazon Advertising accounts to enable automated optimization.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3 pt-0">
         {loading ? (
-          <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="flex items-center justify-center py-4">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
           </div>
         ) : (
           <>
             {connections.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-gray-500 mb-4">No Amazon accounts connected yet</p>
-                <p className="text-sm text-gray-400 mb-6">
-                  Click below to connect your first Amazon Advertising account
-                </p>
-                <Button onClick={handleConnect} className="bg-orange-600 hover:bg-orange-700">
-                  <LinkIcon className="h-4 w-4 mr-2" />
+              <div className="text-center py-4">
+                <p className="text-gray-500 text-sm mb-2">No Amazon accounts connected yet</p>
+                <Button onClick={handleConnect} size="sm" className="bg-orange-600 hover:bg-orange-700">
+                  <LinkIcon className="h-3 w-3 mr-1" />
                   Connect Amazon Account
                 </Button>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {connections.map((connection) => {
                   const needsSetup = needsAttention(connection);
                   const message = getConnectionMessage(connection);
@@ -184,29 +180,29 @@ const AmazonAccountSetup = () => {
                   const isRetrying = retryingConnections.has(connection.id);
                   
                   return (
-                    <div key={connection.id} className="border rounded-lg p-4">
+                    <div key={connection.id} className="border rounded-md p-3">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
                           {getStatusIcon(connection.status, connection.profile_id)}
-                          <div>
-                            <h4 className="font-medium">{connection.profileName || 'Amazon Profile'}</h4>
-                            <p className="text-sm text-gray-500">
+                          <div className="min-w-0 flex-1">
+                            <h4 className="font-medium text-sm">{connection.profileName || 'Amazon Profile'}</h4>
+                            <p className="text-xs text-gray-500 truncate">
                               Profile ID: {connection.profile_id || 'N/A'} • Marketplace: {connection.marketplace_id || 'US'}
                               {connection.last_sync_at && !needsSetup && (
-                                <span className="ml-2">
+                                <span className="ml-1">
                                   • Last sync: {formatDistanceToNow(new Date(connection.last_sync_at), { addSuffix: true })}
                                 </span>
                               )}
                             </p>
                             {message && (
-                              <p className="text-sm text-orange-600 mt-1 font-medium">
+                              <p className="text-xs text-orange-600 mt-1 font-medium">
                                 {message}
                               </p>
                             )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Badge className={getStatusColor(connection.status, connection.profile_id)}>
+                        <div className="flex items-center gap-1">
+                          <Badge className={`text-xs ${getStatusColor(connection.status, connection.profile_id)}`}>
                             {getStatusText(connection.status, connection.profile_id)}
                           </Badge>
                           
@@ -217,13 +213,13 @@ const AmazonAccountSetup = () => {
                               variant="outline"
                               disabled={isRetrying}
                               title="Retry fetching advertising profiles"
+                              className="h-7 px-2"
                             >
                               {isRetrying ? (
-                                <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+                                <RefreshCw className="h-3 w-3 animate-spin" />
                               ) : (
-                                <RotateCcw className="h-4 w-4 mr-1" />
+                                <RotateCcw className="h-3 w-3" />
                               )}
-                              Retry
                             </Button>
                           )}
                           
@@ -231,11 +227,10 @@ const AmazonAccountSetup = () => {
                             <Button
                               onClick={handleConnect}
                               size="sm"
-                              className="bg-orange-600 hover:bg-orange-700"
+                              className="bg-orange-600 hover:bg-orange-700 h-7 px-2"
                               title="Reconnect account"
                             >
-                              <LinkIcon className="h-4 w-4 mr-1" />
-                              Reconnect
+                              <LinkIcon className="h-3 w-3" />
                             </Button>
                           ) : !needsSetup && (
                             <Button
@@ -244,8 +239,9 @@ const AmazonAccountSetup = () => {
                               onClick={() => syncConnection(connection.id)}
                               disabled={connection.status !== 'connected'}
                               title="Sync campaign data"
+                              className="h-7 px-2"
                             >
-                              <RefreshCw className="h-4 w-4" />
+                              <RefreshCw className="h-3 w-3" />
                             </Button>
                           )}
                           
@@ -254,16 +250,17 @@ const AmazonAccountSetup = () => {
                             size="sm"
                             onClick={() => deleteConnection(connection.id)}
                             title="Remove connection"
+                            className="h-7 px-2"
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-3 w-3" />
                           </Button>
                         </div>
                       </div>
                     </div>
                   );
                 })}
-                <Button onClick={handleConnect} variant="outline" className="w-full">
-                  <LinkIcon className="h-4 w-4 mr-2" />
+                <Button onClick={handleConnect} variant="outline" size="sm" className="w-full">
+                  <LinkIcon className="h-3 w-3 mr-1" />
                   Connect Another Account
                 </Button>
               </div>
