@@ -7,10 +7,24 @@ import { Button } from "@/components/ui/button";
 import { Search, Filter } from 'lucide-react';
 
 interface FilterBarProps {
+  selectedCountry?: string;
+  selectedAsin?: string;
+  selectedProduct?: string;
+  onCountryChange?: (value: string) => void;
+  onAsinChange?: (value: string) => void;
+  onProductChange?: (value: string) => void;
   onFilterChange?: (filters: any) => void;
 }
 
-const FilterBar = ({ onFilterChange }: FilterBarProps) => {
+const FilterBar = ({ 
+  selectedCountry = 'all',
+  selectedAsin = 'all',
+  selectedProduct = 'all',
+  onCountryChange,
+  onAsinChange,
+  onProductChange,
+  onFilterChange 
+}: FilterBarProps) => {
   return (
     <Card>
       <CardContent className="p-4">
@@ -23,26 +37,33 @@ const FilterBar = ({ onFilterChange }: FilterBarProps) => {
             />
           </div>
           
-          <Select>
+          <Select value={selectedCountry} onValueChange={onCountryChange}>
             <SelectTrigger className="w-48">
-              <SelectValue placeholder="Campaign Status" />
+              <SelectValue placeholder="Country" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="paused">Paused</SelectItem>
-              <SelectItem value="archived">Archived</SelectItem>
+              <SelectItem value="all">All Countries</SelectItem>
+              <SelectItem value="us">United States</SelectItem>
+              <SelectItem value="uk">United Kingdom</SelectItem>
+              <SelectItem value="de">Germany</SelectItem>
             </SelectContent>
           </Select>
 
-          <Select>
+          <Select value={selectedAsin} onValueChange={onAsinChange}>
             <SelectTrigger className="w-48">
-              <SelectValue placeholder="Date Range" />
+              <SelectValue placeholder="Campaign" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="7d">Last 7 days</SelectItem>
-              <SelectItem value="30d">Last 30 days</SelectItem>
-              <SelectItem value="90d">Last 90 days</SelectItem>
+              <SelectItem value="all">All Campaigns</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={selectedProduct} onValueChange={onProductChange}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Product" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Products</SelectItem>
             </SelectContent>
           </Select>
 

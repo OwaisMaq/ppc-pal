@@ -16,6 +16,10 @@ export interface CampaignData {
   campaign_type?: string;
   data_source?: string;
   last_updated?: string;
+  targeting_type?: string;
+  daily_budget?: number;
+  start_date?: string;
+  end_date?: string;
 }
 
 export const useCampaignData = (connectionId?: string) => {
