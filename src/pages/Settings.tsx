@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { Settings as SettingsIcon, User, Bell, Shield } from 'lucide-react';
+import AmazonAccountSetup from '@/components/AmazonAccountSetup';
 
 const Settings = () => {
   const { user } = useAuth();
@@ -24,6 +25,9 @@ const Settings = () => {
             Manage your account settings and preferences
           </p>
         </div>
+
+        {/* Amazon Account Setup */}
+        <AmazonAccountSetup />
 
         {/* Profile Settings */}
         <Card>
