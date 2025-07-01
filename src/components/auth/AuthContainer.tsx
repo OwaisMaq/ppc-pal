@@ -2,7 +2,7 @@
 import React from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import AuthHeader from './AuthHeader';
-import AuthForm from './AuthForm';
+import AuthFormContainer from './AuthFormContainer';
 import AuthFooter from './AuthFooter';
 
 interface AuthContainerProps {
@@ -15,7 +15,7 @@ const AuthContainer = ({ mode = 'signin' }: AuthContainerProps) => {
       <Card className="w-full max-w-md">
         <CardContent className="p-6">
           <AuthHeader mode={mode} />
-          <AuthForm mode={mode} />
+          <AuthFormContainer mode={mode} />
           <AuthFooter mode={mode} />
         </CardContent>
       </Card>

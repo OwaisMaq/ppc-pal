@@ -1,5 +1,9 @@
 
-const AuthFooter = () => {
+interface AuthFooterProps {
+  mode?: 'signin' | 'signup';
+}
+
+const AuthFooter = ({ mode = 'signin' }: AuthFooterProps) => {
   return (
     <div className="mt-8 text-center text-sm text-gray-500">
       <div className="mb-1">

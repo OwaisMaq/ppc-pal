@@ -1,7 +1,21 @@
 
 import { Bot } from "lucide-react";
 
-const AuthHeader = () => {
+interface AuthHeaderProps {
+  mode?: 'signin' | 'signup';
+}
+
+const AuthHeader = ({ mode = 'signin' }: AuthHeaderProps) => {
+  const getTitle = () => {
+    return mode === 'signup' ? 'Create your account' : 'Welcome back';
+  };
+
+  const getDescription = () => {
+    return mode === 'signup' 
+      ? 'Sign up to start optimizing your Amazon advertising campaigns'
+      : 'Sign in to optimize your Amazon advertising campaigns';
+  };
+
   return (
     <div className="text-center mb-8">
       <div className="flex items-center justify-center mb-4">
@@ -10,8 +24,9 @@ const AuthHeader = () => {
         </div>
         <h1 className="text-2xl font-bold text-gray-900">PPC Pal</h1>
       </div>
+      <h2 className="text-xl font-semibold text-gray-800 mb-2">{getTitle()}</h2>
       <p className="text-gray-600">
-        Sign in to optimize your Amazon advertising campaigns
+        {getDescription()}
       </p>
     </div>
   );
