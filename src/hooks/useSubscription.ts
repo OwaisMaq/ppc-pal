@@ -115,6 +115,9 @@ export const useSubscription = () => {
     await fetchSubscription();
   };
 
+  // Add canOptimize as an alias for checkCanOptimize for backward compatibility
+  const canOptimize = !loading && !isFreeTier;
+
   return { 
     subscription, 
     usage,
@@ -123,6 +126,7 @@ export const useSubscription = () => {
     error,
     isFreeTier,
     isProTier,
+    canOptimize,
     checkCanOptimize,
     incrementUsage,
     createCheckoutSession,

@@ -10,8 +10,10 @@ interface DebugInfo {
 
 interface DebugStep {
   step: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'success' | 'error' | 'warning';
   message: string;
+  details?: string;
+  data?: any;
 }
 
 export const useDebugAmazonSync = () => {
@@ -50,8 +52,10 @@ export const useDebugAmazonSync = () => {
     setDebugSteps([
       {
         step: 'Connection Check',
-        status: 'failed',
-        message: 'Amazon functionality has been removed'
+        status: 'error',
+        message: 'Amazon functionality has been removed',
+        details: 'This feature is no longer available',
+        data: { removed: true }
       }
     ]);
     

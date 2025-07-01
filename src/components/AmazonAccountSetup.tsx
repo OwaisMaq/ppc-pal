@@ -68,14 +68,12 @@ const AmazonAccountSetup = () => {
     }
     
     switch (status) {
-      case 'active':
+      case 'connected':
         return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'expired':
-        return <AlertCircle className="h-4 w-4 text-orange-500" />;
       case 'error':
         return <AlertCircle className="h-4 w-4 text-red-500" />;
-      case 'pending':
-        return <Clock className="h-4 w-4 text-blue-500" />;
+      case 'disconnected':
+        return <AlertCircle className="h-4 w-4 text-orange-500" />;
       default:
         return <AlertCircle className="h-4 w-4 text-gray-500" />;
     }
@@ -93,14 +91,12 @@ const AmazonAccountSetup = () => {
     }
     
     switch (status) {
-      case 'active':
+      case 'connected':
         return 'bg-green-100 text-green-800';
-      case 'expired':
-        return 'bg-orange-100 text-orange-800';
       case 'error':
         return 'bg-red-100 text-red-800';
-      case 'pending':
-        return 'bg-blue-100 text-blue-800';
+      case 'disconnected':
+        return 'bg-orange-100 text-orange-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -193,9 +189,9 @@ const AmazonAccountSetup = () => {
                         <div className="flex items-center gap-3">
                           {getStatusIcon(connection.status, connection.profile_id)}
                           <div>
-                            <h4 className="font-medium">{connection.profile_name || 'Amazon Profile'}</h4>
+                            <h4 className="font-medium">{connection.profileName || 'Amazon Profile'}</h4>
                             <p className="text-sm text-gray-500">
-                              Profile ID: {connection.profile_id} • Marketplace: {connection.marketplace_id || 'US'}
+                              Profile ID: {connection.profile_id || 'N/A'} • Marketplace: {connection.marketplace_id || 'US'}
                               {connection.last_sync_at && !needsSetup && (
                                 <span className="ml-2">
                                   • Last sync: {formatDistanceToNow(new Date(connection.last_sync_at), { addSuffix: true })}
@@ -246,7 +242,7 @@ const AmazonAccountSetup = () => {
                               variant="outline"
                               size="sm"
                               onClick={() => syncConnection(connection.id)}
-                              disabled={connection.status !== 'active'}
+                              disabled={connection.status !== 'connected'}
                               title="Sync campaign data"
                             >
                               <RefreshCw className="h-4 w-4" />
