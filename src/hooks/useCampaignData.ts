@@ -41,7 +41,8 @@ export const useCampaignData = (connectionId?: string) => {
 
     setLoading(true);
     try {
-      let query = supabase
+      // Use any type to bypass TypeScript issues with new tables
+      let query = (supabase as any)
         .from('campaigns')
         .select(`
           *,
@@ -57,7 +58,7 @@ export const useCampaignData = (connectionId?: string) => {
 
       if (error) throw error;
 
-      const formattedCampaigns: CampaignData[] = (data || []).map(campaign => ({
+      const formattedCampaigns: CampaignData[] = (data || []).map((campaign: any) => ({
         id: campaign.id,
         name: campaign.name,
         status: campaign.status,

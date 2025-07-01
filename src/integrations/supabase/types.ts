@@ -9,6 +9,193 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      ad_groups: {
+        Row: {
+          acos: number | null
+          amazon_adgroup_id: string
+          campaign_id: string
+          clicks: number | null
+          created_at: string
+          default_bid: number | null
+          id: string
+          impressions: number | null
+          last_updated: string | null
+          name: string
+          orders: number | null
+          roas: number | null
+          sales: number | null
+          spend: number | null
+          status: Database["public"]["Enums"]["campaign_status"]
+        }
+        Insert: {
+          acos?: number | null
+          amazon_adgroup_id: string
+          campaign_id: string
+          clicks?: number | null
+          created_at?: string
+          default_bid?: number | null
+          id?: string
+          impressions?: number | null
+          last_updated?: string | null
+          name: string
+          orders?: number | null
+          roas?: number | null
+          sales?: number | null
+          spend?: number | null
+          status?: Database["public"]["Enums"]["campaign_status"]
+        }
+        Update: {
+          acos?: number | null
+          amazon_adgroup_id?: string
+          campaign_id?: string
+          clicks?: number | null
+          created_at?: string
+          default_bid?: number | null
+          id?: string
+          impressions?: number | null
+          last_updated?: string | null
+          name?: string
+          orders?: number | null
+          roas?: number | null
+          sales?: number | null
+          spend?: number | null
+          status?: Database["public"]["Enums"]["campaign_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_groups_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      amazon_connections: {
+        Row: {
+          access_token: string
+          created_at: string
+          id: string
+          last_sync_at: string | null
+          marketplace_id: string | null
+          profile_id: string
+          profile_name: string | null
+          refresh_token: string
+          status: Database["public"]["Enums"]["api_connection_status"]
+          token_expires_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          id?: string
+          last_sync_at?: string | null
+          marketplace_id?: string | null
+          profile_id: string
+          profile_name?: string | null
+          refresh_token: string
+          status?: Database["public"]["Enums"]["api_connection_status"]
+          token_expires_at: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          id?: string
+          last_sync_at?: string | null
+          marketplace_id?: string | null
+          profile_id?: string
+          profile_name?: string | null
+          refresh_token?: string
+          status?: Database["public"]["Enums"]["api_connection_status"]
+          token_expires_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      campaigns: {
+        Row: {
+          acos: number | null
+          amazon_campaign_id: string
+          budget: number | null
+          campaign_type: string | null
+          clicks: number | null
+          connection_id: string
+          created_at: string
+          daily_budget: number | null
+          data_source: string | null
+          end_date: string | null
+          id: string
+          impressions: number | null
+          last_updated: string | null
+          name: string
+          orders: number | null
+          roas: number | null
+          sales: number | null
+          spend: number | null
+          start_date: string | null
+          status: Database["public"]["Enums"]["campaign_status"]
+          targeting_type: string | null
+        }
+        Insert: {
+          acos?: number | null
+          amazon_campaign_id: string
+          budget?: number | null
+          campaign_type?: string | null
+          clicks?: number | null
+          connection_id: string
+          created_at?: string
+          daily_budget?: number | null
+          data_source?: string | null
+          end_date?: string | null
+          id?: string
+          impressions?: number | null
+          last_updated?: string | null
+          name: string
+          orders?: number | null
+          roas?: number | null
+          sales?: number | null
+          spend?: number | null
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["campaign_status"]
+          targeting_type?: string | null
+        }
+        Update: {
+          acos?: number | null
+          amazon_campaign_id?: string
+          budget?: number | null
+          campaign_type?: string | null
+          clicks?: number | null
+          connection_id?: string
+          created_at?: string
+          daily_budget?: number | null
+          data_source?: string | null
+          end_date?: string | null
+          id?: string
+          impressions?: number | null
+          last_updated?: string | null
+          name?: string
+          orders?: number | null
+          roas?: number | null
+          sales?: number | null
+          spend?: number | null
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["campaign_status"]
+          targeting_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaigns_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "amazon_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       feedback: {
         Row: {
           created_at: string
@@ -47,6 +234,195 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      keywords: {
+        Row: {
+          acos: number | null
+          adgroup_id: string
+          amazon_keyword_id: string
+          bid: number | null
+          clicks: number | null
+          conversion_rate: number | null
+          cpc: number | null
+          created_at: string
+          ctr: number | null
+          id: string
+          impressions: number | null
+          keyword_text: string
+          last_updated: string | null
+          match_type: string
+          orders: number | null
+          roas: number | null
+          sales: number | null
+          spend: number | null
+          status: Database["public"]["Enums"]["campaign_status"]
+        }
+        Insert: {
+          acos?: number | null
+          adgroup_id: string
+          amazon_keyword_id: string
+          bid?: number | null
+          clicks?: number | null
+          conversion_rate?: number | null
+          cpc?: number | null
+          created_at?: string
+          ctr?: number | null
+          id?: string
+          impressions?: number | null
+          keyword_text: string
+          last_updated?: string | null
+          match_type: string
+          orders?: number | null
+          roas?: number | null
+          sales?: number | null
+          spend?: number | null
+          status?: Database["public"]["Enums"]["campaign_status"]
+        }
+        Update: {
+          acos?: number | null
+          adgroup_id?: string
+          amazon_keyword_id?: string
+          bid?: number | null
+          clicks?: number | null
+          conversion_rate?: number | null
+          cpc?: number | null
+          created_at?: string
+          ctr?: number | null
+          id?: string
+          impressions?: number | null
+          keyword_text?: string
+          last_updated?: string | null
+          match_type?: string
+          orders?: number | null
+          roas?: number | null
+          sales?: number | null
+          spend?: number | null
+          status?: Database["public"]["Enums"]["campaign_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "keywords_adgroup_id_fkey"
+            columns: ["adgroup_id"]
+            isOneToOne: false
+            referencedRelation: "ad_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      optimization_recommendations: {
+        Row: {
+          applied: boolean | null
+          applied_at: string | null
+          created_at: string
+          current_value: string | null
+          entity_id: string
+          entity_type: string
+          estimated_impact: number | null
+          id: string
+          impact_level: string
+          optimization_result_id: string
+          reasoning: string
+          recommendation_type: string
+          recommended_value: string | null
+        }
+        Insert: {
+          applied?: boolean | null
+          applied_at?: string | null
+          created_at?: string
+          current_value?: string | null
+          entity_id: string
+          entity_type: string
+          estimated_impact?: number | null
+          id?: string
+          impact_level: string
+          optimization_result_id: string
+          reasoning: string
+          recommendation_type: string
+          recommended_value?: string | null
+        }
+        Update: {
+          applied?: boolean | null
+          applied_at?: string | null
+          created_at?: string
+          current_value?: string | null
+          entity_id?: string
+          entity_type?: string
+          estimated_impact?: number | null
+          id?: string
+          impact_level?: string
+          optimization_result_id?: string
+          reasoning?: string
+          recommendation_type?: string
+          recommended_value?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "optimization_recommendations_optimization_result_id_fkey"
+            columns: ["optimization_result_id"]
+            isOneToOne: false
+            referencedRelation: "optimization_results"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      optimization_results: {
+        Row: {
+          completed_at: string | null
+          connection_id: string
+          created_at: string
+          error_message: string | null
+          estimated_impact_sales: number | null
+          estimated_impact_spend: number | null
+          id: string
+          optimization_type: string
+          results_data: Json | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["optimization_status"]
+          total_keywords_analyzed: number | null
+          total_recommendations: number | null
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          connection_id: string
+          created_at?: string
+          error_message?: string | null
+          estimated_impact_sales?: number | null
+          estimated_impact_spend?: number | null
+          id?: string
+          optimization_type: string
+          results_data?: Json | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["optimization_status"]
+          total_keywords_analyzed?: number | null
+          total_recommendations?: number | null
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          connection_id?: string
+          created_at?: string
+          error_message?: string | null
+          estimated_impact_sales?: number | null
+          estimated_impact_spend?: number | null
+          id?: string
+          optimization_type?: string
+          results_data?: Json | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["optimization_status"]
+          total_keywords_analyzed?: number | null
+          total_recommendations?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "optimization_results_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "amazon_connections"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -196,6 +572,10 @@ export type Database = {
         Args: { user_uuid: string }
         Returns: boolean
       }
+      create_optimization_batch: {
+        Args: { user_uuid: string; connection_uuid: string }
+        Returns: string
+      }
       grant_admin_role_by_email: {
         Args: { user_email: string }
         Returns: undefined
@@ -211,9 +591,16 @@ export type Database = {
         Args: { user_uuid: string }
         Returns: undefined
       }
+      sync_amazon_data: {
+        Args: { connection_uuid: string }
+        Returns: undefined
+      }
     }
     Enums: {
+      api_connection_status: "active" | "expired" | "error" | "pending"
       app_role: "admin" | "user"
+      campaign_status: "enabled" | "paused" | "archived"
+      optimization_status: "pending" | "in_progress" | "completed" | "failed"
       subscription_plan: "free" | "pro"
       subscription_status: "active" | "cancelled" | "past_due" | "incomplete"
     }
@@ -331,7 +718,10 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      api_connection_status: ["active", "expired", "error", "pending"],
       app_role: ["admin", "user"],
+      campaign_status: ["enabled", "paused", "archived"],
+      optimization_status: ["pending", "in_progress", "completed", "failed"],
       subscription_plan: ["free", "pro"],
       subscription_status: ["active", "cancelled", "past_due", "incomplete"],
     },

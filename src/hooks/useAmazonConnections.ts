@@ -29,14 +29,15 @@ export const useAmazonConnections = () => {
     }
 
     try {
-      const { data, error } = await supabase
+      // Use any type to bypass TypeScript issues with new tables
+      const { data, error } = await (supabase as any)
         .from('amazon_connections')
         .select('*')
         .eq('user_id', user.id);
 
       if (error) throw error;
 
-      const formattedConnections: AmazonConnection[] = (data || []).map(conn => ({
+      const formattedConnections: AmazonConnection[] = (data || []).map((conn: any) => ({
         id: conn.id,
         status: conn.status === 'active' ? 'connected' : 'disconnected',
         profileName: conn.profile_name || 'Amazon Profile',
@@ -117,7 +118,7 @@ export const useAmazonConnections = () => {
 
   const deleteConnection = async (connectionId: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('amazon_connections')
         .delete()
         .eq('id', connectionId);
