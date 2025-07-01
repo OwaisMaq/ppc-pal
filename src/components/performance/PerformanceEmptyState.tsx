@@ -5,10 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Plus, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { AmazonConnection } from '@/lib/amazon/types';
+import { Connection } from '@/types/common';
 
 interface PerformanceEmptyStateProps {
-  connections: AmazonConnection[];
+  connections: Connection[];
   getFilteredDescription: () => string;
 }
 
@@ -28,7 +28,7 @@ const PerformanceEmptyState = ({ connections, getFilteredDescription }: Performa
       <div>
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Performance Summary</h2>
         <p className="text-gray-600">
-          Campaign performance metrics from Amazon API{getFilteredDescription()}
+          Campaign performance metrics{getFilteredDescription()}
         </p>
       </div>
 
@@ -44,8 +44,8 @@ const PerformanceEmptyState = ({ connections, getFilteredDescription }: Performa
             <AlertCircle className="h-4 w-4 text-orange-600" />
             <AlertDescription className="text-orange-800">
               {connections.length === 0 
-                ? "You haven't connected any Amazon Advertising accounts yet. Connect your account to start viewing performance metrics."
-                : "Your Amazon connection is set up but no campaign data has been synced yet. This could mean your account has no active campaigns or the sync process hasn't completed."
+                ? "You haven't connected any accounts yet. Connect your account to start viewing performance metrics."
+                : "Your connection is set up but no campaign data has been synced yet. This could mean your account has no active campaigns or the sync process hasn't completed."
               }
             </AlertDescription>
           </Alert>
@@ -58,7 +58,7 @@ const PerformanceEmptyState = ({ connections, getFilteredDescription }: Performa
                 className="bg-orange-600 hover:bg-orange-700"
               >
                 <Plus className="h-4 w-4 mr-2" />
-                Connect Amazon Account
+                Connect Account
               </Button>
             ) : (
               <Button 
@@ -83,7 +83,7 @@ const PerformanceEmptyState = ({ connections, getFilteredDescription }: Performa
           <div className="text-sm text-orange-700">
             <p className="font-medium mb-2">Getting started:</p>
             <ul className="list-disc list-inside space-y-1">
-              <li>Ensure you have an active Amazon Advertising account</li>
+              <li>Ensure you have an active advertising account</li>
               <li>Make sure your advertising campaigns are running</li>
               <li>Allow up to 24 hours for initial data sync</li>
               <li>Contact support if you continue having issues</li>

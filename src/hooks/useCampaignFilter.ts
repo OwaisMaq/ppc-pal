@@ -1,16 +1,45 @@
 
-import { useMemo } from 'react';
-import { CampaignData } from '@/services/campaignDataService';
+import { useState, useMemo } from 'react';
+import { Campaign } from '@/types/common';
 
-export const useCampaignFilter = (campaigns: CampaignData[], connectionId?: string) => {
+interface CampaignFilters {
+  status: string[];
+  dateRange: string;
+  searchQuery: string;
+}
+
+export const useCampaignFilter = (campaigns: Campaign[] = []) => {
+  const [filters, setFilters] = useState<CampaignFilters>({
+    status: [],
+    dateRange: '30d',
+    searchQuery: ''
+  });
+
   const filteredCampaigns = useMemo(() => {
-    if (!connectionId) return campaigns;
-    return campaigns.filter(campaign => campaign.connection_id === connectionId);
-  }, [campaigns, connectionId]);
+    return campaigns.filter(campaign => {
+      // Status filter
+      if (filters.status.length > 0 && !filters.status.includes(campaign.status)) {
+        return false;
+      }
+
+      // Search query filter
+      if (filters.searchQuery && !campaign.name.toLowerCase().includes(filters.searchQuery.toLowerCase())) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [campaigns, filters]);
+
+  const updateFilters = (newFilters: Partial<CampaignFilters>) => {
+    setFilters(prev => ({ ...prev, ...newFilters }));
+  };
 
   return {
-    campaigns: filteredCampaigns,
-    totalCount: campaigns.length,
+    filters,
+    filteredCampaigns,
+    updateFilters,
+    totalCampaigns: campaigns.length,
     filteredCount: filteredCampaigns.length
   };
 };

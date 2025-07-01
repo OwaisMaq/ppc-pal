@@ -1,45 +1,87 @@
 
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Upload, FileSpreadsheet } from "lucide-react";
-import FileUpload from "@/components/FileUpload";
-import DataPreview from "@/components/DataPreview";
-import { AdvertisingData } from "@/pages/Index";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AdvertisingData } from '@/types/common';
+import FileUpload from './FileUpload';
+import DataPreview from './DataPreview';
+import { Upload, CheckCircle } from 'lucide-react';
 
 interface UploadSectionProps {
-  uploadedData: AdvertisingData | null;
-  onFileUpload: (data: AdvertisingData) => void;
+  onDataUploaded?: (data: AdvertisingData) => void;
 }
 
-const UploadSection = ({ uploadedData, onFileUpload }: UploadSectionProps) => {
+const UploadSection = ({ onDataUploaded }: UploadSectionProps) => {
+  const [uploadedData, setUploadedData] = useState<AdvertisingData | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const handleDataLoaded = async (data: AdvertisingData) => {
+    setIsProcessing(true);
+    
+    // Simulate processing delay
+    setTimeout(() => {
+      setUploadedData(data);
+      setIsProcessing(false);
+      onDataUploaded?.(data);
+    }, 2000);
+  };
+
+  const handleConfirmUpload = () => {
+    if (uploadedData) {
+      // Process the upload
+      console.log('Processing upload:', uploadedData);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <Card className="border-2 border-dashed border-gray-300 hover:border-blue-400 transition-colors">
+      <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Upload className="h-5 w-5 text-blue-600" />
-            Upload Amazon Data
+            <Upload className="h-5 w-5" />
+            Data Upload
           </CardTitle>
           <CardDescription>
-            Upload your Excel workbook containing portfolio, campaign, ad group, and keyword data
+            Upload your advertising data to get started with analysis and optimization
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <FileUpload onFileUpload={onFileUpload} />
+          <FileUpload onDataLoaded={handleDataLoaded} />
         </CardContent>
       </Card>
 
+      {isProcessing && (
+        <Alert>
+          <AlertDescription>
+            Processing your data... Please wait while we analyze your files.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {uploadedData && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileSpreadsheet className="h-5 w-5 text-green-600" />
-              Data Preview
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <DataPreview data={uploadedData} />
-          </CardContent>
-        </Card>
+        <>
+          <DataPreview data={uploadedData} />
+          
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                Upload Complete
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-4">
+                <Button onClick={handleConfirmUpload}>
+                  Continue to Analysis
+                </Button>
+                <Button variant="outline" onClick={() => setUploadedData(null)}>
+                  Upload Different File
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </>
       )}
     </div>
   );
