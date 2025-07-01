@@ -16,7 +16,7 @@ const UploadSection = ({ onDataUploaded }: UploadSectionProps) => {
   const [uploadedData, setUploadedData] = useState<AdvertisingData | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const handleDataLoaded = async (data: AdvertisingData) => {
+  const handleDataParsed = async (data: AdvertisingData) => {
     setIsProcessing(true);
     
     // Simulate processing delay
@@ -47,7 +47,7 @@ const UploadSection = ({ onDataUploaded }: UploadSectionProps) => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <FileUpload onDataLoaded={handleDataLoaded} />
+          <FileUpload onDataParsed={handleDataParsed} />
         </CardContent>
       </Card>
 

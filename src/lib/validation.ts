@@ -3,10 +3,10 @@ import { z } from 'zod';
 import { AdvertisingData } from '@/types/common';
 
 export const advertisingDataSchema = z.object({
-  campaigns: z.array(z.any()),
-  keywords: z.array(z.any()),
-  adGroups: z.array(z.any()),
-  connections: z.array(z.any())
+  campaigns: z.array(z.any()).default([]),
+  keywords: z.array(z.any()).default([]),
+  adGroups: z.array(z.any()).default([]),
+  connections: z.array(z.any()).default([])
 });
 
 export const validateAdvertisingData = (data: unknown): AdvertisingData => {
@@ -16,5 +16,10 @@ export const validateAdvertisingData = (data: unknown): AdvertisingData => {
     throw new Error('Invalid advertising data format');
   }
   
-  return result.data;
+  return {
+    campaigns: result.data.campaigns || [],
+    keywords: result.data.keywords || [],
+    adGroups: result.data.adGroups || [],
+    connections: result.data.connections || []
+  };
 };

@@ -8,8 +8,6 @@ import { useCampaignData } from '@/hooks/useCampaignData';
 import { useAmazonConnections } from '@/hooks/useAmazonConnections';
 import { useKeywordFilters } from '@/hooks/useKeywordFilters';
 import KeywordDataHeader from '@/components/keyword-data/KeywordDataHeader';
-import KeywordDataMetrics from '@/components/keyword-data/KeywordDataMetrics';
-import KeywordDataTabs from '@/components/keyword-data/KeywordDataTabs';
 
 const KeywordData = () => {
   const [activeTab, setActiveTab] = useState('keywords');
@@ -76,24 +74,12 @@ const KeywordData = () => {
       <div className="space-y-6">
         <KeywordDataHeader />
 
-        <KeywordDataMetrics
-          totalKeywords={totalKeywords}
-          totalCampaigns={totalProducts}
-          averageRoas={averageRoas}
-          totalRevenue={totalRevenue}
-        />
-
-        <KeywordDataTabs
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          searchTerm={searchTerm}
-          setSearchTerm={setSearchTerm}
-          statusFilter={statusFilter}
-          setStatusFilter={setStatusFilter}
-          filteredKeywords={filteredKeywords}
-          filteredProducts={filteredProducts}
-          campaigns={campaigns}
-        />
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Keyword data functionality has been simplified. Amazon integration components have been removed.
+          </AlertDescription>
+        </Alert>
       </div>
     </AuthenticatedLayout>
   );
