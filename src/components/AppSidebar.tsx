@@ -15,14 +15,9 @@ import {
 } from "@/components/ui/sidebar";
 import { 
   BarChart3, 
-  TrendingUp, 
-  FileText, 
-  Database, 
-  Lightbulb, 
-  PieChart,
   Settings,
   LogOut,
-  Package
+  MessageSquare
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -32,36 +27,6 @@ const navigationItems = [
     title: "Performance Summary",
     url: "/dashboard",
     icon: BarChart3,
-  },
-  {
-    title: "Trends",
-    url: "/trends",
-    icon: TrendingUp,
-  },
-  {
-    title: "Product Setup",
-    url: "/product-setup",
-    icon: Package,
-  },
-  {
-    title: "Optimisation Logs",
-    url: "/optimization-logs",
-    icon: FileText,
-  },
-  {
-    title: "Keyword/Product Data",
-    url: "/keyword-data",
-    icon: Database,
-  },
-  {
-    title: "Recommendations",
-    url: "/recommendations",
-    icon: Lightbulb,
-  },
-  {
-    title: "Reporting",
-    url: "/reporting",
-    icon: PieChart,
   },
 ];
 
@@ -98,6 +63,12 @@ const AppSidebar = () => {
       </SidebarContent>
 
       <SidebarFooter className="p-4 space-y-2">
+        <Link to="/feedback">
+          <Button variant="ghost" className="w-full justify-start">
+            <MessageSquare className="h-4 w-4 mr-2" />
+            Feedback
+          </Button>
+        </Link>
         <Link to="/settings">
           <Button variant="ghost" className="w-full justify-start">
             <Settings className="h-4 w-4 mr-2" />
