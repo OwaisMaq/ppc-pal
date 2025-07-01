@@ -14,12 +14,20 @@ serve(async (req) => {
   }
 
   try {
+    console.log('=== Amazon OAuth Callback Started ===');
     const { code, state } = await req.json();
+    console.log('Received callback with code:', !!code, 'state:', !!state);
     
     const amazonClientId = Deno.env.get('AMAZON_CLIENT_ID');
     const amazonClientSecret = Deno.env.get('AMAZON_CLIENT_SECRET');
     
+    console.log('Amazon credentials configured:', {
+      clientId: !!amazonClientId,
+      clientSecret: !!amazonClientSecret
+    });
+    
     if (!amazonClientId || !amazonClientSecret) {
+      console.error('Missing Amazon credentials');
       throw new Error('Amazon credentials not configured');
     }
 
@@ -29,6 +37,7 @@ serve(async (req) => {
 
     // Get user from auth header
     const authHeader = req.headers.get('authorization');
+    console.log('Auth header present:', !!authHeader);
     if (!authHeader) {
       throw new Error('No authorization header');
     }
@@ -36,10 +45,18 @@ serve(async (req) => {
     const token = authHeader.replace('Bearer ', '');
     const { data: userData, error: userError } = await supabase.auth.getUser(token);
     
+    console.log('User authentication result:', {
+      success: !userError,
+      userId: userData?.user?.id,
+      error: userError?.message
+    });
+    
     if (userError || !userData.user) {
+      console.error('Authentication failed:', userError);
       throw new Error('Invalid authentication');
     }
 
+    console.log('=== Starting token exchange ===');
     // Exchange authorization code for access token
     const tokenResponse = await fetch('https://api.amazon.com/auth/o2/token', {
       method: 'POST',
@@ -55,13 +72,17 @@ serve(async (req) => {
       }),
     });
 
+    console.log('Token exchange response status:', tokenResponse.status);
     if (!tokenResponse.ok) {
+      const errorText = await tokenResponse.text();
+      console.error('Token exchange failed:', errorText);
       throw new Error(`Token exchange failed: ${tokenResponse.statusText}`);
     }
 
     const tokenData = await tokenResponse.json();
-    console.log('Token exchange successful');
+    console.log('Token exchange successful, expires in:', tokenData.expires_in);
 
+    console.log('=== Fetching advertising profiles ===');
     // Get advertising profiles
     const profilesResponse = await fetch('https://advertising-api.amazon.com/v2/profiles', {
       headers: {
@@ -70,6 +91,7 @@ serve(async (req) => {
       },
     });
 
+    console.log('Profiles API response status:', profilesResponse.status);
     let profiles = [];
     let profileId = 'setup_required_no_profiles_found';
     let profileName = 'Setup Required';
@@ -78,39 +100,65 @@ serve(async (req) => {
     if (profilesResponse.ok) {
       profiles = await profilesResponse.json();
       console.log('Found advertising profiles:', profiles.length);
+      console.log('Profile details:', profiles.map(p => ({ id: p.profileId, name: p.accountInfo?.name })));
       
       if (profiles.length > 0) {
         const activeProfile = profiles[0];
         profileId = activeProfile.profileId.toString();
         profileName = activeProfile.accountInfo?.name || `Profile ${activeProfile.profileId}`;
         marketplaceId = activeProfile.countryCode || 'US';
+        console.log('Using profile:', { profileId, profileName, marketplaceId });
       }
     } else {
-      console.log('No advertising profiles found or API call failed');
+      const errorText = await profilesResponse.text();
+      console.log('Profiles API failed:', profilesResponse.status, errorText);
     }
+
+    console.log('=== Saving connection to database ===');
+    const connectionData = {
+      user_id: userData.user.id,
+      profile_id: profileId,
+      profile_name: profileName,
+      marketplace_id: marketplaceId,
+      access_token: tokenData.access_token,
+      refresh_token: tokenData.refresh_token,
+      token_expires_at: new Date(Date.now() + (tokenData.expires_in * 1000)).toISOString(),
+      status: profiles.length > 0 ? 'active' : 'error',
+      last_sync_at: new Date().toISOString(),
+    };
+
+    console.log('Connection data to save:', {
+      user_id: connectionData.user_id,
+      profile_id: connectionData.profile_id,
+      profile_name: connectionData.profile_name,
+      marketplace_id: connectionData.marketplace_id,
+      status: connectionData.status,
+      token_expires_at: connectionData.token_expires_at
+    });
 
     // Store connection in database
     const { data: connection, error: dbError } = await supabase
       .from('amazon_connections')
-      .insert({
-        user_id: userData.user.id,
-        profile_id: profileId,
-        profile_name: profileName,
-        marketplace_id: marketplaceId,
-        access_token: tokenData.access_token,
-        refresh_token: tokenData.refresh_token,
-        token_expires_at: new Date(Date.now() + (tokenData.expires_in * 1000)).toISOString(),
-        status: profiles.length > 0 ? 'active' : 'error',
-        last_sync_at: new Date().toISOString(),
-      })
+      .insert(connectionData)
       .select()
       .single();
 
+    console.log('Database insert result:', {
+      success: !dbError,
+      connectionId: connection?.id,
+      error: dbError?.message,
+      details: dbError?.details,
+      hint: dbError?.hint,
+      code: dbError?.code
+    });
+
     if (dbError) {
+      console.error('Database error details:', dbError);
       throw new Error(`Database error: ${dbError.message}`);
     }
 
-    console.log('Amazon connection saved successfully');
+    console.log('=== Amazon connection saved successfully ===');
+    console.log('Final connection ID:', connection.id);
 
     return new Response(
       JSON.stringify({ 
@@ -123,7 +171,9 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error('Error in amazon-oauth-callback:', error);
+    console.error('=== Error in amazon-oauth-callback ===');
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
     return new Response(
       JSON.stringify({ error: error.message }),
       {

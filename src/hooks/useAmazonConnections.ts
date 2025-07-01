@@ -29,23 +29,49 @@ export const useAmazonConnections = () => {
       return;
     }
 
-    console.log('Fetching Amazon connections for user:', user.id);
+    console.log('=== Fetching Amazon connections ===');
+    console.log('User ID:', user.id);
+    console.log('User email:', user.email);
     setLoading(true);
 
     try {
       // Use any type to bypass TypeScript issues with new tables
-      const { data, error } = await (supabase as any)
+      const { data, error, count } = await (supabase as any)
         .from('amazon_connections')
-        .select('*')
+        .select('*', { count: 'exact' })
         .eq('user_id', user.id);
 
-      console.log('Amazon connections query result:', { data, error });
+      console.log('Raw database query result:', {
+        data,
+        error,
+        count,
+        dataLength: data?.length
+      });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase query error:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+        throw error;
+      }
 
-      const formattedConnections: AmazonConnection[] = (data || []).map((conn: any) => {
-        console.log('Processing connection:', conn);
-        return {
+      console.log('Raw connection data from DB:', data);
+
+      const formattedConnections: AmazonConnection[] = (data || []).map((conn: any, index: number) => {
+        console.log(`Processing connection ${index + 1}:`, {
+          id: conn.id,
+          user_id: conn.user_id,
+          profile_id: conn.profile_id,
+          profile_name: conn.profile_name,
+          status: conn.status,
+          created_at: conn.created_at,
+          marketplace_id: conn.marketplace_id
+        });
+        
+        const formatted = {
           id: conn.id,
           status: conn.status === 'active' ? 'connected' : 'disconnected',
           profileName: conn.profile_name || 'Amazon Profile',
@@ -55,13 +81,22 @@ export const useAmazonConnections = () => {
           profile_name: conn.profile_name,
           last_sync_at: conn.last_sync_at
         };
+        
+        console.log(`Formatted connection ${index + 1}:`, formatted);
+        return formatted;
       });
 
-      console.log('Formatted connections:', formattedConnections);
+      console.log('=== Final formatted connections ===');
+      console.log('Total connections:', formattedConnections.length);
+      console.log('Connections:', formattedConnections);
+      
       setConnections(formattedConnections);
       setError(null);
     } catch (err) {
-      console.error('Error fetching connections:', err);
+      console.error('=== Error fetching connections ===');
+      console.error('Error type:', typeof err);
+      console.error('Error message:', err instanceof Error ? err.message : String(err));
+      console.error('Full error object:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch connections');
     } finally {
       setLoading(false);
@@ -73,7 +108,7 @@ export const useAmazonConnections = () => {
   }, [user]);
 
   const refreshConnections = async () => {
-    console.log('Manually refreshing connections...');
+    console.log('=== Manual refresh triggered ===');
     await fetchConnections();
   };
 
