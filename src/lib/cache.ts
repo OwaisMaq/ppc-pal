@@ -1,17 +1,19 @@
 
-import { AdvertisingData } from '@/pages/Index';
+import { AdvertisingData } from '@/types/common';
 
-// Cache for storing optimization results
-const optimizationCache = new Map<string, AdvertisingData>();
-
-export const getCachedOptimization = (dataHash: string): AdvertisingData | null => {
-  return optimizationCache.get(dataHash) || null;
-};
-
-export const setCachedOptimization = (dataHash: string, data: AdvertisingData): void => {
-  optimizationCache.set(dataHash, data);
-};
-
-export const hasCachedOptimization = (dataHash: string): boolean => {
-  return optimizationCache.has(dataHash);
+export const cache = {
+  get: (key: string): AdvertisingData | null => {
+    // Mock cache implementation
+    return null;
+  },
+  
+  set: (key: string, data: AdvertisingData): void => {
+    // Mock cache implementation
+    console.log('Cache set (mock):', key);
+  },
+  
+  clear: (): void => {
+    // Mock cache implementation
+    console.log('Cache cleared (mock)');
+  }
 };

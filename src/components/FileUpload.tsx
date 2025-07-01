@@ -1,25 +1,26 @@
 
 import React, { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Upload, FileSpreadsheet } from 'lucide-react';
+import { Upload, FileText, AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AdvertisingData } from '@/types/common';
 
 interface FileUploadProps {
-  onDataLoaded: (data: AdvertisingData) => void;
+  onDataParsed: (data: AdvertisingData) => void;
 }
 
-const FileUpload = ({ onDataLoaded }: FileUploadProps) => {
+const FileUpload = ({ onDataParsed }: FileUploadProps) => {
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    // Mock data loading for now
+    // Mock file processing since Amazon functionality has been removed
     const mockData: AdvertisingData = {
       campaigns: [],
       keywords: [],
-      adGroups: []
+      adGroups: [],
+      connections: []
     };
-    onDataLoaded(mockData);
-  }, [onDataLoaded]);
+    
+    onDataParsed(mockData);
+  }, [onDataParsed]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -27,40 +28,49 @@ const FileUpload = ({ onDataLoaded }: FileUploadProps) => {
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
       'application/vnd.ms-excel': ['.xls'],
       'text/csv': ['.csv']
-    }
+    },
+    multiple: false
   });
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Upload className="h-5 w-5" />
-          Upload Data
-        </CardTitle>
-        <CardDescription>
-          Upload your advertising data files (Excel or CSV format)
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div
-          {...getRootProps()}
-          className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-            isDragActive ? 'border-blue-400 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
-          }`}
-        >
-          <input {...getInputProps()} />
-          <FileSpreadsheet className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-          {isDragActive ? (
-            <p className="text-blue-600">Drop the files here...</p>
-          ) : (
-            <>
-              <p className="text-gray-600 mb-2">Drag & drop files here, or click to select</p>
-              <Button variant="outline">Browse Files</Button>
-            </>
-          )}
+    <div className="space-y-4">
+      <Alert>
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          File upload functionality is currently disabled as Amazon integration has been removed.
+        </AlertDescription>
+      </Alert>
+      
+      <div
+        {...getRootProps()}
+        className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+          isDragActive 
+            ? 'border-blue-400 bg-blue-50' 
+            : 'border-gray-300 hover:border-gray-400'
+        }`}
+      >
+        <input {...getInputProps()} />
+        <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+        <div className="space-y-2">
+          <p className="text-lg font-medium text-gray-700">
+            {isDragActive ? 'Drop files here' : 'Upload advertising data'}
+          </p>
+          <p className="text-gray-500">
+            Drag and drop Excel or CSV files, or click to browse
+          </p>
+          <div className="flex items-center justify-center space-x-4 text-sm text-gray-400">
+            <span className="flex items-center">
+              <FileText className="h-4 w-4 mr-1" />
+              .xlsx
+            </span>
+            <span className="flex items-center">
+              <FileText className="h-4 w-4 mr-1" />
+              .csv
+            </span>
+          </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };
 
