@@ -16,6 +16,12 @@ const AmazonCallbackPage = () => {
   const [details, setDetails] = useState<string>('');
 
   useEffect(() => {
+    console.log('=== AmazonCallbackPage Component Mounted ===');
+    console.log('Component loaded at:', new Date().toISOString());
+    console.log('Window location:', window.location.href);
+    console.log('Window pathname:', window.location.pathname);
+    console.log('Window search:', window.location.search);
+    
     const processCallback = async () => {
       try {
         console.log('=== Amazon Callback Page Loaded ===');
@@ -30,6 +36,7 @@ const AmazonCallbackPage = () => {
 
         console.log('=== URL Parameters ===');
         console.log('Authorization code present:', !!code);
+        console.log('Authorization code length:', code?.length || 0);
         console.log('State parameter:', state);
         console.log('Error parameter:', error);
         console.log('Error description:', errorDescription);
