@@ -6,13 +6,15 @@ import { useToast } from '@/hooks/use-toast';
 
 export interface AmazonConnection {
   id: string;
-  status: 'connected' | 'disconnected' | 'error';
+  status: 'connected' | 'disconnected' | 'error' | 'setup_required';
   profileName: string;
   connectedAt: string;
   marketplace_id?: string;
   profile_id?: string;
   profile_name?: string;
   last_sync_at?: string;
+  campaign_count?: number;
+  needs_sync?: boolean;
 }
 
 export const useAmazonConnections = () => {
@@ -39,7 +41,10 @@ export const useAmazonConnections = () => {
       // Use any type to bypass TypeScript issues with new tables
       const { data, error, count } = await (supabase as any)
         .from('amazon_connections')
-        .select('*', { count: 'exact' })
+        .select(`
+          *,
+          campaigns(count)
+        `, { count: 'exact' })
         .eq('user_id', user.id);
 
       console.log('Raw database query result:', {
@@ -69,18 +74,39 @@ export const useAmazonConnections = () => {
           profile_name: conn.profile_name,
           status: conn.status,
           created_at: conn.created_at,
-          marketplace_id: conn.marketplace_id
+          marketplace_id: conn.marketplace_id,
+          campaigns: conn.campaigns
         });
+        
+        const campaignCount = conn.campaigns?.length || 0;
+        const hasBeenSynced = conn.last_sync_at && campaignCount > 0;
+        const isActive = conn.status === 'active';
+        const needsSync = isActive && (!conn.last_sync_at || campaignCount === 0);
+        
+        // Determine connection status based on profile availability and sync status
+        let connectionStatus: 'connected' | 'disconnected' | 'error' | 'setup_required';
+        
+        if (!isActive) {
+          connectionStatus = 'error';
+        } else if (!conn.profile_id) {
+          connectionStatus = 'setup_required';
+        } else if (needsSync) {
+          connectionStatus = 'setup_required'; // Needs data sync
+        } else {
+          connectionStatus = 'connected';
+        }
         
         const formatted = {
           id: conn.id,
-          status: conn.status === 'active' ? 'connected' : 'disconnected',
-          profileName: conn.profile_name || 'Amazon Profile',
+          status: connectionStatus,
+          profileName: conn.profile_name || `${conn.marketplace_id} Profile` || 'Amazon Profile',
           connectedAt: conn.created_at,
           marketplace_id: conn.marketplace_id,
           profile_id: conn.profile_id,
           profile_name: conn.profile_name,
-          last_sync_at: conn.last_sync_at
+          last_sync_at: conn.last_sync_at,
+          campaign_count: campaignCount,
+          needs_sync: needsSync
         };
         
         console.log(`Formatted connection ${index + 1}:`, formatted);
@@ -145,6 +171,12 @@ export const useAmazonConnections = () => {
     try {
       console.log('Syncing connection:', connectionId);
       
+      // Show loading toast
+      toast({
+        title: "Sync Started",
+        description: "Fetching your campaign data from Amazon. This may take a few moments...",
+      });
+      
       const { data, error } = await supabase.functions.invoke('amazon-sync', {
         body: { connectionId }
       });
@@ -152,8 +184,8 @@ export const useAmazonConnections = () => {
       if (error) throw error;
 
       toast({
-        title: "Sync Started",
-        description: "Campaign data sync has been initiated.",
+        title: "Sync Complete",
+        description: `Successfully synced ${data?.campaignCount || 0} campaigns from Amazon.`,
       });
 
       await refreshConnections();
@@ -161,7 +193,7 @@ export const useAmazonConnections = () => {
       console.error('Error syncing connection:', err);
       toast({
         title: "Sync Failed",
-        description: "Failed to sync campaign data. Please try again.",
+        description: "Failed to sync campaign data. Please check your Amazon account has active campaigns and try again.",
         variant: "destructive",
       });
     }
