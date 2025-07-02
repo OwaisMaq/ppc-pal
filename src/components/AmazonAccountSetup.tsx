@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,10 +20,41 @@ const AmazonAccountSetup = () => {
   } = useAmazonConnections();
   const { toast } = useToast();
 
-  const handleConnect = () => {
-    const currentUrl = window.location.origin;
-    const redirectUri = `${currentUrl}/amazon-callback`;
-    initiateConnection(redirectUri);
+  const handleConnect = async () => {
+    try {
+      console.log('Starting Amazon connection process...');
+      
+      // Use the deployed URL for the redirect
+      const redirectUri = 'https://ppcpal.online/amazon-callback';
+      console.log('Using redirect URI:', redirectUri);
+      
+      const { data, error } = await supabase.functions.invoke('amazon-oauth-init', {
+        body: { redirectUri }
+      });
+
+      console.log('OAuth init response:', { data, error });
+
+      if (error) {
+        console.error('OAuth init error:', error);
+        throw error;
+      }
+
+      if (data?.authUrl) {
+        console.log('Redirecting to Amazon OAuth URL:', data.authUrl);
+        // Force a full page redirect to Amazon
+        window.location.href = data.authUrl;
+      } else {
+        console.error('No authorization URL received:', data);
+        throw new Error('No authorization URL received from server');
+      }
+    } catch (err) {
+      console.error('Error initiating connection:', err);
+      toast({
+        title: "Connection Failed",
+        description: "Failed to initiate Amazon connection. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleForceSync = async (connectionId: string) => {

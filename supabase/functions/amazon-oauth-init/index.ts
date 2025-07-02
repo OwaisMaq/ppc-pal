@@ -14,15 +14,21 @@ serve(async (req) => {
   }
 
   try {
+    console.log('=== Amazon OAuth Init Started ===');
     const { redirectUri } = await req.json();
+    console.log('Requested redirect URI:', redirectUri);
     
     const amazonClientId = Deno.env.get('AMAZON_CLIENT_ID');
     if (!amazonClientId) {
+      console.error('Amazon Client ID not configured');
       throw new Error('Amazon Client ID not configured');
     }
 
+    console.log('Amazon Client ID configured:', !!amazonClientId);
+
     // Generate state parameter for security
     const state = crypto.randomUUID();
+    console.log('Generated state parameter:', state);
     
     // Store state in user session or database for validation
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -31,6 +37,7 @@ serve(async (req) => {
 
     // Get user from auth header
     const authHeader = req.headers.get('authorization');
+    console.log('Auth header present:', !!authHeader);
     if (!authHeader) {
       throw new Error('No authorization header');
     }
@@ -38,9 +45,19 @@ serve(async (req) => {
     const token = authHeader.replace('Bearer ', '');
     const { data: userData, error: userError } = await supabase.auth.getUser(token);
     
+    console.log('User authentication result:', {
+      success: !userError,
+      userId: userData?.user?.id
+    });
+    
     if (userError || !userData.user) {
+      console.error('Authentication failed:', userError);
       throw new Error('Invalid authentication');
     }
+
+    // Use the correct redirect URI - should be the deployed URL
+    const finalRedirectUri = 'https://ppcpal.online/amazon-callback';
+    console.log('Using redirect URI:', finalRedirectUri);
 
     // Amazon OAuth URL
     const scope = 'advertising::campaign_management';
@@ -50,7 +67,7 @@ serve(async (req) => {
     authUrl.searchParams.set('client_id', amazonClientId);
     authUrl.searchParams.set('scope', scope);
     authUrl.searchParams.set('response_type', responseType);
-    authUrl.searchParams.set('redirect_uri', redirectUri);
+    authUrl.searchParams.set('redirect_uri', finalRedirectUri);
     authUrl.searchParams.set('state', state);
 
     console.log('Generated Amazon OAuth URL:', authUrl.toString());

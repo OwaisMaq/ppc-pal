@@ -68,7 +68,10 @@ serve(async (req) => {
     }
 
     console.log('=== Starting token exchange ===');
-    // Exchange authorization code for access token
+    // Exchange authorization code for access token - use the deployed URL consistently
+    const redirectUri = 'https://ppcpal.online/amazon-callback';
+    console.log('Using redirect URI for token exchange:', redirectUri);
+    
     const tokenResponse = await fetch('https://api.amazon.com/auth/o2/token', {
       method: 'POST',
       headers: {
@@ -77,7 +80,7 @@ serve(async (req) => {
       body: new URLSearchParams({
         grant_type: 'authorization_code',
         code: code,
-        redirect_uri: `${req.headers.get('origin')}/auth/amazon/callback`,
+        redirect_uri: redirectUri,
         client_id: amazonClientId,
         client_secret: amazonClientSecret,
       }),
