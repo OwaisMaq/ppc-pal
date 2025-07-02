@@ -1,118 +1,136 @@
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { CheckCircle, XCircle, Loader2, AlertTriangle } from 'lucide-react';
 import { useAmazonConnections } from '@/hooks/useAmazonConnections';
 import { useToast } from '@/hooks/use-toast';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 
 const AmazonCallbackPage = () => {
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { handleOAuthCallback } = useAmazonConnections();
   const { toast } = useToast();
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
-  const [profileCount, setProfileCount] = useState(0);
-  const [errorMessage, setErrorMessage] = useState<string>('');
-  const hasProcessed = useRef(false);
-  const isProcessing = useRef(false);
+  const [message, setMessage] = useState('Processing Amazon connection...');
+  const [details, setDetails] = useState<string>('');
 
   useEffect(() => {
     const processCallback = async () => {
-      // Prevent multiple processing attempts
-      if (hasProcessed.current || isProcessing.current) {
-        console.log('OAuth callback already processed or in progress, skipping');
-        return;
-      }
-
-      const code = searchParams.get('code');
-      const state = searchParams.get('state');
-      const error = searchParams.get('error');
-
-      console.log('Processing Amazon OAuth callback:', { 
-        hasCode: !!code, 
-        hasState: !!state, 
-        error,
-        hasProcessed: hasProcessed.current,
-        isProcessing: isProcessing.current
-      });
-
-      if (error) {
-        console.error('OAuth error:', error);
-        hasProcessed.current = true;
-        setStatus('error');
-        setErrorMessage('Amazon authorization was cancelled or failed.');
-        toast({
-          title: "Connection Failed",
-          description: "Amazon authorization was cancelled or failed.",
-          variant: "destructive",
-        });
-        setTimeout(() => navigate('/settings'), 3000);
-        return;
-      }
-
-      if (!code || !state) {
-        console.error('Missing code or state parameters');
-        hasProcessed.current = true;
-        setStatus('error');
-        setErrorMessage('Invalid callback parameters received.');
-        toast({
-          title: "Connection Failed",
-          description: "Invalid callback parameters received.",
-          variant: "destructive",
-        });
-        setTimeout(() => navigate('/settings'), 3000);
-        return;
-      }
-
-      // Mark as processing to prevent race conditions
-      isProcessing.current = true;
-
       try {
-        console.log('Processing Amazon OAuth callback with state management...');
-        const result = await handleOAuthCallback(code, state);
+        console.log('=== Amazon Callback Page Loaded ===');
+        console.log('Current URL:', window.location.href);
+        console.log('Search params:', window.location.search);
         
-        // Mark as successfully processed
-        hasProcessed.current = true;
-        isProcessing.current = false;
+        // Extract parameters from URL
+        const code = searchParams.get('code');
+        const state = searchParams.get('state');
+        const error = searchParams.get('error');
+        const errorDescription = searchParams.get('error_description');
+
+        console.log('=== URL Parameters ===');
+        console.log('Authorization code present:', !!code);
+        console.log('State parameter:', state);
+        console.log('Error parameter:', error);
+        console.log('Error description:', errorDescription);
         
-        console.log('OAuth callback result:', result);
-        setProfileCount(result.profileCount);
-        setStatus('success');
-        
-        if (result.profileCount === 0) {
+        // Handle OAuth errors
+        if (error) {
+          console.error('=== OAuth Error from Amazon ===');
+          console.error('Error:', error);
+          console.error('Description:', errorDescription);
+          
+          setStatus('error');
+          setMessage('Amazon authorization failed');
+          setDetails(errorDescription || error);
+          
           toast({
-            title: "Connection Successful",
-            description: "Amazon account connected, but no advertising profiles found. You may need to set up Amazon Advertising first.",
+            title: "Authorization Failed",
+            description: `Amazon returned an error: ${errorDescription || error}`,
             variant: "destructive",
           });
-        } else {
-          toast({
-            title: "Connection Successful",
-            description: `Amazon account connected with ${result.profileCount} advertising profile(s).`,
-          });
+          
+          // Redirect to settings after showing error
+          setTimeout(() => navigate('/settings'), 3000);
+          return;
         }
+
+        // Validate required parameters
+        if (!code) {
+          console.error('=== Missing Authorization Code ===');
+          setStatus('error');
+          setMessage('No authorization code received');
+          setDetails('The authorization process was incomplete. Please try connecting again.');
+          
+          toast({
+            title: "Connection Failed",
+            description: "No authorization code received from Amazon",
+            variant: "destructive",
+          });
+          
+          setTimeout(() => navigate('/settings'), 3000);
+          return;
+        }
+
+        if (!state) {
+          console.error('=== Missing State Parameter ===');
+          setStatus('error');
+          setMessage('Security validation failed');
+          setDetails('The state parameter is missing. This may indicate a security issue.');
+          
+          toast({
+            title: "Security Error",
+            description: "State parameter is missing from the callback",
+            variant: "destructive",
+          });
+          
+          setTimeout(() => navigate('/settings'), 3000);
+          return;
+        }
+
+        console.log('=== Starting OAuth Callback Processing ===');
+        setMessage('Exchanging authorization code for access token...');
         
-        // Wait before redirecting to ensure data is synced
-        setTimeout(() => {
-          console.log('Redirecting to settings page...');
-          navigate('/settings');
-        }, 2000);
+        // Process the OAuth callback
+        const result = await handleOAuthCallback(code, state);
         
-      } catch (err) {
-        console.error('Error processing callback:', err);
-        hasProcessed.current = true;
-        isProcessing.current = false;
+        console.log('=== OAuth Callback Completed ===');
+        console.log('Result:', result);
+        
+        setStatus('success');
+        setMessage('Amazon account connected successfully!');
+        setDetails(result.profileCount > 0 
+          ? `Found ${result.profileCount} advertising profile(s)` 
+          : 'Connection established - you may need to set up Amazon Advertising profiles'
+        );
+        
+        toast({
+          title: "Connection Successful",
+          description: result.profileCount > 0 
+            ? `Connected to Amazon with ${result.profileCount} advertising profile(s)`
+            : "Connected to Amazon - setup your advertising profiles to sync campaigns",
+        });
+        
+        // Redirect to settings page after success
+        setTimeout(() => navigate('/settings'), 2000);
+        
+      } catch (error) {
+        console.error('=== Callback Processing Error ===');
+        console.error('Error type:', typeof error);
+        console.error('Error message:', error instanceof Error ? error.message : String(error));
+        console.error('Full error:', error);
+        
         setStatus('error');
-        
-        const errorMsg = err instanceof Error ? err.message : 'Failed to complete Amazon connection';
-        setErrorMessage(errorMsg);
+        setMessage('Failed to process Amazon connection');
+        setDetails(error instanceof Error ? error.message : 'An unexpected error occurred');
         
         toast({
           title: "Connection Failed",
-          description: "Failed to complete Amazon connection. Please try again.",
+          description: `Failed to connect to Amazon: ${error instanceof Error ? error.message : 'Unknown error'}`,
           variant: "destructive",
         });
+        
+        // Redirect to settings after showing error
         setTimeout(() => navigate('/settings'), 3000);
       }
     };
@@ -123,37 +141,22 @@ const AmazonCallbackPage = () => {
   const getStatusIcon = () => {
     switch (status) {
       case 'processing':
-        return <Loader2 className="h-12 w-12 animate-spin text-blue-600" />;
+        return <Loader2 className="h-8 w-8 text-blue-600 animate-spin" />;
       case 'success':
-        return <CheckCircle className="h-12 w-12 text-green-600" />;
+        return <CheckCircle className="h-8 w-8 text-green-600" />;
       case 'error':
-        return <AlertCircle className="h-12 w-12 text-red-600" />;
+        return <XCircle className="h-8 w-8 text-red-600" />;
     }
   };
 
-  const getStatusMessage = () => {
+  const getStatusColor = () => {
     switch (status) {
       case 'processing':
-        return 'Processing Amazon connection...';
+        return 'text-blue-600';
       case 'success':
-        return profileCount === 0 
-          ? 'Connected, but no advertising profiles found'
-          : `Successfully connected with ${profileCount} profile(s)`;
+        return 'text-green-600';
       case 'error':
-        return 'Connection failed';
-    }
-  };
-
-  const getStatusDescription = () => {
-    switch (status) {
-      case 'processing':
-        return 'Please wait while we complete your Amazon Ads connection.';
-      case 'success':
-        return profileCount === 0 
-          ? 'You may need to set up Amazon Advertising at advertising.amazon.com first.'
-          : 'You can now sync your campaigns and start optimizing your ads.';
-      case 'error':
-        return errorMessage || 'There was an issue connecting your Amazon account. Please try again.';
+        return 'text-red-600';
     }
   };
 
@@ -164,17 +167,37 @@ const AmazonCallbackPage = () => {
           <div className="flex justify-center mb-4">
             {getStatusIcon()}
           </div>
-          <CardTitle className="text-xl">
-            {getStatusMessage()}
+          <CardTitle className={`text-xl ${getStatusColor()}`}>
+            Amazon Connection
           </CardTitle>
           <CardDescription>
-            {getStatusDescription()}
+            {status === 'processing' && 'Please wait while we process your Amazon connection...'}
+            {status === 'success' && 'Your Amazon account has been connected successfully!'}
+            {status === 'error' && 'There was an issue connecting your Amazon account.'}
           </CardDescription>
         </CardHeader>
-        <CardContent className="text-center">
-          <p className="text-sm text-gray-600">
-            Redirecting to settings in a few seconds...
-          </p>
+        <CardContent className="text-center space-y-4">
+          <div>
+            <h3 className="font-medium text-gray-900 mb-2">{message}</h3>
+            {details && (
+              <p className="text-sm text-gray-600">{details}</p>
+            )}
+          </div>
+          
+          {status === 'processing' && (
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center gap-2 text-blue-800">
+                <AlertTriangle className="h-4 w-4" />
+                <span className="text-xs">Please do not close this window</span>
+              </div>
+            </div>
+          )}
+          
+          {status !== 'processing' && (
+            <div className="mt-6 text-xs text-gray-500">
+              You will be redirected to your settings page shortly...
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -16,20 +16,45 @@ serve(async (req) => {
   try {
     console.log('=== Amazon OAuth Callback Started ===');
     console.log('Request method:', req.method);
+    console.log('Request URL:', req.url);
     console.log('Request headers:', Object.fromEntries(req.headers.entries()));
     
-    const requestBody = await req.json();
-    console.log('Request body:', requestBody);
+    let requestBody;
+    try {
+      requestBody = await req.json();
+      console.log('Request body parsed successfully:', requestBody);
+    } catch (parseError) {
+      console.error('Failed to parse request body:', parseError);
+      throw new Error('Invalid request body format');
+    }
     
     const { code, state } = requestBody;
-    console.log('Received callback with code:', !!code, 'state:', !!state);
+    console.log('=== OAuth Callback Parameters ===');
+    console.log('Authorization code present:', !!code);
+    console.log('State parameter present:', !!state);
+    console.log('Authorization code length:', code?.length || 0);
+    console.log('State parameter:', state);
     
+    if (!code) {
+      console.error('No authorization code provided');
+      throw new Error('Authorization code is required');
+    }
+
+    if (!state) {
+      console.error('No state parameter provided');
+      throw new Error('State parameter is required for security');
+    }
+    
+    // Environment variables check
+    console.log('=== Environment Variables Check ===');
     const amazonClientId = Deno.env.get('AMAZON_CLIENT_ID');
     const amazonClientSecret = Deno.env.get('AMAZON_CLIENT_SECRET');
     
     console.log('Amazon credentials configured:', {
       clientId: !!amazonClientId,
-      clientSecret: !!amazonClientSecret
+      clientSecret: !!amazonClientSecret,
+      clientIdLength: amazonClientId?.length || 0,
+      clientSecretLength: amazonClientSecret?.length || 0
     });
     
     if (!amazonClientId || !amazonClientSecret) {
@@ -37,98 +62,191 @@ serve(async (req) => {
       throw new Error('Amazon credentials not configured');
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    // Supabase setup
+    console.log('=== Supabase Setup ===');
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    console.log('Supabase configuration:', {
+      url: !!supabaseUrl,
+      serviceKey: !!supabaseKey
+    });
+
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('Missing Supabase configuration');
+      throw new Error('Supabase configuration incomplete');
+    }
+
     const supabase = createClient(supabaseUrl, supabaseKey);
+    console.log('Supabase client created successfully');
 
-    console.log('Supabase client created with URL:', supabaseUrl);
-
-    // Get user from auth header
+    // User authentication
+    console.log('=== User Authentication ===');
     const authHeader = req.headers.get('authorization');
     console.log('Auth header present:', !!authHeader);
+    
     if (!authHeader) {
-      throw new Error('No authorization header');
+      console.error('No authorization header provided');
+      throw new Error('Authentication required');
     }
 
     const token = authHeader.replace('Bearer ', '');
     console.log('Token extracted, length:', token.length);
     
-    const { data: userData, error: userError } = await supabase.auth.getUser(token);
-    
-    console.log('User authentication result:', {
-      success: !userError,
-      userId: userData?.user?.id,
-      userEmail: userData?.user?.email,
-      error: userError?.message
-    });
-    
-    if (userError || !userData.user) {
-      console.error('Authentication failed:', userError);
-      throw new Error('Invalid authentication');
+    let userData;
+    try {
+      const { data: userAuthData, error: userError } = await supabase.auth.getUser(token);
+      
+      console.log('User authentication result:', {
+        success: !userError,
+        userId: userAuthData?.user?.id,
+        userEmail: userAuthData?.user?.email,
+        error: userError?.message
+      });
+      
+      if (userError || !userAuthData.user) {
+        console.error('Authentication failed:', userError);
+        throw new Error(`Invalid authentication: ${userError?.message || 'No user data'}`);
+      }
+
+      userData = userAuthData;
+      console.log('User authenticated successfully:', userData.user.id);
+    } catch (authError) {
+      console.error('Authentication process failed:', authError);
+      throw new Error(`Authentication error: ${authError.message}`);
     }
 
-    console.log('=== Starting token exchange ===');
-    // Exchange authorization code for access token - use the deployed URL consistently
+    // Token exchange
+    console.log('=== Starting Token Exchange ===');
     const redirectUri = 'https://ppcpal.online/amazon-callback';
     console.log('Using redirect URI for token exchange:', redirectUri);
     
-    const tokenResponse = await fetch('https://api.amazon.com/auth/o2/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        grant_type: 'authorization_code',
-        code: code,
-        redirect_uri: redirectUri,
-        client_id: amazonClientId,
-        client_secret: amazonClientSecret,
-      }),
+    const tokenRequestBody = new URLSearchParams({
+      grant_type: 'authorization_code',
+      code: code,
+      redirect_uri: redirectUri,
+      client_id: amazonClientId,
+      client_secret: amazonClientSecret,
     });
 
-    console.log('Token exchange response status:', tokenResponse.status);
-    if (!tokenResponse.ok) {
-      const errorText = await tokenResponse.text();
-      console.error('Token exchange failed:', errorText);
-      throw new Error(`Token exchange failed: ${tokenResponse.statusText}`);
+    console.log('Token request parameters:', {
+      grant_type: 'authorization_code',
+      code: code.substring(0, 10) + '...',
+      redirect_uri: redirectUri,
+      client_id: amazonClientId.substring(0, 8) + '...',
+      client_secret: '[REDACTED]'
+    });
+
+    let tokenResponse;
+    try {
+      console.log('Making token exchange request...');
+      tokenResponse = await fetch('https://api.amazon.com/auth/o2/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': 'PPCPal/1.0'
+        },
+        body: tokenRequestBody,
+      });
+
+      console.log('Token exchange response status:', tokenResponse.status);
+      console.log('Token exchange response headers:', Object.fromEntries(tokenResponse.headers.entries()));
+    } catch (fetchError) {
+      console.error('Token exchange network error:', fetchError);
+      throw new Error(`Network error during token exchange: ${fetchError.message}`);
     }
 
-    const tokenData = await tokenResponse.json();
-    console.log('Token exchange successful, expires in:', tokenData.expires_in);
+    let tokenData;
+    if (!tokenResponse.ok) {
+      const errorText = await tokenResponse.text();
+      console.error('Token exchange failed:', {
+        status: tokenResponse.status,
+        statusText: tokenResponse.statusText,
+        errorBody: errorText
+      });
+      throw new Error(`Token exchange failed (${tokenResponse.status}): ${errorText}`);
+    }
 
-    console.log('=== Fetching advertising profiles ===');
-    // Get advertising profiles
-    const profilesResponse = await fetch('https://advertising-api.amazon.com/v2/profiles', {
-      headers: {
-        'Authorization': `Bearer ${tokenData.access_token}`,
-        'Amazon-Advertising-API-ClientId': amazonClientId,
-      },
-    });
+    try {
+      tokenData = await tokenResponse.json();
+      console.log('Token exchange successful:', {
+        access_token_present: !!tokenData.access_token,
+        refresh_token_present: !!tokenData.refresh_token,
+        expires_in: tokenData.expires_in,
+        token_type: tokenData.token_type
+      });
+    } catch (jsonError) {
+      console.error('Failed to parse token response:', jsonError);
+      throw new Error('Invalid token response format');
+    }
 
-    console.log('Profiles API response status:', profilesResponse.status);
+    if (!tokenData.access_token) {
+      console.error('No access token in response:', tokenData);
+      throw new Error('No access token received from Amazon');
+    }
+
+    // Fetch advertising profiles
+    console.log('=== Fetching Advertising Profiles ===');
+    let profilesResponse;
+    try {
+      profilesResponse = await fetch('https://advertising-api.amazon.com/v2/profiles', {
+        headers: {
+          'Authorization': `Bearer ${tokenData.access_token}`,
+          'Amazon-Advertising-API-ClientId': amazonClientId,
+          'User-Agent': 'PPCPal/1.0'
+        },
+      });
+
+      console.log('Profiles API response status:', profilesResponse.status);
+      console.log('Profiles API response headers:', Object.fromEntries(profilesResponse.headers.entries()));
+    } catch (profilesFetchError) {
+      console.error('Network error fetching profiles:', profilesFetchError);
+      // Continue without profiles for now
+    }
+
     let profiles = [];
     let profileId = 'setup_required_no_profiles_found';
     let profileName = 'Setup Required';
     let marketplaceId = 'US';
 
-    if (profilesResponse.ok) {
-      profiles = await profilesResponse.json();
-      console.log('Found advertising profiles:', profiles.length);
-      console.log('Profile details:', profiles.map(p => ({ id: p.profileId, name: p.accountInfo?.name })));
-      
-      if (profiles.length > 0) {
-        const activeProfile = profiles[0];
-        profileId = activeProfile.profileId.toString();
-        profileName = activeProfile.accountInfo?.name || `Profile ${activeProfile.profileId}`;
-        marketplaceId = activeProfile.countryCode || 'US';
-        console.log('Using profile:', { profileId, profileName, marketplaceId });
+    if (profilesResponse && profilesResponse.ok) {
+      try {
+        profiles = await profilesResponse.json();
+        console.log('Found advertising profiles:', {
+          count: profiles.length,
+          profiles: profiles.map(p => ({ 
+            id: p.profileId, 
+            name: p.accountInfo?.name,
+            countryCode: p.countryCode,
+            type: p.accountInfo?.type
+          }))
+        });
+        
+        if (profiles.length > 0) {
+          const activeProfile = profiles[0];
+          profileId = activeProfile.profileId.toString();
+          profileName = activeProfile.accountInfo?.name || `Profile ${activeProfile.profileId}`;
+          marketplaceId = activeProfile.countryCode || 'US';
+          console.log('Using profile:', { profileId, profileName, marketplaceId });
+        } else {
+          console.log('No advertising profiles found - user may need to set up Amazon Advertising');
+        }
+      } catch (profilesJsonError) {
+        console.error('Failed to parse profiles response:', profilesJsonError);
+        console.log('Continuing with default profile setup');
       }
-    } else {
+    } else if (profilesResponse) {
       const errorText = await profilesResponse.text();
-      console.log('Profiles API failed:', profilesResponse.status, errorText);
+      console.log('Profiles API failed:', {
+        status: profilesResponse.status,
+        statusText: profilesResponse.statusText,
+        errorBody: errorText
+      });
+      console.log('Continuing with setup-required profile');
     }
 
-    console.log('=== Saving connection to database ===');
+    // Save connection to database
+    console.log('=== Saving Connection to Database ===');
     const connectionData = {
       user_id: userData.user.id,
       profile_id: profileId,
@@ -137,7 +255,7 @@ serve(async (req) => {
       access_token: tokenData.access_token,
       refresh_token: tokenData.refresh_token,
       token_expires_at: new Date(Date.now() + (tokenData.expires_in * 1000)).toISOString(),
-      status: profiles.length > 0 ? 'active' : 'error',
+      status: profiles.length > 0 ? 'active' : 'active', // Keep as active even without profiles
       last_sync_at: new Date().toISOString(),
     };
 
@@ -147,101 +265,156 @@ serve(async (req) => {
       profile_name: connectionData.profile_name,
       marketplace_id: connectionData.marketplace_id,
       status: connectionData.status,
-      token_expires_at: connectionData.token_expires_at
+      token_expires_at: connectionData.token_expires_at,
+      has_access_token: !!connectionData.access_token,
+      has_refresh_token: !!connectionData.refresh_token
     });
 
-    // Check if connection already exists for this user and profile
-    console.log('Checking for existing connections...');
-    const { data: existingConnections, error: checkError } = await supabase
-      .from('amazon_connections')
-      .select('*')
-      .eq('user_id', userData.user.id)
-      .eq('profile_id', profileId);
+    // Check for existing connections
+    console.log('=== Checking for Existing Connections ===');
+    let existingConnections;
+    try {
+      const { data: existingData, error: checkError } = await supabase
+        .from('amazon_connections')
+        .select('*')
+        .eq('user_id', userData.user.id)
+        .eq('profile_id', profileId);
 
-    console.log('Existing connections check result:', {
-      success: !checkError,
-      existingCount: existingConnections?.length || 0,
-      error: checkError?.message
-    });
+      console.log('Existing connections check result:', {
+        success: !checkError,
+        existingCount: existingData?.length || 0,
+        error: checkError?.message
+      });
 
-    if (checkError) {
-      console.error('Error checking existing connections:', checkError);
+      if (checkError) {
+        console.error('Error checking existing connections:', checkError);
+        throw new Error(`Database query failed: ${checkError.message}`);
+      }
+
+      existingConnections = existingData;
+    } catch (dbError) {
+      console.error('Database connection check failed:', dbError);
+      throw new Error(`Failed to check existing connections: ${dbError.message}`);
     }
 
-    // Store connection in database
+    // Insert or update connection
+    console.log('=== Database Operation ===');
     let connection;
     let dbError;
 
-    if (existingConnections && existingConnections.length > 0) {
-      console.log('Updating existing connection...');
-      const { data: updatedConnection, error: updateError } = await supabase
-        .from('amazon_connections')
-        .update(connectionData)
-        .eq('id', existingConnections[0].id)
-        .select()
-        .single();
-      
-      connection = updatedConnection;
-      dbError = updateError;
-    } else {
-      console.log('Creating new connection...');
-      const { data: newConnection, error: insertError } = await supabase
-        .from('amazon_connections')
-        .insert(connectionData)
-        .select()
-        .single();
-      
-      connection = newConnection;
-      dbError = insertError;
+    try {
+      if (existingConnections && existingConnections.length > 0) {
+        console.log('Updating existing connection:', existingConnections[0].id);
+        const { data: updatedConnection, error: updateError } = await supabase
+          .from('amazon_connections')
+          .update(connectionData)
+          .eq('id', existingConnections[0].id)
+          .select()
+          .single();
+        
+        connection = updatedConnection;
+        dbError = updateError;
+        console.log('Update operation result:', { success: !updateError, connectionId: connection?.id });
+      } else {
+        console.log('Creating new connection...');
+        const { data: newConnection, error: insertError } = await supabase
+          .from('amazon_connections')
+          .insert(connectionData)
+          .select()
+          .single();
+        
+        connection = newConnection;
+        dbError = insertError;
+        console.log('Insert operation result:', { success: !insertError, connectionId: connection?.id });
+      }
+
+      if (dbError) {
+        console.error('Database operation error:', {
+          message: dbError.message,
+          details: dbError.details,
+          hint: dbError.hint,
+          code: dbError.code
+        });
+        throw new Error(`Database operation failed: ${dbError.message}`);
+      }
+
+      if (!connection) {
+        console.error('No connection data returned from database operation');
+        throw new Error('Failed to save connection - no data returned');
+      }
+
+      console.log('=== Connection Saved Successfully ===');
+      console.log('Final connection ID:', connection.id);
+    } catch (saveError) {
+      console.error('Failed to save connection:', saveError);
+      throw new Error(`Connection save failed: ${saveError.message}`);
     }
 
-    console.log('Database operation result:', {
-      success: !dbError,
-      connectionId: connection?.id,
-      error: dbError?.message,
-      details: dbError?.details,
-      hint: dbError?.hint,
-      code: dbError?.code
-    });
+    // Verification query
+    console.log('=== Verifying Saved Connection ===');
+    try {
+      const { data: verificationData, error: verificationError } = await supabase
+        .from('amazon_connections')
+        .select('*')
+        .eq('user_id', userData.user.id);
 
-    if (dbError) {
-      console.error('Database error details:', dbError);
-      throw new Error(`Database error: ${dbError.message}`);
+      console.log('Verification query result:', {
+        success: !verificationError,
+        connectionsFound: verificationData?.length || 0,
+        connections: verificationData?.map(c => ({ 
+          id: c.id, 
+          profile_id: c.profile_id, 
+          status: c.status,
+          profile_name: c.profile_name
+        })),
+        error: verificationError?.message
+      });
+    } catch (verificationError) {
+      console.error('Verification query failed:', verificationError);
+      // Don't throw here, just log
     }
 
-    console.log('=== Amazon connection saved successfully ===');
-    console.log('Final connection ID:', connection.id);
+    console.log('=== OAuth Callback Completed Successfully ===');
+    const successResponse = { 
+      success: true, 
+      profileCount: profiles.length,
+      connection: {
+        id: connection.id,
+        profile_name: connection.profile_name,
+        marketplace_id: connection.marketplace_id,
+        status: connection.status
+      },
+      timestamp: new Date().toISOString()
+    };
 
-    // Verify the connection was saved by querying it back
-    console.log('=== Verifying saved connection ===');
-    const { data: verificationData, error: verificationError } = await supabase
-      .from('amazon_connections')
-      .select('*')
-      .eq('user_id', userData.user.id);
-
-    console.log('Verification query result:', {
-      success: !verificationError,
-      connectionsFound: verificationData?.length || 0,
-      connections: verificationData?.map(c => ({ id: c.id, profile_id: c.profile_id, status: c.status })),
-      error: verificationError?.message
-    });
+    console.log('Success response:', successResponse);
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        profileCount: profiles.length,
-        connection: connection 
-      }),
+      JSON.stringify(successResponse),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200
       }
     );
   } catch (error) {
-    console.error('=== Error in amazon-oauth-callback ===');
+    console.error('=== Amazon OAuth Callback Error ===');
+    console.error('Error type:', typeof error);
+    console.error('Error name:', error.name);
     console.error('Error message:', error.message);
     console.error('Error stack:', error.stack);
+    console.error('Full error object:', error);
+    
+    const errorResponse = {
+      success: false,
+      error: error.message || 'Unknown error occurred',
+      timestamp: new Date().toISOString(),
+      details: error.stack?.split('\n').slice(0, 3).join('\n')
+    };
+    
+    console.log('Error response:', errorResponse);
+    
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify(errorResponse),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
