@@ -24,6 +24,7 @@ export const useAmazonConnections = () => {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const oauthCallbackCache = useRef<Map<string, Promise<any>>>(new Map());
+  const fetchingRef = useRef(false);
 
   const fetchConnections = async () => {
     if (!user) {
@@ -32,6 +33,14 @@ export const useAmazonConnections = () => {
       setLoading(false);
       return;
     }
+
+    if (fetchingRef.current) {
+      console.log('=== Fetch Already in Progress ===');
+      console.log('Skipping duplicate fetch request');
+      return;
+    }
+
+    fetchingRef.current = true;
 
     console.log('=== Fetching Amazon Connections ===');
     console.log('User ID:', user.id);
@@ -155,8 +164,16 @@ export const useAmazonConnections = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch connections';
       setError(errorMessage);
       setConnections([]);
+      
+      // Show user-friendly error toast
+      toast({
+        title: "Connection Error",
+        description: "Failed to load your Amazon connections. Please refresh the page.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
+      fetchingRef.current = false;
       console.log('=== Fetch Connections Process Ended ===');
     }
   };
@@ -180,6 +197,11 @@ export const useAmazonConnections = () => {
       console.log('User ID:', user?.id);
       console.log('Timestamp:', new Date().toISOString());
       
+      toast({
+        title: "Connecting to Amazon",
+        description: "Initializing connection to Amazon Advertising...",
+      });
+      
       const { data, error } = await supabase.functions.invoke('amazon-oauth-init', {
         body: { redirectUri }
       });
@@ -192,25 +214,51 @@ export const useAmazonConnections = () => {
       if (error) {
         console.error('=== OAuth Init Error ===');
         console.error('Error details:', error);
-        throw error;
+        
+        // Extract user-friendly error message
+        let userMessage = 'Failed to initialize Amazon connection';
+        if (typeof error === 'object' && error.message) {
+          userMessage = error.message;
+        } else if (typeof error === 'string') {
+          userMessage = error;
+        }
+        
+        throw new Error(userMessage);
+      }
+
+      if (data?.error) {
+        console.error('=== OAuth Init Returned Error ===');
+        console.error('Server error:', data.error);
+        console.error('Server details:', data.details);
+        throw new Error(data.details || data.error);
       }
 
       if (data?.authUrl) {
         console.log('=== Redirecting to Amazon ===');
         console.log('Auth URL received:', data.authUrl);
         console.log('Redirect timestamp:', new Date().toISOString());
-        window.location.href = data.authUrl;
+        
+        // Add a small delay to ensure logs are captured and UI updates
+        setTimeout(() => {
+          window.location.href = data.authUrl;
+        }, 100);
       } else {
         console.error('=== No Auth URL Received ===');
         console.error('Data received:', data);
-        throw new Error('No authorization URL received');
+        throw new Error('No authorization URL received from server');
       }
     } catch (err) {
       console.error('=== Connection Initiation Error ===');
       console.error('Error:', err);
+      
+      let userMessage = 'Failed to initiate Amazon connection';
+      if (err instanceof Error) {
+        userMessage = err.message;
+      }
+      
       toast({
         title: "Connection Failed",
-        description: `Failed to initiate Amazon connection: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        description: userMessage,
         variant: "destructive",
       });
     }
@@ -239,21 +287,75 @@ export const useAmazonConnections = () => {
       if (error) {
         console.error('=== Sync Error ===');
         console.error('Error details:', error);
-        throw error;
+        
+        let userMessage = 'Failed to sync campaign data';
+        if (typeof error === 'object' && error.message) {
+          userMessage = error.message;
+        } else if (typeof error === 'string') {
+          userMessage = error;
+        }
+        
+        throw new Error(userMessage);
       }
 
+      if (data?.error) {
+        console.error('=== Sync Returned Error ===');
+        console.error('Server error:', data.error);
+        console.error('Server details:', data.details);
+        
+        // Handle specific error cases
+        if (data.requiresSetup) {
+          toast({
+            title: "Setup Required",
+            description: data.details || "Please set up your Amazon Advertising account first",
+            variant: "destructive",
+          });
+        } else if (data.requiresReconnection) {
+          toast({
+            title: "Reconnection Required",
+            description: data.details || "Please reconnect your Amazon account",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Sync Failed",
+            description: data.details || data.error,
+            variant: "destructive",
+          });
+        }
+        
+        await refreshConnections();
+        return;
+      }
+
+      const campaignCount = data?.campaignsSynced || data?.campaignCount || 0;
+      
       toast({
         title: "Sync Complete",
-        description: `Successfully synced ${data?.campaignCount || 0} campaigns from Amazon.`,
+        description: campaignCount > 0 
+          ? `Successfully synced ${campaignCount} campaigns from Amazon.`
+          : "Sync completed, but no campaigns were found. Please check your Amazon Advertising account.",
       });
 
       await refreshConnections();
     } catch (err) {
       console.error('=== Sync Connection Error ===');
       console.error('Error:', err);
+      
+      let userMessage = 'Failed to sync campaign data';
+      if (err instanceof Error) {
+        if (err.message.includes('Authentication') || err.message.includes('auth')) {
+          userMessage = 'Please reconnect your Amazon account and try again.';
+        } else if (err.message.includes('Network') || err.message.includes('fetch')) {
+          userMessage = 'Network error. Please check your connection and try again.';
+        } else {
+          userMessage = err.message;
+        }
+      }
+      
       toast({
         title: "Sync Failed",
-        description: "Failed to sync campaign data. Please check your Amazon account has active campaigns and try again.",
+        description: userMessage,
         variant: "destructive",
       });
     }
@@ -280,16 +382,22 @@ export const useAmazonConnections = () => {
 
       toast({
         title: "Connection Removed",
-        description: "Amazon connection has been removed.",
+        description: "Amazon connection has been removed successfully.",
       });
 
       await refreshConnections();
     } catch (err) {
       console.error('=== Delete Connection Error ===');
       console.error('Error:', err);
+      
+      let userMessage = 'Failed to remove connection';
+      if (err instanceof Error) {
+        userMessage = err.message;
+      }
+      
       toast({
         title: "Delete Failed",
-        description: "Failed to remove connection. Please try again.",
+        description: userMessage,
         variant: "destructive",
       });
     }
@@ -315,6 +423,8 @@ export const useAmazonConnections = () => {
       } catch (err) {
         console.error('=== Duplicate Callback Error ===');
         console.error('Error:', err);
+        // Remove failed promise from cache and retry
+        oauthCallbackCache.current.delete(cacheKey);
         throw err;
       }
     }
@@ -334,14 +444,32 @@ export const useAmazonConnections = () => {
         if (error) {
           console.error('=== OAuth Callback Error ===');
           console.error('Error details:', error);
-          throw error;
+          
+          let userMessage = 'Failed to process Amazon callback';
+          if (typeof error === 'object' && error.message) {
+            userMessage = error.message;
+          } else if (typeof error === 'string') {
+            userMessage = error;
+          }
+          
+          throw new Error(userMessage);
+        }
+
+        if (data?.error || !data?.success) {
+          console.error('=== OAuth Callback Returned Error ===');
+          console.error('Server error:', data?.error);
+          console.error('Server details:', data?.details);
+          throw new Error(data?.details || data?.error || 'Callback processing failed');
         }
 
         // Force refresh connections after successful callback
         console.log('=== Refreshing Connections After Callback ===');
         await fetchConnections();
         
-        const result = { profileCount: data?.profileCount || 0 };
+        const result = { 
+          profileCount: data?.profileCount || 0,
+          message: data?.message || 'Connection successful'
+        };
         console.log('=== OAuth Callback Success ===');
         console.log('Final result:', result);
         return result;

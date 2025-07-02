@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,54 +29,14 @@ const AmazonAccountSetup = () => {
       const redirectUri = 'https://ppcpal.online/amazon-callback';
       console.log('Using redirect URI:', redirectUri);
       
-      console.log('About to call supabase.functions.invoke with amazon-oauth-init...');
-      const { data, error } = await supabase.functions.invoke('amazon-oauth-init', {
-        body: { redirectUri }
-      });
-
-      console.log('=== OAuth Init Response ===');
-      console.log('Data:', data);
-      console.log('Error:', error);
-      console.log('Data type:', typeof data);
-      console.log('Data keys:', data ? Object.keys(data) : 'no data');
-
-      if (error) {
-        console.error('=== OAuth Init Error Details ===');
-        console.error('Error message:', error.message);
-        console.error('Error details:', error.details);
-        console.error('Full error object:', error);
-        throw error;
-      }
-
-      if (data?.authUrl) {
-        console.log('=== Auth URL Found ===');
-        console.log('Auth URL:', data.authUrl);
-        console.log('Auth URL type:', typeof data.authUrl);
-        console.log('Auth URL length:', data.authUrl.length);
-        
-        // Add a small delay to ensure logs are captured
-        setTimeout(() => {
-          console.log('=== Redirecting to Amazon OAuth URL ===');
-          console.log('Final redirect URL:', data.authUrl);
-          // Force a full page redirect to Amazon
-          window.location.href = data.authUrl;
-        }, 100);
-      } else {
-        console.error('=== No Auth URL Received ===');
-        console.error('Data received:', data);
-        console.error('Data structure:', JSON.stringify(data, null, 2));
-        throw new Error('No authorization URL received from server');
-      }
+      await initiateConnection(redirectUri);
     } catch (err) {
       console.error('=== Connect Error ===');
       console.error('Error type:', typeof err);
       console.error('Error message:', err instanceof Error ? err.message : String(err));
       console.error('Full error:', err);
-      toast({
-        title: "Connection Failed",
-        description: `Failed to initiate Amazon connection: ${err instanceof Error ? err.message : 'Unknown error'}`,
-        variant: "destructive",
-      });
+      
+      // The error handling is now done in the hook, so we don't need to show another toast here
     }
   };
 
@@ -92,7 +53,23 @@ const AmazonAccountSetup = () => {
         body: { connectionId }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Force sync error:', error);
+        
+        let userMessage = 'Failed to force sync campaign data';
+        if (typeof error === 'object' && error.message) {
+          userMessage = error.message;
+        } else if (typeof error === 'string') {
+          userMessage = error;
+        }
+        
+        throw new Error(userMessage);
+      }
+
+      if (data?.error) {
+        console.error('Force sync returned error:', data.error);
+        throw new Error(data.details || data.error);
+      }
 
       toast({
         title: "Force Sync Complete",
@@ -102,9 +79,15 @@ const AmazonAccountSetup = () => {
       await refreshConnections();
     } catch (err) {
       console.error('Error force syncing connection:', err);
+      
+      let userMessage = 'Failed to force sync campaign data';
+      if (err instanceof Error) {
+        userMessage = err.message;
+      }
+      
       toast({
         title: "Force Sync Failed",
-        description: "Failed to force sync campaign data. Please check your Amazon account setup and try again.",
+        description: userMessage,
         variant: "destructive",
       });
     }
@@ -143,10 +126,19 @@ const AmazonAccountSetup = () => {
         <CardContent className="space-y-4">
           {error && (
             <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5" />
-              <div>
+              <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
                 <h4 className="font-medium text-red-800">Connection Error</h4>
                 <p className="text-sm text-red-700 mt-1">{error}</p>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={refreshConnections}
+                  className="mt-2 text-red-700 border-red-300 hover:bg-red-50"
+                >
+                  <RefreshCw className="h-4 w-4 mr-1" />
+                  Try Again
+                </Button>
               </div>
             </div>
           )}
@@ -162,9 +154,9 @@ const AmazonAccountSetup = () => {
                 </p>
               </div>
               
-              <Button onClick={handleConnect} className="mb-4">
+              <Button onClick={handleConnect} className="mb-4" disabled={loading}>
                 <ExternalLink className="h-4 w-4 mr-2" />
-                Connect Amazon Account
+                {loading ? 'Connecting...' : 'Connect Amazon Account'}
               </Button>
               
               <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-left">
@@ -173,6 +165,7 @@ const AmazonAccountSetup = () => {
                   <li>• Make sure you have an active Amazon Advertising account</li>
                   <li>• Ensure you have campaigns with recent activity</li>
                   <li>• You'll be redirected to Amazon to authorize access</li>
+                  <li>• The connection process may take a few moments</li>
                 </ul>
               </div>
             </div>
@@ -187,6 +180,7 @@ const AmazonAccountSetup = () => {
                   variant="outline" 
                   size="sm" 
                   onClick={handleConnect}
+                  disabled={loading}
                 >
                   <ExternalLink className="h-4 w-4 mr-2" />
                   Add Another Account

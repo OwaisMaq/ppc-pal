@@ -24,7 +24,16 @@ serve(async (req) => {
       console.log('Request body parsed successfully:', requestBody);
     } catch (parseError) {
       console.error('Failed to parse request body:', parseError);
-      throw new Error('Invalid request body format');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid request body format',
+          details: 'Request body must be valid JSON'
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
     const { redirectUri } = requestBody;
@@ -33,12 +42,30 @@ serve(async (req) => {
     // Validate redirect URI
     if (!redirectUri) {
       console.error('No redirect URI provided');
-      throw new Error('Redirect URI is required');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Redirect URI is required',
+          details: 'Please provide a valid redirect URI'
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
     if (!redirectUri.startsWith('https://')) {
       console.error('Invalid redirect URI scheme:', redirectUri);
-      throw new Error('Redirect URI must use HTTPS');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid redirect URI',
+          details: 'Redirect URI must use HTTPS'
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
     
     const amazonClientId = Deno.env.get('AMAZON_CLIENT_ID');
@@ -51,12 +78,30 @@ serve(async (req) => {
     
     if (!amazonClientId) {
       console.error('AMAZON_CLIENT_ID environment variable not set');
-      throw new Error('Amazon Client ID not configured');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Server configuration error',
+          details: 'Amazon Client ID not configured'
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
     if (!amazonClientSecret) {
       console.error('AMAZON_CLIENT_SECRET environment variable not set');
-      throw new Error('Amazon Client Secret not configured');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Server configuration error',
+          details: 'Amazon Client Secret not configured'
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
     // Generate state parameter for security
@@ -75,7 +120,16 @@ serve(async (req) => {
     
     if (!supabaseUrl || !supabaseKey) {
       console.error('Missing Supabase configuration');
-      throw new Error('Supabase configuration incomplete');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Server configuration error',
+          details: 'Supabase configuration incomplete'
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -88,12 +142,30 @@ serve(async (req) => {
     
     if (!authHeader) {
       console.error('No authorization header provided');
-      throw new Error('Authentication required');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Authentication required',
+          details: 'Please log in to connect your Amazon account'
+        }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
     if (!authHeader.startsWith('Bearer ')) {
       console.error('Invalid authorization header format');
-      throw new Error('Invalid authorization format');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid authentication format',
+          details: 'Authorization header must be in Bearer format'
+        }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
     const token = authHeader.replace('Bearer ', '');
@@ -110,18 +182,45 @@ serve(async (req) => {
       
       if (userError) {
         console.error('User authentication failed:', userError);
-        throw new Error(`Authentication failed: ${userError.message}`);
+        return new Response(
+          JSON.stringify({ 
+            error: 'Authentication failed',
+            details: userError.message
+          }),
+          {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
       }
 
       if (!userData?.user) {
         console.error('No user data returned from authentication');
-        throw new Error('Invalid user session');
+        return new Response(
+          JSON.stringify({ 
+            error: 'Invalid user session',
+            details: 'Please log in again'
+          }),
+          {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
       }
 
       console.log('User authenticated successfully:', userData.user.id);
     } catch (authError) {
       console.error('Authentication process failed:', authError);
-      throw new Error(`Authentication error: ${authError.message}`);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Authentication error',
+          details: authError.message
+        }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
     // Use the correct redirect URI - should be the deployed URL
@@ -159,7 +258,16 @@ serve(async (req) => {
         console.log('Auth URL validation: PASSED');
       } catch (urlError) {
         console.error('Auth URL validation: FAILED', urlError);
-        throw new Error('Generated auth URL is invalid');
+        return new Response(
+          JSON.stringify({ 
+            error: 'URL generation failed',
+            details: 'Generated auth URL is invalid'
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
       }
 
       console.log('=== Successful Response Preparation ===');
@@ -181,7 +289,16 @@ serve(async (req) => {
       );
     } catch (urlError) {
       console.error('URL construction failed:', urlError);
-      throw new Error(`Failed to construct OAuth URL: ${urlError.message}`);
+      return new Response(
+        JSON.stringify({ 
+          error: 'URL construction failed',
+          details: urlError.message
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
   } catch (error) {
     console.error('=== Amazon OAuth Init Error ===');
@@ -192,9 +309,10 @@ serve(async (req) => {
     console.error('Full error object:', error);
     
     const errorResponse = {
-      error: error.message || 'Unknown error occurred',
+      error: 'Server error',
+      details: error.message || 'An unexpected error occurred',
       timestamp: new Date().toISOString(),
-      details: error.stack?.split('\n').slice(0, 3).join('\n')
+      stack: error.stack?.split('\n').slice(0, 3).join('\n')
     };
     
     console.log('Error response:', errorResponse);
