@@ -15,7 +15,13 @@ serve(async (req) => {
 
   try {
     console.log('=== Amazon OAuth Callback Started ===');
-    const { code, state } = await req.json();
+    console.log('Request method:', req.method);
+    console.log('Request headers:', Object.fromEntries(req.headers.entries()));
+    
+    const requestBody = await req.json();
+    console.log('Request body:', requestBody);
+    
+    const { code, state } = requestBody;
     console.log('Received callback with code:', !!code, 'state:', !!state);
     
     const amazonClientId = Deno.env.get('AMAZON_CLIENT_ID');
@@ -35,6 +41,8 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    console.log('Supabase client created with URL:', supabaseUrl);
+
     // Get user from auth header
     const authHeader = req.headers.get('authorization');
     console.log('Auth header present:', !!authHeader);
@@ -43,11 +51,14 @@ serve(async (req) => {
     }
 
     const token = authHeader.replace('Bearer ', '');
+    console.log('Token extracted, length:', token.length);
+    
     const { data: userData, error: userError } = await supabase.auth.getUser(token);
     
     console.log('User authentication result:', {
       success: !userError,
       userId: userData?.user?.id,
+      userEmail: userData?.user?.email,
       error: userError?.message
     });
     
@@ -136,14 +147,52 @@ serve(async (req) => {
       token_expires_at: connectionData.token_expires_at
     });
 
-    // Store connection in database
-    const { data: connection, error: dbError } = await supabase
+    // Check if connection already exists for this user and profile
+    console.log('Checking for existing connections...');
+    const { data: existingConnections, error: checkError } = await supabase
       .from('amazon_connections')
-      .insert(connectionData)
-      .select()
-      .single();
+      .select('*')
+      .eq('user_id', userData.user.id)
+      .eq('profile_id', profileId);
 
-    console.log('Database insert result:', {
+    console.log('Existing connections check result:', {
+      success: !checkError,
+      existingCount: existingConnections?.length || 0,
+      error: checkError?.message
+    });
+
+    if (checkError) {
+      console.error('Error checking existing connections:', checkError);
+    }
+
+    // Store connection in database
+    let connection;
+    let dbError;
+
+    if (existingConnections && existingConnections.length > 0) {
+      console.log('Updating existing connection...');
+      const { data: updatedConnection, error: updateError } = await supabase
+        .from('amazon_connections')
+        .update(connectionData)
+        .eq('id', existingConnections[0].id)
+        .select()
+        .single();
+      
+      connection = updatedConnection;
+      dbError = updateError;
+    } else {
+      console.log('Creating new connection...');
+      const { data: newConnection, error: insertError } = await supabase
+        .from('amazon_connections')
+        .insert(connectionData)
+        .select()
+        .single();
+      
+      connection = newConnection;
+      dbError = insertError;
+    }
+
+    console.log('Database operation result:', {
       success: !dbError,
       connectionId: connection?.id,
       error: dbError?.message,
@@ -159,6 +208,20 @@ serve(async (req) => {
 
     console.log('=== Amazon connection saved successfully ===');
     console.log('Final connection ID:', connection.id);
+
+    // Verify the connection was saved by querying it back
+    console.log('=== Verifying saved connection ===');
+    const { data: verificationData, error: verificationError } = await supabase
+      .from('amazon_connections')
+      .select('*')
+      .eq('user_id', userData.user.id);
+
+    console.log('Verification query result:', {
+      success: !verificationError,
+      connectionsFound: verificationData?.length || 0,
+      connections: verificationData?.map(c => ({ id: c.id, profile_id: c.profile_id, status: c.status })),
+      error: verificationError?.message
+    });
 
     return new Response(
       JSON.stringify({ 

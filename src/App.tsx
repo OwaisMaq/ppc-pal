@@ -13,6 +13,7 @@ import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Settings from "./pages/Settings";
 import Feedback from "./pages/Feedback";
+import AmazonCallbackPage from "./pages/AmazonCallbackPage";
 
 const queryClient = new QueryClient();
 
@@ -62,6 +63,15 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Feedback />
+                </ProtectedRoute>
+              } 
+            />
+            {/* Amazon OAuth callback route */}
+            <Route 
+              path="/auth/amazon/callback" 
+              element={
+                <ProtectedRoute>
+                  <AmazonCallbackPage />
                 </ProtectedRoute>
               } 
             />
