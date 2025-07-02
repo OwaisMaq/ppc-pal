@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,36 +21,59 @@ const AmazonAccountSetup = () => {
 
   const handleConnect = async () => {
     try {
+      console.log('=== Amazon Connect Button Clicked ===');
       console.log('Starting Amazon connection process...');
       
       // Use the deployed URL for the redirect
       const redirectUri = 'https://ppcpal.online/amazon-callback';
       console.log('Using redirect URI:', redirectUri);
       
+      console.log('About to call supabase.functions.invoke with amazon-oauth-init...');
       const { data, error } = await supabase.functions.invoke('amazon-oauth-init', {
         body: { redirectUri }
       });
 
-      console.log('OAuth init response:', { data, error });
+      console.log('=== OAuth Init Response ===');
+      console.log('Data:', data);
+      console.log('Error:', error);
+      console.log('Data type:', typeof data);
+      console.log('Data keys:', data ? Object.keys(data) : 'no data');
 
       if (error) {
-        console.error('OAuth init error:', error);
+        console.error('=== OAuth Init Error Details ===');
+        console.error('Error message:', error.message);
+        console.error('Error details:', error.details);
+        console.error('Full error object:', error);
         throw error;
       }
 
       if (data?.authUrl) {
-        console.log('Redirecting to Amazon OAuth URL:', data.authUrl);
-        // Force a full page redirect to Amazon
-        window.location.href = data.authUrl;
+        console.log('=== Auth URL Found ===');
+        console.log('Auth URL:', data.authUrl);
+        console.log('Auth URL type:', typeof data.authUrl);
+        console.log('Auth URL length:', data.authUrl.length);
+        
+        // Add a small delay to ensure logs are captured
+        setTimeout(() => {
+          console.log('=== Redirecting to Amazon OAuth URL ===');
+          console.log('Final redirect URL:', data.authUrl);
+          // Force a full page redirect to Amazon
+          window.location.href = data.authUrl;
+        }, 100);
       } else {
-        console.error('No authorization URL received:', data);
+        console.error('=== No Auth URL Received ===');
+        console.error('Data received:', data);
+        console.error('Data structure:', JSON.stringify(data, null, 2));
         throw new Error('No authorization URL received from server');
       }
     } catch (err) {
-      console.error('Error initiating connection:', err);
+      console.error('=== Connect Error ===');
+      console.error('Error type:', typeof err);
+      console.error('Error message:', err instanceof Error ? err.message : String(err));
+      console.error('Full error:', err);
       toast({
         title: "Connection Failed",
-        description: "Failed to initiate Amazon connection. Please try again.",
+        description: `Failed to initiate Amazon connection: ${err instanceof Error ? err.message : 'Unknown error'}`,
         variant: "destructive",
       });
     }
