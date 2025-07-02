@@ -1,5 +1,4 @@
-
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,7 +15,8 @@ const PerformanceSummary = () => {
   const { 
     connections, 
     syncConnection, 
-    deleteConnection 
+    deleteConnection,
+    refreshConnections
   } = useAmazonConnections();
   
   const {
@@ -37,6 +37,16 @@ const PerformanceSummary = () => {
   console.log('Has real data:', hasRealData);
   console.log('Loading:', loading);
   console.log('Metrics:', metrics);
+
+  // Add periodic refresh to ensure fresh data
+  useEffect(() => {
+    const interval = setInterval(() => {
+      console.log('Periodic refresh of Amazon connections...');
+      refreshConnections();
+    }, 30000); // Refresh every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [refreshConnections]);
 
   const handleAddConnection = () => {
     navigate('/settings');

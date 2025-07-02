@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -21,6 +21,7 @@ export const useAmazonConnections = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+  const oauthCallbackCache = useRef<Map<string, Promise<any>>>(new Map());
 
   const fetchConnections = async () => {
     if (!user) {
@@ -194,24 +195,45 @@ export const useAmazonConnections = () => {
   };
 
   const handleOAuthCallback = async (code: string, state: string) => {
+    const cacheKey = `${code}-${state}`;
+    
+    // Check if we're already processing this exact callback
+    if (oauthCallbackCache.current.has(cacheKey)) {
+      console.log('OAuth callback already in progress for this code/state, waiting for existing request...');
+      return await oauthCallbackCache.current.get(cacheKey);
+    }
+
     try {
       console.log('Handling OAuth callback with code:', code, 'state:', state);
       
-      const { data, error } = await supabase.functions.invoke('amazon-oauth-callback', {
+      // Create and cache the promise to prevent duplicate requests
+      const callbackPromise = supabase.functions.invoke('amazon-oauth-callback', {
         body: { code, state }
+      }).then(async ({ data, error }) => {
+        console.log('OAuth callback response:', { data, error });
+
+        if (error) throw error;
+
+        // Force refresh connections after successful callback
+        console.log('OAuth callback successful, refreshing connections...');
+        await fetchConnections();
+        
+        return { profileCount: data?.profileCount || 0 };
       });
 
-      console.log('OAuth callback response:', { data, error });
+      // Cache the promise
+      oauthCallbackCache.current.set(cacheKey, callbackPromise);
 
-      if (error) throw error;
-
-      // Force refresh connections after successful callback
-      console.log('OAuth callback successful, refreshing connections...');
-      await fetchConnections();
+      const result = await callbackPromise;
       
-      return { profileCount: data?.profileCount || 0 };
+      // Clean up the cache after successful completion
+      oauthCallbackCache.current.delete(cacheKey);
+      
+      return result;
     } catch (err) {
       console.error('Error handling OAuth callback:', err);
+      // Clean up the cache on error
+      oauthCallbackCache.current.delete(cacheKey);
       throw err;
     }
   };
