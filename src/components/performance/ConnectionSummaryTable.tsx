@@ -4,16 +4,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Trash2, CheckCircle, AlertTriangle, XCircle, Clock } from 'lucide-react';
+import { RefreshCw, Trash2, CheckCircle, AlertTriangle, XCircle, Clock, Zap } from 'lucide-react';
 import { AmazonConnection } from '@/hooks/useAmazonConnections';
 
 interface ConnectionSummaryTableProps {
   connections: AmazonConnection[];
   onSync: (connectionId: string) => Promise<void>;
   onDelete: (connectionId: string) => Promise<void>;
+  onForceSync?: (connectionId: string) => Promise<void>;
 }
 
-const ConnectionSummaryTable = ({ connections, onSync, onDelete }: ConnectionSummaryTableProps) => {
+const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: ConnectionSummaryTableProps) => {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'connected':
@@ -45,7 +46,7 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete }: ConnectionSum
       return `${connection.campaign_count || 0} campaigns synced`;
     } else if (connection.status === 'setup_required') {
       if (!connection.profile_id) {
-        return 'No advertising profiles found - set up Amazon Advertising first';
+        return 'No advertising profiles found - try Force Sync or set up Amazon Advertising first';
       } else if (connection.needs_sync) {
         return 'Campaign data needs to be synced from Amazon';
       }
@@ -56,10 +57,13 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete }: ConnectionSum
     return 'Status unknown';
   };
 
-  const getActionButton = (connection: AmazonConnection) => {
+  const getActionButtons = (connection: AmazonConnection) => {
+    const buttons = [];
+    
     if (connection.status === 'setup_required' && connection.profile_id) {
-      return (
+      buttons.push(
         <Button
+          key="sync"
           variant="outline"
           size="sm"
           onClick={() => onSync(connection.id)}
@@ -70,8 +74,9 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete }: ConnectionSum
         </Button>
       );
     } else if (connection.status === 'connected') {
-      return (
+      buttons.push(
         <Button
+          key="refresh"
           variant="outline"
           size="sm"
           onClick={() => onSync(connection.id)}
@@ -82,7 +87,24 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete }: ConnectionSum
         </Button>
       );
     }
-    return null;
+
+    // Add Force Sync button for connections that need it
+    if (connection.status === 'setup_required' && !connection.profile_id && onForceSync) {
+      buttons.push(
+        <Button
+          key="force-sync"
+          variant="outline"
+          size="sm"
+          onClick={() => onForceSync(connection.id)}
+          className="text-orange-600 border-orange-600 hover:bg-orange-50"
+        >
+          <Zap className="h-4 w-4 mr-1" />
+          Force Sync
+        </Button>
+      );
+    }
+
+    return buttons;
   };
 
   if (connections.length === 0) {
@@ -152,7 +174,7 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete }: ConnectionSum
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      {getActionButton(connection)}
+                      {getActionButtons(connection)}
                       <Button
                         variant="ghost"
                         size="sm"
@@ -180,6 +202,7 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete }: ConnectionSum
                   Click "Sync Campaigns" to import your campaign data and view performance metrics.
                 </p>
                 <p className="text-xs text-yellow-600 mt-2">
+                  If no advertising profiles are showing, try "Force Sync" - this may occur due to API delays or temporary issues. 
                   Make sure your Amazon account has active campaigns with recent activity for best results.
                 </p>
               </div>
