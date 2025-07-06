@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -19,7 +18,7 @@ export interface AmazonConnection {
 }
 
 export const useAmazonConnections = () => {
-  const { user, session } = useAuth();
+  const { user } = useAuth();
   const [connections, setConnections] = useState<AmazonConnection[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -318,14 +317,24 @@ export const useAmazonConnections = () => {
 
   const syncConnection = async (connectionId: string) => {
     try {
-      console.log('=== Sync Connection ===');
+      console.log('=== Sync Connection Started ===');
       console.log('Connection ID:', connectionId);
-      console.log('Session present:', !!session);
-      console.log('Access token present:', !!session?.access_token);
       
-      // Check if we have a valid session
+      // Step 1: Fetch fresh session to ensure we have valid auth
+      console.log('=== Fetching Fresh Session ===');
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('=== Session Fetch Error ===');
+        console.error('Session error:', sessionError);
+        throw new Error('Failed to get authentication session. Please sign in again.');
+      }
+      
       if (!session?.access_token) {
-        console.error('=== No Valid Session ===');
+        console.error('=== No Valid Session Found ===');
+        console.error('Session exists:', !!session);
+        console.error('Access token exists:', !!session?.access_token);
+        
         toast({
           title: "Authentication Required",
           description: "Please sign in again to sync your Amazon connection.",
@@ -334,7 +343,12 @@ export const useAmazonConnections = () => {
         return;
       }
       
-      // First, validate the connection exists and get its current state
+      console.log('=== Fresh Session Retrieved Successfully ===');
+      console.log('Session user ID:', session.user?.id);
+      console.log('Access token length:', session.access_token.length);
+      
+      // Step 2: Validate the connection exists and get its current state
+      console.log('=== Validating Connection ===');
       const { data: connectionData, error: connectionError } = await supabase
         .from('amazon_connections')
         .select('*')
@@ -342,16 +356,21 @@ export const useAmazonConnections = () => {
         .single();
 
       if (connectionError || !connectionData) {
-        console.error('Connection not found:', connectionError);
+        console.error('Connection validation failed:', connectionError);
         throw new Error('Connection not found or access denied');
       }
 
-      console.log('Connection data before sync:', connectionData);
+      console.log('Connection data before sync:', {
+        id: connectionData.id,
+        status: connectionData.status,
+        profile_id: connectionData.profile_id,
+        profile_name: connectionData.profile_name
+      });
 
-      // Validate profile before attempting sync
+      // Step 3: Validate profile before attempting sync
       const profileValidation = validateProfileConfiguration(connectionData);
       if (!profileValidation.isValid) {
-        console.log('Profile validation failed, suggesting enhanced sync:', profileValidation.reason);
+        console.log('Profile validation failed:', profileValidation.reason);
         
         toast({
           title: "Profile Setup Required",
@@ -364,43 +383,64 @@ export const useAmazonConnections = () => {
         return;
       }
       
+      // Step 4: Show sync started message
       toast({
         title: "Sync Started",
         description: "Fetching your campaign data from Amazon. Please wait...",
       });
       
+      // Step 5: Call Amazon Sync Function with fresh session
       console.log('=== Calling Amazon Sync Function ===');
-      console.log('Using access token:', session.access_token.substring(0, 20) + '...');
+      console.log('Using fresh access token (first 20 chars):', session.access_token.substring(0, 20) + '...');
       
       const { data, error } = await supabase.functions.invoke('amazon-sync', {
         body: { connectionId },
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
         }
       });
 
-      console.log('=== Sync Response ===');
-      console.log('Data:', data);
-      console.log('Error:', error);
+      console.log('=== Sync Response Received ===');
+      console.log('Data present:', !!data);
+      console.log('Error present:', !!error);
+      console.log('Response data:', data);
+      console.log('Response error:', error);
 
+      // Step 6: Handle edge function errors
       if (error) {
-        console.error('=== Sync Error ===');
+        console.error('=== Sync Edge Function Error ===');
+        console.error('Error type:', typeof error);
         console.error('Error details:', error);
         
         let userMessage = 'Failed to sync campaign data';
+        let errorType = 'unknown_error';
+        
         if (typeof error === 'object' && error.message) {
           userMessage = error.message;
+          errorType = 'server_error';
         } else if (typeof error === 'string') {
           userMessage = error;
+          if (error.includes('401') || error.includes('Unauthorized')) {
+            errorType = 'auth_error';
+            userMessage = 'Authentication failed. Please reconnect your Amazon account.';
+          } else if (error.includes('403') || error.includes('Forbidden')) {
+            errorType = 'permission_error';
+            userMessage = 'Access denied. Please check your Amazon Advertising permissions.';
+          }
         }
         
-        await updateConnectionStatus(connectionId, 'error', userMessage);
+        await updateConnectionStatus(connectionId, errorType === 'auth_error' ? 'error' : 'warning', userMessage);
         throw new Error(userMessage);
       }
 
+      // Step 7: Handle server response errors
       if (data?.error) {
-        console.error('=== Sync Returned Error ===');
+        console.error('=== Sync Server Response Error ===');
         console.error('Server error:', data.error);
+        console.error('Error type:', data.errorType);
+        console.error('Requires reconnection:', data.requiresReconnection);
+        console.error('Requires setup:', data.requiresSetup);
         
         if (data.requiresSetup || data.error === 'Profile setup required') {
           toast({
@@ -429,7 +469,8 @@ export const useAmazonConnections = () => {
         return;
       }
 
-      // Handle successful sync responses
+      // Step 8: Handle successful sync responses
+      console.log('=== Sync Successful ===');
       const campaignCount = data?.campaignsSynced || data?.campaignCount || 0;
       const syncStatus = data?.syncStatus || 'success';
       
@@ -449,24 +490,33 @@ export const useAmazonConnections = () => {
         });
       }
 
+      console.log('=== Refreshing Connections After Successful Sync ===');
       await refreshConnections();
+      
     } catch (err) {
       console.error('=== Sync Connection Error ===');
-      console.error('Error:', err);
+      console.error('Error type:', typeof err);
+      console.error('Error message:', err instanceof Error ? err.message : String(err));
+      console.error('Full error object:', err);
       
       let userMessage = 'Failed to sync campaign data';
+      let statusUpdate: 'error' | 'warning' = 'error';
+      
       if (err instanceof Error) {
-        if (err.message.includes('Authentication') || err.message.includes('auth')) {
+        userMessage = err.message;
+        
+        if (err.message.includes('Authentication') || err.message.includes('auth') || err.message.includes('sign in')) {
           userMessage = 'Please reconnect your Amazon account and try again.';
-          await updateConnectionStatus(connectionId, 'error', 'Authentication failed');
+          statusUpdate = 'error';
         } else if (err.message.includes('Network') || err.message.includes('fetch')) {
           userMessage = 'Network error. Please check your connection and try again.';
-          await updateConnectionStatus(connectionId, 'warning', 'Network error');
-        } else {
-          userMessage = err.message;
-          await updateConnectionStatus(connectionId, 'error', err.message);
+          statusUpdate = 'warning';
+        } else if (err.message.includes('Profile') || err.message.includes('setup')) {
+          statusUpdate = 'warning';
         }
       }
+      
+      await updateConnectionStatus(connectionId, statusUpdate, userMessage);
       
       toast({
         title: "Sync Failed",
