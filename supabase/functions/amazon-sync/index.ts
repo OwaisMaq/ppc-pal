@@ -57,6 +57,37 @@ interface SyncResponse {
   details?: string;
 }
 
+// Regional endpoint mapping for Amazon Advertising API
+const getRegionalEndpoint = (countryCode: string): string => {
+  switch (countryCode.toUpperCase()) {
+    case 'US':
+    case 'CA':
+    case 'MX':
+      return 'https://advertising-api.amazon.com';
+    case 'UK':
+    case 'GB':
+    case 'DE':
+    case 'FR':
+    case 'IT':
+    case 'ES':
+    case 'NL':
+    case 'PL':
+    case 'SE':
+    case 'TR':
+    case 'BE':
+      return 'https://advertising-api-eu.amazon.com';
+    case 'JP':
+    case 'AU':
+    case 'SG':
+    case 'AE':
+    case 'IN':
+      return 'https://advertising-api-fe.amazon.com';
+    default:
+      console.log(`Unknown country code: ${countryCode}, defaulting to NA endpoint`);
+      return 'https://advertising-api.amazon.com';
+  }
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -154,6 +185,8 @@ serve(async (req) => {
       console.log(`=== Syncing connection ${connection.id} ===`);
       console.log('Connection status:', connection.status);
       console.log('Profile ID:', connection.profile_id);
+      console.log('Profile Name:', connection.profile_name);
+      console.log('Marketplace ID:', connection.marketplace_id);
       
       try {
         // Validate connection configuration
@@ -209,8 +242,8 @@ serve(async (req) => {
           connection.access_token = refreshResult.access_token;
         }
 
-        // Sync campaigns
-        const campaignSyncResult = await syncCampaigns(supabase, connection);
+        // Sync campaigns with enhanced logging
+        const campaignSyncResult = await syncCampaignsWithDetailedLogging(supabase, connection);
         totalCampaignsSynced += campaignSyncResult.campaignsCount || 0;
         
         syncResults.push({
@@ -350,40 +383,108 @@ async function refreshAccessToken(refreshToken: string) {
   }
 }
 
-async function syncCampaigns(supabase: any, connection: any) {
+async function syncCampaignsWithDetailedLogging(supabase: any, connection: any) {
   try {
-    console.log(`Fetching campaigns for profile ${connection.profile_id}`);
+    console.log(`=== DETAILED CAMPAIGN SYNC DEBUG ===`);
+    console.log(`Profile ID: ${connection.profile_id}`);
+    console.log(`Profile Name: ${connection.profile_name}`);
+    console.log(`Marketplace ID: ${connection.marketplace_id}`);
     
-    // Fetch campaigns from Amazon API
-    const campaignsResponse = await fetch(
-      `https://advertising-api.amazon.com/v2/sp/campaigns`,
-      {
-        headers: {
-          'Authorization': `Bearer ${connection.access_token}`,
-          'Amazon-Advertising-API-ClientId': Deno.env.get('AMAZON_CLIENT_ID')!,
-          'Amazon-Advertising-API-Scope': connection.profile_id,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    // Determine the correct regional endpoint
+    const countryCode = connection.marketplace_id || 'US'; // Default to US if not set
+    const baseEndpoint = getRegionalEndpoint(countryCode);
+    console.log(`Country Code: ${countryCode}`);
+    console.log(`Using endpoint: ${baseEndpoint}`);
+    
+    // Prepare headers for Amazon API call
+    const headers = {
+      'Authorization': `Bearer ${connection.access_token}`,
+      'Amazon-Advertising-API-ClientId': Deno.env.get('AMAZON_CLIENT_ID')!,
+      'Amazon-Advertising-API-Scope': connection.profile_id,
+      'Content-Type': 'application/json',
+    };
+
+    console.log('=== HEADERS SENT TO AMAZON ===');
+    console.log('Authorization:', headers.Authorization ? `Bearer ${connection.access_token.substring(0, 20)}...` : 'Missing');
+    console.log('Amazon-Advertising-API-ClientId:', headers['Amazon-Advertising-API-ClientId']);
+    console.log('Amazon-Advertising-API-Scope:', headers['Amazon-Advertising-API-Scope']);
+    console.log('Content-Type:', headers['Content-Type']);
+
+    // Make the API call to fetch campaigns
+    const campaignUrl = `${baseEndpoint}/v2/sp/campaigns`;
+    console.log(`=== MAKING REQUEST TO: ${campaignUrl} ===`);
+    
+    const campaignsResponse = await fetch(campaignUrl, {
+      headers,
+    });
+
+    console.log('=== AMAZON API RESPONSE STATUS ===');
+    console.log('Status:', campaignsResponse.status);
+    console.log('Status Text:', campaignsResponse.statusText);
+    console.log('OK:', campaignsResponse.ok);
+
+    // Log response headers
+    console.log('=== AMAZON API RESPONSE HEADERS ===');
+    for (const [key, value] of campaignsResponse.headers.entries()) {
+      console.log(`${key}: ${value}`);
+    }
 
     if (!campaignsResponse.ok) {
       const errorText = await campaignsResponse.text();
-      console.error('Campaign API error:', errorText);
+      console.error('=== AMAZON API ERROR RESPONSE ===');
+      console.error('Error Text:', errorText);
       
-      if (campaignsResponse.status === 401) {
-        throw new Error('Authentication failed - token may be expired');
-      } else if (campaignsResponse.status === 403) {
-        throw new Error('Access denied - check Amazon Advertising permissions');
-      } else {
-        throw new Error(`API request failed: ${campaignsResponse.status} ${errorText}`);
+      // Try to parse error as JSON
+      try {
+        const errorJson = JSON.parse(errorText);
+        console.error('Error JSON:', JSON.stringify(errorJson, null, 2));
+      } catch (parseError) {
+        console.error('Could not parse error as JSON');
       }
+      
+      throw new Error(`Amazon API error: ${campaignsResponse.status} ${errorText}`);
     }
 
-    const campaigns: AmazonCampaign[] = await campaignsResponse.json();
-    console.log(`Found ${campaigns.length} campaigns`);
+    // Parse the response
+    const responseText = await campaignsResponse.text();
+    console.log('=== RAW AMAZON API RESPONSE ===');
+    console.log('Response length:', responseText.length);
+    console.log('Response preview (first 1000 chars):', responseText.substring(0, 1000));
+
+    let campaigns;
+    try {
+      campaigns = JSON.parse(responseText);
+      console.log('=== PARSED CAMPAIGN DATA ===');
+      console.log('Campaigns type:', typeof campaigns);
+      console.log('Is array:', Array.isArray(campaigns));
+      console.log('Campaign count:', Array.isArray(campaigns) ? campaigns.length : 'Not an array');
+      
+      if (Array.isArray(campaigns) && campaigns.length > 0) {
+        console.log('First campaign sample:', JSON.stringify(campaigns[0], null, 2));
+        console.log('All campaign IDs:', campaigns.map(c => c.campaignId || c.id));
+        console.log('All campaign names:', campaigns.map(c => c.name));
+        console.log('All campaign states:', campaigns.map(c => c.state || c.status));
+      } else if (!Array.isArray(campaigns)) {
+        console.log('Non-array response:', JSON.stringify(campaigns, null, 2));
+      }
+    } catch (parseError) {
+      console.error('Failed to parse campaign response as JSON:', parseError);
+      throw new Error(`Failed to parse Amazon API response: ${parseError.message}`);
+    }
+
+    if (!Array.isArray(campaigns)) {
+      console.log('Converting non-array response to array');
+      campaigns = [campaigns];
+    }
 
     if (campaigns.length === 0) {
+      console.log('=== NO CAMPAIGNS FOUND ===');
+      console.log('This could indicate:');
+      console.log('1. No campaigns exist in this profile');
+      console.log('2. Wrong profile ID or region');
+      console.log('3. Profile has no advertising campaigns');
+      console.log('4. API permissions issue');
+      
       return {
         success: true,
         campaignsCount: 0,
@@ -391,106 +492,75 @@ async function syncCampaigns(supabase: any, connection: any) {
       };
     }
 
-    let syncedCount = 0;
+    console.log(`=== PROCESSING ${campaigns.length} CAMPAIGNS ===`);
+    let successCount = 0;
+    let errorCount = 0;
 
-    // Fetch campaign metrics for the last 30 days
-    const endDate = new Date().toISOString().split('T')[0];
-    const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-
-    const campaignIds = campaigns.map(c => c.campaignId);
-    let metricsMap = new Map<string, CampaignMetrics>();
-
-    if (campaignIds.length > 0) {
-      try {
-        const metricsResponse = await fetch(
-          `https://advertising-api.amazon.com/v2/sp/campaigns/report`,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${connection.access_token}`,
-              'Amazon-Advertising-API-ClientId': Deno.env.get('AMAZON_CLIENT_ID')!,
-              'Amazon-Advertising-API-Scope': connection.profile_id,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              reportDate: endDate,
-              metrics: 'campaignId,impressions,clicks,cost,sales14d,orders14d',
-              campaignType: 'sponsoredProducts'
-            }),
-          }
-        );
-
-        if (metricsResponse.ok) {
-          const metricsData = await metricsResponse.json();
-          if (Array.isArray(metricsData)) {
-            metricsData.forEach((metric: CampaignMetrics) => {
-              metricsMap.set(metric.campaignId, metric);
-            });
-          }
-        }
-      } catch (metricsError) {
-        console.warn('Failed to fetch metrics, continuing with campaign sync:', metricsError);
-      }
-    }
-
-    // Sync each campaign
     for (const campaign of campaigns) {
       try {
-        const metrics = metricsMap.get(campaign.campaignId);
+        console.log(`Processing campaign: ${campaign.name || 'Unnamed'} (ID: ${campaign.campaignId || campaign.id})`);
         
         const campaignData = {
           connection_id: connection.id,
-          amazon_campaign_id: campaign.campaignId,
-          name: campaign.name,
-          campaign_type: campaign.campaignType,
+          amazon_campaign_id: (campaign.campaignId || campaign.id)?.toString(),
+          name: campaign.name || 'Unnamed Campaign',
+          campaign_type: campaign.campaignType || campaign.type,
           targeting_type: campaign.targetingType,
-          status: mapCampaignStatus(campaign.state),
-          budget: campaign.budget || null,
-          daily_budget: campaign.dailyBudget || null,
-          start_date: campaign.startDate || null,
-          end_date: campaign.endDate || null,
-          impressions: metrics?.impressions || 0,
-          clicks: metrics?.clicks || 0,
-          spend: metrics?.cost || 0,
-          sales: metrics?.sales14d || 0,
-          orders: metrics?.orders14d || 0,
-          acos: metrics && metrics.cost > 0 && metrics.sales14d > 0 
-            ? Math.round((metrics.cost / metrics.sales14d) * 10000) / 100 
-            : null,
-          roas: metrics && metrics.cost > 0 && metrics.sales14d > 0 
-            ? Math.round((metrics.sales14d / metrics.cost) * 100) / 100 
-            : null,
+          status: mapCampaignStatus(campaign.state || campaign.status),
+          budget: campaign.budget ? parseFloat(campaign.budget) : null,
+          daily_budget: campaign.dailyBudget ? parseFloat(campaign.dailyBudget) : null,
+          start_date: campaign.startDate,
+          end_date: campaign.endDate,
           data_source: 'amazon_api',
           last_updated: new Date().toISOString()
         };
 
-        const { error: upsertError } = await supabase
+        console.log('Campaign data to insert:', JSON.stringify(campaignData, null, 2));
+
+        const { error: insertError } = await supabase
           .from('campaigns')
           .upsert(campaignData, {
             onConflict: 'connection_id,amazon_campaign_id',
             ignoreDuplicates: false
           });
 
-        if (upsertError) {
-          console.error(`Failed to upsert campaign ${campaign.campaignId}:`, upsertError);
+        if (insertError) {
+          console.error(`Failed to insert campaign ${campaignData.amazon_campaign_id}:`, insertError);
+          errorCount++;
         } else {
-          syncedCount++;
+          console.log(`Successfully inserted/updated campaign ${campaignData.amazon_campaign_id}`);
+          successCount++;
         }
+
       } catch (campaignError) {
-        console.error(`Error processing campaign ${campaign.campaignId}:`, campaignError);
+        console.error(`Error processing individual campaign:`, campaignError);
+        errorCount++;
       }
     }
 
+    console.log(`=== CAMPAIGN SYNC SUMMARY ===`);
+    console.log(`Total campaigns processed: ${campaigns.length}`);
+    console.log(`Successfully synced: ${successCount}`);
+    console.log(`Errors: ${errorCount}`);
+
     return {
-      success: true,
-      campaignsCount: syncedCount
+      success: successCount > 0,
+      campaignsCount: successCount,
+      message: errorCount > 0 
+        ? `Synced ${successCount} campaigns with ${errorCount} errors`
+        : `Successfully synced ${successCount} campaigns`
     };
+
   } catch (error) {
-    console.error('Campaign sync failed:', error);
+    console.error('=== CAMPAIGN SYNC ERROR ===');
+    console.error('Error details:', error);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    
     return {
       success: false,
-      error: error.message,
-      campaignsCount: 0
+      campaignsCount: 0,
+      error: error.message
     };
   }
 }
@@ -498,6 +568,7 @@ async function syncCampaigns(supabase: any, connection: any) {
 function mapCampaignStatus(amazonStatus: string): 'enabled' | 'paused' | 'archived' {
   switch (amazonStatus?.toLowerCase()) {
     case 'enabled':
+    case 'active':
       return 'enabled';
     case 'paused':
       return 'paused';
@@ -508,18 +579,27 @@ function mapCampaignStatus(amazonStatus: string): 'enabled' | 'paused' | 'archiv
   }
 }
 
-async function updateConnectionStatus(supabase: any, connectionId: string, status: string, errorMessage?: string) {
+async function updateConnectionStatus(supabase: any, connectionId: string, status: string, message?: string) {
   try {
-    const updateData: any = {
-      status,
-      updated_at: new Date().toISOString()
-    };
-
-    await supabase
+    console.log(`Updating connection ${connectionId} status to: ${status}`);
+    if (message) {
+      console.log(`Status message: ${message}`);
+    }
+    
+    const { error } = await supabase
       .from('amazon_connections')
-      .update(updateData)
+      .update({
+        status,
+        updated_at: new Date().toISOString()
+      })
       .eq('id', connectionId);
+
+    if (error) {
+      console.error('Failed to update connection status:', error);
+    } else {
+      console.log('Connection status updated successfully');
+    }
   } catch (error) {
-    console.error('Failed to update connection status:', error);
+    console.error('Error updating connection status:', error);
   }
 }
