@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 
 export interface ConnectionStatus {
   id: string;
-  status: 'healthy' | 'warning' | 'error';
+  status: 'active' | 'expired' | 'error' | 'pending' | 'warning' | 'setup_required';
   lastSync: string | null;
   campaignCount: number;
   profileStatus: 'active' | 'missing' | 'expired' | 'invalid';
@@ -46,7 +46,7 @@ export const useConnectionStatus = () => {
 
       const connectionStatuses: ConnectionStatus[] = connections.map(conn => {
         const issues: string[] = [];
-        let statusLevel: 'healthy' | 'warning' | 'error' = 'healthy';
+        let statusLevel: 'active' | 'expired' | 'error' | 'pending' | 'warning' | 'setup_required' = 'active';
         let setupRequired = false;
         let setupReason = '';
         
@@ -65,15 +65,18 @@ export const useConnectionStatus = () => {
         
         let profileStatus: 'active' | 'missing' | 'expired' | 'invalid' = 'active';
         
-        // Determine status based on various conditions
-        if (tokenExpiry <= now) {
+        // Use the database status as the primary status
+        statusLevel = conn.status;
+        
+        // Determine profile status and setup requirements based on database status
+        if (statusLevel === 'expired' || tokenExpiry <= now) {
           issues.push('Access token has expired');
-          statusLevel = 'error';
+          statusLevel = 'expired';
           profileStatus = 'expired';
           setupRequired = true;
           setupReason = 'token_expired';
           console.log('Token expired for connection:', conn.id);
-        } else if (hoursUntilExpiry < 24) {
+        } else if (hoursUntilExpiry < 24 && statusLevel === 'active') {
           issues.push('Access token expires soon');
           statusLevel = 'warning';
           console.log('Token expires soon for connection:', conn.id);
@@ -82,14 +85,14 @@ export const useConnectionStatus = () => {
         // Enhanced profile validation
         if (!conn.profile_id) {
           issues.push('No profile ID configured');
-          statusLevel = 'error';
+          statusLevel = 'setup_required';
           profileStatus = 'missing';
           setupRequired = true;
           setupReason = 'no_profile';
           console.log('No profile ID for connection:', conn.id);
         } else if (conn.profile_id === 'setup_required_no_profiles_found') {
           issues.push('No advertising profiles found - Amazon Advertising setup required');
-          statusLevel = 'error';
+          statusLevel = 'setup_required';
           profileStatus = 'missing';
           setupRequired = true;
           setupReason = 'no_advertising_profiles';
@@ -103,36 +106,25 @@ export const useConnectionStatus = () => {
           console.log('Invalid profile for connection:', conn.id);
         }
 
-        // Check connection status from database
+        // Additional status checks based on database status
         if (conn.status === 'setup_required') {
           setupRequired = true;
           if (!setupReason) setupReason = 'needs_sync';
-          if (statusLevel === 'healthy') statusLevel = 'warning';
           console.log('Connection requires setup:', conn.id);
         } else if (conn.status === 'error') {
-          statusLevel = 'error';
-          issues.push('Connection is in error state');
           setupRequired = true;
           if (!setupReason) setupReason = 'connection_error';
           console.log('Connection in error state:', conn.id);
-        } else if (conn.status === 'expired') {
-          statusLevel = 'error';
-          profileStatus = 'expired';
-          setupRequired = true;
-          setupReason = 'token_expired';
-          issues.push('Connection has expired');
-          console.log('Connection expired:', conn.id);
-        } else if (conn.status !== 'active') {
-          issues.push(`Connection status is ${conn.status}`);
-          statusLevel = 'error';
-          console.log('Connection not active:', conn.id, conn.status);
+        } else if (conn.status === 'warning') {
+          if (!setupReason) setupReason = 'needs_attention';
+          console.log('Connection has warnings:', conn.id);
         }
 
         // Check sync status
         const campaignCount = Array.isArray(conn.campaigns) ? conn.campaigns.length : 0;
         if (!conn.last_sync_at) {
           issues.push('Never synced with Amazon');
-          if (statusLevel === 'healthy') statusLevel = 'warning';
+          if (statusLevel === 'active') statusLevel = 'setup_required';
           if (!setupRequired && conn.status === 'active') {
             setupRequired = true;
             setupReason = 'needs_sync';
@@ -144,7 +136,7 @@ export const useConnectionStatus = () => {
           
           if (daysSinceSync > 7) {
             issues.push('Last sync was over a week ago');
-            if (statusLevel === 'healthy') statusLevel = 'warning';
+            if (statusLevel === 'active') statusLevel = 'warning';
             console.log('Sync overdue for connection:', conn.id);
           }
         }
@@ -152,7 +144,7 @@ export const useConnectionStatus = () => {
         // Check campaign data
         if (campaignCount === 0 && conn.last_sync_at) {
           issues.push('No campaigns found after sync - may indicate API or setup issues');
-          if (statusLevel === 'healthy') statusLevel = 'warning';
+          if (statusLevel === 'active') statusLevel = 'warning';
           console.log('No campaigns after sync for connection:', conn.id);
         }
 

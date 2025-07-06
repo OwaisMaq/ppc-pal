@@ -16,10 +16,11 @@ interface ConnectionSummaryTableProps {
 
 const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: ConnectionSummaryTableProps) => {
   const getStatusIcon = (connection: AmazonConnection) => {
-    // Map database status to display status
-    if (connection.status === 'active' && connection.campaign_count > 0) {
+    // Map database status to display icons
+    if (connection.status === 'active' && connection.campaign_count && connection.campaign_count > 0) {
       return <CheckCircle className="h-4 w-4 text-green-600" />;
-    } else if (connection.status === 'setup_required' || connection.campaign_count === 0) {
+    } else if (connection.status === 'setup_required' || connection.status === 'warning' || 
+               (connection.status === 'active' && (!connection.campaign_count || connection.campaign_count === 0))) {
       return <AlertTriangle className="h-4 w-4 text-yellow-600" />;
     } else if (connection.status === 'error' || connection.status === 'expired') {
       return <XCircle className="h-4 w-4 text-red-600" />;
@@ -29,23 +30,25 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
   };
 
   const getStatusBadge = (connection: AmazonConnection) => {
-    // Enhanced status mapping
-    if (connection.status === 'active' && connection.campaign_count > 0) {
+    // Enhanced status mapping using database enum values
+    if (connection.status === 'active' && connection.campaign_count && connection.campaign_count > 0) {
       return <Badge variant="default" className="bg-green-100 text-green-800 border-green-200">Connected</Badge>;
-    } else if (connection.status === 'setup_required' || 
-               (connection.status === 'active' && connection.campaign_count === 0)) {
+    } else if (connection.status === 'setup_required' || connection.status === 'warning' || 
+               (connection.status === 'active' && (!connection.campaign_count || connection.campaign_count === 0))) {
       return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 border-yellow-200">Setup Required</Badge>;
     } else if (connection.status === 'error') {
       return <Badge variant="destructive">Error</Badge>;
     } else if (connection.status === 'expired') {
       return <Badge variant="destructive">Expired</Badge>;
+    } else if (connection.status === 'pending') {
+      return <Badge variant="outline">Pending</Badge>;
     } else {
       return <Badge variant="outline">Unknown</Badge>;
     }
   };
 
   const getEnhancedStatusDescription = (connection: AmazonConnection) => {
-    if (connection.status === 'active' && connection.campaign_count > 0) {
+    if (connection.status === 'active' && connection.campaign_count && connection.campaign_count > 0) {
       return `${connection.campaign_count} campaigns synced successfully`;
     } else if (connection.status === 'setup_required') {
       if (connection.setup_required_reason === 'no_advertising_profiles') {
@@ -55,7 +58,7 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
       } else {
         return 'Setup required - please complete configuration';
       }
-    } else if (connection.status === 'active' && connection.campaign_count === 0) {
+    } else if (connection.status === 'active' && (!connection.campaign_count || connection.campaign_count === 0)) {
       return 'Connected but no campaigns found - Click "Sync Campaigns"';
     } else if (connection.status === 'expired') {
       return 'Access token expired - please reconnect';
@@ -67,6 +70,10 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
       } else {
         return 'Connection error - please reconnect or try force sync';
       }
+    } else if (connection.status === 'warning') {
+      return 'Connection has warnings - may need attention';
+    } else if (connection.status === 'pending') {
+      return 'Connection setup in progress';
     }
     return 'Status unknown - please refresh';
   };
@@ -90,9 +97,9 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
         </Button>
       );
     } 
-    // Show sync button for setup_required or active connections without campaigns
-    else if (connection.status === 'setup_required' || 
-             (connection.status === 'active' && connection.campaign_count === 0)) {
+    // Show sync button for setup_required, warning, or active connections without campaigns
+    else if (connection.status === 'setup_required' || connection.status === 'warning' ||
+             (connection.status === 'active' && (!connection.campaign_count || connection.campaign_count === 0))) {
       buttons.push(
         <Button
           key="sync"
@@ -107,7 +114,7 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
       );
     } 
     // Show refresh button for active connections with campaigns
-    else if (connection.status === 'active' && connection.campaign_count > 0) {
+    else if (connection.status === 'active' && connection.campaign_count && connection.campaign_count > 0) {
       buttons.push(
         <Button
           key="refresh"
@@ -247,7 +254,7 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
                       <div className="font-medium">
                         {connection.campaign_count || 0}
                       </div>
-                      {connection.campaign_count === 0 && (
+                      {(!connection.campaign_count || connection.campaign_count === 0) && (
                         <div className="text-xs text-gray-500">
                           {connection.status === 'setup_required' 
                             ? (connection.setup_required_reason === 'no_advertising_profiles' 
@@ -289,7 +296,8 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
         </div>
         
         {/* Enhanced help sections */}
-        {connections.some(c => c.status === 'setup_required' || (c.status === 'active' && c.campaign_count === 0)) && (
+        {connections.some(c => c.status === 'setup_required' || c.status === 'warning' || 
+                            (c.status === 'active' && (!c.campaign_count || c.campaign_count === 0))) && (
           <div className="mt-4 space-y-3">
             {connections.some(c => c.setup_required_reason === 'no_advertising_profiles') && (
               <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
@@ -320,7 +328,8 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
               </div>
             )}
             
-            {connections.some(c => c.status === 'setup_required' || (c.status === 'active' && c.campaign_count === 0)) && (
+            {connections.some(c => c.status === 'setup_required' || c.status === 'warning' || 
+                                (c.status === 'active' && (!c.campaign_count || c.campaign_count === 0))) && (
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="flex items-start gap-3">
                   <RefreshCw className="h-5 w-5 text-blue-600 mt-0.5" />

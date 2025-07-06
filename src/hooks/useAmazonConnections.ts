@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -6,7 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 
 export interface AmazonConnection {
   id: string;
-  status: 'connected' | 'disconnected' | 'error' | 'setup_required';
+  status: 'active' | 'expired' | 'error' | 'pending' | 'warning' | 'setup_required';
   profileName: string;
   connectedAt: string;
   marketplace_id?: string;
@@ -146,27 +145,22 @@ export const useAmazonConnections = () => {
           
           const campaignCount = Array.isArray(conn.campaigns) ? conn.campaigns.length : 0;
           const hasBeenSynced = conn.last_sync_at && campaignCount > 0;
-          const isActive = conn.status === 'active';
           
-          // Enhanced connection status determination
-          let connectionStatus: 'connected' | 'disconnected' | 'error' | 'setup_required';
+          // Use the database status directly, but determine setup_required_reason
+          let connectionStatus = conn.status;
           let setupRequiredReason: string | undefined;
           
           // Check token expiry first
           const tokenExpiry = new Date(conn.token_expires_at);
           const now = new Date();
-          if (tokenExpiry <= now) {
-            connectionStatus = 'error';
-            setupRequiredReason = 'token_expired';
-            console.log('Status: error (token expired)');
+          if (tokenExpiry <= now && connectionStatus !== 'expired') {
+            connectionStatus = 'expired';
+            console.log('Status: expired (token expired)');
             await updateConnectionStatus(conn.id, 'error', 'Token expired');
-          } else if (!isActive) {
-            connectionStatus = 'error';
-            setupRequiredReason = 'connection_inactive';
-            console.log('Status: error (connection not active)');
-            await updateConnectionStatus(conn.id, 'error', 'Connection inactive');
+          } else if (connectionStatus !== 'active') {
+            console.log('Status from DB:', connectionStatus);
           } else {
-            // Validate profile configuration
+            // Validate profile configuration for active connections
             const profileValidation = validateProfileConfiguration(conn);
             
             if (!profileValidation.isValid) {
@@ -185,10 +179,16 @@ export const useAmazonConnections = () => {
               console.log('Status: setup_required (synced but no campaigns found)');
               await updateConnectionStatus(conn.id, 'warning', 'No campaigns found after sync');
             } else {
-              connectionStatus = 'connected';
-              console.log('Status: connected (fully operational)');
-              await updateConnectionStatus(conn.id, 'active');
+              connectionStatus = 'active';
+              console.log('Status: active (fully operational)');
             }
+          }
+
+          // Set setup_required_reason based on status and conditions
+          if (connectionStatus === 'expired') {
+            setupRequiredReason = 'token_expired';
+          } else if (connectionStatus === 'error') {
+            setupRequiredReason = 'connection_error';
           }
           
           const formatted = {
