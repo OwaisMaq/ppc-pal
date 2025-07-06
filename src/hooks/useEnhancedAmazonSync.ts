@@ -291,6 +291,40 @@ export const useEnhancedAmazonSync = () => {
     }
   };
 
+  const debugConnection = async (connectionId: string) => {
+    console.log('=== Debug Connection Started ===');
+    
+    try {
+      addStep('Starting connection debug', 'pending', 'Running comprehensive connection analysis');
+      
+      // Token validation check
+      const tokenValid = await refreshTokenIfNeeded(connectionId);
+      
+      // Account validation check
+      const accountValidation = await validateAmazonAccount(connectionId);
+      
+      // Profile detection test
+      const profileResult = await runEnhancedProfileDetection(connectionId);
+      
+      if (tokenValid && accountValidation?.validation.isValid && profileResult.success) {
+        updateLastStep('success', 'All connection checks passed successfully');
+        return { success: true };
+      } else {
+        const issues = [];
+        if (!tokenValid) issues.push('Token validation failed');
+        if (!accountValidation?.validation.isValid) issues.push('Account validation failed');
+        if (!profileResult.success) issues.push('Profile detection failed');
+        
+        updateLastStep('warning', `Debug found issues: ${issues.join(', ')}`);
+        return { success: false, issues };
+      }
+    } catch (err) {
+      console.error('Debug connection error:', err);
+      updateLastStep('error', `Debug failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
+    }
+  };
+
   const updateConnectionWithProfiles = async (connectionId: string, profiles: any[]) => {
     console.log('=== Updating Connection with Profiles ===');
     
@@ -528,6 +562,8 @@ export const useEnhancedAmazonSync = () => {
     clearSteps,
     runEnhancedSync,
     runConnectionRecovery,
+    runEnhancedProfileDetection,
+    debugConnection,
     validateAmazonAccount,
     refreshTokenIfNeeded
   };
