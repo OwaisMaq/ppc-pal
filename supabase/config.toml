@@ -38,6 +38,24 @@ pop3_port = 54326
 [functions.amazon-oauth]
 verify_jwt = true
 
+[functions.amazon-oauth-init]
+verify_jwt = true
+
+[functions.amazon-oauth-callback]
+verify_jwt = false
+
+[functions.amazon-enhanced-profile-detection]
+verify_jwt = true
+
+[functions.amazon-test-connection]
+verify_jwt = true
+
+[functions.amazon-update-connection-profiles]
+verify_jwt = false
+
+[functions.amazon-retry-profiles]
+verify_jwt = false
+
 [functions.sync-amazon-data]
 verify_jwt = true
 
@@ -55,3 +73,6 @@ verify_jwt = true
 
 [functions.customer-portal]
 verify_jwt = true
+
+[functions.scheduled-optimization]
+verify_jwt = false
