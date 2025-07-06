@@ -7,6 +7,13 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Regional validation endpoints
+const VALIDATION_ENDPOINTS = [
+  'https://advertising-api.amazon.com/v2/profiles',
+  'https://advertising-api-eu.amazon.com/v2/profiles', 
+  'https://advertising-api-fe.amazon.com/v2/profiles'
+];
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -143,117 +150,78 @@ serve(async (req) => {
       );
     }
 
-    // Try to validate by calling profiles endpoint
-    console.log('Testing Amazon API access...');
+    // Enhanced validation across multiple regions
+    console.log('Testing Amazon API access across regions...');
     
-    try {
-      const profilesResponse = await fetch('https://advertising-api.amazon.com/v2/profiles', {
-        headers: {
-          'Authorization': `Bearer ${connection.access_token}`,
-          'Amazon-Advertising-API-ClientId': clientId,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      console.log('Profiles API response status:', profilesResponse.status);
-
-      if (profilesResponse.ok) {
-        const profiles = await profilesResponse.json();
-        const profileCount = Array.isArray(profiles) ? profiles.length : 0;
+    let totalProfiles = 0;
+    let validationErrors = [];
+    let authenticationFailed = false;
+    
+    for (const endpoint of VALIDATION_ENDPOINTS) {
+      try {
+        console.log(`Testing endpoint: ${endpoint}`);
         
-        console.log('Found profiles:', profileCount);
+        const profilesResponse = await fetch(endpoint, {
+          headers: {
+            'Authorization': `Bearer ${connection.access_token}`,
+            'Amazon-Advertising-API-ClientId': clientId,
+            'Content-Type': 'application/json'
+          }
+        });
 
-        if (profileCount > 0) {
-          // Account has advertising profiles - fully set up
-          return new Response(
-            JSON.stringify({
-              success: true,
-              validation: {
-                isValid: true,
-                hasAdvertisingAccount: true,
-                hasActiveProfiles: true,
-                hasCampaigns: true, // Assume campaigns exist if profiles exist
-                issues: [],
-                recommendations: [],
-                profilesFound: profileCount,
-                campaignsFound: 0 // We don't check campaigns in validation
-              },
-              summary: {
-                accountReady: true,
-                setupRequired: false,
-                canSync: true,
-                nextSteps: ['Run campaign sync']
-              },
-              message: `Account validated successfully - ${profileCount} advertising profiles found`
-            }),
-            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
+        console.log(`Validation response status for ${endpoint}:`, profilesResponse.status);
+
+        if (profilesResponse.ok) {
+          const profiles = await profilesResponse.json();
+          const profileCount = Array.isArray(profiles) ? profiles.length : 0;
+          totalProfiles += profileCount;
+          
+          console.log(`Found ${profileCount} profiles from ${endpoint}`);
+          
+          if (profileCount > 0) {
+            // Found profiles - account is validated
+            return new Response(
+              JSON.stringify({
+                success: true,
+                validation: {
+                  isValid: true,
+                  hasAdvertisingAccount: true,
+                  hasActiveProfiles: true,
+                  hasCampaigns: true, // Assume campaigns exist if profiles exist
+                  issues: [],
+                  recommendations: [],
+                  profilesFound: totalProfiles,
+                  campaignsFound: 0 // We don't check campaigns in validation
+                },
+                summary: {
+                  accountReady: true,
+                  setupRequired: false,
+                  canSync: true,
+                  nextSteps: ['Run campaign sync']
+                },
+                message: `Account validated successfully - ${profileCount} advertising profiles found`
+              }),
+              { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
         } else {
-          // API works but no profiles - setup required
-          return new Response(
-            JSON.stringify({
-              success: false,
-              validation: {
-                isValid: false,
-                hasAdvertisingAccount: false,
-                hasActiveProfiles: false,
-                hasCampaigns: false,
-                issues: ['No advertising profiles found'],
-                recommendations: [
-                  'Set up Amazon Advertising account at advertising.amazon.com',
-                  'Create your first advertising campaign',
-                  'Wait 24 hours for data to become available'
-                ],
-                profilesFound: 0,
-                campaignsFound: 0
-              },
-              summary: {
-                accountReady: false,
-                setupRequired: true,
-                canSync: false,
-                nextSteps: [
-                  'Visit advertising.amazon.com',
-                  'Set up advertising account',
-                  'Create first campaign'
-                ]
-              },
-              message: 'Amazon Advertising setup required'
-            }),
-            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
+          const errorText = await profilesResponse.text();
+          console.error(`Validation failed for ${endpoint}:`, profilesResponse.status, errorText);
+          
+          if (profilesResponse.status === 401 || profilesResponse.status === 403) {
+            authenticationFailed = true;
+          }
+          
+          validationErrors.push(`${endpoint}: ${profilesResponse.status}`);
         }
-      } else {
-        // API call failed - could be auth or permission issue
-        const errorText = await profilesResponse.text();
-        console.error('Profiles API failed:', profilesResponse.status, errorText);
-        
-        return new Response(
-          JSON.stringify({
-            success: false,
-            validation: {
-              isValid: false,
-              hasAdvertisingAccount: false,
-              hasActiveProfiles: false,
-              hasCampaigns: false,
-              issues: [`API access failed: ${profilesResponse.status}`],
-              recommendations: ['Reconnect your Amazon account with proper permissions'],
-              profilesFound: 0,
-              campaignsFound: 0
-            },
-            summary: {
-              accountReady: false,
-              setupRequired: true,
-              canSync: false,
-              nextSteps: ['Reconnect Amazon account']
-            },
-            message: 'API access validation failed'
-          }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+      } catch (apiError) {
+        console.error(`Network error for ${endpoint}:`, apiError);
+        validationErrors.push(`${endpoint}: Network error`);
       }
-    } catch (apiError) {
-      console.error('API validation error:', apiError);
-      
+    }
+
+    // No profiles found across all regions
+    if (authenticationFailed) {
       return new Response(
         JSON.stringify({
           success: false,
@@ -262,18 +230,52 @@ serve(async (req) => {
             hasAdvertisingAccount: false,
             hasActiveProfiles: false,
             hasCampaigns: false,
-            issues: ['Network error during validation'],
-            recommendations: ['Check internet connection and try again'],
+            issues: ['Authentication failed across all regions'],
+            recommendations: ['Reconnect your Amazon account with proper permissions'],
             profilesFound: 0,
             campaignsFound: 0
           },
           summary: {
             accountReady: false,
-            setupRequired: false,
+            setupRequired: true,
             canSync: false,
-            nextSteps: ['Retry validation']
+            nextSteps: ['Reconnect Amazon account']
           },
-          message: 'Network error during account validation'
+          message: 'Authentication validation failed - reconnection required'
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    } else {
+      // API works but no profiles - setup required
+      return new Response(
+        JSON.stringify({
+          success: false,
+          validation: {
+            isValid: false,
+            hasAdvertisingAccount: false,
+            hasActiveProfiles: false,
+            hasCampaigns: false,
+            issues: ['No advertising profiles found across all regions'],
+            recommendations: [
+              'Set up Amazon Advertising account at advertising.amazon.com',
+              'Create your first advertising campaign',
+              'Wait 24-48 hours for data to become available'
+            ],
+            profilesFound: 0,
+            campaignsFound: 0
+          },
+          summary: {
+            accountReady: false,
+            setupRequired: true,
+            canSync: false,
+            nextSteps: [
+              'Visit advertising.amazon.com',
+              'Set up advertising account',
+              'Create first campaign'
+            ]
+          },
+          message: 'Amazon Advertising setup required - no profiles found',
+          validationErrors
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );

@@ -7,6 +7,25 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Regional endpoint configuration
+const REGIONAL_ENDPOINTS = [
+  {
+    region: 'North America',
+    endpoint: 'https://advertising-api.amazon.com/v2/profiles',
+    countries: ['US', 'CA', 'MX']
+  },
+  {
+    region: 'Europe',
+    endpoint: 'https://advertising-api-eu.amazon.com/v2/profiles', 
+    countries: ['UK', 'DE', 'FR', 'IT', 'ES', 'NL']
+  },
+  {
+    region: 'Far East',
+    endpoint: 'https://advertising-api-fe.amazon.com/v2/profiles',
+    countries: ['JP', 'AU', 'IN', 'SG']
+  }
+];
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -131,24 +150,19 @@ serve(async (req) => {
       );
     }
 
-    console.log('Attempting to fetch advertising profiles...');
-
-    // Define endpoints to try
-    const endpoints = [
-      'https://advertising-api.amazon.com/v2/profiles',
-      'https://advertising-api-eu.amazon.com/v2/profiles', 
-      'https://advertising-api-fe.amazon.com/v2/profiles'
-    ];
+    console.log('Attempting enhanced profile detection across regions...');
 
     let allProfiles = [];
-    let errors = [];
+    let detectionResults = [];
+    let authenticationIssues = false;
 
-    // Try each regional endpoint
-    for (const endpoint of endpoints) {
+    // Enhanced multi-strategy detection
+    for (const regionConfig of REGIONAL_ENDPOINTS) {
       try {
-        console.log(`Trying endpoint: ${endpoint}`);
+        console.log(`=== Trying ${regionConfig.region} Region ===`);
+        console.log(`Endpoint: ${regionConfig.endpoint}`);
         
-        const profilesResponse = await fetch(endpoint, {
+        const profilesResponse = await fetch(regionConfig.endpoint, {
           headers: {
             'Authorization': `Bearer ${connection.access_token}`,
             'Amazon-Advertising-API-ClientId': clientId,
@@ -156,47 +170,110 @@ serve(async (req) => {
           }
         });
 
-        console.log(`Response status for ${endpoint}:`, profilesResponse.status);
+        console.log(`Response status for ${regionConfig.region}:`, profilesResponse.status);
 
         if (profilesResponse.ok) {
           const profiles = await profilesResponse.json();
+          console.log(`Raw profiles from ${regionConfig.region}:`, profiles);
           
           if (Array.isArray(profiles) && profiles.length > 0) {
-            // Filter valid profiles
-            const validProfiles = profiles.filter(profile => 
-              profile.profileId && 
-              profile.countryCode &&
-              (profile.accountInfo?.marketplaceStringId || profile.marketplaceStringId)
-            );
+            // Enhanced profile validation and filtering
+            const validProfiles = profiles.filter(profile => {
+              const isValid = profile.profileId && 
+                             profile.countryCode &&
+                             (profile.accountInfo?.marketplaceStringId || profile.marketplaceStringId);
+              
+              if (!isValid) {
+                console.log('Filtered invalid profile:', profile);
+              }
+              
+              return isValid;
+            });
             
             if (validProfiles.length > 0) {
-              console.log(`Found ${validProfiles.length} valid profiles from ${endpoint}`);
+              console.log(`Found ${validProfiles.length} valid profiles from ${regionConfig.region}`);
               
-              // Add profiles that aren't already in our list
+              // Add region metadata and deduplicate
+              const enrichedProfiles = validProfiles.map(profile => ({
+                ...profile,
+                detectedRegion: regionConfig.region,
+                detectedEndpoint: regionConfig.endpoint
+              }));
+              
+              // Deduplicate by profileId
               const existingIds = new Set(allProfiles.map(p => p.profileId));
-              const newProfiles = validProfiles.filter(p => !existingIds.has(p.profileId));
+              const newProfiles = enrichedProfiles.filter(p => !existingIds.has(p.profileId));
+              
               allProfiles.push(...newProfiles);
+              
+              detectionResults.push({
+                region: regionConfig.region,
+                endpoint: regionConfig.endpoint,
+                status: 'success',
+                profilesFound: validProfiles.length,
+                newProfilesAdded: newProfiles.length
+              });
+            } else {
+              detectionResults.push({
+                region: regionConfig.region,
+                endpoint: regionConfig.endpoint,
+                status: 'no_valid_profiles',
+                profilesFound: 0,
+                rawProfilesFound: profiles.length
+              });
             }
+          } else {
+            detectionResults.push({
+              region: regionConfig.region,
+              endpoint: regionConfig.endpoint,
+              status: 'empty_response',
+              profilesFound: 0
+            });
           }
         } else {
           const errorText = await profilesResponse.text();
-          errors.push(`${endpoint}: ${profilesResponse.status} ${errorText.substring(0, 100)}`);
-          console.error(`Error from ${endpoint}:`, profilesResponse.status, errorText.substring(0, 200));
+          console.error(`Error from ${regionConfig.region}:`, profilesResponse.status, errorText);
+          
+          // Check for authentication issues
+          if (profilesResponse.status === 401 || profilesResponse.status === 403) {
+            authenticationIssues = true;
+          }
+          
+          detectionResults.push({
+            region: regionConfig.region,
+            endpoint: regionConfig.endpoint,
+            status: 'error',
+            httpStatus: profilesResponse.status,
+            error: errorText.substring(0, 200)
+          });
         }
       } catch (endpointError) {
-        const errorMsg = `${endpoint}: ${endpointError.message}`;
-        errors.push(errorMsg);
-        console.error(`Network error for ${endpoint}:`, endpointError);
+        console.error(`Network error for ${regionConfig.region}:`, endpointError);
+        detectionResults.push({
+          region: regionConfig.region,
+          endpoint: regionConfig.endpoint,
+          status: 'network_error',
+          error: endpointError.message
+        });
       }
     }
 
-    console.log(`Profile detection complete. Found ${allProfiles.length} total profiles.`);
+    console.log(`=== Detection Complete ===`);
+    console.log(`Total profiles found: ${allProfiles.length}`);
+    console.log(`Detection results:`, detectionResults);
 
     if (allProfiles.length > 0) {
-      // Sort profiles - prefer US profiles and larger profile IDs
+      // Enhanced profile sorting with regional preference
       const sortedProfiles = allProfiles.sort((a, b) => {
+        // Prefer US profiles
         if (a.countryCode === 'US' && b.countryCode !== 'US') return -1;
         if (b.countryCode === 'US' && a.countryCode !== 'US') return 1;
+        
+        // Then prefer North America region
+        if (a.detectedRegion === 'North America' && b.detectedRegion !== 'North America') return -1;
+        if (b.detectedRegion === 'North America' && a.detectedRegion !== 'North America') return 1;
+        
+        // Finally, sort by profile ID (larger = more recent)
         return parseInt(b.profileId) - parseInt(a.profileId);
       });
 
@@ -206,31 +283,61 @@ serve(async (req) => {
           profiles: sortedProfiles,
           detectionSummary: {
             totalProfilesFound: sortedProfiles.length,
-            endpointsChecked: endpoints.length,
-            errorsEncountered: errors.length
+            regionsChecked: REGIONAL_ENDPOINTS.length,
+            successfulRegions: detectionResults.filter(r => r.status === 'success').length,
+            detectionResults,
+            primaryRegion: sortedProfiles[0]?.detectedRegion || 'Unknown'
           },
-          message: `Successfully detected ${sortedProfiles.length} advertising profile${sortedProfiles.length === 1 ? '' : 's'}`,
+          message: `Successfully detected ${sortedProfiles.length} advertising profile${sortedProfiles.length === 1 ? '' : 's'} across ${detectionResults.filter(r => r.status === 'success').length} region${detectionResults.filter(r => r.status === 'success').length === 1 ? '' : 's'}`,
           nextSteps: [
             'Profile configuration will be updated automatically',
+            'Connection status will be set to active',
             'Campaign sync can now proceed'
           ]
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     } else {
-      // No profiles found
-      let primaryReason = 'No advertising profiles found';
-      let requiresReconnection = false;
+      // Enhanced failure analysis
+      let primaryReason = 'No advertising profiles found across all regions';
+      let requiresReconnection = authenticationIssues;
+      let detailedGuidance = [];
       
-      // Check if we got authentication errors
-      const hasAuthErrors = errors.some(err => 
-        err.includes('401') || err.includes('403') || 
-        err.includes('Unauthorized') || err.includes('Forbidden')
-      );
-      
-      if (hasAuthErrors) {
-        primaryReason = 'Authentication issues detected';
+      if (authenticationIssues) {
+        primaryReason = 'Authentication issues detected across multiple regions';
         requiresReconnection = true;
+        detailedGuidance = [
+          'Reconnect your Amazon account with proper advertising permissions',
+          'Ensure your Amazon account has access to Amazon Advertising',
+          'Verify that advertising campaigns exist in your account'
+        ];
+      } else {
+        const hasNetworkErrors = detectionResults.some(r => r.status === 'network_error');
+        const hasServerErrors = detectionResults.some(r => r.httpStatus >= 500);
+        
+        if (hasNetworkErrors) {
+          primaryReason = 'Network connectivity issues during detection';
+          detailedGuidance = [
+            'Check your internet connection',
+            'Try the enhanced sync again in a few minutes',
+            'Contact support if the issue persists'
+          ];
+        } else if (hasServerErrors) {
+          primaryReason = 'Amazon API server issues detected';
+          detailedGuidance = [
+            'Amazon\'s advertising API may be experiencing issues',
+            'Wait a few minutes and try again',
+            'Check Amazon Advertising console for service status'
+          ];
+        } else {
+          primaryReason = 'No advertising profiles found - setup required';
+          detailedGuidance = [
+            'Visit advertising.amazon.com to set up your advertising account',
+            'Create at least one sponsored product campaign',
+            'Wait 24-48 hours for data to become available',
+            'Run enhanced sync again after setup'
+          ];
+        }
       }
 
       return new Response(
@@ -241,17 +348,25 @@ serve(async (req) => {
           primaryReason,
           requiresReconnection,
           detectionSummary: {
-            endpointsChecked: endpoints.length,
-            errorsEncountered: errors.length
+            regionsChecked: REGIONAL_ENDPOINTS.length,
+            successfulRegions: 0,
+            detectionResults,
+            authenticationIssues,
+            troubleshooting: {
+              hasNetworkErrors: detectionResults.some(r => r.status === 'network_error'),
+              hasServerErrors: detectionResults.some(r => r.httpStatus >= 500),
+              hasAuthErrors: authenticationIssues,
+              allRegionsFailed: detectionResults.every(r => r.status !== 'success')
+            }
           },
-          detailedGuidance: requiresReconnection ? 
-            ['Reconnect your Amazon account with proper permissions'] :
-            [
-              'Visit advertising.amazon.com to set up your advertising account',
-              'Create at least one advertising campaign',  
-              'Try Enhanced Sync again after setup'
-            ],
-          errors: errors.length > 0 ? errors : undefined
+          detailedGuidance,
+          nextSteps: requiresReconnection ? 
+            ['Reconnect Amazon account'] :
+            detailedGuidance,
+          troubleshooting: {
+            authenticationIssues,
+            detectionResults
+          }
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -267,7 +382,7 @@ serve(async (req) => {
         profiles: [],
         error: 'Internal server error',
         details: error.message || 'An unexpected error occurred',
-        primaryReason: 'Server error'
+        primaryReason: 'Server error during profile detection'
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

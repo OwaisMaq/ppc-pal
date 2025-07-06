@@ -14,7 +14,10 @@ import {
   Zap,
   RefreshCw,
   Info,
-  Lightbulb
+  Lightbulb,
+  Globe,
+  Shield,
+  Target
 } from "lucide-react";
 import { useEnhancedAmazonSync } from "@/hooks/useEnhancedAmazonSync";
 import { formatDistanceToNow } from 'date-fns';
@@ -93,17 +96,28 @@ const EnhancedAmazonSync = ({
           )}
         </CardTitle>
         <p className="text-sm text-gray-600">
-          Advanced multi-strategy sync with intelligent profile detection and error recovery
+          Intelligent multi-region sync with enhanced profile detection and automatic recovery
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Control Panel */}
-        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+        <div className="flex items-center justify-between p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-100">
           <div>
             <h4 className="font-medium text-gray-900">Connection: {connectionName}</h4>
-            <p className="text-sm text-gray-600">
-              Uses enhanced detection across multiple regions and strategies
-            </p>
+            <div className="flex items-center gap-4 mt-1 text-sm text-gray-600">
+              <span className="flex items-center gap-1">
+                <Globe className="h-3 w-3" />
+                Multi-region detection
+              </span>
+              <span className="flex items-center gap-1">
+                <Shield className="h-3 w-3" />
+                Auto-recovery
+              </span>
+              <span className="flex items-center gap-1">
+                <Target className="h-3 w-3" />
+                Smart optimization
+              </span>
+            </div>
           </div>
           <div className="flex gap-2">
             {steps.length > 0 && (
@@ -120,7 +134,7 @@ const EnhancedAmazonSync = ({
             <Button
               onClick={handleStartSync}
               disabled={isRunning}
-              className="bg-purple-600 hover:bg-purple-700"
+              className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
             >
               {isRunning ? (
                 <>
@@ -145,21 +159,21 @@ const EnhancedAmazonSync = ({
                 <>
                   <XCircle className="h-4 w-4 text-red-600" />
                   <span className="text-red-700">
-                    Sync completed with errors. Review the steps below for guidance.
+                    Enhanced sync encountered issues. Review the detailed steps below for resolution guidance.
                   </span>
                 </>
               ) : hasWarnings ? (
                 <>
                   <AlertTriangle className="h-4 w-4 text-yellow-600" />
                   <span className="text-yellow-700">
-                    Sync completed with warnings. Some setup may be required.
+                    Enhanced sync completed with setup recommendations. Additional configuration may be required.
                   </span>
                 </>
               ) : (
                 <>
                   <CheckCircle2 className="h-4 w-4 text-green-600" />
                   <span className="text-green-700">
-                    Enhanced sync completed successfully!
+                    Enhanced sync completed successfully! Your Amazon connection is optimally configured.
                   </span>
                 </>
               )}
@@ -172,13 +186,13 @@ const EnhancedAmazonSync = ({
           <div className="space-y-3">
             <h4 className="font-medium text-gray-900 flex items-center gap-2">
               <Lightbulb className="h-4 w-4" />
-              Sync Progress & Details
+              Detailed Progress & Insights
             </h4>
-            <div className="space-y-2 max-h-96 overflow-y-auto">
+            <div className="space-y-3 max-h-96 overflow-y-auto">
               {steps.map((step, index) => (
                 <div
                   key={index}
-                  className={`p-3 rounded-lg border ${getStatusColor(step.status)}`}
+                  className={`p-4 rounded-lg border ${getStatusColor(step.status)} transition-all duration-200`}
                 >
                   <div className="flex items-start gap-3">
                     <div className="flex-shrink-0 mt-0.5">
@@ -195,12 +209,30 @@ const EnhancedAmazonSync = ({
                         <p className="text-sm mt-1 text-gray-600">{step.details}</p>
                       )}
                       {step.data && (
-                        <div className="mt-2 text-xs">
-                          <details className="cursor-pointer">
-                            <summary className="text-gray-500 hover:text-gray-700">
+                        <div className="mt-3">
+                          {/* Enhanced data display for profile detection results */}
+                          {step.data.profilesFound && (
+                            <div className="grid grid-cols-2 gap-4 p-3 bg-white bg-opacity-50 rounded-md text-xs">
+                              <div>
+                                <span className="font-medium">Profiles Found:</span> {step.data.profilesFound}
+                              </div>
+                              <div>
+                                <span className="font-medium">Regions Checked:</span> {step.data.regionsChecked || 'N/A'}
+                              </div>
+                              {step.data.primaryRegion && (
+                                <div className="col-span-2">
+                                  <span className="font-medium">Primary Region:</span> {step.data.primaryRegion}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          
+                          {/* Technical details collapsible */}
+                          <details className="cursor-pointer mt-2">
+                            <summary className="text-xs text-gray-500 hover:text-gray-700 select-none">
                               View technical details
                             </summary>
-                            <pre className="mt-1 p-2 bg-gray-100 rounded text-xs overflow-x-auto">
+                            <pre className="mt-2 p-3 bg-gray-100 bg-opacity-70 rounded text-xs overflow-x-auto border">
                               {JSON.stringify(step.data, null, 2)}
                             </pre>
                           </details>
@@ -214,17 +246,48 @@ const EnhancedAmazonSync = ({
           </div>
         )}
 
-        {/* Help and Information */}
+        {/* Enhanced Help and Information */}
         {steps.length === 0 && (
-          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <h4 className="font-medium text-blue-900 mb-2">About Enhanced Sync</h4>
-            <ul className="text-sm text-blue-800 space-y-1">
-              <li>• <strong>Multi-Strategy Detection:</strong> Uses multiple methods to find advertising profiles</li>
-              <li>• <strong>Regional Coverage:</strong> Checks North America, Europe, and Far East regions</li>
-              <li>• <strong>Intelligent Recovery:</strong> Automatically fixes common profile configuration issues</li>
-              <li>• <strong>Comprehensive Validation:</strong> Verifies tokens, permissions, and account setup</li>
-              <li>• <strong>Detailed Guidance:</strong> Provides step-by-step instructions for any issues</li>
-            </ul>
+          <div className="p-4 bg-gradient-to-br from-blue-50 to-purple-50 border border-blue-200 rounded-lg">
+            <h4 className="font-medium text-blue-900 mb-3 flex items-center gap-2">
+              <Zap className="h-4 w-4" />
+              Enhanced Sync Capabilities
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-blue-800">
+              <div className="space-y-2">
+                <div className="flex items-start gap-2">
+                  <Globe className="h-4 w-4 mt-0.5 text-blue-600" />
+                  <div>
+                    <strong>Multi-Region Detection:</strong> Scans North America, Europe, and Far East Amazon advertising regions
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <Shield className="h-4 w-4 mt-0.5 text-blue-600" />
+                  <div>
+                    <strong>Intelligent Recovery:</strong> Automatically fixes common profile and authentication issues
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-start gap-2">
+                  <Target className="h-4 w-4 mt-0.5 text-blue-600" />
+                  <div>
+                    <strong>Smart Optimization:</strong> Selects optimal profiles and configurations automatically
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <RefreshCw className="h-4 w-4 mt-0.5 text-blue-600" />
+                  <div>
+                    <strong>Comprehensive Validation:</strong> Verifies tokens, permissions, and account setup across all regions
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="mt-3 p-3 bg-blue-100 bg-opacity-50 rounded-md">
+              <p className="text-xs text-blue-700">
+                <strong>Pro Tip:</strong> Enhanced sync automatically handles region-specific configurations and selects the best advertising profile for optimal campaign performance.
+              </p>
+            </div>
           </div>
         )}
       </CardContent>
