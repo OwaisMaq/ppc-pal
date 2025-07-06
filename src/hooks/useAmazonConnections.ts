@@ -234,7 +234,8 @@ export const useAmazonConnections = () => {
             last_sync_at: conn.last_sync_at,
             campaign_count: campaignCount,
             needs_sync: needsSync,
-            setup_required_reason: setupRequiredReason
+            setup_required_reason: setupRequiredReason,
+            token_expires_at: conn.token_expires_at
           };
           
           console.log('Final formatted connection:', formatted);
