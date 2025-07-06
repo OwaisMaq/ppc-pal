@@ -22,13 +22,10 @@ const AmazonCallbackPage = () => {
     console.log('=== AmazonCallbackPage Component Mounted ===');
     console.log('Component loaded at:', new Date().toISOString());
     console.log('Window location:', window.location.href);
-    console.log('Window pathname:', window.location.pathname);
-    console.log('Window search:', window.location.search);
     
     // Prevent duplicate processing
     if (processingRef.current) {
       console.log('=== Callback Already Processing ===');
-      console.log('Skipping duplicate callback processing');
       return;
     }
     
@@ -38,7 +35,6 @@ const AmazonCallbackPage = () => {
       try {
         console.log('=== Amazon Callback Page Loaded ===');
         console.log('Current URL:', window.location.href);
-        console.log('Search params:', window.location.search);
         
         // Extract parameters from URL
         const code = searchParams.get('code');
@@ -48,7 +44,6 @@ const AmazonCallbackPage = () => {
 
         console.log('=== URL Parameters ===');
         console.log('Authorization code present:', !!code);
-        console.log('Authorization code length:', code?.length || 0);
         console.log('State parameter:', state);
         console.log('Error parameter:', error);
         console.log('Error description:', errorDescription);
@@ -73,12 +68,6 @@ const AmazonCallbackPage = () => {
             case 'unauthorized_client':
               userFriendlyMessage = 'The application is not authorized. Please contact support.';
               break;
-            case 'unsupported_response_type':
-              userFriendlyMessage = 'Technical error with the authorization process. Please contact support.';
-              break;
-            case 'invalid_scope':
-              userFriendlyMessage = 'Invalid permissions requested. Please contact support.';
-              break;
             case 'server_error':
               userFriendlyMessage = 'Amazon encountered a server error. Please try again later.';
               break;
@@ -97,7 +86,6 @@ const AmazonCallbackPage = () => {
             variant: "destructive",
           });
           
-          // Redirect to settings after showing error
           setTimeout(() => navigate('/settings'), 5000);
           return;
         }
@@ -107,7 +95,7 @@ const AmazonCallbackPage = () => {
           console.error('=== Missing Authorization Code ===');
           setStatus('error');
           setMessage('No authorization code received');
-          setDetails('The authorization process was incomplete. This may happen if you closed the browser window too quickly. Please try connecting again.');
+          setDetails('The authorization process was incomplete. Please try connecting again.');
           
           toast({
             title: "Connection Failed",
@@ -123,7 +111,7 @@ const AmazonCallbackPage = () => {
           console.error('=== Missing State Parameter ===');
           setStatus('error');
           setMessage('Security validation failed');
-          setDetails('The state parameter is missing. This may indicate a security issue or browser problem. Please try connecting again.');
+          setDetails('The state parameter is missing. Please try connecting again.');
           
           toast({
             title: "Security Error",
@@ -138,43 +126,10 @@ const AmazonCallbackPage = () => {
         console.log('=== Starting OAuth Callback Processing ===');
         setMessage('Exchanging authorization code for access token...');
         
-        // Process the OAuth callback with retry logic
-        let result;
-        let lastError;
-        
-        for (let attempt = 0; attempt <= maxRetries; attempt++) {
-          try {
-            if (attempt > 0) {
-              console.log(`=== Retry Attempt ${attempt}/${maxRetries} ===`);
-              setMessage(`Retrying connection (attempt ${attempt + 1}/${maxRetries + 1})...`);
-              // Wait before retry
-              await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-            }
-            
-            result = await handleOAuthCallback(code, state);
-            console.log('=== OAuth Callback Completed Successfully ===');
-            console.log('Result:', result);
-            break; // Success, exit retry loop
-            
-          } catch (error) {
-            console.error(`=== OAuth Callback Attempt ${attempt + 1} Failed ===`);
-            console.error('Error:', error);
-            lastError = error;
-            
-            // If this is not the last attempt, continue to retry
-            if (attempt < maxRetries) {
-              console.log(`Will retry in ${1000 * (attempt + 1)}ms...`);
-              continue;
-            }
-            
-            // If we've exhausted all retries, throw the error
-            throw error;
-          }
-        }
-        
-        if (!result) {
-          throw lastError || new Error('Failed to process callback after all retries');
-        }
+        // Process the OAuth callback
+        const result = await handleOAuthCallback(code, state);
+        console.log('=== OAuth Callback Completed Successfully ===');
+        console.log('Result:', result);
         
         setStatus('success');
         setMessage('Amazon account connected successfully!');
@@ -186,7 +141,7 @@ const AmazonCallbackPage = () => {
             description: `Connected to Amazon with ${result.profileCount} advertising profile(s)`,
           });
         } else {
-          setDetails('Connection established, but no advertising profiles were found. You may need to set up Amazon Advertising at advertising.amazon.com first.');
+          setDetails('Connection established, but no advertising profiles were found. You may need to set up Amazon Advertising first.');
           toast({
             title: "Connection Successful",
             description: "Connected to Amazon - please set up advertising profiles to sync campaigns",
@@ -198,19 +153,26 @@ const AmazonCallbackPage = () => {
         
       } catch (error) {
         console.error('=== Callback Processing Error ===');
-        console.error('Error type:', typeof error);
-        console.error('Error message:', error instanceof Error ? error.message : String(error));
-        console.error('Full error:', error);
+        console.error('Error details:', error);
         
         setStatus('error');
         setMessage('Failed to process Amazon connection');
         
-        // Provide user-friendly error messages
+        // Enhanced error handling
         let userMessage = 'An unexpected error occurred while connecting to Amazon.';
         let shouldRetry = false;
         
         if (error instanceof Error) {
-          if (error.message.includes('Authentication failed') || error.message.includes('Invalid user session')) {
+          if (error.message.includes('Server configuration error') || 
+              error.message.includes('missing Amazon credentials')) {
+            userMessage = 'Server configuration issue. Please contact support.';
+          } else if (error.message.includes('Authorization code has expired') || 
+                     error.message.includes('invalid_grant')) {
+            userMessage = 'Authorization code has expired. Please try connecting again.';
+          } else if (error.message.includes('Invalid client configuration')) {
+            userMessage = 'Application configuration error. Please contact support.';
+          } else if (error.message.includes('Authentication failed') || 
+                     error.message.includes('Invalid user session')) {
             userMessage = 'Your login session has expired. Please log in again and try connecting to Amazon.';
           } else if (error.message.includes('Token exchange failed')) {
             userMessage = 'Failed to exchange authorization code with Amazon. Please try connecting again.';
@@ -221,10 +183,6 @@ const AmazonCallbackPage = () => {
           } else if (error.message.includes('Server error') || error.message.includes('500')) {
             userMessage = 'Server error occurred. Please try again in a few moments.';
             shouldRetry = retryCount < maxRetries;
-          } else if (error.message.includes('duplicate') || error.message.includes('already')) {
-            userMessage = 'This authorization has already been processed. Redirecting to settings...';
-            setTimeout(() => navigate('/settings'), 2000);
-            return;
           } else {
             userMessage = error.message;
           }
@@ -243,8 +201,8 @@ const AmazonCallbackPage = () => {
           setRetryCount(prev => prev + 1);
           setTimeout(() => {
             console.log('=== Auto-retry triggered ===');
-            processingRef.current = false; // Reset processing flag
-            window.location.reload(); // Restart the process
+            processingRef.current = false;
+            window.location.reload();
           }, 3000);
           return;
         }
@@ -252,8 +210,7 @@ const AmazonCallbackPage = () => {
         // Redirect to settings after showing error
         setTimeout(() => navigate('/settings'), 5000);
       } finally {
-        // Reset processing flag when done (success or final failure)
-        if (!processingRef.current) return; // Already reset for retry
+        if (!processingRef.current) return;
         processingRef.current = false;
       }
     };

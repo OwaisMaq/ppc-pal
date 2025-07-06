@@ -70,9 +70,23 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           error: 'Access token has expired',
-          details: 'Please reconnect your Amazon account'
+          details: 'Please reconnect your Amazon account',
+          requiresReconnection: true
         }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Validate Amazon client credentials
+    const clientId = Deno.env.get('AMAZON_CLIENT_ID')
+    if (!clientId) {
+      console.error('Missing Amazon client ID')
+      return new Response(
+        JSON.stringify({ 
+          error: 'Server configuration error',
+          details: 'Amazon client credentials not configured'
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
@@ -83,7 +97,7 @@ serve(async (req) => {
       const profilesResponse = await fetch('https://advertising-api.amazon.com/v2/profiles', {
         headers: {
           'Authorization': `Bearer ${connection.access_token}`,
-          'Amazon-Advertising-API-ClientId': Deno.env.get('AMAZON_CLIENT_ID') ?? '',
+          'Amazon-Advertising-API-ClientId': clientId,
           'Content-Type': 'application/json',
         },
       })
@@ -96,7 +110,7 @@ serve(async (req) => {
           const firstProfile = profiles[0]
           const profileId = firstProfile.profileId.toString()
           const profileName = firstProfile.countryCode || `Profile ${firstProfile.profileId}`
-          const marketplaceId = firstProfile.marketplaceStringId || firstProfile.countryCode
+          const marketplaceId = firstProfile.accountInfo?.marketplaceStringId || firstProfile.countryCode
 
           // Update connection with found profile
           await supabaseClient
@@ -105,7 +119,7 @@ serve(async (req) => {
               profile_id: profileId,
               profile_name: profileName,
               marketplace_id: marketplaceId,
-              status: 'active',
+              status: 'setup_required', // Will be set to active after successful sync
               updated_at: new Date().toISOString()
             })
             .eq('id', connectionId)
@@ -118,16 +132,35 @@ serve(async (req) => {
           console.log('Updated connection with profile:', { profileId, profileName })
         } else {
           console.log('Still no profiles found')
+          
+          await supabaseClient
+            .from('amazon_connections')
+            .update({ 
+              status: 'setup_required',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', connectionId)
+
           return new Response(
             JSON.stringify({ 
               error: 'No advertising profiles found',
-              details: 'Please set up Amazon Advertising first, then try again'
+              details: 'Please set up Amazon Advertising first, then try again',
+              requiresSetup: true
             }),
             { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           )
         }
       } else {
         console.error('Failed to fetch profiles:', profilesResponse.status)
+        
+        await supabaseClient
+          .from('amazon_connections')
+          .update({ 
+            status: 'error',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', connectionId)
+
         return new Response(
           JSON.stringify({ 
             error: 'Failed to access Amazon Advertising API',
@@ -138,22 +171,10 @@ serve(async (req) => {
       }
     }
 
-    // Fetch campaigns from Amazon API
-    console.log('Fetching campaigns from Amazon API...')
-    const campaignsResponse = await fetch('https://advertising-api.amazon.com/v2/campaigns', {
-      headers: {
-        'Authorization': `Bearer ${connection.access_token}`,
-        'Amazon-Advertising-API-ClientId': Deno.env.get('AMAZON_CLIENT_ID') ?? '',
-        'Amazon-Advertising-API-Scope': connection.profile_id,
-        'Content-Type': 'application/json',
-      },
-    })
-
-    if (!campaignsResponse.ok) {
-      const errorText = await campaignsResponse.text()
-      console.error('Failed to fetch campaigns:', campaignsResponse.status, errorText)
+    // Validate profile ID
+    if (!connection.profile_id || connection.profile_id === 'invalid') {
+      console.error('Invalid profile ID:', connection.profile_id)
       
-      // Update connection status to error
       await supabaseClient
         .from('amazon_connections')
         .update({ 
@@ -164,15 +185,105 @@ serve(async (req) => {
 
       return new Response(
         JSON.stringify({ 
-          error: 'Failed to fetch campaigns from Amazon',
-          details: errorText
+          error: 'Invalid profile configuration',
+          details: 'Please reconnect your Amazon account'
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    const campaigns = await campaignsResponse.json()
-    console.log('Campaigns fetched:', campaigns.length)
+    // Fetch campaigns from Amazon API with retry logic
+    console.log('Fetching campaigns from Amazon API...')
+    let campaigns = []
+    let lastError = null
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const campaignsResponse = await fetch('https://advertising-api.amazon.com/v2/campaigns', {
+          headers: {
+            'Authorization': `Bearer ${connection.access_token}`,
+            'Amazon-Advertising-API-ClientId': clientId,
+            'Amazon-Advertising-API-Scope': connection.profile_id,
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (campaignsResponse.ok) {
+          campaigns = await campaignsResponse.json()
+          console.log(`Campaigns fetched (attempt ${attempt}):`, campaigns.length)
+          break
+        } else {
+          const errorText = await campaignsResponse.text()
+          console.error(`Failed to fetch campaigns (attempt ${attempt}):`, campaignsResponse.status, errorText)
+          lastError = { status: campaignsResponse.status, text: errorText }
+          
+          if (campaignsResponse.status === 401) {
+            // Token is invalid, mark as expired
+            await supabaseClient
+              .from('amazon_connections')
+              .update({ 
+                status: 'expired',
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', connectionId)
+
+            return new Response(
+              JSON.stringify({ 
+                error: 'Access token is invalid or expired',
+                details: 'Please reconnect your Amazon account',
+                requiresReconnection: true
+              }),
+              { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+          }
+          
+          if (campaignsResponse.status === 403) {
+            await supabaseClient
+              .from('amazon_connections')
+              .update({ 
+                status: 'error',
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', connectionId)
+
+            return new Response(
+              JSON.stringify({ 
+                error: 'Access denied to Amazon Advertising API',
+                details: 'Please check your Amazon Advertising account permissions'
+              }),
+              { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+          }
+        }
+      } catch (error) {
+        console.error(`Campaign fetch attempt ${attempt} failed:`, error)
+        lastError = { message: error.message }
+      }
+      
+      // Wait before retry
+      if (attempt < 3) {
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
+      }
+    }
+
+    // If all attempts failed
+    if (campaigns.length === 0 && lastError) {
+      await supabaseClient
+        .from('amazon_connections')
+        .update({ 
+          status: 'error',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', connectionId)
+
+      return new Response(
+        JSON.stringify({ 
+          error: 'Failed to fetch campaigns from Amazon after multiple attempts',
+          details: lastError.text || lastError.message || 'Network or API error'
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
     if (!campaigns || campaigns.length === 0) {
       console.log('No campaigns found')
@@ -190,7 +301,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           success: true,
-          message: 'Sync completed but no campaigns found',
+          message: 'Sync completed but no campaigns found in your Amazon account',
           campaignCount: 0
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -225,6 +336,15 @@ serve(async (req) => {
 
     if (campaignError) {
       console.error('Error upserting campaigns:', campaignError)
+      
+      await supabaseClient
+        .from('amazon_connections')
+        .update({ 
+          status: 'error',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', connectionId)
+
       return new Response(
         JSON.stringify({ 
           error: 'Failed to save campaigns to database',
@@ -251,7 +371,8 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         message: `Successfully synced ${campaigns.length} campaigns from Amazon`,
-        campaignCount: campaigns.length
+        campaignCount: campaigns.length,
+        campaignsSynced: campaigns.length
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

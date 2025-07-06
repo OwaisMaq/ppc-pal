@@ -62,6 +62,18 @@ serve(async (req) => {
       )
     }
 
+    // Validate environment variables
+    const clientId = Deno.env.get('AMAZON_CLIENT_ID')
+    const clientSecret = Deno.env.get('AMAZON_CLIENT_SECRET')
+    
+    if (!clientId || !clientSecret) {
+      console.error('Missing Amazon credentials')
+      return new Response(
+        JSON.stringify({ error: 'Server configuration error - missing Amazon credentials' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     // Exchange authorization code for access token
     console.log('Exchanging authorization code for tokens...')
     const tokenResponse = await fetch('https://api.amazon.com/auth/o2/token', {
@@ -73,16 +85,26 @@ serve(async (req) => {
         grant_type: 'authorization_code',
         code: code,
         redirect_uri: redirectUri,
-        client_id: Deno.env.get('AMAZON_CLIENT_ID') ?? '',
-        client_secret: Deno.env.get('AMAZON_CLIENT_SECRET') ?? '',
+        client_id: clientId,
+        client_secret: clientSecret,
       }),
     })
 
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text()
       console.error('Token exchange failed:', tokenResponse.status, errorText)
+      
+      let userFriendlyMessage = 'Failed to exchange authorization code with Amazon'
+      if (tokenResponse.status === 400) {
+        if (errorText.includes('invalid_grant')) {
+          userFriendlyMessage = 'Authorization code has expired or is invalid. Please try connecting again.'
+        } else if (errorText.includes('invalid_client')) {
+          userFriendlyMessage = 'Invalid client configuration. Please contact support.'
+        }
+      }
+      
       return new Response(
-        JSON.stringify({ error: 'Failed to exchange authorization code', details: errorText }),
+        JSON.stringify({ error: userFriendlyMessage, details: errorText }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -100,54 +122,80 @@ serve(async (req) => {
       )
     }
 
-    // Get advertising profiles
-    console.log('Fetching advertising profiles...')
-    const profilesResponse = await fetch('https://advertising-api.amazon.com/v2/profiles', {
-      headers: {
-        'Authorization': `Bearer ${access_token}`,
-        'Amazon-Advertising-API-ClientId': Deno.env.get('AMAZON_CLIENT_ID') ?? '',
-        'Content-Type': 'application/json',
-      },
-    })
+    // Calculate token expiry with buffer
+    const tokenExpiresAt = new Date(Date.now() + ((expires_in - 300) * 1000)).toISOString() // 5 min buffer
 
+    // Get advertising profiles with retry logic
+    console.log('Fetching advertising profiles...')
     let profiles = []
-    let connectionStatus = 'active'
+    let connectionStatus = 'setup_required'
     let profileId = 'setup_required_no_profiles_found'
     let profileName = 'No profiles found'
     let marketplaceId = null
+    let setupRequiredReason = 'needs_sync'
 
-    if (profilesResponse.ok) {
-      profiles = await profilesResponse.json()
-      console.log('Profiles response:', profiles)
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const profilesResponse = await fetch('https://advertising-api.amazon.com/v2/profiles', {
+          headers: {
+            'Authorization': `Bearer ${access_token}`,
+            'Amazon-Advertising-API-ClientId': clientId,
+            'Content-Type': 'application/json',
+          },
+        })
 
-      if (profiles && profiles.length > 0) {
-        // Use the first profile for now
-        const firstProfile = profiles[0]
-        profileId = firstProfile.profileId.toString()
-        profileName = firstProfile.countryCode || `Profile ${firstProfile.profileId}`
-        marketplaceId = firstProfile.marketplaceStringId || firstProfile.countryCode
-        connectionStatus = 'setup_required' // Will be set to active after first successful sync
-        console.log('Using profile:', { profileId, profileName, marketplaceId })
-      } else {
-        console.log('No advertising profiles found')
-        connectionStatus = 'setup_required'
+        if (profilesResponse.ok) {
+          const profilesData = await profilesResponse.json()
+          console.log(`Profiles response (attempt ${attempt}):`, profilesData)
+
+          if (profilesData && Array.isArray(profilesData) && profilesData.length > 0) {
+            profiles = profilesData
+            // Use the first active profile
+            const activeProfile = profiles.find(p => p.accountInfo?.marketplaceStringId) || profiles[0]
+            profileId = activeProfile.profileId.toString()
+            profileName = activeProfile.countryCode || `Profile ${activeProfile.profileId}`
+            marketplaceId = activeProfile.accountInfo?.marketplaceStringId || activeProfile.countryCode
+            connectionStatus = 'setup_required' // Will be set to active after first successful sync
+            setupRequiredReason = 'needs_sync'
+            console.log('Using profile:', { profileId, profileName, marketplaceId })
+            break
+          } else {
+            console.log(`No advertising profiles found (attempt ${attempt})`)
+            setupRequiredReason = 'no_advertising_profiles'
+          }
+        } else {
+          const errorText = await profilesResponse.text()
+          console.error(`Failed to fetch profiles (attempt ${attempt}):`, profilesResponse.status, errorText)
+          
+          if (profilesResponse.status === 401) {
+            console.error('Token appears to be invalid for advertising API')
+            setupRequiredReason = 'token_invalid'
+            break
+          }
+          
+          if (attempt === 3) {
+            console.error('All profile fetch attempts failed')
+            setupRequiredReason = 'api_error'
+          }
+        }
+      } catch (error) {
+        console.error(`Profile fetch attempt ${attempt} failed:`, error)
+        if (attempt === 3) {
+          setupRequiredReason = 'connection_error'
+        }
       }
-    } else {
-      const errorText = await profilesResponse.text()
-      console.error('Failed to fetch profiles:', profilesResponse.status, errorText)
-      // Continue with setup_required status - user can try force sync later
-      connectionStatus = 'setup_required'
+      
+      // Wait before retry
+      if (attempt < 3) {
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
+      }
     }
 
-    // Calculate token expiry
-    const tokenExpiresAt = new Date(Date.now() + (expires_in * 1000)).toISOString()
-
-    // Check if connection already exists for this user
+    // Check if connection already exists for this user and profile
     const { data: existingConnections, error: fetchError } = await supabaseClient
       .from('amazon_connections')
-      .select('id')
+      .select('id, profile_id')
       .eq('user_id', userId)
-      .eq('profile_id', profileId)
 
     if (fetchError) {
       console.error('Error checking existing connections:', fetchError)
@@ -157,10 +205,13 @@ serve(async (req) => {
       )
     }
 
-    let connectionId
-    if (existingConnections && existingConnections.length > 0) {
-      // Update existing connection
-      console.log('Updating existing connection...')
+    // Check for duplicate profile
+    const duplicateConnection = existingConnections?.find(conn => 
+      conn.profile_id === profileId && profileId !== 'setup_required_no_profiles_found'
+    )
+
+    if (duplicateConnection) {
+      console.log('Updating existing connection for profile:', profileId)
       const { data, error } = await supabaseClient
         .from('amazon_connections')
         .update({
@@ -172,7 +223,7 @@ serve(async (req) => {
           marketplace_id: marketplaceId,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', existingConnections[0].id)
+        .eq('id', duplicateConnection.id)
         .select('id')
         .single()
 
@@ -184,47 +235,61 @@ serve(async (req) => {
         )
       }
 
-      connectionId = data.id
-    } else {
-      // Create new connection
-      console.log('Creating new connection...')
-      const { data, error } = await supabaseClient
-        .from('amazon_connections')
-        .insert({
-          user_id: userId,
-          profile_id: profileId,
-          profile_name: profileName,
-          marketplace_id: marketplaceId,
-          access_token,
-          refresh_token,
-          token_expires_at: tokenExpiresAt,
+      return new Response(
+        JSON.stringify({
+          success: true,
+          connection_id: data.id,
           status: connectionStatus,
-        })
-        .select('id')
-        .single()
+          profile_count: profiles.length,
+          setup_required_reason: setupRequiredReason,
+          message: profiles.length > 0 
+            ? 'Amazon account connection updated successfully. You can now sync your campaigns.'
+            : 'Amazon account connected, but no advertising profiles found. Set up Amazon Advertising and use Force Sync.'
+        }),
+        { 
+          status: 200, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
 
-      if (error) {
-        console.error('Error creating connection:', error)
-        return new Response(
-          JSON.stringify({ error: 'Failed to create connection', details: error.message }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
+    // Create new connection
+    console.log('Creating new connection...')
+    const { data, error } = await supabaseClient
+      .from('amazon_connections')
+      .insert({
+        user_id: userId,
+        profile_id: profileId,
+        profile_name: profileName,
+        marketplace_id: marketplaceId,
+        access_token,
+        refresh_token,
+        token_expires_at: tokenExpiresAt,
+        status: connectionStatus,
+      })
+      .select('id')
+      .single()
 
-      connectionId = data.id
+    if (error) {
+      console.error('Error creating connection:', error)
+      return new Response(
+        JSON.stringify({ error: 'Failed to create connection', details: error.message }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     console.log('=== OAuth Callback Successful ===')
-    console.log('Connection ID:', connectionId)
+    console.log('Connection ID:', data.id)
     console.log('Status:', connectionStatus)
     console.log('Profiles found:', profiles.length)
 
     return new Response(
       JSON.stringify({
         success: true,
-        connection_id: connectionId,
+        connection_id: data.id,
         status: connectionStatus,
         profile_count: profiles.length,
+        setup_required_reason: setupRequiredReason,
         message: profiles.length > 0 
           ? 'Amazon account connected successfully. You can now sync your campaigns.'
           : 'Amazon account connected, but no advertising profiles found. Set up Amazon Advertising and use Force Sync.'

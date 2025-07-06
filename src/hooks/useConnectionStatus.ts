@@ -58,31 +58,28 @@ export const useConnectionStatus = () => {
           last_sync_at: conn.last_sync_at
         });
         
-        // Check token expiry
+        // Check token expiry first
         const tokenExpiry = new Date(conn.token_expires_at);
         const now = new Date();
         const hoursUntilExpiry = (tokenExpiry.getTime() - now.getTime()) / (1000 * 60 * 60);
         
         let profileStatus: 'active' | 'missing' | 'expired' | 'invalid' = 'active';
         
-        // Use the database status as the primary status
-        statusLevel = conn.status;
-        
-        // Determine profile status and setup requirements based on database status
-        if (statusLevel === 'expired' || tokenExpiry <= now) {
+        // Token expiry check
+        if (tokenExpiry <= now) {
           issues.push('Access token has expired');
           statusLevel = 'expired';
           profileStatus = 'expired';
           setupRequired = true;
           setupReason = 'token_expired';
           console.log('Token expired for connection:', conn.id);
-        } else if (hoursUntilExpiry < 24 && statusLevel === 'active') {
+        } else if (hoursUntilExpiry < 24) {
           issues.push('Access token expires soon');
-          statusLevel = 'warning';
+          if (statusLevel === 'active') statusLevel = 'warning';
           console.log('Token expires soon for connection:', conn.id);
         }
 
-        // Enhanced profile validation
+        // Profile validation
         if (!conn.profile_id) {
           issues.push('No profile ID configured');
           statusLevel = 'setup_required';
@@ -106,45 +103,41 @@ export const useConnectionStatus = () => {
           console.log('Invalid profile for connection:', conn.id);
         }
 
-        // Additional status checks based on database status
-        if (conn.status === 'setup_required') {
+        // Database status override
+        if (conn.status === 'error' && statusLevel !== 'expired') {
+          statusLevel = 'error';
           setupRequired = true;
-          if (!setupReason) setupReason = 'needs_sync';
-          console.log('Connection requires setup:', conn.id);
-        } else if (conn.status === 'error') {
+          setupReason = setupReason || 'connection_error';
+          issues.push('Connection error detected');
+        } else if (conn.status === 'setup_required' && statusLevel === 'active') {
+          statusLevel = 'setup_required';
           setupRequired = true;
-          if (!setupReason) setupReason = 'connection_error';
-          console.log('Connection in error state:', conn.id);
-        } else if (conn.status === 'warning') {
-          if (!setupReason) setupReason = 'needs_attention';
-          console.log('Connection has warnings:', conn.id);
+          setupReason = setupReason || 'needs_sync';
         }
 
-        // Check sync status
+        // Sync status check
         const campaignCount = Array.isArray(conn.campaigns) ? conn.campaigns.length : 0;
-        if (!conn.last_sync_at) {
+        if (!conn.last_sync_at && statusLevel === 'active') {
           issues.push('Never synced with Amazon');
-          if (statusLevel === 'active') statusLevel = 'setup_required';
-          if (!setupRequired && conn.status === 'active') {
-            setupRequired = true;
-            setupReason = 'needs_sync';
-          }
+          statusLevel = 'setup_required';
+          setupRequired = true;
+          setupReason = setupReason || 'needs_sync';
           console.log('Never synced:', conn.id);
-        } else {
+        } else if (conn.last_sync_at) {
           const lastSync = new Date(conn.last_sync_at);
           const daysSinceSync = (now.getTime() - lastSync.getTime()) / (1000 * 60 * 60 * 24);
           
-          if (daysSinceSync > 7) {
+          if (daysSinceSync > 7 && statusLevel === 'active') {
             issues.push('Last sync was over a week ago');
-            if (statusLevel === 'active') statusLevel = 'warning';
+            statusLevel = 'warning';
             console.log('Sync overdue for connection:', conn.id);
           }
         }
 
-        // Check campaign data
-        if (campaignCount === 0 && conn.last_sync_at) {
+        // Campaign data validation
+        if (campaignCount === 0 && conn.last_sync_at && statusLevel === 'active') {
           issues.push('No campaigns found after sync - may indicate API or setup issues');
-          if (statusLevel === 'active') statusLevel = 'warning';
+          statusLevel = 'warning';
           console.log('No campaigns after sync for connection:', conn.id);
         }
 
