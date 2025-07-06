@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -45,72 +44,103 @@ export class AmazonConnectionOperations {
     console.log('Redirect URI:', redirectUri);
 
     try {
-      // Ensure we have a valid redirect URI
+      // Validate redirect URI first
       if (!redirectUri || !redirectUri.startsWith('https://')) {
         throw new Error('Invalid redirect URI provided');
       }
 
-      // Get auth headers first
+      // Get auth headers
       const headers = await this.getAuthHeaders();
-      console.log('=== Auth Headers Prepared ===');
+      console.log('Auth headers prepared successfully');
 
-      // Make sure we have proper request body - the edge function expects 'redirectUri' not 'redirect_uri'
+      // Prepare request body - make sure it's exactly what the edge function expects
       const requestBody = {
         redirectUri: redirectUri
       };
 
-      console.log('=== Calling OAuth Init Function ===');
+      console.log('=== Making request to amazon-oauth-init ===');
       console.log('Request body:', requestBody);
-      console.log('Headers:', { ...headers, Authorization: 'Bearer [REDACTED]' });
+      console.log('Headers (auth redacted):', { 
+        ...headers, 
+        Authorization: `Bearer ${headers.Authorization.substring(0, 20)}...` 
+      });
 
-      const { data, error } = await supabase.functions.invoke('amazon-oauth-init', {
+      // Use supabase.functions.invoke with proper error handling
+      const response = await supabase.functions.invoke('amazon-oauth-init', {
         body: requestBody,
         headers: headers
       });
 
-      console.log('=== OAuth Init Response ===');
-      console.log('Data present:', !!data);
-      console.log('Error present:', !!error);
+      console.log('=== Raw Response from Edge Function ===');
+      console.log('Response data:', response.data);
+      console.log('Response error:', response.error);
 
-      if (error) {
-        console.error('OAuth init error:', error);
-        console.error('Error details:', JSON.stringify(error, null, 2));
+      // Handle edge function errors
+      if (response.error) {
+        console.error('=== Edge Function Error ===');
+        console.error('Error details:', response.error);
         
-        // Enhanced error handling for different error types
-        if (error.message?.includes('Edge Function returned a non-2xx status code')) {
-          throw new Error('Server configuration error. Please contact support.');
-        } else if (error.message?.includes('Network')) {
-          throw new Error('Network error. Please check your connection and try again.');
-        } else {
-          throw new Error(error.message || 'Failed to initialize OAuth flow');
+        let errorMessage = 'Failed to initialize Amazon connection';
+        
+        // Parse error message if possible
+        if (response.error.message) {
+          errorMessage = response.error.message;
+        } else if (typeof response.error === 'string') {
+          errorMessage = response.error;
         }
+        
+        throw new Error(errorMessage);
       }
 
-      if (!data || !data.authUrl) {
-        console.error('No auth URL received from server');
-        console.error('Response data:', data);
+      // Check if we have valid response data
+      if (!response.data) {
+        console.error('No response data received');
+        throw new Error('No response received from server');
+      }
+
+      // Check for error in response data
+      if (response.data.error) {
+        console.error('Server returned error:', response.data.error);
+        throw new Error(response.data.details || response.data.error);
+      }
+
+      // Check for auth URL in response
+      if (!response.data.authUrl) {
+        console.error('No auth URL in response:', response.data);
         throw new Error('No authorization URL received from server');
       }
 
-      console.log('=== Redirecting to Amazon OAuth ===');
-      console.log('Auth URL received, redirecting...');
+      console.log('=== Success! Redirecting to Amazon OAuth ===');
+      console.log('Auth URL length:', response.data.authUrl.length);
       
-      // Redirect to Amazon OAuth page
-      window.location.href = data.authUrl;
+      // Redirect to Amazon OAuth
+      window.location.href = response.data.authUrl;
       
     } catch (err) {
-      console.error('Connection initiation error:', err);
+      console.error('=== Connection Initiation Error ===');
+      console.error('Error type:', typeof err);
+      console.error('Error details:', err);
       
-      let userMessage = 'Failed to initiate Amazon connection';
+      let userMessage = 'Failed to connect to Amazon';
+      
       if (err instanceof Error) {
-        if (err.message.includes('Edge Function returned a non-2xx status code')) {
-          userMessage = 'Server configuration error. Please contact support.';
-        } else if (err.message.includes('Network')) {
-          userMessage = 'Network error. Please check your connection and try again.';
-        } else {
-          userMessage = err.message;
+        userMessage = err.message;
+        
+        // Provide more specific error messages for common issues
+        if (err.message.includes('Authentication') || err.message.includes('sign in')) {
+          userMessage = 'Please sign in again and try connecting to Amazon';
+        } else if (err.message.includes('Network') || err.message.includes('fetch')) {
+          userMessage = 'Network error. Please check your internet connection and try again';
+        } else if (err.message.includes('Invalid JSON') || err.message.includes('parse')) {
+          userMessage = 'Server communication error. Please try again';
         }
       }
+      
+      this.toast({
+        title: "Connection Failed",
+        description: userMessage,
+        variant: "destructive",
+      });
       
       throw new Error(userMessage);
     }

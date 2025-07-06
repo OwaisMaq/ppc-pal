@@ -19,24 +19,24 @@ serve(async (req) => {
   }
 
   try {
-    // Get environment variables
+    // Check environment variables
     const amazonClientId = Deno.env.get('AMAZON_CLIENT_ID');
     const amazonClientSecret = Deno.env.get('AMAZON_CLIENT_SECRET');
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
-    console.log('Environment check:');
-    console.log('- Amazon Client ID present:', !!amazonClientId);
-    console.log('- Amazon Client Secret present:', !!amazonClientSecret);
-    console.log('- Supabase URL present:', !!supabaseUrl);
-    console.log('- Supabase Key present:', !!supabaseKey);
+    console.log('Environment variables check:');
+    console.log('- Amazon Client ID:', !!amazonClientId);
+    console.log('- Amazon Client Secret:', !!amazonClientSecret);
+    console.log('- Supabase URL:', !!supabaseUrl);
+    console.log('- Supabase Key:', !!supabaseKey);
     
     if (!amazonClientId || !amazonClientSecret) {
       console.error('Missing Amazon credentials');
       return new Response(
         JSON.stringify({ 
           error: 'Amazon credentials not configured',
-          details: 'Amazon API credentials missing'
+          details: 'Amazon API credentials are missing from server configuration'
         }),
         {
           status: 500,
@@ -49,8 +49,8 @@ serve(async (req) => {
       console.error('Missing Supabase configuration');
       return new Response(
         JSON.stringify({ 
-          error: 'Supabase configuration missing',
-          details: 'Supabase URL or service key not configured'
+          error: 'Server configuration error',
+          details: 'Database configuration missing'
         }),
         {
           status: 500,
@@ -63,15 +63,14 @@ serve(async (req) => {
     let requestBody;
     try {
       const bodyText = await req.text();
-      console.log('Request body received, length:', bodyText?.length || 0);
-      console.log('Raw request body:', bodyText);
+      console.log('Raw request body received:', bodyText || 'EMPTY');
       
       if (!bodyText || bodyText.trim() === '') {
-        console.error('Empty request body');
+        console.error('Request body is empty');
         return new Response(
           JSON.stringify({ 
-            error: 'Empty request body',
-            details: 'Request body is required'
+            error: 'Missing request data',
+            details: 'Request body cannot be empty'
           }),
           {
             status: 400,
@@ -81,13 +80,14 @@ serve(async (req) => {
       }
       
       requestBody = JSON.parse(bodyText);
-      console.log('Request body parsed successfully:', requestBody);
+      console.log('Parsed request body:', requestBody);
+      
     } catch (parseError) {
-      console.error('Failed to parse request body:', parseError);
+      console.error('JSON parse error:', parseError);
       return new Response(
         JSON.stringify({ 
-          error: 'Invalid JSON in request body',
-          details: parseError.message || 'Request body must be valid JSON'
+          error: 'Invalid request format',
+          details: 'Request body must be valid JSON'
         }),
         {
           status: 400,
@@ -96,15 +96,16 @@ serve(async (req) => {
       );
     }
 
+    // Validate redirect URI
     const { redirectUri } = requestBody;
-    console.log('Redirect URI:', redirectUri);
+    console.log('Redirect URI from request:', redirectUri);
     
     if (!redirectUri) {
-      console.error('No redirect URI provided');
+      console.error('Missing redirectUri in request body');
       return new Response(
         JSON.stringify({ 
           error: 'Missing redirect URI',
-          details: 'redirectUri field is required in request body'
+          details: 'redirectUri field is required'
         }),
         {
           status: 400,
@@ -115,15 +116,15 @@ serve(async (req) => {
 
     // Validate redirect URI format
     try {
-      new URL(redirectUri);
-      if (!redirectUri.startsWith('https://')) {
-        throw new Error('Redirect URI must use HTTPS');
+      const url = new URL(redirectUri);
+      if (!url.protocol.startsWith('https')) {
+        throw new Error('Must use HTTPS protocol');
       }
     } catch (urlError) {
-      console.error('Invalid redirect URI format:', urlError);
+      console.error('Invalid redirect URI:', urlError);
       return new Response(
         JSON.stringify({ 
-          error: 'Invalid redirect URI format',
+          error: 'Invalid redirect URI',
           details: 'Redirect URI must be a valid HTTPS URL'
         }),
         {
@@ -133,19 +134,16 @@ serve(async (req) => {
       );
     }
 
-    // Initialize Supabase client
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    // Get user from auth header
+    // Get authentication token
     const authHeader = req.headers.get('authorization');
     console.log('Auth header present:', !!authHeader);
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.error('Invalid authorization header');
+      console.error('Missing or invalid authorization header');
       return new Response(
         JSON.stringify({ 
           error: 'Authentication required',
-          details: 'Valid Bearer token required'
+          details: 'Valid Bearer token required in Authorization header'
         }),
         {
           status: 401,
@@ -155,22 +153,23 @@ serve(async (req) => {
     }
 
     const token = authHeader.replace('Bearer ', '');
-    console.log('Token extracted, length:', token.length);
+    console.log('Extracted token length:', token.length);
     
-    // Get user with token
+    // Initialize Supabase client and verify user
+    const supabase = createClient(supabaseUrl, supabaseKey);
     const { data: userResponse, error: userError } = await supabase.auth.getUser(token);
     
-    console.log('User authentication result:');
-    console.log('- User present:', !!userResponse?.user);
+    console.log('User verification result:');
+    console.log('- User found:', !!userResponse?.user);
     console.log('- User ID:', userResponse?.user?.id);
-    console.log('- Error:', userError?.message);
+    console.log('- Auth error:', userError?.message);
     
     if (userError || !userResponse?.user) {
       console.error('User authentication failed:', userError?.message);
       return new Response(
         JSON.stringify({ 
           error: 'Authentication failed',
-          details: userError?.message || 'Invalid authentication token'
+          details: 'Invalid or expired authentication token'
         }),
         {
           status: 401,
@@ -179,39 +178,27 @@ serve(async (req) => {
       );
     }
 
-    // Generate state parameter
+    // Generate state parameter with user info
     const stateData = {
       user_id: userResponse.user.id,
       redirect_uri: redirectUri,
       timestamp: Date.now()
     };
     
-    console.log('Generating state for user:', userResponse.user.id);
-    
-    // Encode state as base64 JSON
     const state = btoa(JSON.stringify(stateData));
-    console.log('State generated, length:', state.length);
+    console.log('Generated state parameter, length:', state.length);
 
-    // Amazon OAuth parameters
-    const scope = 'advertising::campaign_management';
-    const responseType = 'code';
-    
-    console.log('OAuth parameters:');
-    console.log('- Client ID (first 10 chars):', amazonClientId.substring(0, 10));
-    console.log('- Scope:', scope);
-    console.log('- Response Type:', responseType);
-    
     // Build Amazon OAuth URL
+    const scope = 'advertising::campaign_management';
     const authUrl = new URL('https://www.amazon.com/ap/oa');
     authUrl.searchParams.set('client_id', amazonClientId);
     authUrl.searchParams.set('scope', scope);
-    authUrl.searchParams.set('response_type', responseType);
+    authUrl.searchParams.set('response_type', 'code');
     authUrl.searchParams.set('redirect_uri', redirectUri);
     authUrl.searchParams.set('state', state);
 
     const finalAuthUrl = authUrl.toString();
-    console.log('Amazon OAuth URL generated successfully');
-    console.log('URL length:', finalAuthUrl.length);
+    console.log('Amazon OAuth URL generated, length:', finalAuthUrl.length);
 
     const responseData = { 
       authUrl: finalAuthUrl, 
@@ -220,7 +207,7 @@ serve(async (req) => {
       timestamp: new Date().toISOString()
     };
     
-    console.log('=== OAuth Init Successful ===');
+    console.log('=== OAuth Init Success ===');
 
     return new Response(
       JSON.stringify(responseData),
