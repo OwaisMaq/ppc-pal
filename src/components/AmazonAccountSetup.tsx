@@ -2,7 +2,7 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ExternalLink, AlertTriangle, CheckCircle, RefreshCw } from 'lucide-react';
+import { ExternalLink, AlertTriangle, CheckCircle, RefreshCw, Bug } from 'lucide-react';
 import { useAmazonConnections } from '@/hooks/useAmazonConnections';
 import { useToast } from '@/hooks/use-toast';
 import ConnectionSummaryTable from '@/components/performance/ConnectionSummaryTable';
@@ -24,26 +24,84 @@ const AmazonAccountSetup = () => {
   const handleConnect = async () => {
     try {
       console.log('=== Amazon Connect Button Clicked ===');
+      console.log('Current environment:', window.location.origin);
       const redirectUri = 'https://ppcpal.online/amazon-callback';
+      console.log('Using redirect URI:', redirectUri);
       await initiateConnection(redirectUri);
     } catch (err) {
       console.error('Connect error:', err);
+      toast({
+        title: "Connection Failed",
+        description: err instanceof Error ? err.message : "Failed to initiate Amazon connection",
+        variant: "destructive",
+      });
     }
   };
 
   const handleSync = async (connectionId: string) => {
+    console.log('=== Standard Sync Started ===');
+    console.log('Connection ID:', connectionId);
     await syncConnection(connectionId);
   };
 
   const handleForceSync = async (connectionId: string) => {
-    // Force sync implementation - uses the same sync function but could be enhanced
-    // to bypass some validation or use different parameters if needed
-    console.log('Force syncing connection:', connectionId);
+    console.log('=== Force Sync Started ===');
+    console.log('Connection ID:', connectionId);
     await syncConnection(connectionId);
     toast({
       title: "Force Sync Initiated",
       description: "Attempting to sync connection with enhanced parameters.",
     });
+  };
+
+  const handleDebugConnection = async (connectionId: string) => {
+    console.log('=== Debug Connection Started ===');
+    console.log('Connection ID:', connectionId);
+    
+    try {
+      // Get connection details
+      const connection = connections.find(c => c.id === connectionId);
+      if (!connection) {
+        console.error('Connection not found');
+        toast({
+          title: "Debug Failed",
+          description: "Connection not found",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log('=== Connection Debug Info ===');
+      console.log('ID:', connection.id);
+      console.log('Profile ID:', connection.profile_id);
+      console.log('Profile Name:', connection.profile_name);
+      console.log('Marketplace ID:', connection.marketplace_id);
+      console.log('Status:', connection.status);
+      console.log('Token Expires:', connection.token_expires_at);
+      console.log('Last Sync:', connection.last_sync_at);
+      
+      // Check token expiry
+      const tokenExpiry = new Date(connection.token_expires_at);
+      const now = new Date();
+      const hoursUntilExpiry = Math.round((tokenExpiry.getTime() - now.getTime()) / (1000 * 60 * 60));
+      
+      console.log('Token Status:');
+      console.log('- Expires:', tokenExpiry.toISOString());
+      console.log('- Hours until expiry:', hoursUntilExpiry);
+      console.log('- Is expired:', tokenExpiry <= now);
+      
+      toast({
+        title: "Debug Complete",
+        description: `Check console for detailed connection info. Token ${hoursUntilExpiry > 0 ? `expires in ${hoursUntilExpiry}h` : `expired ${Math.abs(hoursUntilExpiry)}h ago`}`,
+      });
+    } catch (err) {
+      console.error('Debug error:', err);
+      toast({
+        title: "Debug Failed",
+        description: err instanceof Error ? err.message : "Unknown debug error",
+        variant: "destructive",
+      });
+    }
   };
 
   if (loading) {
@@ -129,15 +187,25 @@ const AmazonAccountSetup = () => {
                   <CheckCircle className="h-5 w-5 text-green-600" />
                   <span className="font-medium">Amazon Account Connected</span>
                 </div>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={handleConnect}
-                  disabled={loading}
-                >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Add Another Account
-                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => handleDebugConnection(connections[0].id)}
+                  >
+                    <Bug className="h-4 w-4 mr-2" />
+                    Debug
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleConnect}
+                    disabled={loading}
+                  >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Add Another Account
+                  </Button>
+                </div>
               </div>
             </div>
           )}
@@ -149,7 +217,7 @@ const AmazonAccountSetup = () => {
         <ConnectionRecovery
           key={`recovery-${connection.id}`}
           connectionId={connection.id}
-          connectionName={connection.profileName}
+          connectionName={connection.profile_name}
           profileId={connection.profile_id}
           onRecoveryComplete={refreshConnections}
         />
@@ -164,7 +232,7 @@ const AmazonAccountSetup = () => {
       ) && (
         <EnhancedAmazonSync
           connectionId={connections[0].id}
-          connectionName={connections[0].profileName}
+          connectionName={connections[0].profile_name}
           onSyncComplete={refreshConnections}
         />
       )}

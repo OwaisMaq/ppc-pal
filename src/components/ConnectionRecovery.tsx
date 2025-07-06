@@ -8,9 +8,11 @@ import {
   RefreshCw, 
   CheckCircle2,
   ExternalLink,
-  Lightbulb
+  Lightbulb,
+  Bug
 } from "lucide-react";
 import { useEnhancedAmazonSync } from "@/hooks/useEnhancedAmazonSync";
+import { useToast } from "@/hooks/use-toast";
 
 interface ConnectionRecoveryProps {
   connectionId: string;
@@ -26,11 +28,67 @@ const ConnectionRecovery = ({
   onRecoveryComplete 
 }: ConnectionRecoveryProps) => {
   const { runConnectionRecovery, isRunning } = useEnhancedAmazonSync();
+  const { toast } = useToast();
 
   const handleRecovery = async () => {
-    const result = await runConnectionRecovery(connectionId);
-    if (result.success && onRecoveryComplete) {
-      onRecoveryComplete();
+    console.log('=== Connection Recovery Started ===');
+    console.log('Connection ID:', connectionId);
+    console.log('Connection Name:', connectionName);
+    console.log('Profile ID:', profileId);
+    
+    try {
+      const result = await runConnectionRecovery(connectionId);
+      console.log('Recovery result:', result);
+      
+      if (result.success && onRecoveryComplete) {
+        toast({
+          title: "Recovery Successful",
+          description: `Successfully configured ${result.profilesFound} profile${result.profilesFound === 1 ? '' : 's'}`,
+        });
+        onRecoveryComplete();
+      } else if (result.requiresReconnection) {
+        toast({
+          title: "Reconnection Required",
+          description: "Please reconnect your Amazon account to continue.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Setup Required",
+          description: result.guidance || "Complete Amazon Advertising setup at advertising.amazon.com",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Recovery error:', error);
+      toast({
+        title: "Recovery Failed",
+        description: error instanceof Error ? error.message : "Unknown error occurred",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDebugTest = async () => {
+    console.log('=== Debug Test Started ===');
+    console.log('Testing profile detection function directly...');
+    
+    try {
+      const { runEnhancedProfileDetection } = useEnhancedAmazonSync();
+      const result = await runEnhancedProfileDetection(connectionId);
+      console.log('Debug test result:', result);
+      
+      toast({
+        title: "Debug Test Complete",
+        description: `Check console for detailed results. Found ${result.profiles?.length || 0} profiles.`,
+      });
+    } catch (error) {
+      console.error('Debug test error:', error);
+      toast({
+        title: "Debug Test Failed",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
+      });
     }
   };
 
@@ -55,6 +113,8 @@ const ConnectionRecovery = ({
           <Lightbulb className="h-4 w-4" />
           <AlertDescription className="text-orange-800">
             <strong>{connectionName}</strong> needs profile configuration to sync campaigns properly.
+            <br />
+            <span className="text-sm">Profile ID: {profileId || 'None'}</span>
           </AlertDescription>
         </Alert>
 
@@ -93,6 +153,16 @@ const ConnectionRecovery = ({
             </Button>
 
             <Button
+              onClick={handleDebugTest}
+              variant="outline"
+              size="sm"
+              className="border-orange-300"
+            >
+              <Bug className="h-4 w-4 mr-2" />
+              Debug Test
+            </Button>
+
+            <Button
               variant="outline"
               size="sm"
               asChild
@@ -111,6 +181,7 @@ const ConnectionRecovery = ({
 
           <div className="text-xs text-gray-500 space-y-1">
             <p><strong>Auto-Fix:</strong> Attempts to detect and configure your advertising profiles automatically.</p>
+            <p><strong>Debug Test:</strong> Tests the profile detection function and logs detailed results.</p>
             <p><strong>Manual Setup:</strong> Create campaigns at advertising.amazon.com, then try Auto-Fix.</p>
           </div>
         </div>

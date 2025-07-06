@@ -61,36 +61,48 @@ export const useEnhancedAmazonSync = () => {
 
   const getAuthHeaders = async () => {
     console.log('=== Getting Auth Headers ===');
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     
-    if (sessionError) {
-      console.error('Session error:', sessionError);
-      throw new Error(`Session error: ${sessionError.message}`);
+    try {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Session error:', sessionError);
+        throw new Error(`Session error: ${sessionError.message}`);
+      }
+      
+      if (!session?.access_token) {
+        console.error('No access token in session');
+        throw new Error('No valid session found. Please sign in again.');
+      }
+      
+      console.log('Auth headers prepared successfully');
+      return {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json'
+      };
+    } catch (error) {
+      console.error('Failed to get auth headers:', error);
+      throw error;
     }
-    
-    if (!session?.access_token) {
-      console.error('No access token in session');
-      throw new Error('No valid session found. Please sign in again.');
-    }
-    
-    return {
-      'Authorization': `Bearer ${session.access_token}`,
-      'Content-Type': 'application/json'
-    };
   };
 
   const runEnhancedProfileDetection = async (connectionId: string): Promise<ProfileDetectionResult> => {
     console.log('=== Enhanced Profile Detection Started ===');
     
     try {
-      addStep('Starting enhanced profile detection', 'pending', 'Using advanced multi-strategy detection');
+      addStep('Starting enhanced profile detection', 'pending', 'Preparing authentication and API call');
       
       const headers = await getAuthHeaders();
+      console.log('Headers prepared, invoking function...');
+      
+      addStep('Calling profile detection function', 'pending', 'Invoking amazon-enhanced-profile-detection');
       
       const { data, error } = await supabase.functions.invoke('amazon-enhanced-profile-detection', {
         body: { connectionId },
         headers
       });
+
+      console.log('Function response received:', { data: !!data, error: !!error });
 
       if (error) {
         console.error('Enhanced profile detection error:', error);
@@ -99,9 +111,11 @@ export const useEnhancedAmazonSync = () => {
           success: false,
           profiles: [],
           errors: [error.message],
-          primaryReason: 'API communication error'
+          primaryReason: 'Function invocation error'
         };
       }
+
+      console.log('Function data received:', Object.keys(data || {}));
 
       if (data?.success && data.profiles?.length > 0) {
         const summary = data.detectionSummary || {};
