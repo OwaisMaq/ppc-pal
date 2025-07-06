@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { validateSyncResponse, SyncResponse } from '@/lib/validation/amazonApiSchemas';
@@ -198,54 +199,52 @@ export class EnhancedSyncService {
   }
 
   private async handleEdgeFunctionError(error: any, connectionId: string): Promise<void> {
-    let userMessage = 'Failed to sync campaign data';
-    let errorType = 'unknown_error';
+    console.log('=== Handling Edge Function Error ===');
+    
+    let status: 'error' | 'setup_required' | 'expired' = 'error';
+    let reason = 'Unknown error';
+    let userMessage = 'An error occurred during sync';
     
     if (typeof error === 'object' && error.message) {
-      userMessage = error.message;
-      errorType = 'server_error';
-    } else if (typeof error === 'string') {
-      userMessage = error;
-      if (error.includes('401') || error.includes('Unauthorized')) {
-        errorType = 'auth_error';
-        userMessage = 'Authentication failed. Please reconnect your Amazon account.';
-      } else if (error.includes('403') || error.includes('Forbidden')) {
-        errorType = 'permission_error';
-        userMessage = 'Access denied. Please check your Amazon Advertising permissions.';
+      const errorMessage = error.message.toLowerCase();
+      
+      if (errorMessage.includes('setup') || errorMessage.includes('profile')) {
+        status = 'setup_required';
+        reason = 'Amazon Advertising setup required';
+        userMessage = 'Please set up your Amazon Advertising account';
+      } else if (errorMessage.includes('token') || errorMessage.includes('expired')) {
+        status = 'expired';
+        reason = 'Access token expired';
+        userMessage = 'Please reconnect your Amazon account';
+      } else {
+        reason = error.message;
+        userMessage = error.message;
       }
+    } else if (typeof error === 'string') {
+      reason = error;
+      userMessage = error;
     }
     
-    await this.operations.updateConnectionStatus(
-      connectionId, 
-      errorType === 'auth_error' ? 'error' : 'warning', 
-      userMessage
-    );
+    await this.operations.updateConnectionStatus(connectionId, status, reason);
     
-    this.toast.error("Sync Failed", {
+    this.toast.error("Sync Error", {
       description: userMessage
     });
   }
 
-  private async handleGeneralError(err: unknown, connectionId: string): Promise<void> {
-    let userMessage = 'Failed to sync campaign data';
-    let statusUpdate: 'error' | 'warning' = 'error';
+  private async handleGeneralError(error: unknown, connectionId: string): Promise<void> {
+    console.log('=== Handling General Error ===');
     
-    if (err instanceof Error) {
-      userMessage = err.message;
-      
-      if (err.message.includes('Authentication') || err.message.includes('auth') || err.message.includes('sign in')) {
-        userMessage = 'Please reconnect your Amazon account and try again.';
-        statusUpdate = 'error';
-      } else if (err.message.includes('Network') || err.message.includes('fetch')) {
-        userMessage = 'Network error. Please check your connection and try again.';
-        statusUpdate = 'warning';
-      }
-    }
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     
-    await this.operations.updateConnectionStatus(connectionId, statusUpdate, userMessage);
+    await this.operations.updateConnectionStatus(
+      connectionId, 
+      'error', 
+      `Sync failed: ${errorMessage}`
+    );
     
     this.toast.error("Sync Failed", {
-      description: userMessage
+      description: errorMessage
     });
   }
 }

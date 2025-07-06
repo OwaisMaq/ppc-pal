@@ -1,70 +1,54 @@
 
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
-
-// Cleanup function to remove stale auth data
-const cleanupAuthState = () => {
-  console.log('Auth: Cleaning up auth state');
-  
-  Object.keys(localStorage).forEach((key) => {
-    if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
-      console.log('Auth: Removing localStorage key:', key);
-      localStorage.removeItem(key);
-    }
-  });
-  
-  Object.keys(sessionStorage || {}).forEach((key) => {
-    if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
-      console.log('Auth: Removing sessionStorage key:', key);
-      sessionStorage.removeItem(key);
-    }
-  });
-};
+import { useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { errorTracker } from '@/services/errorTracker';
+import { toast } from 'sonner';
 
 export const useAuthActions = () => {
   const [isLoading, setIsLoading] = useState(false);
-  const navigate = useNavigate();
+  const { signIn: authSignIn, signUp: authSignUp } = useAuth();
 
   const signIn = async (email: string, password: string) => {
+    console.log('=== Sign In Attempt ===');
     setIsLoading(true);
+    
     try {
-      console.log('Auth: Starting sign in process');
+      const result = await authSignIn(email, password);
       
-      // Clean up before sign in
-      cleanupAuthState();
-      
-      // Attempt global sign out first
-      try {
-        await supabase.auth.signOut({ scope: 'global' });
-      } catch (err) {
-        console.log('Auth: Sign out during sign in cleanup failed (continuing)');
+      if (result.error) {
+        console.error('Sign in error:', result.error);
+        
+        errorTracker.captureError(result.error.message, {
+          component: 'Auth',
+          action: 'signin',
+          metadata: { email }
+        });
+        
+        toast.error("Sign In Failed", {
+          description: result.error.message
+        });
+        
+        throw new Error(result.error.message);
       }
-
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      
+      console.log('Sign in successful');
+      toast.success("Welcome back!", {
+        description: "You have been signed in successfully"
       });
-
-      if (error) throw error;
-
-      if (data.user) {
-        console.log('Auth: Sign in successful, redirecting to /dashboard');
-        toast.success("Welcome back!");
-        navigate("/dashboard", { replace: true });
-      }
-    } catch (error: any) {
-      console.error("Sign in error:", error);
-      let errorMessage = "Failed to sign in";
       
-      if (error.message.includes("Invalid login credentials")) {
-        errorMessage = "Invalid email or password";
-      } else if (error.message.includes("Email not confirmed")) {
-        errorMessage = "Please check your email and confirm your account";
-      }
+      return result;
       
-      toast.error(errorMessage);
+    } catch (error) {
+      console.error('Sign in error:', error);
+      
+      const errorMessage = error instanceof Error ? error.message : 'Sign in failed';
+      
+      errorTracker.captureError(errorMessage, {
+        component: 'Auth',
+        action: 'signin',
+        metadata: { email }
+      });
+      
       throw error;
     } finally {
       setIsLoading(false);
@@ -72,47 +56,46 @@ export const useAuthActions = () => {
   };
 
   const signUp = async (email: string, password: string) => {
+    console.log('=== Sign Up Attempt ===');
     setIsLoading(true);
+    
     try {
-      console.log('Auth: Starting sign up process');
+      const result = await authSignUp(email, password);
       
-      // Clean up before sign up
-      cleanupAuthState();
-      
-      // Attempt global sign out first
-      try {
-        await supabase.auth.signOut({ scope: 'global' });
-      } catch (err) {
-        console.log('Auth: Sign out during sign up cleanup failed (continuing)');
+      if (result.error) {
+        console.error('Sign up error:', result.error);
+        
+        errorTracker.captureError(result.error.message, {
+          component: 'Auth',
+          action: 'signup',
+          metadata: { email }
+        });
+        
+        toast.error("Sign Up Failed", {
+          description: result.error.message
+        });
+        
+        throw new Error(result.error.message);
       }
-
-      const redirectUrl = `${window.location.origin}/dashboard`;
       
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: redirectUrl
-        }
+      console.log('Sign up successful');
+      toast.success("Account Created!", {
+        description: "Please check your email to verify your account"
       });
-
-      if (error) throw error;
-
-      if (data.user) {
-        console.log('Auth: Sign up successful');
-        toast.success("Account created successfully! Please check your email to confirm your account.");
-      }
-    } catch (error: any) {
-      console.error("Sign up error:", error);
-      let errorMessage = "Failed to create account";
       
-      if (error.message.includes("already registered")) {
-        errorMessage = "An account with this email already exists. Please sign in instead.";
-      } else if (error.message.includes("Password should be")) {
-        errorMessage = "Password is too weak. Please choose a stronger password.";
-      }
+      return result;
       
-      toast.error(errorMessage);
+    } catch (error) {
+      console.error('Sign up error:', error);
+      
+      const errorMessage = error instanceof Error ? error.message : 'Sign up failed';
+      
+      errorTracker.captureError(errorMessage, {
+        component: 'Auth',
+        action: 'signup',
+        metadata: { email }
+      });
+      
       throw error;
     } finally {
       setIsLoading(false);
@@ -120,8 +103,8 @@ export const useAuthActions = () => {
   };
 
   return {
-    isLoading,
     signIn,
-    signUp
+    signUp,
+    isLoading
   };
 };
