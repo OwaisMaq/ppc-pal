@@ -26,7 +26,7 @@ export class AmazonConnectionOperations {
         throw new Error('No valid session - please sign in again');
       }
       
-      console.log('Valid session found, preparing headers');
+      console.log('Valid session found, token length:', session.access_token.length);
       
       return {
         'Authorization': `Bearer ${session.access_token}`,
@@ -53,87 +53,44 @@ export class AmazonConnectionOperations {
       const headers = await this.getAuthHeaders();
       console.log('Auth headers prepared successfully');
 
-      // Prepare request body - ensure it matches what the edge function expects
+      // Prepare request body with explicit JSON structure
       const requestBody = {
         redirectUri: redirectUri
       };
 
       console.log('=== Making request to amazon-oauth-init ===');
-      console.log('Request body:', requestBody);
+      console.log('Request body:', JSON.stringify(requestBody, null, 2));
       console.log('Headers (auth redacted):', { 
         ...headers, 
-        Authorization: `Bearer ${headers.Authorization.substring(0, 20)}...` 
+        Authorization: `Bearer ${headers.Authorization.substring(7, 27)}...` 
       });
 
-      // Use supabase.functions.invoke with enhanced error handling
+      // Use supabase.functions.invoke with detailed logging
+      console.log('Calling edge function...');
       const response = await supabase.functions.invoke('amazon-oauth-init', {
         body: requestBody,
         headers: headers
       });
 
-      console.log('=== Raw Response from Edge Function ===');
-      console.log('Response structure:', {
+      console.log('=== Edge Function Response Analysis ===');
+      console.log('Response received:', {
         hasData: !!response.data,
         hasError: !!response.error,
-        dataType: typeof response.data,
-        errorType: typeof response.error
+        dataKeys: response.data ? Object.keys(response.data) : [],
+        errorDetails: response.error
       });
-      console.log('Response data:', response.data);
-      console.log('Response error:', response.error);
 
-      // Handle edge function errors with detailed logging
+      // Handle edge function errors first
       if (response.error) {
-        console.error('=== Edge Function Error Details ===');
+        console.error('=== Edge Function Error ===');
         console.error('Error object:', response.error);
-        console.error('Error message:', response.error.message);
-        console.error('Error context:', response.error.context);
         
         let errorMessage = 'Failed to initialize Amazon connection';
-        let debugInfo = '';
         
-        // Extract detailed error information
-        if (response.error.message) {
+        if (typeof response.error === 'object' && response.error.message) {
           errorMessage = response.error.message;
         } else if (typeof response.error === 'string') {
           errorMessage = response.error;
-        }
-
-        // Check if we have debug information from the edge function
-        if (response.data && response.data.debug) {
-          debugInfo = JSON.stringify(response.data.debug, null, 2);
-          console.error('Debug info from edge function:', debugInfo);
-        }
-        
-        // Show detailed error message to user
-        this.toast({
-          title: "Connection Failed",
-          description: `${errorMessage}${debugInfo ? `\n\nDebug: ${debugInfo}` : ''}`,
-          variant: "destructive",
-        });
-        
-        throw new Error(errorMessage);
-      }
-
-      // Check if we have valid response data
-      if (!response.data) {
-        console.error('No response data received from edge function');
-        throw new Error('No response received from server');
-      }
-
-      // Check for error in response data (edge function might return error in data)
-      if (response.data.error) {
-        console.error('=== Server Returned Error in Data ===');
-        console.error('Error details:', response.data.error);
-        console.error('Error message:', response.data.details);
-        console.error('Debug info:', response.data.debug);
-        
-        let errorMessage = response.data.details || response.data.error;
-        
-        // Include debug information if available
-        if (response.data.debug) {
-          const debugInfo = JSON.stringify(response.data.debug, null, 2);
-          console.error('Debug details:', debugInfo);
-          errorMessage += `\n\nDebug: ${debugInfo}`;
         }
         
         this.toast({
@@ -142,45 +99,72 @@ export class AmazonConnectionOperations {
           variant: "destructive",
         });
         
-        throw new Error(response.data.details || response.data.error);
+        throw new Error(errorMessage);
       }
 
-      // Check for auth URL in response
+      // Check for valid response data
+      if (!response.data) {
+        console.error('No response data received');
+        throw new Error('No response received from server');
+      }
+
+      // Check for server-side errors in response data
+      if (response.data.error) {
+        console.error('=== Server Error in Response ===');
+        console.error('Server error:', response.data.error);
+        console.error('Error details:', response.data.details);
+        console.error('Debug info:', response.data.debug);
+        
+        let errorMessage = response.data.details || response.data.error;
+        
+        // Include debug information for troubleshooting
+        if (response.data.debug) {
+          console.error('Debug details:', JSON.stringify(response.data.debug, null, 2));
+        }
+        
+        this.toast({
+          title: "Connection Failed",
+          description: errorMessage,
+          variant: "destructive",
+        });
+        
+        throw new Error(errorMessage);
+      }
+
+      // Validate auth URL presence
       if (!response.data.authUrl) {
-        console.error('=== Missing Auth URL in Response ===');
-        console.error('Response data:', response.data);
+        console.error('=== Missing Auth URL ===');
+        console.error('Response data structure:', Object.keys(response.data));
         throw new Error('No authorization URL received from server');
       }
 
-      console.log('=== Success! Redirecting to Amazon OAuth ===');
-      console.log('Auth URL length:', response.data.authUrl.length);
+      console.log('=== Success! Redirecting to Amazon ===');
+      console.log('Auth URL validated, length:', response.data.authUrl.length);
       
-      // Redirect to Amazon OAuth
+      // Perform redirect
       window.location.href = response.data.authUrl;
       
     } catch (err) {
-      console.error('=== Connection Initiation Error ===');
-      console.error('Error type:', typeof err);
+      console.error('=== Connection Initiation Failed ===');
       console.error('Error details:', err);
-      console.error('Error stack:', err instanceof Error ? err.stack : 'No stack trace');
+      console.error('Error type:', typeof err);
+      console.error('Error stack:', err instanceof Error ? err.stack : 'No stack');
       
       let userMessage = 'Failed to connect to Amazon';
       
       if (err instanceof Error) {
         userMessage = err.message;
         
-        // Provide more specific error messages for common issues
+        // Provide specific guidance for common issues
         if (err.message.includes('Authentication') || err.message.includes('sign in')) {
-          userMessage = 'Please sign in again and try connecting to Amazon';
-        } else if (err.message.includes('Network') || err.message.includes('fetch')) {
-          userMessage = 'Network error. Please check your internet connection and try again';
-        } else if (err.message.includes('Invalid JSON') || err.message.includes('parse')) {
-          userMessage = 'Server communication error. Please try again';
+          userMessage = 'Authentication failed. Please refresh the page and try again.';
+        } else if (err.message.includes('Server configuration')) {
+          userMessage = 'Server configuration issue. Please contact support.';
         }
       }
       
       // Only show toast if we haven't already shown one
-      if (!err.message || !err.message.includes('Debug:')) {
+      if (!err.message || !err.message.includes('Failed to initialize Amazon connection')) {
         this.toast({
           title: "Connection Failed",
           description: userMessage,

@@ -12,53 +12,40 @@ serve(async (req) => {
   console.log('=== Amazon OAuth Init Function Started ===');
   console.log('Request method:', req.method);
   console.log('Request URL:', req.url);
-  console.log('Request headers:', Object.fromEntries(req.headers.entries()));
-
+  
+  // Log all headers for debugging
+  const headers = Object.fromEntries(req.headers.entries());
+  console.log('All request headers:', headers);
+  
   if (req.method === 'OPTIONS') {
     console.log('Handling CORS preflight request');
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Check environment variables first
-    const amazonClientId = Deno.env.get('AMAZON_CLIENT_ID');
-    const amazonClientSecret = Deno.env.get('AMAZON_CLIENT_SECRET');
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    // First, let's check all environment variables
+    const requiredEnvVars = {
+      AMAZON_CLIENT_ID: Deno.env.get('AMAZON_CLIENT_ID'),
+      AMAZON_CLIENT_SECRET: Deno.env.get('AMAZON_CLIENT_SECRET'),
+      SUPABASE_URL: Deno.env.get('SUPABASE_URL'),
+      SUPABASE_SERVICE_ROLE_KEY: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    };
     
     console.log('=== Environment Variables Check ===');
-    console.log('Amazon Client ID exists:', !!amazonClientId);
-    console.log('Amazon Client Secret exists:', !!amazonClientSecret);
-    console.log('Supabase URL exists:', !!supabaseUrl);
-    console.log('Supabase Service Key exists:', !!supabaseKey);
-    
-    if (!amazonClientId || !amazonClientSecret) {
-      console.error('Missing Amazon credentials in environment');
-      return new Response(
-        JSON.stringify({ 
-          error: 'Amazon credentials not configured',
-          details: 'Server is missing Amazon API credentials. Please contact support.',
-          debug: {
-            hasClientId: !!amazonClientId,
-            hasClientSecret: !!amazonClientSecret
-          }
-        }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+    for (const [key, value] of Object.entries(requiredEnvVars)) {
+      console.log(`${key}: ${value ? 'SET' : 'MISSING'} (length: ${value?.length || 0})`);
     }
-
-    if (!supabaseUrl || !supabaseKey) {
-      console.error('Missing Supabase configuration in environment');
+    
+    // Check for missing Amazon credentials
+    if (!requiredEnvVars.AMAZON_CLIENT_ID || !requiredEnvVars.AMAZON_CLIENT_SECRET) {
+      console.error('Missing Amazon API credentials');
       return new Response(
         JSON.stringify({ 
           error: 'Server configuration error',
-          details: 'Database configuration is missing. Please contact support.',
+          details: 'Amazon API credentials are not configured on the server',
           debug: {
-            hasSupabaseUrl: !!supabaseUrl,
-            hasSupabaseKey: !!supabaseKey
+            hasClientId: !!requiredEnvVars.AMAZON_CLIENT_ID,
+            hasClientSecret: !!requiredEnvVars.AMAZON_CLIENT_SECRET
           }
         }),
         {
@@ -68,25 +55,42 @@ serve(async (req) => {
       );
     }
 
-    // Parse request body with enhanced error handling
+    // Check for missing Supabase credentials
+    if (!requiredEnvVars.SUPABASE_URL || !requiredEnvVars.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('Missing Supabase configuration');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Server configuration error',
+          details: 'Database configuration is missing',
+          debug: {
+            hasSupabaseUrl: !!requiredEnvVars.SUPABASE_URL,
+            hasSupabaseKey: !!requiredEnvVars.SUPABASE_SERVICE_ROLE_KEY
+          }
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Parse request body with detailed logging
     let requestBody;
-    let bodyText = '';
-    
     try {
-      bodyText = await req.text();
-      console.log('=== Request Body Analysis ===');
+      const bodyText = await req.text();
+      console.log('=== Request Body Parsing ===');
       console.log('Raw body length:', bodyText?.length || 0);
-      console.log('Raw body content:', bodyText || 'EMPTY');
+      console.log('Raw body preview:', bodyText?.substring(0, 200) || 'EMPTY');
       
       if (!bodyText || bodyText.trim() === '') {
-        console.error('Request body is completely empty');
+        console.error('Request body is empty');
         return new Response(
           JSON.stringify({ 
             error: 'Missing request data',
-            details: 'The request body is empty. Please ensure you are sending the redirectUri parameter.',
+            details: 'Request body is empty. Please ensure redirectUri is provided.',
             debug: {
-              bodyLength: bodyText?.length || 0,
-              bodyContent: bodyText || 'EMPTY'
+              contentType: headers['content-type'] || 'NOT SET',
+              bodyLength: bodyText?.length || 0
             }
           }),
           {
@@ -97,21 +101,17 @@ serve(async (req) => {
       }
       
       requestBody = JSON.parse(bodyText);
-      console.log('Successfully parsed request body:', requestBody);
+      console.log('Parsed request body:', requestBody);
       
     } catch (parseError) {
-      console.error('=== JSON Parse Error ===');
-      console.error('Parse error details:', parseError);
-      console.error('Raw body that failed to parse:', bodyText);
-      
+      console.error('JSON parse error:', parseError);
       return new Response(
         JSON.stringify({ 
           error: 'Invalid request format',
-          details: 'Request body must be valid JSON with redirectUri field',
+          details: 'Request body must be valid JSON',
           debug: {
             parseError: parseError.message,
-            receivedBody: bodyText,
-            expectedFormat: '{"redirectUri": "https://..."}' 
+            contentType: headers['content-type'] || 'NOT SET'
           }
         }),
         {
@@ -121,21 +121,19 @@ serve(async (req) => {
       );
     }
 
-    // Validate redirect URI
+    // Validate redirectUri
     const { redirectUri } = requestBody;
     console.log('=== Redirect URI Validation ===');
-    console.log('Redirect URI from request:', redirectUri);
-    console.log('Redirect URI type:', typeof redirectUri);
+    console.log('Provided redirectUri:', redirectUri);
     
     if (!redirectUri) {
-      console.error('redirectUri field is missing from request body');
+      console.error('redirectUri is missing');
       return new Response(
         JSON.stringify({ 
           error: 'Missing redirect URI',
-          details: 'The redirectUri field is required in the request body.',
+          details: 'redirectUri field is required',
           debug: {
-            requestBody: requestBody,
-            missingField: 'redirectUri'
+            receivedFields: Object.keys(requestBody)
           }
         }),
         {
@@ -145,31 +143,23 @@ serve(async (req) => {
       );
     }
 
-    // Validate redirect URI format
+    // Validate URL format
     try {
       const url = new URL(redirectUri);
-      console.log('Redirect URI parsed successfully:', {
+      console.log('Redirect URI validation passed:', {
         protocol: url.protocol,
         hostname: url.hostname,
         pathname: url.pathname
       });
-      
-      if (!url.protocol.startsWith('https')) {
-        throw new Error('Must use HTTPS protocol');
-      }
     } catch (urlError) {
-      console.error('=== Invalid Redirect URI ===');
-      console.error('URL validation error:', urlError);
-      console.error('Invalid URL:', redirectUri);
-      
+      console.error('Invalid redirect URI format:', urlError);
       return new Response(
         JSON.stringify({ 
-          error: 'Invalid redirect URI',
-          details: 'Redirect URI must be a valid HTTPS URL',
+          error: 'Invalid redirect URI format',
+          details: 'Redirect URI must be a valid URL',
           debug: {
             providedUri: redirectUri,
-            urlError: urlError.message,
-            requiredFormat: 'https://domain.com/path'
+            urlError: urlError.message
           }
         }),
         {
@@ -179,21 +169,20 @@ serve(async (req) => {
       );
     }
 
-    // Get and validate authentication token
+    // Validate authentication
     const authHeader = req.headers.get('authorization');
-    console.log('=== Authentication Check ===');
+    console.log('=== Authentication Validation ===');
     console.log('Auth header present:', !!authHeader);
-    console.log('Auth header format valid:', authHeader?.startsWith('Bearer '));
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       console.error('Missing or invalid authorization header');
       return new Response(
         JSON.stringify({ 
           error: 'Authentication required',
-          details: 'Valid Bearer token required in Authorization header',
+          details: 'Valid Bearer token required',
           debug: {
             hasAuthHeader: !!authHeader,
-            headerFormat: authHeader?.substring(0, 10) + '...' || 'MISSING'
+            authHeaderFormat: authHeader?.substring(0, 20) || 'MISSING'
           }
         }),
         {
@@ -204,31 +193,42 @@ serve(async (req) => {
     }
 
     const token = authHeader.replace('Bearer ', '');
-    console.log('Extracted token length:', token.length);
+    console.log('Token extracted, length:', token.length);
     
-    // Initialize Supabase client and verify user
-    console.log('=== Supabase Client Initialization ===');
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // Initialize Supabase and verify user
+    const supabase = createClient(
+      requiredEnvVars.SUPABASE_URL!,
+      requiredEnvVars.SUPABASE_SERVICE_ROLE_KEY!
+    );
     
-    console.log('Attempting to verify user token...');
+    console.log('=== User Authentication ===');
     const { data: userResponse, error: userError } = await supabase.auth.getUser(token);
     
-    console.log('=== User Verification Result ===');
-    console.log('User data present:', !!userResponse?.user);
-    console.log('User ID:', userResponse?.user?.id);
-    console.log('User email:', userResponse?.user?.email);
-    console.log('Auth error present:', !!userError);
-    console.log('Auth error details:', userError);
-    
-    if (userError || !userResponse?.user) {
-      console.error('User authentication failed');
+    if (userError) {
+      console.error('User authentication error:', userError);
       return new Response(
         JSON.stringify({ 
           error: 'Authentication failed',
-          details: 'Invalid or expired authentication token',
+          details: 'Invalid or expired token',
           debug: {
-            authError: userError?.message || 'No user found',
-            hasUser: !!userResponse?.user
+            authError: userError.message
+          }
+        }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+    
+    if (!userResponse?.user) {
+      console.error('No user found in auth response');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Authentication failed',
+          details: 'User not found',
+          debug: {
+            hasUserResponse: !!userResponse
           }
         }),
         {
@@ -238,8 +238,12 @@ serve(async (req) => {
       );
     }
 
-    // Generate state parameter with user info
-    console.log('=== State Parameter Generation ===');
+    console.log('User authenticated successfully:', {
+      userId: userResponse.user.id,
+      email: userResponse.user.email
+    });
+
+    // Generate state parameter
     const stateData = {
       user_id: userResponse.user.id,
       redirect_uri: redirectUri,
@@ -247,42 +251,37 @@ serve(async (req) => {
     };
     
     const state = btoa(JSON.stringify(stateData));
-    console.log('Generated state parameter length:', state.length);
+    console.log('State parameter generated, length:', state.length);
 
     // Build Amazon OAuth URL
-    console.log('=== Amazon OAuth URL Construction ===');
     const scope = 'advertising::campaign_management';
     const authUrl = new URL('https://www.amazon.com/ap/oa');
-    authUrl.searchParams.set('client_id', amazonClientId);
+    authUrl.searchParams.set('client_id', requiredEnvVars.AMAZON_CLIENT_ID!);
     authUrl.searchParams.set('scope', scope);
     authUrl.searchParams.set('response_type', 'code');
     authUrl.searchParams.set('redirect_uri', redirectUri);
     authUrl.searchParams.set('state', state);
 
     const finalAuthUrl = authUrl.toString();
-    console.log('Final Amazon OAuth URL length:', finalAuthUrl.length);
-    console.log('OAuth URL components:', {
-      baseUrl: 'https://www.amazon.com/ap/oa',
-      clientId: amazonClientId.substring(0, 10) + '...',
+    console.log('=== OAuth URL Generated ===');
+    console.log('Final URL length:', finalAuthUrl.length);
+    console.log('URL components verified:', {
+      baseUrl: authUrl.origin + authUrl.pathname,
+      clientIdLength: requiredEnvVars.AMAZON_CLIENT_ID!.length,
       scope: scope,
+      responseType: 'code',
       redirectUri: redirectUri,
       stateLength: state.length
     });
 
     const responseData = { 
-      authUrl: finalAuthUrl, 
-      state: state,
-      scope: scope,
-      timestamp: new Date().toISOString(),
-      debug: {
-        userId: userResponse.user.id,
-        redirectUri: redirectUri
-      }
+      authUrl: finalAuthUrl,
+      success: true,
+      timestamp: new Date().toISOString()
     };
     
     console.log('=== Success Response ===');
-    console.log('Response data keys:', Object.keys(responseData));
-    console.log('Auth URL length:', responseData.authUrl.length);
+    console.log('Sending successful response with auth URL');
 
     return new Response(
       JSON.stringify(responseData),
@@ -293,19 +292,20 @@ serve(async (req) => {
     );
     
   } catch (error) {
-    console.error('=== Unexpected Error in Amazon OAuth Init ===');
-    console.error('Error name:', error.name);
-    console.error('Error message:', error.message);
-    console.error('Error stack:', error.stack);
-    console.error('Error cause:', error.cause);
+    console.error('=== Unexpected Error ===');
+    console.error('Error type:', typeof error);
+    console.error('Error name:', error?.name);
+    console.error('Error message:', error?.message);
+    console.error('Error stack:', error?.stack);
     
     return new Response(
       JSON.stringify({
         error: 'Internal server error',
-        details: 'An unexpected error occurred while processing your request',
+        details: 'An unexpected error occurred',
         debug: {
-          errorName: error.name,
-          errorMessage: error.message,
+          errorType: typeof error,
+          errorName: error?.name || 'Unknown',
+          errorMessage: error?.message || 'No message',
           timestamp: new Date().toISOString()
         }
       }),
