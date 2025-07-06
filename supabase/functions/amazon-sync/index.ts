@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -13,15 +12,60 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseClient = createClient(
+    // Get the authorization header
+    const authHeader = req.headers.get('authorization')
+    console.log('=== Authentication Debug ===')
+    console.log('Auth header present:', !!authHeader)
+    console.log('Auth header value:', authHeader ? authHeader.substring(0, 20) + '...' : 'missing')
+
+    // Create Supabase client with service role for database operations
+    const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
+
+    // Create Supabase client with user context for auth verification
+    const supabaseUser = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: {
+            Authorization: authHeader || '',
+          },
+        },
+      }
+    )
+
+    // Verify the user is authenticated
+    const { data: { user }, error: authError } = await supabaseUser.auth.getUser()
+    
+    if (authError || !user) {
+      console.error('=== Authentication Failed ===')
+      console.error('Auth error:', authError)
+      console.error('User:', user)
+      
+      return new Response(
+        JSON.stringify({ 
+          error: 'Authentication required',
+          details: 'Please sign in to sync your Amazon connection'
+        }),
+        { 
+          status: 401, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    console.log('=== Authentication Successful ===')
+    console.log('User ID:', user.id)
+    console.log('User email:', user.email)
 
     const { connectionId } = await req.json()
     
     console.log('=== Amazon Sync Started ===')
     console.log('Connection ID:', connectionId)
+    console.log('Authenticated user:', user.id)
 
     if (!connectionId) {
       return new Response(
@@ -30,17 +74,18 @@ serve(async (req) => {
       )
     }
 
-    // Get connection details
-    const { data: connection, error: fetchError } = await supabaseClient
+    // Get connection details - verify user owns this connection
+    const { data: connection, error: fetchError } = await supabaseAdmin
       .from('amazon_connections')
       .select('*')
       .eq('id', connectionId)
+      .eq('user_id', user.id) // Ensure user owns this connection
       .single()
 
     if (fetchError || !connection) {
-      console.error('Connection not found:', fetchError)
+      console.error('Connection not found or access denied:', fetchError)
       return new Response(
-        JSON.stringify({ error: 'Connection not found' }),
+        JSON.stringify({ error: 'Connection not found or access denied' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -48,7 +93,8 @@ serve(async (req) => {
     console.log('Connection details:', {
       profile_id: connection.profile_id,
       status: connection.status,
-      profile_name: connection.profile_name
+      profile_name: connection.profile_name,
+      user_id: connection.user_id
     })
 
     // Check if token is expired
@@ -59,7 +105,7 @@ serve(async (req) => {
       console.error('Token expired for connection:', connectionId)
       
       // Update connection status to expired
-      await supabaseClient
+      await supabaseAdmin
         .from('amazon_connections')
         .update({ 
           status: 'expired',
@@ -113,7 +159,7 @@ serve(async (req) => {
           const marketplaceId = firstProfile.accountInfo?.marketplaceStringId || firstProfile.countryCode
 
           // Update connection with found profile
-          await supabaseClient
+          await supabaseAdmin
             .from('amazon_connections')
             .update({
               profile_id: profileId,
@@ -133,7 +179,7 @@ serve(async (req) => {
         } else {
           console.log('Still no profiles found')
           
-          await supabaseClient
+          await supabaseAdmin
             .from('amazon_connections')
             .update({ 
               status: 'setup_required',
@@ -153,7 +199,7 @@ serve(async (req) => {
       } else {
         console.error('Failed to fetch profiles:', profilesResponse.status)
         
-        await supabaseClient
+        await supabaseAdmin
           .from('amazon_connections')
           .update({ 
             status: 'error',
@@ -175,7 +221,7 @@ serve(async (req) => {
     if (!connection.profile_id || connection.profile_id === 'invalid') {
       console.error('Invalid profile ID:', connection.profile_id)
       
-      await supabaseClient
+      await supabaseAdmin
         .from('amazon_connections')
         .update({ 
           status: 'error',
@@ -219,7 +265,7 @@ serve(async (req) => {
           
           if (campaignsResponse.status === 401) {
             // Token is invalid, mark as expired
-            await supabaseClient
+            await supabaseAdmin
               .from('amazon_connections')
               .update({ 
                 status: 'expired',
@@ -238,7 +284,7 @@ serve(async (req) => {
           }
           
           if (campaignsResponse.status === 403) {
-            await supabaseClient
+            await supabaseAdmin
               .from('amazon_connections')
               .update({ 
                 status: 'error',
@@ -268,7 +314,7 @@ serve(async (req) => {
 
     // If all attempts failed
     if (campaigns.length === 0 && lastError) {
-      await supabaseClient
+      await supabaseAdmin
         .from('amazon_connections')
         .update({ 
           status: 'error',
@@ -290,7 +336,7 @@ serve(async (req) => {
       console.log('No campaigns found - this is normal for new advertising accounts')
       
       // Update sync timestamp and set status to active (successful sync with no campaigns)
-      await supabaseClient
+      await supabaseAdmin
         .from('amazon_connections')
         .update({ 
           last_sync_at: new Date().toISOString(),
@@ -331,7 +377,7 @@ serve(async (req) => {
     }))
 
     // Upsert campaigns
-    const { error: campaignError } = await supabaseClient
+    const { error: campaignError } = await supabaseAdmin
       .from('campaigns')
       .upsert(campaignInserts, {
         onConflict: 'amazon_campaign_id,connection_id',
@@ -341,7 +387,7 @@ serve(async (req) => {
     if (campaignError) {
       console.error('Error upserting campaigns:', campaignError)
       
-      await supabaseClient
+      await supabaseAdmin
         .from('amazon_connections')
         .update({ 
           status: 'error',
@@ -359,7 +405,7 @@ serve(async (req) => {
     }
 
     // Update connection status and sync timestamp
-    await supabaseClient
+    await supabaseAdmin
       .from('amazon_connections')
       .update({ 
         status: 'active',

@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -18,7 +19,7 @@ export interface AmazonConnection {
 }
 
 export const useAmazonConnections = () => {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [connections, setConnections] = useState<AmazonConnection[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -319,6 +320,19 @@ export const useAmazonConnections = () => {
     try {
       console.log('=== Sync Connection ===');
       console.log('Connection ID:', connectionId);
+      console.log('Session present:', !!session);
+      console.log('Access token present:', !!session?.access_token);
+      
+      // Check if we have a valid session
+      if (!session?.access_token) {
+        console.error('=== No Valid Session ===');
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in again to sync your Amazon connection.",
+          variant: "destructive",
+        });
+        return;
+      }
       
       // First, validate the connection exists and get its current state
       const { data: connectionData, error: connectionError } = await supabase
@@ -355,8 +369,14 @@ export const useAmazonConnections = () => {
         description: "Fetching your campaign data from Amazon. Please wait...",
       });
       
+      console.log('=== Calling Amazon Sync Function ===');
+      console.log('Using access token:', session.access_token.substring(0, 20) + '...');
+      
       const { data, error } = await supabase.functions.invoke('amazon-sync', {
-        body: { connectionId }
+        body: { connectionId },
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        }
       });
 
       console.log('=== Sync Response ===');
