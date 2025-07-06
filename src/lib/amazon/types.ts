@@ -20,4 +20,24 @@ export interface AmazonProfile {
   name: string;
   countryCode: string;
   currencyCode: string;
+  profileId: number;
+  accountInfo?: {
+    marketplaceStringId?: string;
+    name?: string;
+  };
+  marketplaceStringId?: string;
+}
+
+export interface TokenValidationResult {
+  isValid: boolean;
+  hoursUntilExpiry: number;
+  requiresRefresh: boolean;
+  error?: string;
+}
+
+export interface ProfileDetectionStrategy {
+  name: string;
+  endpoint: string;
+  region?: string;
+  timeout: number;
 }

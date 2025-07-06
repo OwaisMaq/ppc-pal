@@ -9,7 +9,8 @@ import {
   CheckCircle2,
   ExternalLink,
   Lightbulb,
-  Bug
+  Bug,
+  Zap
 } from "lucide-react";
 import { useEnhancedAmazonSync } from "@/hooks/useEnhancedAmazonSync";
 import { useToast } from "@/hooks/use-toast";
@@ -27,7 +28,7 @@ const ConnectionRecovery = ({
   profileId,
   onRecoveryComplete 
 }: ConnectionRecoveryProps) => {
-  const { runConnectionRecovery, isRunning } = useEnhancedAmazonSync();
+  const { runConnectionRecovery, runEnhancedProfileDetection, debugConnection, isRunning } = useEnhancedAmazonSync();
   const { toast } = useToast();
 
   const handleRecovery = async () => {
@@ -71,21 +72,49 @@ const ConnectionRecovery = ({
 
   const handleDebugTest = async () => {
     console.log('=== Debug Test Started ===');
-    console.log('Testing profile detection function directly...');
+    console.log('Running comprehensive connection debug...');
     
     try {
-      const { runEnhancedProfileDetection } = useEnhancedAmazonSync();
-      const result = await runEnhancedProfileDetection(connectionId);
+      const result = await debugConnection(connectionId);
       console.log('Debug test result:', result);
       
-      toast({
-        title: "Debug Test Complete",
-        description: `Check console for detailed results. Found ${result.profiles?.length || 0} profiles.`,
-      });
+      if (result.success) {
+        toast({
+          title: "Debug Complete",
+          description: "Check console for comprehensive connection analysis.",
+        });
+      } else {
+        toast({
+          title: "Debug Failed",
+          description: result.error || "Unknown debug error",
+          variant: "destructive",
+        });
+      }
     } catch (error) {
       console.error('Debug test error:', error);
       toast({
         title: "Debug Test Failed",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleProfileDetectionTest = async () => {
+    console.log('=== Profile Detection Test Started ===');
+    
+    try {
+      const result = await runEnhancedProfileDetection(connectionId);
+      console.log('Profile detection test result:', result);
+      
+      toast({
+        title: "Profile Detection Test Complete",
+        description: `Found ${result.profiles?.length || 0} profiles. Check console for details.`,
+      });
+    } catch (error) {
+      console.error('Profile detection test error:', error);
+      toast({
+        title: "Profile Detection Failed",
         description: error instanceof Error ? error.message : "Unknown error",
         variant: "destructive",
       });
@@ -129,10 +158,11 @@ const ConnectionRecovery = ({
               <li>• Amazon Advertising account setup is incomplete</li>
               <li>• No advertising campaigns have been created yet</li>
               <li>• Profile detection failed during initial connection</li>
+              <li>• Token permissions are insufficient for advertising API</li>
             </ul>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Button
               onClick={handleRecovery}
               disabled={isRunning}
@@ -142,7 +172,7 @@ const ConnectionRecovery = ({
               {isRunning ? (
                 <>
                   <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  Detecting Profiles...
+                  Running Recovery...
                 </>
               ) : (
                 <>
@@ -154,12 +184,24 @@ const ConnectionRecovery = ({
 
             <Button
               onClick={handleDebugTest}
+              disabled={isRunning}
               variant="outline"
               size="sm"
               className="border-orange-300"
             >
               <Bug className="h-4 w-4 mr-2" />
-              Debug Test
+              Debug Analysis
+            </Button>
+
+            <Button
+              onClick={handleProfileDetectionTest}
+              disabled={isRunning}
+              variant="outline"
+              size="sm"
+              className="border-orange-300"
+            >
+              <Zap className="h-4 w-4 mr-2" />
+              Test Profile Detection
             </Button>
 
             <Button
@@ -179,9 +221,10 @@ const ConnectionRecovery = ({
             </Button>
           </div>
 
-          <div className="text-xs text-gray-500 space-y-1">
-            <p><strong>Auto-Fix:</strong> Attempts to detect and configure your advertising profiles automatically.</p>
-            <p><strong>Debug Test:</strong> Tests the profile detection function and logs detailed results.</p>
+          <div className="text-xs text-gray-500 space-y-1 bg-white p-3 rounded border">
+            <p><strong>Auto-Fix:</strong> Comprehensive recovery with multi-region detection and validation.</p>
+            <p><strong>Debug Analysis:</strong> Complete connection analysis with token validation and logging.</p>
+            <p><strong>Profile Detection:</strong> Tests the enhanced profile detection directly.</p>
             <p><strong>Manual Setup:</strong> Create campaigns at advertising.amazon.com, then try Auto-Fix.</p>
           </div>
         </div>

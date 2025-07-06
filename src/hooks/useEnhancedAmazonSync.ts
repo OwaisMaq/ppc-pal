@@ -22,6 +22,13 @@ export interface ProfileDetectionResult {
   nextSteps?: string[];
 }
 
+export interface TokenValidationResult {
+  isValid: boolean;
+  hoursUntilExpiry: number;
+  requiresRefresh: boolean;
+  error?: string;
+}
+
 export const useEnhancedAmazonSync = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [steps, setSteps] = useState<SyncStep[]>([]);
@@ -83,6 +90,65 @@ export const useEnhancedAmazonSync = () => {
     } catch (error) {
       console.error('Failed to get auth headers:', error);
       throw error;
+    }
+  };
+
+  const validateToken = async (connection: any): Promise<TokenValidationResult> => {
+    console.log('=== Token Validation Started ===');
+    
+    try {
+      if (!connection.token_expires_at) {
+        console.error('No token expiry information available');
+        return {
+          isValid: false,
+          hoursUntilExpiry: 0,
+          requiresRefresh: true,
+          error: 'No token expiry information'
+        };
+      }
+
+      const tokenExpiry = new Date(connection.token_expires_at);
+      const now = new Date();
+      const hoursUntilExpiry = Math.round((tokenExpiry.getTime() - now.getTime()) / (1000 * 60 * 60));
+      
+      console.log('Token validation details:', {
+        expires: tokenExpiry.toISOString(),
+        now: now.toISOString(),
+        hoursUntilExpiry,
+        isExpired: tokenExpiry <= now
+      });
+
+      if (tokenExpiry <= now) {
+        console.error(`Token expired ${Math.abs(hoursUntilExpiry)} hours ago`);
+        return {
+          isValid: false,
+          hoursUntilExpiry,
+          requiresRefresh: true,
+          error: `Token expired ${Math.abs(hoursUntilExpiry)} hours ago`
+        };
+      }
+
+      // Check if token expires within the next 24 hours
+      const requiresRefresh = hoursUntilExpiry <= 24;
+      
+      if (requiresRefresh) {
+        console.warn(`Token expires in ${hoursUntilExpiry} hours - refresh recommended`);
+      }
+
+      return {
+        isValid: true,
+        hoursUntilExpiry,
+        requiresRefresh,
+        error: undefined
+      };
+    } catch (error) {
+      console.error('Token validation error:', error);
+      return {
+        isValid: false,
+        hoursUntilExpiry: 0,
+        requiresRefresh: true,
+        error: error instanceof Error ? error.message : 'Unknown validation error'
+      };
     }
   };
 
@@ -333,21 +399,23 @@ export const useEnhancedAmazonSync = () => {
 
       // Enhanced token validity check
       addStep('Checking token validity', 'pending', 'Verifying Amazon API token');
-      const tokenExpiry = new Date(connection.token_expires_at);
-      const now = new Date();
-      const hoursUntilExpiry = Math.round((tokenExpiry.getTime() - now.getTime()) / (1000 * 60 * 60));
+      const tokenValidation = await validateToken(connection);
       
-      if (tokenExpiry <= now) {
-        updateLastStep('error', `Access token expired ${Math.abs(hoursUntilExpiry)} hours ago`);
+      if (!tokenValidation.isValid) {
+        updateLastStep('error', tokenValidation.error || 'Token validation failed');
         toast({
-          title: "Token Expired",
+          title: "Token Invalid",
           description: "Please reconnect your Amazon account.",
           variant: "destructive",
         });
         return;
       }
       
-      updateLastStep('success', `Token valid for ${hoursUntilExpiry} hours`);
+      if (tokenValidation.requiresRefresh) {
+        updateLastStep('warning', `Token expires in ${tokenValidation.hoursUntilExpiry} hours - consider refreshing`);
+      } else {
+        updateLastStep('success', `Token valid for ${tokenValidation.hoursUntilExpiry} hours`);
+      }
 
       // Enhanced profile validation and recovery
       addStep('Validating profile configuration', 'pending', 'Checking advertising profile setup');
@@ -386,7 +454,7 @@ export const useEnhancedAmazonSync = () => {
         updateLastStep('success', `Profile validated: ${connection.profile_id}`);
       }
 
-      // Enhanced campaign sync
+      // Enhanced campaign sync with detailed error handling
       addStep('Syncing campaigns', 'pending', 'Fetching campaign data from Amazon');
       
       const { data: syncData, error: syncError } = await supabase.functions.invoke('amazon-sync', {
@@ -478,12 +546,62 @@ export const useEnhancedAmazonSync = () => {
     }
   };
 
+  const debugConnection = async (connectionId: string) => {
+    console.log('=== Debug Connection Utility Started ===');
+    
+    try {
+      addStep('Starting connection debug', 'pending', 'Analyzing connection details');
+      
+      // Get connection details
+      const { data: connection, error: fetchError } = await supabase
+        .from('amazon_connections')
+        .select('*')
+        .eq('id', connectionId)
+        .single();
+
+      if (fetchError || !connection) {
+        updateLastStep('error', 'Connection not found or access denied');
+        return { success: false, error: 'Connection not found' };
+      }
+
+      // Validate token
+      const tokenValidation = await validateToken(connection);
+      
+      // Log comprehensive debug information
+      const debugInfo = {
+        connectionId: connection.id,
+        profileId: connection.profile_id,
+        profileName: connection.profile_name,
+        marketplaceId: connection.marketplace_id,
+        status: connection.status,
+        lastSync: connection.last_sync_at,
+        tokenValidation,
+        hasValidProfile: connection.profile_id && 
+                        connection.profile_id !== 'setup_required_no_profiles_found' &&
+                        /^\d+$/.test(connection.profile_id)
+      };
+
+      console.log('=== Complete Debug Information ===');
+      console.log(JSON.stringify(debugInfo, null, 2));
+      
+      updateLastStep('success', 'Debug analysis complete - check console for details', debugInfo);
+      
+      return { success: true, debugInfo };
+    } catch (error) {
+      console.error('Debug utility error:', error);
+      updateLastStep('error', `Debug failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  };
+
   return {
     steps,
     isRunning,
     runEnhancedSync,
     runEnhancedProfileDetection,
     runConnectionRecovery,
+    debugConnection,
+    validateToken,
     clearSteps,
   };
 };
