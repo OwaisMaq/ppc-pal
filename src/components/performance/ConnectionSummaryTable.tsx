@@ -16,52 +16,57 @@ interface ConnectionSummaryTableProps {
 
 const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: ConnectionSummaryTableProps) => {
   const getStatusIcon = (connection: AmazonConnection) => {
-    switch (connection.status) {
-      case 'connected':
-        return <CheckCircle className="h-4 w-4 text-green-600" />;
-      case 'setup_required':
-        return <AlertTriangle className="h-4 w-4 text-yellow-600" />;
-      case 'error':
-        return <XCircle className="h-4 w-4 text-red-600" />;
-      default:
-        return <Clock className="h-4 w-4 text-gray-400" />;
+    // Map database status to display status
+    if (connection.status === 'active' && connection.campaign_count > 0) {
+      return <CheckCircle className="h-4 w-4 text-green-600" />;
+    } else if (connection.status === 'setup_required' || connection.campaign_count === 0) {
+      return <AlertTriangle className="h-4 w-4 text-yellow-600" />;
+    } else if (connection.status === 'error' || connection.status === 'expired') {
+      return <XCircle className="h-4 w-4 text-red-600" />;
+    } else {
+      return <Clock className="h-4 w-4 text-gray-400" />;
     }
   };
 
   const getStatusBadge = (connection: AmazonConnection) => {
-    switch (connection.status) {
-      case 'connected':
-        return <Badge variant="default" className="bg-green-100 text-green-800 border-green-200">Connected</Badge>;
-      case 'setup_required':
-        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 border-yellow-200">Setup Required</Badge>;
-      case 'error':
-        return <Badge variant="destructive">Error</Badge>;
-      default:
-        return <Badge variant="outline">Unknown</Badge>;
+    // Enhanced status mapping
+    if (connection.status === 'active' && connection.campaign_count > 0) {
+      return <Badge variant="default" className="bg-green-100 text-green-800 border-green-200">Connected</Badge>;
+    } else if (connection.status === 'setup_required' || 
+               (connection.status === 'active' && connection.campaign_count === 0)) {
+      return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 border-yellow-200">Setup Required</Badge>;
+    } else if (connection.status === 'error') {
+      return <Badge variant="destructive">Error</Badge>;
+    } else if (connection.status === 'expired') {
+      return <Badge variant="destructive">Expired</Badge>;
+    } else {
+      return <Badge variant="outline">Unknown</Badge>;
     }
   };
 
   const getEnhancedStatusDescription = (connection: AmazonConnection) => {
-    if (connection.status === 'connected') {
-      return `${connection.campaign_count || 0} campaigns synced successfully`;
+    if (connection.status === 'active' && connection.campaign_count > 0) {
+      return `${connection.campaign_count} campaigns synced successfully`;
     } else if (connection.status === 'setup_required') {
       if (connection.setup_required_reason === 'no_advertising_profiles') {
         return 'No advertising profiles found - Amazon Advertising setup required';
       } else if (connection.setup_required_reason === 'needs_sync') {
         return 'Ready to sync - Click "Sync Campaigns" to import data';
-      } else if (connection.setup_required_reason === 'token_expired') {
-        return 'Access token expired - please reconnect';
-      } else if (connection.setup_required_reason === 'connection_inactive') {
-        return 'Connection inactive - please reconnect';
+      } else {
+        return 'Setup required - please complete configuration';
       }
-      return 'Setup required - please check connection';
+    } else if (connection.status === 'active' && connection.campaign_count === 0) {
+      return 'Connected but no campaigns found - Click "Sync Campaigns"';
+    } else if (connection.status === 'expired') {
+      return 'Access token expired - please reconnect';
     } else if (connection.status === 'error') {
       if (connection.setup_required_reason === 'token_expired') {
         return 'Access token expired - reconnection required';
       } else if (connection.setup_required_reason === 'connection_inactive') {
         return 'Connection inactive - please check status';
+      } else {
+        return 'Connection error - please reconnect or try force sync';
       }
-      return 'Connection error - please reconnect';
     }
     return 'Status unknown - please refresh';
   };
@@ -69,7 +74,8 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
   const getActionButtons = (connection: AmazonConnection) => {
     const buttons = [];
     
-    if (connection.setup_required_reason === 'token_expired' || 
+    // Check if token is expired or connection needs reconnection
+    if (connection.status === 'expired' || 
         (connection.status === 'error' && connection.setup_required_reason?.includes('token'))) {
       buttons.push(
         <Button
@@ -83,7 +89,10 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
           Reconnect
         </Button>
       );
-    } else if (connection.status === 'setup_required' && connection.setup_required_reason === 'needs_sync') {
+    } 
+    // Show sync button for setup_required or active connections without campaigns
+    else if (connection.status === 'setup_required' || 
+             (connection.status === 'active' && connection.campaign_count === 0)) {
       buttons.push(
         <Button
           key="sync"
@@ -96,7 +105,9 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
           Sync Campaigns
         </Button>
       );
-    } else if (connection.status === 'connected') {
+    } 
+    // Show refresh button for active connections with campaigns
+    else if (connection.status === 'active' && connection.campaign_count > 0) {
       buttons.push(
         <Button
           key="refresh"
@@ -112,9 +123,7 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
     }
 
     // Enhanced Force Sync button logic
-    if (connection.status === 'setup_required' && 
-        connection.setup_required_reason === 'no_advertising_profiles' && 
-        onForceSync) {
+    if (connection.setup_required_reason === 'no_advertising_profiles' && onForceSync) {
       buttons.push(
         <Button
           key="force-sync"
@@ -280,7 +289,7 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
         </div>
         
         {/* Enhanced help sections */}
-        {connections.some(c => c.status === 'setup_required') && (
+        {connections.some(c => c.status === 'setup_required' || (c.status === 'active' && c.campaign_count === 0)) && (
           <div className="mt-4 space-y-3">
             {connections.some(c => c.setup_required_reason === 'no_advertising_profiles') && (
               <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
@@ -311,22 +320,21 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
               </div>
             )}
             
-            {connections.some(c => c.setup_required_reason === 'needs_sync') && (
+            {connections.some(c => c.status === 'setup_required' || (c.status === 'active' && c.campaign_count === 0)) && (
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="flex items-start gap-3">
                   <RefreshCw className="h-5 w-5 text-blue-600 mt-0.5" />
                   <div>
                     <h4 className="font-medium text-blue-800">Ready to Sync Campaigns</h4>
                     <p className="text-sm text-blue-700 mt-1">
-                      Your Amazon account is connected with valid advertising profiles. 
-                      Click "Sync Campaigns" to import your campaign data and view performance metrics.
+                      Your Amazon account is connected. Click "Sync Campaigns" to import your campaign data and view performance metrics.
                     </p>
                   </div>
                 </div>
               </div>
             )}
 
-            {connections.some(c => c.setup_required_reason === 'token_expired') && (
+            {connections.some(c => c.status === 'expired') && (
               <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
                 <div className="flex items-start gap-3">
                   <XCircle className="h-5 w-5 text-red-600 mt-0.5" />

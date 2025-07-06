@@ -11,6 +11,8 @@ export interface ConnectionStatus {
   profileStatus: 'active' | 'missing' | 'expired' | 'invalid';
   tokenExpiry: string;
   issues: string[];
+  setupRequired?: boolean;
+  setupReason?: string;
 }
 
 export const useConnectionStatus = () => {
@@ -45,6 +47,8 @@ export const useConnectionStatus = () => {
       const connectionStatuses: ConnectionStatus[] = connections.map(conn => {
         const issues: string[] = [];
         let statusLevel: 'healthy' | 'warning' | 'error' = 'healthy';
+        let setupRequired = false;
+        let setupReason = '';
         
         console.log(`=== Analyzing Connection ${conn.id} ===`);
         console.log('Connection details:', {
@@ -66,6 +70,8 @@ export const useConnectionStatus = () => {
           issues.push('Access token has expired');
           statusLevel = 'error';
           profileStatus = 'expired';
+          setupRequired = true;
+          setupReason = 'token_expired';
           console.log('Token expired for connection:', conn.id);
         } else if (hoursUntilExpiry < 24) {
           issues.push('Access token expires soon');
@@ -78,21 +84,45 @@ export const useConnectionStatus = () => {
           issues.push('No profile ID configured');
           statusLevel = 'error';
           profileStatus = 'missing';
+          setupRequired = true;
+          setupReason = 'no_profile';
           console.log('No profile ID for connection:', conn.id);
         } else if (conn.profile_id === 'setup_required_no_profiles_found') {
           issues.push('No advertising profiles found - Amazon Advertising setup required');
           statusLevel = 'error';
           profileStatus = 'missing';
+          setupRequired = true;
+          setupReason = 'no_advertising_profiles';
           console.log('No advertising profiles found for connection:', conn.id);
         } else if (conn.profile_id === 'invalid' || conn.profile_id.includes('error')) {
           issues.push('Invalid profile configuration detected');
           statusLevel = 'error';
           profileStatus = 'invalid';
+          setupRequired = true;
+          setupReason = 'invalid_profile';
           console.log('Invalid profile for connection:', conn.id);
         }
 
-        // Check connection status
-        if (conn.status !== 'active') {
+        // Check connection status from database
+        if (conn.status === 'setup_required') {
+          setupRequired = true;
+          if (!setupReason) setupReason = 'needs_sync';
+          if (statusLevel === 'healthy') statusLevel = 'warning';
+          console.log('Connection requires setup:', conn.id);
+        } else if (conn.status === 'error') {
+          statusLevel = 'error';
+          issues.push('Connection is in error state');
+          setupRequired = true;
+          if (!setupReason) setupReason = 'connection_error';
+          console.log('Connection in error state:', conn.id);
+        } else if (conn.status === 'expired') {
+          statusLevel = 'error';
+          profileStatus = 'expired';
+          setupRequired = true;
+          setupReason = 'token_expired';
+          issues.push('Connection has expired');
+          console.log('Connection expired:', conn.id);
+        } else if (conn.status !== 'active') {
           issues.push(`Connection status is ${conn.status}`);
           statusLevel = 'error';
           console.log('Connection not active:', conn.id, conn.status);
@@ -103,6 +133,10 @@ export const useConnectionStatus = () => {
         if (!conn.last_sync_at) {
           issues.push('Never synced with Amazon');
           if (statusLevel === 'healthy') statusLevel = 'warning';
+          if (!setupRequired && conn.status === 'active') {
+            setupRequired = true;
+            setupReason = 'needs_sync';
+          }
           console.log('Never synced:', conn.id);
         } else {
           const lastSync = new Date(conn.last_sync_at);
@@ -129,7 +163,9 @@ export const useConnectionStatus = () => {
           campaignCount,
           profileStatus,
           tokenExpiry: conn.token_expires_at,
-          issues
+          issues,
+          setupRequired,
+          setupReason
         };
 
         console.log('Final connection status:', connectionStatus);

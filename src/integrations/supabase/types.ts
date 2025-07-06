@@ -597,7 +597,13 @@ export type Database = {
       }
     }
     Enums: {
-      api_connection_status: "active" | "expired" | "error" | "pending"
+      api_connection_status:
+        | "active"
+        | "expired"
+        | "error"
+        | "pending"
+        | "warning"
+        | "setup_required"
       app_role: "admin" | "user"
       campaign_status: "enabled" | "paused" | "archived"
       optimization_status: "pending" | "in_progress" | "completed" | "failed"
@@ -718,7 +724,14 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      api_connection_status: ["active", "expired", "error", "pending"],
+      api_connection_status: [
+        "active",
+        "expired",
+        "error",
+        "pending",
+        "warning",
+        "setup_required",
+      ],
       app_role: ["admin", "user"],
       campaign_status: ["enabled", "paused", "archived"],
       optimization_status: ["pending", "in_progress", "completed", "failed"],
