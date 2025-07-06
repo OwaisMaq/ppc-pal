@@ -47,7 +47,20 @@ serve(async (req) => {
       );
     }
 
-    const requestBody = await req.json();
+    let requestBody;
+    try {
+      requestBody = await req.json();
+    } catch (parseError) {
+      console.error('Failed to parse request body:', parseError);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid request format',
+          details: 'Request body must be valid JSON'
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { connectionId } = requestBody;
 
     if (!connectionId) {
@@ -59,6 +72,8 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    console.log('Refreshing token for connection:', connectionId);
 
     // Get connection details
     const { data: connection, error: connectionError } = await supabaseClient
@@ -118,92 +133,104 @@ serve(async (req) => {
     }
 
     console.log('=== Refreshing Access Token ===');
-    const refreshResponse = await fetch('https://api.amazon.com/auth/o2/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        grant_type: 'refresh_token',
-        refresh_token: connection.refresh_token,
-        client_id: clientId,
-        client_secret: clientSecret,
-      }),
-    });
+    
+    try {
+      const refreshResponse = await fetch('https://api.amazon.com/auth/o2/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          grant_type: 'refresh_token',
+          refresh_token: connection.refresh_token,
+          client_id: clientId,
+          client_secret: clientSecret,
+        }),
+      });
 
-    if (!refreshResponse.ok) {
-      const errorText = await refreshResponse.text();
-      console.error('Token refresh failed:', refreshResponse.status, errorText);
-      
-      // Mark connection as expired if refresh fails
-      await supabaseClient
+      if (!refreshResponse.ok) {
+        const errorText = await refreshResponse.text();
+        console.error('Token refresh failed:', refreshResponse.status, errorText);
+        
+        // Mark connection as expired if refresh fails
+        await supabaseClient
+          .from('amazon_connections')
+          .update({ 
+            status: 'expired',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', connectionId);
+
+        return new Response(
+          JSON.stringify({ 
+            error: 'Token refresh failed',
+            details: 'Your Amazon connection has expired. Please reconnect your account.',
+            requiresReconnection: true
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const tokenData = await refreshResponse.json();
+      const { access_token, expires_in } = tokenData;
+
+      if (!access_token) {
+        console.error('No access token in refresh response');
+        return new Response(
+          JSON.stringify({ 
+            error: 'Invalid refresh response',
+            details: 'Amazon did not provide a valid access token'
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Calculate new expiry with buffer (5 minutes)
+      const newTokenExpiresAt = new Date(Date.now() + ((expires_in - 300) * 1000)).toISOString();
+
+      // Update connection with new token
+      const { error: updateError } = await supabaseClient
         .from('amazon_connections')
-        .update({ 
-          status: 'expired',
+        .update({
+          access_token,
+          token_expires_at: newTokenExpiresAt,
+          status: 'active',
           updated_at: new Date().toISOString()
         })
         .eq('id', connectionId);
 
+      if (updateError) {
+        console.error('Failed to update connection:', updateError);
+        return new Response(
+          JSON.stringify({ 
+            error: 'Failed to update connection',
+            details: updateError.message
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      console.log('=== Token Refresh Successful ===');
       return new Response(
-        JSON.stringify({ 
-          error: 'Token refresh failed',
-          details: 'Your Amazon connection has expired. Please reconnect your account.',
-          requiresReconnection: true
+        JSON.stringify({
+          success: true,
+          message: 'Token refreshed successfully',
+          newExpiresAt: newTokenExpiresAt,
+          hoursUntilExpiry: Math.round(expires_in / 3600),
+          refreshed: true
         }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
-    }
-
-    const tokenData = await refreshResponse.json();
-    const { access_token, expires_in } = tokenData;
-
-    if (!access_token) {
-      console.error('No access token in refresh response');
+    } catch (refreshError) {
+      console.error('Token refresh network error:', refreshError);
       return new Response(
         JSON.stringify({ 
-          error: 'Invalid refresh response',
-          details: 'Amazon did not provide a valid access token'
-        }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Calculate new expiry with buffer
-    const newTokenExpiresAt = new Date(Date.now() + ((expires_in - 300) * 1000)).toISOString();
-
-    // Update connection with new token
-    const { error: updateError } = await supabaseClient
-      .from('amazon_connections')
-      .update({
-        access_token,
-        token_expires_at: newTokenExpiresAt,
-        status: 'active',
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', connectionId);
-
-    if (updateError) {
-      console.error('Failed to update connection:', updateError);
-      return new Response(
-        JSON.stringify({ 
-          error: 'Failed to update connection',
-          details: updateError.message
+          error: 'Network error during token refresh',
+          details: refreshError.message || 'Could not connect to Amazon token service'
         }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-
-    console.log('=== Token Refresh Successful ===');
-    return new Response(
-      JSON.stringify({
-        success: true,
-        message: 'Token refreshed successfully',
-        newExpiresAt: newTokenExpiresAt,
-        hoursUntilExpiry: Math.round(expires_in / 3600),
-        refreshed: true
-      }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
 
   } catch (error) {
     console.error('=== Token Refresh Error ===');
