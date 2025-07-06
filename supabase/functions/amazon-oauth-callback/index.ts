@@ -7,6 +7,19 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// In-memory store to track processed authorization codes
+const processedCodes = new Map<string, { timestamp: number; result: any }>();
+
+// Cleanup old entries every 10 minutes
+setInterval(() => {
+  const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
+  for (const [code, data] of processedCodes.entries()) {
+    if (data.timestamp < tenMinutesAgo) {
+      processedCodes.delete(code);
+    }
+  }
+}, 10 * 60 * 1000);
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -18,31 +31,70 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { code, state, error: oauthError } = await req.json()
+    const requestBody = await req.json()
+    const { code, state, error: oauthError } = requestBody
     
     console.log('=== Amazon OAuth Callback ===')
-    console.log('Received callback with:', { code: !!code, state: !!state, error: oauthError })
+    console.log('Request body:', { code: !!code, state: !!state, error: oauthError })
+    console.log('Authorization code hash:', code ? btoa(code).substring(0, 10) : 'none')
+
+    // Check if this code has already been processed
+    if (code && processedCodes.has(code)) {
+      const cached = processedCodes.get(code)!;
+      console.log('=== Returning Cached Result ===')
+      console.log('Cached result timestamp:', new Date(cached.timestamp).toISOString())
+      return new Response(
+        JSON.stringify(cached.result),
+        { 
+          status: cached.result.success ? 200 : 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
 
     if (oauthError) {
       console.error('OAuth error from Amazon:', oauthError)
+      const errorResult = { 
+        error: 'OAuth authorization failed', 
+        details: oauthError,
+        errorType: 'oauth_error',
+        userAction: 'Please try connecting your Amazon account again'
+      }
+      
+      if (code) {
+        processedCodes.set(code, { timestamp: Date.now(), result: errorResult });
+      }
+      
       return new Response(
-        JSON.stringify({ error: 'OAuth authorization failed', details: oauthError }),
+        JSON.stringify(errorResult),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
     if (!code) {
       console.error('No authorization code received')
+      const errorResult = { 
+        error: 'No authorization code received',
+        errorType: 'missing_code',
+        userAction: 'Please try the authorization process again'
+      }
       return new Response(
-        JSON.stringify({ error: 'No authorization code received' }),
+        JSON.stringify(errorResult),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
     if (!state) {
       console.error('No state parameter received')
+      const errorResult = { 
+        error: 'No state parameter received',
+        errorType: 'missing_state',
+        userAction: 'Please start the connection process from the settings page'
+      }
+      
+      processedCodes.set(code, { timestamp: Date.now(), result: errorResult });
       return new Response(
-        JSON.stringify({ error: 'No state parameter received' }),
+        JSON.stringify(errorResult),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -51,11 +103,10 @@ serve(async (req) => {
     let userId, redirectUri
     try {
       console.log('=== Parsing State Parameter ===')
-      console.log('Raw state:', state)
-      console.log('State length:', state.length)
+      console.log('Raw state length:', state.length)
       
       const stateData = JSON.parse(atob(state))
-      console.log('Decoded state data:', stateData)
+      console.log('Decoded state data keys:', Object.keys(stateData))
       
       userId = stateData.user_id
       redirectUri = stateData.redirect_uri
@@ -63,20 +114,31 @@ serve(async (req) => {
       console.log('Parsed state:', { userId: !!userId, redirectUri })
     } catch (e) {
       console.error('Failed to parse state parameter:', e)
-      console.error('State value was:', state)
+      const errorResult = { 
+        error: 'Invalid state parameter',
+        details: 'State parameter could not be decoded',
+        errorType: 'invalid_state',
+        userAction: 'Please start the connection process again from the settings page'
+      }
+      
+      processedCodes.set(code, { timestamp: Date.now(), result: errorResult });
       return new Response(
-        JSON.stringify({ 
-          error: 'Invalid state parameter',
-          details: 'State parameter could not be decoded' 
-        }),
+        JSON.stringify(errorResult),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
     if (!userId) {
       console.error('No user ID found in state')
+      const errorResult = { 
+        error: 'User ID not found in state',
+        errorType: 'invalid_user',
+        userAction: 'Please log in and try connecting again'
+      }
+      
+      processedCodes.set(code, { timestamp: Date.now(), result: errorResult });
       return new Response(
-        JSON.stringify({ error: 'User ID not found in state' }),
+        JSON.stringify(errorResult),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -87,8 +149,15 @@ serve(async (req) => {
     
     if (!clientId || !clientSecret) {
       console.error('Missing Amazon credentials')
+      const errorResult = { 
+        error: 'Server configuration error - missing Amazon credentials',
+        errorType: 'server_config',
+        userAction: 'Please contact support - server configuration issue'
+      }
+      
+      processedCodes.set(code, { timestamp: Date.now(), result: errorResult });
       return new Response(
-        JSON.stringify({ error: 'Server configuration error - missing Amazon credentials' }),
+        JSON.stringify(errorResult),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -116,16 +185,31 @@ serve(async (req) => {
       console.error('Token exchange failed:', tokenResponse.status, errorText)
       
       let userFriendlyMessage = 'Failed to exchange authorization code with Amazon'
+      let errorType = 'token_exchange_failed'
+      let userAction = 'Please try connecting your Amazon account again'
+      
       if (tokenResponse.status === 400) {
         if (errorText.includes('invalid_grant')) {
-          userFriendlyMessage = 'Authorization code has expired or is invalid. Please try connecting again.'
+          userFriendlyMessage = 'Authorization code has expired or been used already'
+          errorType = 'code_expired'
+          userAction = 'Please start the connection process again - the authorization code has expired'
         } else if (errorText.includes('invalid_client')) {
-          userFriendlyMessage = 'Invalid client configuration. Please contact support.'
+          userFriendlyMessage = 'Invalid client configuration'
+          errorType = 'invalid_client'
+          userAction = 'Please contact support - client configuration issue'
         }
       }
       
+      const errorResult = { 
+        error: userFriendlyMessage, 
+        details: errorText,
+        errorType,
+        userAction
+      }
+      
+      processedCodes.set(code, { timestamp: Date.now(), result: errorResult });
       return new Response(
-        JSON.stringify({ error: userFriendlyMessage, details: errorText }),
+        JSON.stringify(errorResult),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -136,9 +220,16 @@ serve(async (req) => {
     const { access_token, refresh_token, expires_in } = tokenData
 
     if (!access_token || !refresh_token) {
-      console.error('Missing tokens in response:', tokenData)
+      console.error('Missing tokens in response:', Object.keys(tokenData))
+      const errorResult = { 
+        error: 'Invalid token response from Amazon',
+        errorType: 'invalid_tokens',
+        userAction: 'Please try connecting again - Amazon did not provide valid tokens'
+      }
+      
+      processedCodes.set(code, { timestamp: Date.now(), result: errorResult });
       return new Response(
-        JSON.stringify({ error: 'Invalid token response from Amazon' }),
+        JSON.stringify(errorResult),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -221,8 +312,15 @@ serve(async (req) => {
 
     if (fetchError) {
       console.error('Error checking existing connections:', fetchError)
+      const errorResult = { 
+        error: 'Database error checking existing connections',
+        errorType: 'database_error',
+        userAction: 'Please try again - database connection issue'
+      }
+      
+      processedCodes.set(code, { timestamp: Date.now(), result: errorResult });
       return new Response(
-        JSON.stringify({ error: 'Database error checking existing connections' }),
+        JSON.stringify(errorResult),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -232,6 +330,7 @@ serve(async (req) => {
       conn.profile_id === profileId && profileId !== 'setup_required_no_profiles_found'
     )
 
+    let result;
     if (duplicateConnection) {
       console.log('Updating existing connection for profile:', profileId)
       const { data, error } = await supabaseClient
@@ -251,64 +350,67 @@ serve(async (req) => {
 
       if (error) {
         console.error('Error updating connection:', error)
+        const errorResult = { 
+          error: 'Failed to update connection', 
+          details: error.message,
+          errorType: 'database_update_error',
+          userAction: 'Please try connecting again'
+        }
+        
+        processedCodes.set(code, { timestamp: Date.now(), result: errorResult });
         return new Response(
-          JSON.stringify({ error: 'Failed to update connection', details: error.message }),
+          JSON.stringify(errorResult),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
 
-      return new Response(
-        JSON.stringify({
-          success: true,
-          connection_id: data.id,
-          status: connectionStatus,
-          profile_count: profiles.length,
-          setup_required_reason: setupRequiredReason,
-          message: profiles.length > 0 
-            ? 'Amazon account connection updated successfully. You can now sync your campaigns.'
-            : 'Amazon account connected, but no advertising profiles found. Set up Amazon Advertising and use Force Sync.'
-        }),
-        { 
-          status: 200, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
-    }
-
-    // Create new connection
-    console.log('=== Creating New Connection ===')
-    console.log('Connection details:', { userId, profileId, profileName, marketplaceId, status: connectionStatus })
-    
-    const { data, error } = await supabaseClient
-      .from('amazon_connections')
-      .insert({
-        user_id: userId,
-        profile_id: profileId,
-        profile_name: profileName,
-        marketplace_id: marketplaceId,
-        access_token,
-        refresh_token,
-        token_expires_at: tokenExpiresAt,
+      result = {
+        success: true,
+        connection_id: data.id,
         status: connectionStatus,
-      })
-      .select('id')
-      .single()
+        profile_count: profiles.length,
+        setup_required_reason: setupRequiredReason,
+        message: profiles.length > 0 
+          ? 'Amazon account connection updated successfully. You can now sync your campaigns.'
+          : 'Amazon account connected, but no advertising profiles found. Set up Amazon Advertising and use Force Sync.'
+      }
+    } else {
+      // Create new connection
+      console.log('=== Creating New Connection ===')
+      console.log('Connection details:', { userId, profileId, profileName, marketplaceId, status: connectionStatus })
+      
+      const { data, error } = await supabaseClient
+        .from('amazon_connections')
+        .insert({
+          user_id: userId,
+          profile_id: profileId,
+          profile_name: profileName,
+          marketplace_id: marketplaceId,
+          access_token,
+          refresh_token,
+          token_expires_at: tokenExpiresAt,
+          status: connectionStatus,
+        })
+        .select('id')
+        .single()
 
-    if (error) {
-      console.error('Error creating connection:', error)
-      return new Response(
-        JSON.stringify({ error: 'Failed to create connection', details: error.message }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
+      if (error) {
+        console.error('Error creating connection:', error)
+        const errorResult = { 
+          error: 'Failed to create connection', 
+          details: error.message,
+          errorType: 'database_insert_error',
+          userAction: 'Please try connecting again'
+        }
+        
+        processedCodes.set(code, { timestamp: Date.now(), result: errorResult });
+        return new Response(
+          JSON.stringify(errorResult),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
 
-    console.log('=== OAuth Callback Successful ===')
-    console.log('Connection ID:', data.id)
-    console.log('Status:', connectionStatus)
-    console.log('Profiles found:', profiles.length)
-
-    return new Response(
-      JSON.stringify({
+      result = {
         success: true,
         connection_id: data.id,
         status: connectionStatus,
@@ -317,7 +419,17 @@ serve(async (req) => {
         message: profiles.length > 0 
           ? 'Amazon account connected successfully. You can now sync your campaigns.'
           : 'Amazon account connected, but no advertising profiles found. Set up Amazon Advertising and use Force Sync.'
-      }),
+      }
+    }
+
+    // Cache the successful result
+    processedCodes.set(code, { timestamp: Date.now(), result });
+
+    console.log('=== OAuth Callback Successful ===')
+    console.log('Result:', result)
+
+    return new Response(
+      JSON.stringify(result),
       { 
         status: 200, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -328,11 +440,15 @@ serve(async (req) => {
     console.error('=== OAuth Callback Error ===')
     console.error('Error details:', error)
     
+    const errorResult = { 
+      error: 'Internal server error during OAuth callback',
+      details: error.message,
+      errorType: 'internal_error',
+      userAction: 'Please try connecting again. If the problem persists, contact support.'
+    }
+    
     return new Response(
-      JSON.stringify({ 
-        error: 'Internal server error during OAuth callback',
-        details: error.message 
-      }),
+      JSON.stringify(errorResult),
       { 
         status: 500, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
