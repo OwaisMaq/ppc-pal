@@ -49,7 +49,14 @@ serve(async (req) => {
 
     let requestBody;
     try {
-      requestBody = await req.json();
+      const bodyText = await req.text();
+      console.log('Raw request body:', bodyText);
+      
+      if (!bodyText || bodyText.trim() === '') {
+        throw new Error('Empty request body');
+      }
+      
+      requestBody = JSON.parse(bodyText);
     } catch (parseError) {
       console.error('Failed to parse request body:', parseError);
       return new Response(

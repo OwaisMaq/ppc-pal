@@ -47,7 +47,27 @@ serve(async (req) => {
       );
     }
 
-    const requestBody = await req.json();
+    let requestBody;
+    try {
+      const bodyText = await req.text();
+      console.log('Raw request body:', bodyText);
+      
+      if (!bodyText || bodyText.trim() === '') {
+        throw new Error('Empty request body');
+      }
+      
+      requestBody = JSON.parse(bodyText);
+    } catch (parseError) {
+      console.error('Failed to parse request body:', parseError);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid request format',
+          details: 'Request body must be valid JSON'
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { connectionId } = requestBody;
 
     if (!connectionId) {
@@ -113,7 +133,14 @@ serve(async (req) => {
 
     const clientId = Deno.env.get('AMAZON_CLIENT_ID');
     if (!clientId) {
-      throw new Error('Amazon client ID not configured');
+      console.error('Missing Amazon client ID');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Server configuration error',
+          details: 'Amazon client ID not configured'
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Try to validate by calling profiles endpoint

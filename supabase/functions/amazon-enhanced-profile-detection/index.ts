@@ -49,7 +49,14 @@ serve(async (req) => {
 
     let requestBody;
     try {
-      requestBody = await req.json();
+      const bodyText = await req.text();
+      console.log('Raw request body:', bodyText);
+      
+      if (!bodyText || bodyText.trim() === '') {
+        throw new Error('Empty request body');
+      }
+      
+      requestBody = JSON.parse(bodyText);
     } catch (parseError) {
       console.error('Failed to parse request body:', parseError);
       return new Response(
@@ -114,7 +121,14 @@ serve(async (req) => {
 
     const clientId = Deno.env.get('AMAZON_CLIENT_ID');
     if (!clientId) {
-      throw new Error('Amazon client ID not configured');
+      console.error('Missing Amazon client ID');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Server configuration error',
+          details: 'Amazon client ID not configured'
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     console.log('Attempting to fetch advertising profiles...');
