@@ -330,6 +330,47 @@ export const useEnhancedAmazonSync = () => {
     }
   };
 
+  const updateConnectionWithProfiles = async (connectionId: string, profiles: any[]): Promise<boolean> => {
+    try {
+      if (profiles.length === 0) {
+        console.log('No profiles to update connection with');
+        return false;
+      }
+
+      // Use the first profile as primary
+      const primaryProfile = profiles[0];
+      console.log('=== Updating Connection with Profiles ===');
+      console.log('Primary profile:', primaryProfile);
+
+      addStep('Profile Update', 'pending', 'Updating connection with found profiles...');
+
+      const { error } = await supabase
+        .from('amazon_connections')
+        .update({
+          profile_id: primaryProfile.profileId.toString(),
+          profile_name: primaryProfile.accountInfo?.name || `${primaryProfile.countryCode} Profile`,
+          marketplace_id: primaryProfile.accountInfo?.marketplaceStringId || primaryProfile.countryCode,
+          status: 'active',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', connectionId);
+
+      if (error) {
+        console.error('Failed to update connection:', error);
+        updateLastStep('error', `Failed to update connection: ${error.message}`);
+        return false;
+      }
+
+      updateLastStep('success', `Connection updated with profile: ${primaryProfile.accountInfo?.name || primaryProfile.profileId}`);
+      return true;
+
+    } catch (error) {
+      console.error('Error updating connection with profiles:', error);
+      updateLastStep('error', `Update failed: ${error.message}`);
+      return false;
+    }
+  };
+
   const runEnhancedSync = async (connectionId: string) => {
     setIsRunning(true);
     console.log('[Enhanced Sync] Running enhanced sync:', { connectionId });
@@ -356,7 +397,14 @@ export const useEnhancedAmazonSync = () => {
         return;
       }
 
-      addStep('Enhanced Sync Complete', 'success', 'All validation steps completed successfully');
+      // Step 4: Update connection with found profiles
+      const updateSuccess = await updateConnectionWithProfiles(connectionId, profileResult.profiles);
+      if (!updateSuccess) {
+        addStep('Sync Warning', 'warning', 'Profiles found but connection update failed');
+        return;
+      }
+
+      addStep('Enhanced Sync Complete', 'success', 'All validation steps completed successfully and connection updated');
 
     } catch (error) {
       console.error('Enhanced sync error:', error);
@@ -369,18 +417,22 @@ export const useEnhancedAmazonSync = () => {
   const runConnectionRecovery = async (connectionId: string) => {
     console.log('[Enhanced Sync] Running enhanced connection recovery:', { connectionId });
     
-    // This is a simplified recovery - just run the enhanced sync
+    // Run the enhanced sync which now includes profile updating
     await runEnhancedSync(connectionId);
     
     const hasErrors = steps.some(step => step.status === 'error');
     const profileDetectionStep = steps.find(step => step.step === 'Profile Detection');
     const profilesFound = profileDetectionStep?.data?.profilesFound || 0;
+    const profileUpdateStep = steps.find(step => step.step === 'Profile Update');
+    const connectionUpdated = profileUpdateStep?.status === 'success';
     
     return {
-      success: !hasErrors && profilesFound > 0,
+      success: !hasErrors && profilesFound > 0 && connectionUpdated,
       profilesFound,
       requiresReconnection: hasErrors,
-      guidance: hasErrors ? 'Please check the errors above and try reconnecting' : 'Recovery completed successfully'
+      guidance: hasErrors ? 'Please check the errors above and try reconnecting' : 
+                connectionUpdated ? 'Connection successfully updated with profiles' :
+                'Recovery completed successfully'
     };
   };
 
@@ -403,7 +455,12 @@ export const useEnhancedAmazonSync = () => {
       // Run all diagnostic steps
       await validateToken(connectionId);
       await validateAccount(connectionId);
-      await detectProfiles(connectionId);
+      const profileResult = await detectProfiles(connectionId);
+      
+      // If profiles found, try to update connection
+      if (profileResult.success && profileResult.profiles.length > 0) {
+        await updateConnectionWithProfiles(connectionId, profileResult.profiles);
+      }
       
       const hasErrors = steps.some(step => step.status === 'error');
       const issues = steps.filter(step => step.status === 'error').map(step => step.details || step.step);
