@@ -29,10 +29,8 @@ export class SyncResponseHandler {
       // Update connection status to error
       await this.operations.updateConnectionStatus(connectionId, 'error', 'sync_error');
       
-      this.toast({
-        title: "Sync Failed",
-        description: error.message || "Failed to sync with Amazon API",
-        variant: "destructive",
+      this.toast.error("Sync Failed", {
+        description: error.message || "Failed to sync with Amazon API"
       });
       
       await refreshConnections();
@@ -45,10 +43,8 @@ export class SyncResponseHandler {
       // Update connection status to warning
       await this.operations.updateConnectionStatus(connectionId, 'warning', 'no_response_data');
       
-      this.toast({
-        title: "Sync Warning",
-        description: "No data received from Amazon API. Please try again.",
-        variant: "destructive",
+      this.toast.error("Sync Warning", {
+        description: "No data received from Amazon API. Please try again."
       });
       
       await refreshConnections();
@@ -61,7 +57,7 @@ export class SyncResponseHandler {
       console.log('Failure reason:', data.error || data.message);
       
       let setupReason = 'sync_failed';
-      let connectionStatus = 'error';
+      let connectionStatus: 'active' | 'expired' | 'error' | 'pending' | 'warning' | 'setup_required' = 'error';
       
       // Determine specific failure reason
       if (data.error?.includes('profile') || data.message?.includes('profile')) {
@@ -77,10 +73,8 @@ export class SyncResponseHandler {
       
       await this.operations.updateConnectionStatus(connectionId, connectionStatus, setupReason);
       
-      this.toast({
-        title: "Sync Failed",
-        description: data.error || data.message || "Amazon sync encountered an error",
-        variant: "destructive",
+      this.toast.error("Sync Failed", {
+        description: data.error || data.message || "Amazon sync encountered an error"
       });
       
       await refreshConnections();
@@ -124,9 +118,8 @@ export class SyncResponseHandler {
           ? `Connected successfully with ${profilesFound} profiles found`
           : "Amazon connection synced successfully";
       
-      this.toast({
-        title: "Sync Complete",
-        description: successMessage,
+      this.toast.success("Sync Complete", {
+        description: successMessage
       });
       
       console.log('=== Sync Response Handled Successfully ===');
@@ -156,12 +149,10 @@ export class SyncResponseHandler {
         }
       }
       
-      this.toast({
-        title: "Sync Completed with Warnings",
+      this.toast.warning("Sync Completed with Warnings", {
         description: Array.isArray(data.warnings) 
           ? data.warnings.join(', ')
-          : data.warning || "Some issues were encountered during sync",
-        variant: "destructive",
+          : data.warning || "Some issues were encountered during sync"
       });
       
       await refreshConnections();
@@ -191,18 +182,15 @@ export class SyncResponseHandler {
         console.error('Error updating campaign count:', updateErr);
       }
       
-      this.toast({
-        title: "Sync Complete",
-        description: `Successfully processed ${campaignCount} campaigns`,
+      this.toast.success("Sync Complete", {
+        description: `Successfully processed ${campaignCount} campaigns`
       });
     } else {
       // No clear success indicator
       await this.operations.updateConnectionStatus(connectionId, 'warning', 'unclear_sync_result');
       
-      this.toast({
-        title: "Sync Status Unclear",
-        description: "Sync completed but results are unclear. Please check your campaigns.",
-        variant: "destructive",
+      this.toast.warning("Sync Status Unclear", {
+        description: "Sync completed but results are unclear. Please check your campaigns."
       });
     }
     

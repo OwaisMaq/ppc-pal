@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { validateProfileConfiguration } from '@/utils/amazonConnectionValidation';
 import { AmazonConnectionOperations } from './amazonConnectionOperations';
 import { SyncResponseHandler } from './amazon/syncResponseHandler';
@@ -8,16 +8,16 @@ import { SyncErrorHandler } from './amazon/syncErrorHandler';
 import { SyncResponse } from './amazon/types';
 
 export class AmazonSyncService {
-  private toast: ReturnType<typeof useToast>['toast'];
+  private toast: typeof toast;
   private operations: AmazonConnectionOperations;
   private responseHandler: SyncResponseHandler;
   private errorHandler: SyncErrorHandler;
 
-  constructor(toast: ReturnType<typeof useToast>['toast'], operations: AmazonConnectionOperations) {
-    this.toast = toast;
+  constructor(toastFn: typeof toast, operations: AmazonConnectionOperations) {
+    this.toast = toastFn;
     this.operations = operations;
-    this.responseHandler = new SyncResponseHandler(toast, operations);
-    this.errorHandler = new SyncErrorHandler(toast, operations);
+    this.responseHandler = new SyncResponseHandler(toastFn, operations);
+    this.errorHandler = new SyncErrorHandler(toastFn, operations);
   }
 
   async syncConnection(connectionId: string, refreshConnections: () => Promise<void>) {
@@ -35,10 +35,8 @@ export class AmazonSyncService {
         console.error('=== Auth Header Error ===');
         console.error('Auth error:', authError);
         
-        this.toast({
-          title: "Authentication Required",
-          description: authError.message || "Please sign in again to sync your Amazon connection.",
-          variant: "destructive",
+        this.toast.error("Authentication Required", {
+          description: authError.message || "Please sign in again to sync your Amazon connection."
         });
         return;
       }
@@ -64,9 +62,8 @@ export class AmazonSyncService {
       });
 
       // Step 3: Show sync started message
-      this.toast({
-        title: "Sync Started",
-        description: "Fetching your campaign data from Amazon. Please wait...",
+      this.toast.info("Sync Started", {
+        description: "Fetching your campaign data from Amazon. Please wait..."
       });
       
       // Step 4: Call Amazon Sync Function with proper headers and connectionId
