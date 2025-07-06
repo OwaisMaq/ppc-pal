@@ -77,7 +77,7 @@ export class EnhancedSyncService {
         return;
       }
 
-      // Handle validated response
+      // Handle validated response - now we know success is true, so data is available
       await this.handleValidatedSyncResponse(
         validationResult.data,
         connectionId,
@@ -105,7 +105,7 @@ export class EnhancedSyncService {
   ): Promise<void> {
     console.log('=== Processing Validated Sync Response ===');
     
-    // Handle errors
+    // Handle errors - check the data properties directly since validation passed
     if (!data.success || data.error) {
       console.log('=== Sync Failed ===');
       console.log('Error:', data.error);
