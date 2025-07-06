@@ -12,7 +12,6 @@ serve(async (req) => {
   console.log('=== Amazon OAuth Init Function Started ===');
   console.log('Request method:', req.method);
   console.log('Request URL:', req.url);
-  console.log('Request headers:', Object.fromEntries(req.headers.entries()));
   
   if (req.method === 'OPTIONS') {
     console.log('Handling CORS preflight request');
@@ -42,11 +41,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           error: 'Server configuration error',
-          details: 'Amazon API credentials not configured',
-          debug: {
-            amazonClientId: !!amazonClientId,
-            amazonClientSecret: !!amazonClientSecret
-          }
+          details: 'Amazon API credentials not configured'
         }),
         {
           status: 500,
@@ -69,30 +64,25 @@ serve(async (req) => {
       );
     }
 
-    // Parse request body
+    // Parse request body with better error handling
     console.log('=== Parsing Request Body ===');
     let requestBody;
-    let bodyText = '';
     
     try {
       const contentType = req.headers.get('content-type') || '';
       console.log('Content-Type:', contentType);
       
-      bodyText = await req.text();
-      console.log('Raw body text:', bodyText);
-      console.log('Body length:', bodyText.length);
+      // Read the body as text first
+      const bodyText = await req.text();
+      console.log('Raw body text length:', bodyText.length);
+      console.log('Raw body text preview:', bodyText.substring(0, 200));
       
       if (!bodyText || bodyText.trim().length === 0) {
         console.error('=== EMPTY REQUEST BODY ===');
         return new Response(
           JSON.stringify({ 
             error: 'Invalid request',
-            details: 'Request body is required and cannot be empty',
-            debug: {
-              contentType,
-              bodyLength: bodyText.length,
-              bodyPreview: bodyText.substring(0, 100)
-            }
+            details: 'Request body is required and cannot be empty'
           }),
           {
             status: 400,
@@ -101,23 +91,18 @@ serve(async (req) => {
         );
       }
       
+      // Try to parse as JSON
       requestBody = JSON.parse(bodyText);
       console.log('Parsed request body:', requestBody);
       
     } catch (parseError) {
       console.error('=== REQUEST BODY PARSE ERROR ===');
       console.error('Parse error:', parseError);
-      console.error('Raw body that failed to parse:', bodyText);
       
       return new Response(
         JSON.stringify({ 
           error: 'Invalid JSON',
-          details: 'Request body must be valid JSON',
-          debug: {
-            parseError: parseError.message,
-            rawBody: bodyText.substring(0, 200),
-            bodyLength: bodyText.length
-          }
+          details: 'Request body must be valid JSON'
         }),
         {
           status: 400,
@@ -136,11 +121,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           error: 'Missing redirect URI',
-          details: 'redirectUri field is required',
-          debug: {
-            requestBodyKeys: Object.keys(requestBody),
-            redirectUri: redirectUri
-          }
+          details: 'redirectUri field is required'
         }),
         {
           status: 400,
@@ -154,11 +135,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           error: 'Invalid redirect URI',
-          details: 'redirectUri must be a string',
-          debug: {
-            redirectUriType: typeof redirectUri,
-            redirectUri: redirectUri
-          }
+          details: 'redirectUri must be a string'
         }),
         {
           status: 400,
@@ -182,11 +159,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           error: 'Invalid redirect URI format',
-          details: 'Redirect URI must be a valid URL',
-          debug: {
-            redirectUri,
-            urlError: urlError.message
-          }
+          details: 'Redirect URI must be a valid URL'
         }),
         {
           status: 400,
@@ -334,13 +307,6 @@ serve(async (req) => {
     
     console.log('=== OAuth URL Generated Successfully ===');
     console.log('Final URL length:', finalAuthUrl.length);
-    console.log('URL parameters:', {
-      client_id: amazonClientId.substring(0, 10) + '...',
-      scope: 'advertising::campaign_management profile',
-      response_type: 'code',
-      redirect_uri: redirectUri,
-      state_length: state.length
-    });
 
     // Return successful response
     const responseData = { 
@@ -350,7 +316,6 @@ serve(async (req) => {
     };
     
     console.log('=== SUCCESS - Returning Auth URL ===');
-    console.log('Response keys:', Object.keys(responseData));
 
     return new Response(
       JSON.stringify(responseData),
@@ -362,22 +327,12 @@ serve(async (req) => {
     
   } catch (error) {
     console.error('=== UNEXPECTED ERROR ===');
-    console.error('Error type:', typeof error);
-    console.error('Error name:', error?.name);
-    console.error('Error message:', error?.message);
-    console.error('Error stack:', error?.stack);
-    console.error('Full error object:', error);
+    console.error('Error details:', error);
     
     return new Response(
       JSON.stringify({
         error: 'Internal server error',
-        details: 'An unexpected error occurred',
-        debug: {
-          errorType: typeof error,
-          errorName: error?.name || 'Unknown',
-          errorMessage: error?.message || 'No message',
-          timestamp: new Date().toISOString()
-        }
+        details: 'An unexpected error occurred'
       }),
       {
         status: 500,
