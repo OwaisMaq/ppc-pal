@@ -52,6 +52,12 @@ const PerformanceSummary = () => {
     navigate('/settings');
   };
 
+  const handleForceSync = async (connectionId: string) => {
+    console.log('Force syncing connection:', connectionId);
+    // For now, we'll use the regular sync function - this can be enhanced later
+    await syncConnection(connectionId);
+  };
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -190,6 +196,7 @@ const PerformanceSummary = () => {
         connections={connections}
         onSync={syncConnection}
         onDelete={deleteConnection}
+        onForceSync={handleForceSync}
       />
 
       {/* Campaign Data Table */}

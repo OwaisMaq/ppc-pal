@@ -1,16 +1,14 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { 
-  Sync, 
+  RefreshCw, 
   Trash2, 
   AlertTriangle, 
   CheckCircle, 
   Clock, 
-  RefreshCw,
   Zap,
   Info,
   ExternalLink
@@ -174,7 +172,7 @@ const ConnectionSummaryTable = ({
                         onClick={() => onSync(connection.id)}
                         className="flex items-center gap-2"
                       >
-                        <Sync className="h-4 w-4" />
+                        <RefreshCw className="h-4 w-4" />
                         Sync
                       </Button>
                     )}
