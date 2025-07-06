@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { validateSyncResponse, SyncResponse } from '@/lib/validation/amazonApiSchemas';
@@ -60,8 +59,7 @@ export class EnhancedSyncService {
         
         errorTracker.captureAmazonError('Invalid sync response format', {
           connectionId,
-          operation: 'sync',
-          metadata: { validationErrors: validationResult.error.issues }
+          operation: 'sync'
         });
         
         await this.operations.updateConnectionStatus(

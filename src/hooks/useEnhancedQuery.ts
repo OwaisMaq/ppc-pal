@@ -40,17 +40,17 @@ export function useEnhancedQuery<TData, TError = Error>(
       return failureCount < retryCount;
     },
     retryDelay,
-    onError: (error: TError) => {
-      console.error('Enhanced query error:', error);
-      
-      if (showErrorToast && error instanceof Error) {
-        toast.error('Query Failed', {
-          description: error.message || 'An unexpected error occurred'
-        });
+    meta: {
+      ...queryOptions.meta,
+      errorHandler: (error: TError) => {
+        console.error('Enhanced query error:', error);
+        
+        if (showErrorToast && error instanceof Error) {
+          toast.error('Query Failed', {
+            description: error.message || 'An unexpected error occurred'
+          });
+        }
       }
-      
-      // Call original onError if provided
-      queryOptions.onError?.(error);
     }
   });
 }
@@ -131,7 +131,7 @@ export function useAmazonDataQuery<TData>(
     queryKey,
     queryFn,
     staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 10 * 60 * 1000, // 10 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes (replaces cacheTime)
     retryCount: 2,
     showErrorToast: true,
     ...options

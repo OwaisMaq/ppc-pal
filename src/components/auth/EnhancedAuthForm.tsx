@@ -19,25 +19,33 @@ const EnhancedAuthForm = ({ mode = 'signin', onModeChange }: EnhancedAuthFormPro
   const { signIn, signUp, isLoading } = useAuthActions();
   
   const isSignUp = mode === 'signup';
-  const schema = isSignUp ? signUpFormSchema : signInFormSchema;
   
-  const form = useValidatedForm({
-    schema,
+  // Use different forms for different modes to handle type safety
+  const signInForm = useValidatedForm({
+    schema: signInFormSchema,
+    defaultValues: {
+      email: '',
+      password: ''
+    },
+    onSubmitSuccess: async (data: SignInFormData) => {
+      await signIn(data.email, data.password);
+    }
+  });
+
+  const signUpForm = useValidatedForm({
+    schema: signUpFormSchema,
     defaultValues: {
       email: '',
       password: '',
-      ...(isSignUp && { confirmPassword: '' })
+      confirmPassword: ''
     },
-    onSubmitSuccess: async (data) => {
-      if (isSignUp) {
-        const signUpData = data as SignUpFormData;
-        await signUp(signUpData.email, signUpData.password);
-      } else {
-        const signInData = data as SignInFormData;
-        await signIn(signInData.email, signInData.password);
-      }
+    onSubmitSuccess: async (data: SignUpFormData) => {
+      await signUp(data.email, data.password);
     }
   });
+
+  // Use the appropriate form based on mode
+  const form = isSignUp ? signUpForm : signInForm;
 
   const togglePassword = () => setShowPassword(!showPassword);
 
@@ -110,11 +118,11 @@ const EnhancedAuthForm = ({ mode = 'signin', onModeChange }: EnhancedAuthFormPro
                 id="confirmPassword"
                 type="password"
                 placeholder="Confirm your password"
-                {...form.register('confirmPassword')}
-                className={form.errors.confirmPassword ? 'border-red-500' : ''}
+                {...signUpForm.register('confirmPassword')}
+                className={signUpForm.errors.confirmPassword ? 'border-red-500' : ''}
               />
-              {form.errors.confirmPassword && (
-                <p className="text-sm text-red-500">{form.errors.confirmPassword.message}</p>
+              {signUpForm.errors.confirmPassword && (
+                <p className="text-sm text-red-500">{signUpForm.errors.confirmPassword.message}</p>
               )}
             </div>
           )}

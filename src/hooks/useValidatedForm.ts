@@ -1,5 +1,5 @@
 
-import { useForm, UseFormProps, FieldValues, Path } from 'react-hook-form';
+import { useForm, UseFormProps, FieldValues, Path, DefaultValues } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ZodSchema } from 'zod';
 import { toast } from 'sonner';
@@ -73,8 +73,8 @@ export function useValidatedForm<T extends FieldValues>({
     form.clearErrors();
   };
 
-  // Helper to reset form with new data
-  const resetWithData = (data: Partial<T>) => {
+  // Helper to reset form with new data - fix type issue
+  const resetWithData = (data: DefaultValues<T>) => {
     form.reset(data);
   };
 
