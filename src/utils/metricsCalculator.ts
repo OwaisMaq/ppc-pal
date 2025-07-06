@@ -1,8 +1,7 @@
-
-import { CampaignData } from '@/hooks/useCampaignData';
+import { Campaign } from '@/hooks/useCampaignData';
 import { PerformanceMetrics } from '@/types/performance';
 
-export const calculateMetrics = (campaigns: CampaignData[]): PerformanceMetrics | null => {
+export const calculateMetrics = (campaigns: Campaign[]): PerformanceMetrics | null => {
   console.log('=== CALCULATING PERFORMANCE METRICS ===');
   console.log('Total campaigns received:', campaigns.length);
   

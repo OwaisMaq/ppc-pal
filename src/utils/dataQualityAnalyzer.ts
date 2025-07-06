@@ -1,12 +1,11 @@
-
-import { CampaignData } from '@/hooks/useCampaignData';
+import { Campaign } from '@/hooks/useCampaignData';
 
 export interface DataQualityInfo {
   hasSimulatedData: boolean;
   dataSourceInfo: string;
 }
 
-export const analyzeDataQuality = (campaigns: CampaignData[]): DataQualityInfo => {
+export const analyzeDataQuality = (campaigns: Campaign[]): DataQualityInfo => {
   const simulatedDataCampaigns = campaigns.filter(c => c.data_source === 'simulated');
   const hasSimulatedData = simulatedDataCampaigns.length > 0;
   

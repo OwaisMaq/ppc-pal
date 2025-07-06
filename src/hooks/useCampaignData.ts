@@ -28,6 +28,9 @@ export interface Campaign {
   created_at: string;
 }
 
+// Type alias for backward compatibility
+export type CampaignData = Campaign;
+
 export interface CampaignConnection {
   id: string;
   profile_id: string;
@@ -38,11 +41,11 @@ export interface CampaignConnection {
   campaigns: Campaign[];
 }
 
-export const useCampaignData = () => {
+export const useCampaignData = (connectionId?: string) => {
   const { user } = useAuth();
 
-  return useQuery({
-    queryKey: ['campaignData', user?.id],
+  const queryResult = useQuery({
+    queryKey: ['campaignData', user?.id, connectionId],
     queryFn: async (): Promise<CampaignConnection[]> => {
       if (!user?.id) {
         throw new Error('User not authenticated');
@@ -50,10 +53,11 @@ export const useCampaignData = () => {
 
       console.log('=== Fetching Campaign Data ===');
       console.log('User ID:', user.id);
+      console.log('Connection ID filter:', connectionId);
 
       try {
-        // First, fetch Amazon connections with their campaigns
-        const { data: connections, error: connectionsError } = await supabase
+        // Build query with optional connection filter
+        let query = supabase
           .from('amazon_connections')
           .select(`
             id,
@@ -86,8 +90,14 @@ export const useCampaignData = () => {
               created_at
             )
           `)
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false });
+          .eq('user_id', user.id);
+
+        // Add connection filter if provided
+        if (connectionId) {
+          query = query.eq('id', connectionId);
+        }
+
+        const { data: connections, error: connectionsError } = await query.order('created_at', { ascending: false });
 
         if (connectionsError) {
           console.error('Error fetching connections:', connectionsError);
@@ -176,6 +186,22 @@ export const useCampaignData = () => {
     },
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
+
+  // Extract campaigns from all connections
+  const allCampaigns = queryResult.data?.reduce<Campaign[]>((acc, connection) => {
+    return [...acc, ...connection.campaigns];
+  }, []) || [];
+
+  return {
+    // Standard query result properties
+    ...queryResult,
+    // Backward compatibility properties
+    campaigns: allCampaigns,
+    loading: queryResult.isLoading,
+    refreshCampaigns: queryResult.refetch,
+    // New structured data
+    connections: queryResult.data || [],
+  };
 };
 
 // Helper hook to get all campaigns across all connections
@@ -195,7 +221,7 @@ export const useAllCampaigns = () => {
 
 // Helper hook to get campaigns by connection
 export const useCampaignsByConnection = (connectionId?: string) => {
-  const { data: connections, ...queryResult } = useCampaignData();
+  const { data: connections, ...queryResult } = useCampaignData(connectionId);
   
   const connectionCampaigns = connectionId 
     ? connections?.find(conn => conn.id === connectionId)?.campaigns || []

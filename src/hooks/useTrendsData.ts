@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { CampaignData } from './useCampaignData';
+import { Campaign } from './useCampaignData';
 import { AmazonConnection } from './useAmazonConnections';
 
 interface TrendData {
@@ -16,7 +16,7 @@ interface TrendData {
 }
 
 export const useTrendsData = (
-  campaigns: CampaignData[],
+  campaigns: Campaign[],
   connections: AmazonConnection[],
   selectedCountry: string,
   selectedCampaign: string,

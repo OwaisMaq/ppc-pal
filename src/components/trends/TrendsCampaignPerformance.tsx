@@ -4,10 +4,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
-import { CampaignData } from '@/hooks/useCampaignData';
+import { Campaign } from '@/hooks/useCampaignData';
 
 interface TrendsCampaignPerformanceProps {
-  campaigns: CampaignData[];
+  campaigns: Campaign[];
 }
 
 const TrendsCampaignPerformance = ({ campaigns }: TrendsCampaignPerformanceProps) => {

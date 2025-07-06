@@ -1,7 +1,6 @@
-
 import { useState, useMemo } from 'react';
 import { KeywordData } from './useKeywordData';
-import { CampaignData } from './useCampaignData';
+import { Campaign } from './useCampaignData';
 
 interface MockProductData {
   id: string;
@@ -20,7 +19,7 @@ interface MockProductData {
   status: string;
 }
 
-export const useKeywordFilters = (keywords: KeywordData[], campaigns: CampaignData[]) => {
+export const useKeywordFilters = (keywords: KeywordData[], campaigns: Campaign[]) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
