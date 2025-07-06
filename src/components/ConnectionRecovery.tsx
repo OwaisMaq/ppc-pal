@@ -86,7 +86,7 @@ const ConnectionRecovery = ({
       } else {
         toast({
           title: "Debug Failed",
-          description: result.error || "Unknown debug error",
+          description: result.message || "Unknown debug error",
           variant: "destructive",
         });
       }
