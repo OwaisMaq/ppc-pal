@@ -1,14 +1,14 @@
 
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { AmazonConnectionOperations } from '../amazonConnectionOperations';
 import { SyncResponse } from './types';
 
 export class SyncErrorHandler {
-  private toast: ReturnType<typeof useToast>['toast'];
+  private toast: typeof toast;
   private operations: AmazonConnectionOperations;
 
-  constructor(toast: ReturnType<typeof useToast>['toast'], operations: AmazonConnectionOperations) {
-    this.toast = toast;
+  constructor(toastFn: typeof toast, operations: AmazonConnectionOperations) {
+    this.toast = toastFn;
     this.operations = operations;
   }
 
@@ -51,24 +51,18 @@ export class SyncErrorHandler {
     console.error('Requires setup:', data.requiresSetup);
     
     if (data.requiresSetup) {
-      this.toast({
-        title: "Amazon Advertising Setup Required",
+      this.toast.error("Amazon Advertising Setup Required", {
         description: data.details || "Please set up your Amazon Advertising account at advertising.amazon.com first, then try 'Enhanced Sync' to import your campaigns.",
-        variant: "destructive",
       });
       await this.operations.updateConnectionStatus(connectionId, 'setup_required', 'Amazon Advertising setup required');
     } else if (data.requiresReconnection) {
-      this.toast({
-        title: "Reconnection Required",
+      this.toast.error("Reconnection Required", {
         description: data.details || "Please reconnect your Amazon account to continue syncing",
-        variant: "destructive",
       });
       await this.operations.updateConnectionStatus(connectionId, 'error', 'Token expired or invalid');
     } else {
-      this.toast({
-        title: "Sync Failed",
+      this.toast.error("Sync Failed", {
         description: data.details || data.error,
-        variant: "destructive",
       });
       await this.operations.updateConnectionStatus(connectionId, 'error', data.error || 'Unknown error');
     }
@@ -101,10 +95,8 @@ export class SyncErrorHandler {
     
     await this.operations.updateConnectionStatus(connectionId, statusUpdate, userMessage);
     
-    this.toast({
-      title: "Sync Failed",
+    this.toast.error("Sync Failed", {
       description: userMessage,
-      variant: "destructive",
     });
   }
 }

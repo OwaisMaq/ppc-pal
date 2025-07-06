@@ -1,8 +1,8 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { AmazonConnectionOperations } from '@/services/amazonConnectionOperations';
 import { AmazonSyncService } from '@/services/amazonSyncService';
 import { AmazonOAuthService } from '@/services/amazonOAuthService';
@@ -28,13 +28,13 @@ export const useAmazonConnections = () => {
   const [connections, setConnections] = useState<AmazonConnection[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { toast } = useToast();
+  const { toast: shadcnToast } = useToast();
   const fetchingRef = useRef(false);
 
-  // Initialize services
-  const connectionOperations = new AmazonConnectionOperations(toast);
+  // Initialize services - pass shadcn toast to operations, sonner toast to sync service
+  const connectionOperations = new AmazonConnectionOperations(shadcnToast);
   const syncService = new AmazonSyncService(toast, connectionOperations);
-  const oauthService = new AmazonOAuthService(toast);
+  const oauthService = new AmazonOAuthService(shadcnToast);
 
   const fetchConnections = async () => {
     if (!user) {
@@ -124,7 +124,7 @@ export const useAmazonConnections = () => {
       setError(errorMessage);
       setConnections([]);
       
-      toast({
+      shadcnToast({
         title: "Connection Error",
         description: "Failed to load your Amazon connections. Please refresh the page.",
         variant: "destructive",
