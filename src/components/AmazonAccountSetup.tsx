@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import ConnectionSummaryTable from '@/components/performance/ConnectionSummaryTable';
 import ConnectionRecovery from '@/components/ConnectionRecovery';
 import EnhancedAmazonSync from '@/components/EnhancedAmazonSync';
+import type { AmazonConnection } from '@/lib/amazon/types';
 
 const AmazonAccountSetup = () => {
   const { 
