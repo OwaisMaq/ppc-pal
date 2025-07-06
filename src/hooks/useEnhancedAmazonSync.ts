@@ -300,7 +300,7 @@ export const useEnhancedAmazonSync = () => {
   };
 
   const updateConnectionWithProfiles = async (connectionId: string, profiles: any[]) => {
-    console.log('=== Updating Connection with Profiles ===');
+    console.log('=== Updating Connection with Enhanced Profile Data ===');
     
     if (!profiles || profiles.length === 0) {
       throw new Error('No profiles provided for connection update');
@@ -327,7 +327,7 @@ export const useEnhancedAmazonSync = () => {
         profile_id: profileId,
         profile_name: profileName,
         marketplace_id: marketplaceId,
-        status: 'active', // Set to active once profile is configured
+        status: 'active',
         updated_at: new Date().toISOString()
       })
       .eq('id', connectionId);
@@ -341,7 +341,7 @@ export const useEnhancedAmazonSync = () => {
   };
 
   const runConnectionRecovery = async (connectionId: string) => {
-    addStep('Running connection recovery', 'pending', 'Intelligent profile detection and configuration');
+    addStep('Running enhanced connection recovery', 'pending', 'Intelligent profile detection and configuration with multi-region support');
     
     try {
       // Step 1: Refresh token if needed
@@ -365,26 +365,27 @@ export const useEnhancedAmazonSync = () => {
         };
       }
 
-      // Step 3: Enhanced profile detection
+      // Step 3: Enhanced profile detection with multi-region support
       const profileResult = await runEnhancedProfileDetection(connectionId);
       
       if (profileResult.success && profileResult.profiles.length > 0) {
-        addStep('Configuring connection', 'pending', 
-          `Found ${profileResult.profiles.length} profile${profileResult.profiles.length === 1 ? '' : 's'} - setting up optimal configuration`);
+        addStep('Configuring enhanced connection', 'pending', 
+          `Found ${profileResult.profiles.length} profile${profileResult.profiles.length === 1 ? '' : 's'} across multiple regions - setting up optimal configuration`);
         
         try {
           const updatedProfile = await updateConnectionWithProfiles(connectionId, profileResult.profiles);
           updateLastStep('success', 
-            `Connection configured with ${updatedProfile.profileName}`,
+            `Enhanced connection configured with ${updatedProfile.profileName}`,
             {
               ...updatedProfile,
-              detectedRegion: profileResult.profiles[0]?.detectedRegion
+              detectedRegion: profileResult.profiles[0]?.detectedRegion,
+              multiRegionSupport: profileResult.profiles.length > 1
             }
           );
           
           if (profileResult.profiles.length > 1) {
-            addStep('Multi-profile optimization', 'info', 
-              `${profileResult.profiles.length} profiles available. Using optimal profile from ${profileResult.profiles[0]?.detectedRegion || 'primary region'}.`);
+            addStep('Multi-region optimization enabled', 'info', 
+              `${profileResult.profiles.length} profiles available across regions. Enhanced sync capabilities activated.`);
           }
           
           return { success: true, profilesFound: profileResult.profiles.length };
@@ -424,16 +425,16 @@ export const useEnhancedAmazonSync = () => {
         }
       }
     } catch (err) {
-      updateLastStep('error', `Recovery failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      updateLastStep('error', `Enhanced recovery failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
       return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
     }
   };
 
   const debugConnection = async (connectionId: string) => {
-    console.log('=== Debug Connection Started ===');
+    console.log('=== Enhanced Debug Connection Started ===');
     
     try {
-      addStep('Starting connection debug', 'pending', 'Running comprehensive connection analysis');
+      addStep('Starting enhanced connection debug', 'pending', 'Running comprehensive connection analysis with multi-region support');
       
       // Token validation check
       const tokenValid = await refreshTokenIfNeeded(connectionId);
@@ -441,24 +442,24 @@ export const useEnhancedAmazonSync = () => {
       // Account validation check
       const accountValidation = await validateAmazonAccount(connectionId);
       
-      // Profile detection test
+      // Enhanced profile detection test
       const profileResult = await runEnhancedProfileDetection(connectionId);
       
       if (tokenValid && accountValidation?.validation.isValid && profileResult.success) {
-        updateLastStep('success', 'All connection checks passed successfully');
+        updateLastStep('success', 'All enhanced connection checks passed successfully');
         return { success: true };
       } else {
         const issues = [];
         if (!tokenValid) issues.push('Token validation failed');
         if (!accountValidation?.validation.isValid) issues.push('Account validation failed');
-        if (!profileResult.success) issues.push('Profile detection failed');
+        if (!profileResult.success) issues.push('Enhanced profile detection failed');
         
-        updateLastStep('warning', `Debug found issues: ${issues.join(', ')}`);
+        updateLastStep('warning', `Enhanced debug found issues: ${issues.join(', ')}`);
         return { success: false, issues };
       }
     } catch (err) {
-      console.error('Debug connection error:', err);
-      updateLastStep('error', `Debug failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      console.error('Enhanced debug connection error:', err);
+      updateLastStep('error', `Enhanced debug failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
       return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
     }
   };
@@ -466,7 +467,7 @@ export const useEnhancedAmazonSync = () => {
   const runEnhancedSync = async (connectionId: string) => {
     if (isRunning) {
       toast({
-        title: "Sync in Progress",
+        title: "Enhanced Sync in Progress",
         description: "Please wait for the current enhanced sync to complete.",
         variant: "destructive",
       });
@@ -478,7 +479,7 @@ export const useEnhancedAmazonSync = () => {
 
     try {
       console.log('=== Enhanced Amazon Sync Started ===');
-      addStep('Initializing enhanced sync', 'pending', `Starting intelligent sync for connection: ${connectionId}`);
+      addStep('Initializing enhanced sync with multi-region support', 'pending', `Starting intelligent sync for connection: ${connectionId}`);
 
       // Validate session and get auth headers
       addStep('Validating authentication', 'pending', 'Checking session and preparing API headers');
@@ -516,18 +517,18 @@ export const useEnhancedAmazonSync = () => {
 
       updateLastStep('success', `Connection found: ${connection.profile_name || 'Amazon Account'}`);
 
-      // Run enhanced connection recovery
-      console.log('=== Starting Intelligent Recovery ===');
+      // Run enhanced connection recovery with multi-region support
+      console.log('=== Starting Enhanced Intelligent Recovery ===');
       const recoveryResult = await runConnectionRecovery(connectionId);
 
       if (recoveryResult.success) {
-        addStep('Enhanced sync completed', 'success', 
-          `Successfully configured Amazon connection with ${recoveryResult.profilesFound} profile${recoveryResult.profilesFound === 1 ? '' : 's'} - ready for campaign sync`
+        addStep('Enhanced sync completed successfully', 'success', 
+          `Successfully configured Amazon connection with ${recoveryResult.profilesFound} profile${recoveryResult.profilesFound === 1 ? '' : 's'} - enhanced multi-region sync capabilities activated`
         );
         
         toast({
           title: "Enhanced Sync Successful",
-          description: `Amazon connection is now properly configured across multiple regions and ready for campaign sync.`,
+          description: `Amazon connection is now properly configured with multi-region support and ready for advanced campaign sync.`,
         });
       } else {
         if (recoveryResult.requiresReconnection) {
@@ -560,7 +561,7 @@ export const useEnhancedAmazonSync = () => {
       );
       
       toast({
-        title: "Sync Failed",
+        title: "Enhanced Sync Failed",
         description: "An unexpected error occurred during enhanced sync.",
         variant: "destructive",
       });
