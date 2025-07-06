@@ -1,0 +1,253 @@
+
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { validateSyncResponse, SyncResponse } from '@/lib/validation/amazonApiSchemas';
+import { errorTracker } from '@/services/errorTracker';
+import { AmazonConnectionOperations } from '../amazonConnectionOperations';
+
+export class EnhancedSyncService {
+  private toast: typeof toast;
+  private operations: AmazonConnectionOperations;
+
+  constructor(toastFn: typeof toast, operations: AmazonConnectionOperations) {
+    this.toast = toastFn;
+    this.operations = operations;
+  }
+
+  async syncConnection(
+    connectionId: string,
+    refreshConnections: () => Promise<void>
+  ): Promise<void> {
+    console.log('=== Enhanced Sync Service - Starting Sync ===');
+    console.log('Connection ID:', connectionId);
+
+    try {
+      // Get auth headers
+      const headers = await this.operations.getAuthHeaders();
+      console.log('Auth headers prepared successfully');
+
+      // Call sync function
+      console.log('Calling amazon-sync edge function...');
+      const response = await supabase.functions.invoke('amazon-sync', {
+        body: { connectionId },
+        headers
+      });
+
+      console.log('=== Sync Response Received ===');
+      console.log('Response:', response);
+
+      // Handle Supabase client errors
+      if (response.error) {
+        console.error('=== Supabase Client Error ===');
+        console.error('Error:', response.error);
+        
+        errorTracker.captureAmazonError(response.error, {
+          connectionId,
+          operation: 'sync',
+          endpoint: 'amazon-sync'
+        });
+        
+        await this.handleEdgeFunctionError(response.error, connectionId);
+        await refreshConnections();
+        return;
+      }
+
+      // Validate response data
+      const validationResult = validateSyncResponse(response.data);
+      if (!validationResult.success) {
+        console.error('=== Invalid Response Format ===');
+        console.error('Validation errors:', validationResult.error.issues);
+        
+        errorTracker.captureAmazonError('Invalid sync response format', {
+          connectionId,
+          operation: 'sync',
+          metadata: { validationErrors: validationResult.error.issues }
+        });
+        
+        await this.operations.updateConnectionStatus(
+          connectionId, 
+          'warning', 
+          'Invalid response format from sync service'
+        );
+        
+        this.toast.error("Sync Warning", {
+          description: "Received unexpected response format. Please try again."
+        });
+        
+        await refreshConnections();
+        return;
+      }
+
+      // Handle validated response
+      await this.handleValidatedSyncResponse(
+        validationResult.data,
+        connectionId,
+        refreshConnections
+      );
+
+    } catch (err) {
+      console.error('=== Sync Service Error ===');
+      console.error('Error:', err);
+      
+      errorTracker.captureAmazonError(err as Error, {
+        connectionId,
+        operation: 'sync'
+      });
+      
+      await this.handleGeneralError(err, connectionId);
+      await refreshConnections();
+    }
+  }
+
+  private async handleValidatedSyncResponse(
+    data: SyncResponse,
+    connectionId: string,
+    refreshConnections: () => Promise<void>
+  ): Promise<void> {
+    console.log('=== Processing Validated Sync Response ===');
+    
+    // Handle errors
+    if (!data.success || data.error) {
+      console.log('=== Sync Failed ===');
+      console.log('Error:', data.error);
+      console.log('Requires setup:', data.requiresSetup);
+      console.log('Requires reconnection:', data.requiresReconnection);
+      
+      if (data.requiresSetup) {
+        await this.operations.updateConnectionStatus(
+          connectionId, 
+          'setup_required', 
+          data.details || 'Amazon Advertising setup required'
+        );
+        
+        this.toast.error("Setup Required", {
+          description: data.details || "Please set up your Amazon Advertising account first"
+        });
+      } else if (data.requiresReconnection) {
+        await this.operations.updateConnectionStatus(
+          connectionId, 
+          'error', 
+          data.details || 'Token expired or invalid'
+        );
+        
+        this.toast.error("Reconnection Required", {
+          description: data.details || "Please reconnect your Amazon account"
+        });
+      } else {
+        await this.operations.updateConnectionStatus(
+          connectionId, 
+          'error', 
+          data.error || 'Unknown sync error'
+        );
+        
+        this.toast.error("Sync Failed", {
+          description: data.details || data.error || "An error occurred during sync"
+        });
+      }
+      
+      await refreshConnections();
+      return;
+    }
+
+    // Handle success
+    console.log('=== Sync Successful ===');
+    const campaignCount = data.campaignCount || data.campaigns_synced || 0;
+    const profilesFound = data.profilesFound || 0;
+    
+    console.log('Campaigns synced:', campaignCount);
+    console.log('Profiles found:', profilesFound);
+    
+    // Update connection status
+    try {
+      const { error: updateError } = await supabase
+        .from('amazon_connections')
+        .update({
+          status: 'active',
+          campaign_count: campaignCount,
+          setup_required_reason: null,
+          last_sync_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', connectionId);
+
+      if (updateError) {
+        console.error('Failed to update connection after successful sync:', updateError);
+        errorTracker.captureAmazonError(updateError, {
+          connectionId,
+          operation: 'update_connection_status'
+        });
+      }
+    } catch (updateErr) {
+      console.error('Error updating connection status:', updateErr);
+      errorTracker.captureAmazonError(updateErr as Error, {
+        connectionId,
+        operation: 'update_connection_status'
+      });
+    }
+    
+    // Show success message
+    const successMessage = campaignCount > 0 
+      ? `Successfully synced ${campaignCount} campaigns`
+      : profilesFound > 0 
+        ? `Connected successfully with ${profilesFound} profiles found`
+        : "Amazon connection synced successfully";
+    
+    this.toast.success("Sync Complete", {
+      description: successMessage
+    });
+    
+    await refreshConnections();
+  }
+
+  private async handleEdgeFunctionError(error: any, connectionId: string): Promise<void> {
+    let userMessage = 'Failed to sync campaign data';
+    let errorType = 'unknown_error';
+    
+    if (typeof error === 'object' && error.message) {
+      userMessage = error.message;
+      errorType = 'server_error';
+    } else if (typeof error === 'string') {
+      userMessage = error;
+      if (error.includes('401') || error.includes('Unauthorized')) {
+        errorType = 'auth_error';
+        userMessage = 'Authentication failed. Please reconnect your Amazon account.';
+      } else if (error.includes('403') || error.includes('Forbidden')) {
+        errorType = 'permission_error';
+        userMessage = 'Access denied. Please check your Amazon Advertising permissions.';
+      }
+    }
+    
+    await this.operations.updateConnectionStatus(
+      connectionId, 
+      errorType === 'auth_error' ? 'error' : 'warning', 
+      userMessage
+    );
+    
+    this.toast.error("Sync Failed", {
+      description: userMessage
+    });
+  }
+
+  private async handleGeneralError(err: unknown, connectionId: string): Promise<void> {
+    let userMessage = 'Failed to sync campaign data';
+    let statusUpdate: 'error' | 'warning' = 'error';
+    
+    if (err instanceof Error) {
+      userMessage = err.message;
+      
+      if (err.message.includes('Authentication') || err.message.includes('auth') || err.message.includes('sign in')) {
+        userMessage = 'Please reconnect your Amazon account and try again.';
+        statusUpdate = 'error';
+      } else if (err.message.includes('Network') || err.message.includes('fetch')) {
+        userMessage = 'Network error. Please check your connection and try again.';
+        statusUpdate = 'warning';
+      }
+    }
+    
+    await this.operations.updateConnectionStatus(connectionId, statusUpdate, userMessage);
+    
+    this.toast.error("Sync Failed", {
+      description: userMessage
+    });
+  }
+}
