@@ -3,9 +3,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
 export class AmazonConnectionOperations {
-  private toast: ReturnType<typeof toast>['toast'];
+  private toast: typeof toast;
 
-  constructor(toastFn: ReturnType<typeof toast>['toast']) {
+  constructor(toastFn: typeof toast) {
     this.toast = toastFn;
   }
 
