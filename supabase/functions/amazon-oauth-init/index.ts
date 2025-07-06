@@ -11,6 +11,7 @@ const corsHeaders = {
 serve(async (req) => {
   console.log('=== Amazon OAuth Init Function Started ===');
   console.log('Request method:', req.method);
+  console.log('Request URL:', req.url);
 
   if (req.method === 'OPTIONS') {
     console.log('Handling CORS preflight request');
@@ -63,8 +64,9 @@ serve(async (req) => {
     try {
       const bodyText = await req.text();
       console.log('Request body received, length:', bodyText?.length || 0);
+      console.log('Raw request body:', bodyText);
       
-      if (!bodyText) {
+      if (!bodyText || bodyText.trim() === '') {
         console.error('Empty request body');
         return new Response(
           JSON.stringify({ 
@@ -79,13 +81,13 @@ serve(async (req) => {
       }
       
       requestBody = JSON.parse(bodyText);
-      console.log('Request body parsed successfully');
+      console.log('Request body parsed successfully:', requestBody);
     } catch (parseError) {
       console.error('Failed to parse request body:', parseError);
       return new Response(
         JSON.stringify({ 
           error: 'Invalid JSON in request body',
-          details: 'Request body must be valid JSON'
+          details: parseError.message || 'Request body must be valid JSON'
         }),
         {
           status: 400,
@@ -230,7 +232,9 @@ serve(async (req) => {
     
   } catch (error) {
     console.error('=== Amazon OAuth Init Error ===');
-    console.error('Error:', error);
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
     
     return new Response(
       JSON.stringify({
