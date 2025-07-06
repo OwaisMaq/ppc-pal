@@ -44,10 +44,13 @@ const EnhancedAuthForm = ({ mode = 'signin', onModeChange }: EnhancedAuthFormPro
     }
   });
 
-  // Use the appropriate form based on mode
-  const form = isSignUp ? signUpForm : signInForm;
-
   const togglePassword = () => setShowPassword(!showPassword);
+
+  // Get the appropriate form and its properties based on mode
+  const currentForm = isSignUp ? signUpForm : signInForm;
+  const handleSubmit = isSignUp ? signUpForm.handleSubmit : signInForm.handleSubmit;
+  const errors = isSignUp ? signUpForm.errors : signInForm.errors;
+  const isSubmitting = isSignUp ? signUpForm.isSubmitting : signInForm.isSubmitting;
 
   return (
     <Card className="w-full max-w-md mx-auto">
@@ -64,7 +67,7 @@ const EnhancedAuthForm = ({ mode = 'signin', onModeChange }: EnhancedAuthFormPro
       </CardHeader>
       
       <CardContent>
-        <form onSubmit={form.handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           {/* Email Field */}
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
@@ -72,11 +75,11 @@ const EnhancedAuthForm = ({ mode = 'signin', onModeChange }: EnhancedAuthFormPro
               id="email"
               type="email"
               placeholder="Enter your email"
-              {...form.register('email')}
-              className={form.errors.email ? 'border-red-500' : ''}
+              {...(isSignUp ? signUpForm.register('email') : signInForm.register('email'))}
+              className={errors.email ? 'border-red-500' : ''}
             />
-            {form.errors.email && (
-              <p className="text-sm text-red-500">{form.errors.email.message}</p>
+            {errors.email && (
+              <p className="text-sm text-red-500">{errors.email.message}</p>
             )}
           </div>
 
@@ -88,8 +91,8 @@ const EnhancedAuthForm = ({ mode = 'signin', onModeChange }: EnhancedAuthFormPro
                 id="password"
                 type={showPassword ? 'text' : 'password'}
                 placeholder="Enter your password"
-                {...form.register('password')}
-                className={form.errors.password ? 'border-red-500 pr-10' : 'pr-10'}
+                {...(isSignUp ? signUpForm.register('password') : signInForm.register('password'))}
+                className={errors.password ? 'border-red-500 pr-10' : 'pr-10'}
               />
               <Button
                 type="button"
@@ -105,8 +108,8 @@ const EnhancedAuthForm = ({ mode = 'signin', onModeChange }: EnhancedAuthFormPro
                 )}
               </Button>
             </div>
-            {form.errors.password && (
-              <p className="text-sm text-red-500">{form.errors.password.message}</p>
+            {errors.password && (
+              <p className="text-sm text-red-500">{errors.password.message}</p>
             )}
           </div>
 
@@ -131,9 +134,9 @@ const EnhancedAuthForm = ({ mode = 'signin', onModeChange }: EnhancedAuthFormPro
           <Button 
             type="submit" 
             className="w-full" 
-            disabled={isLoading || form.isSubmitting}
+            disabled={isLoading || isSubmitting}
           >
-            {(isLoading || form.isSubmitting) && (
+            {(isLoading || isSubmitting) && (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             )}
             {isSignUp ? 'Create Account' : 'Sign In'}
