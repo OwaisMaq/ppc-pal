@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Trash2, CheckCircle, AlertTriangle, XCircle, Clock, Zap, ExternalLink } from 'lucide-react';
+import { RefreshCw, Trash2, CheckCircle, AlertTriangle, XCircle, Clock, Zap, ExternalLink, AlertCircle } from 'lucide-react';
 import { AmazonConnection } from '@/hooks/useAmazonConnections';
 
 interface ConnectionSummaryTableProps {
@@ -15,8 +15,8 @@ interface ConnectionSummaryTableProps {
 }
 
 const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: ConnectionSummaryTableProps) => {
-  const getStatusIcon = (status: string) => {
-    switch (status) {
+  const getStatusIcon = (connection: AmazonConnection) => {
+    switch (connection.status) {
       case 'connected':
         return <CheckCircle className="h-4 w-4 text-green-600" />;
       case 'setup_required':
@@ -31,9 +31,9 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
   const getStatusBadge = (connection: AmazonConnection) => {
     switch (connection.status) {
       case 'connected':
-        return <Badge variant="default">Connected</Badge>;
+        return <Badge variant="default" className="bg-green-100 text-green-800 border-green-200">Connected</Badge>;
       case 'setup_required':
-        return <Badge variant="secondary">Setup Required</Badge>;
+        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 border-yellow-200">Setup Required</Badge>;
       case 'error':
         return <Badge variant="destructive">Error</Badge>;
       default:
@@ -49,6 +49,8 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
         return 'No advertising profiles found - Set up Amazon Advertising first';
       } else if (connection.setup_required_reason === 'needs_sync') {
         return 'Campaign data needs to be synced from Amazon';
+      } else if (connection.setup_required_reason === 'token_expired') {
+        return 'Access token expired - please reconnect';
       }
       return 'Setup required';
     } else if (connection.status === 'error') {
@@ -60,7 +62,21 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
   const getActionButtons = (connection: AmazonConnection) => {
     const buttons = [];
     
-    if (connection.status === 'setup_required' && connection.setup_required_reason === 'needs_sync') {
+    if (connection.setup_required_reason === 'token_expired' || connection.status === 'error') {
+      // For expired tokens or errors, suggest reconnection
+      buttons.push(
+        <Button
+          key="reconnect"
+          variant="outline"
+          size="sm"
+          onClick={() => window.location.href = '/settings'}
+          className="text-red-600 border-red-600 hover:bg-red-50"
+        >
+          <AlertCircle className="h-4 w-4 mr-1" />
+          Reconnect
+        </Button>
+      );
+    } else if (connection.status === 'setup_required' && connection.setup_required_reason === 'needs_sync') {
       buttons.push(
         <Button
           key="sync"
@@ -107,6 +123,41 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
     return buttons;
   };
 
+  const getSyncStatusInfo = (connection: AmazonConnection) => {
+    if (!connection.last_sync_at) {
+      return {
+        text: 'Never',
+        className: 'text-gray-500'
+      };
+    }
+    
+    const lastSync = new Date(connection.last_sync_at);
+    const now = new Date();
+    const diffDays = Math.floor((now.getTime() - lastSync.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) {
+      return {
+        text: 'Today',
+        className: 'text-green-600'
+      };
+    } else if (diffDays === 1) {
+      return {
+        text: 'Yesterday',
+        className: 'text-green-600'
+      };
+    } else if (diffDays <= 7) {
+      return {
+        text: `${diffDays} days ago`,
+        className: 'text-yellow-600'
+      };
+    } else {
+      return {
+        text: `${diffDays} days ago`,
+        className: 'text-red-600'
+      };
+    }
+  };
+
   if (connections.length === 0) {
     return null;
   }
@@ -133,63 +184,68 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
               </TableRow>
             </TableHeader>
             <TableBody>
-              {connections.map((connection) => (
-                <TableRow key={connection.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      {getStatusIcon(connection.status)}
-                      <div>
-                        <div className="font-medium">{connection.profileName}</div>
-                        <div className="text-sm text-gray-500">
-                          {getStatusDescription(connection)}
+              {connections.map((connection) => {
+                const syncInfo = getSyncStatusInfo(connection);
+                return (
+                  <TableRow key={connection.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {getStatusIcon(connection)}
+                        <div>
+                          <div className="font-medium">{connection.profileName}</div>
+                          <div className="text-sm text-gray-500">
+                            {getStatusDescription(connection)}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">
-                      {connection.marketplace_id || 'Unknown'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {getStatusBadge(connection)}
-                  </TableCell>
-                  <TableCell>
-                    <div className="font-medium">
-                      {connection.campaign_count || 0}
-                    </div>
-                    {connection.campaign_count === 0 && connection.status === 'setup_required' && (
-                      <div className="text-xs text-gray-500">
-                        {connection.setup_required_reason === 'no_advertising_profiles' 
-                          ? 'Setup required' 
-                          : 'Click sync to import'
-                        }
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">
+                        {connection.marketplace_id || 'Unknown'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {getStatusBadge(connection)}
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium">
+                        {connection.campaign_count || 0}
                       </div>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm">
-                      {connection.last_sync_at
-                        ? new Date(connection.last_sync_at).toLocaleDateString()
-                        : 'Never'
-                      }
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      {getActionButtons(connection)}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onDelete(connection.id)}
-                        className="text-red-600 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+                      {connection.campaign_count === 0 && connection.status === 'setup_required' && (
+                        <div className="text-xs text-gray-500">
+                          {connection.setup_required_reason === 'no_advertising_profiles' 
+                            ? 'Setup required' 
+                            : 'Click sync to import'
+                          }
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className={`text-sm font-medium ${syncInfo.className}`}>
+                        {syncInfo.text}
+                      </div>
+                      {connection.last_sync_at && (
+                        <div className="text-xs text-gray-500">
+                          {new Date(connection.last_sync_at).toLocaleDateString()}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {getActionButtons(connection)}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onDelete(connection.id)}
+                          className="text-red-600 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>
@@ -226,14 +282,28 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
             )}
             
             {connections.some(c => c.setup_required_reason === 'needs_sync') && (
-              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="flex items-start gap-3">
-                  <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
+                  <RefreshCw className="h-5 w-5 text-blue-600 mt-0.5" />
                   <div>
-                    <h4 className="font-medium text-yellow-800">Campaign Sync Required</h4>
-                    <p className="text-sm text-yellow-700 mt-1">
+                    <h4 className="font-medium text-blue-800">Campaign Sync Required</h4>
+                    <p className="text-sm text-blue-700 mt-1">
                       Your Amazon account is connected with advertising profiles, but campaign data hasn't been synced yet. 
                       Click "Sync Campaigns" to import your campaign data and view performance metrics.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {connections.some(c => c.setup_required_reason === 'token_expired') && (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <XCircle className="h-5 w-5 text-red-600 mt-0.5" />
+                  <div>
+                    <h4 className="font-medium text-red-800">Authentication Expired</h4>
+                    <p className="text-sm text-red-700 mt-1">
+                      Your Amazon access token has expired. Please reconnect your Amazon account to continue syncing campaign data.
                     </p>
                   </div>
                 </div>

@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -29,29 +30,21 @@ export const useAmazonConnections = () => {
   const fetchConnections = async () => {
     if (!user) {
       console.log('=== No User Found ===');
-      console.log('Skipping connection fetch - user not authenticated');
       setLoading(false);
       return;
     }
 
     if (fetchingRef.current) {
       console.log('=== Fetch Already in Progress ===');
-      console.log('Skipping duplicate fetch request');
       return;
     }
 
     fetchingRef.current = true;
-
     console.log('=== Fetching Amazon Connections ===');
-    console.log('User ID:', user.id);
-    console.log('User email:', user.email);
-    console.log('Timestamp:', new Date().toISOString());
     setLoading(true);
 
     try {
-      console.log('=== Database Query Starting ===');
-      // Use any type to bypass TypeScript issues with new tables
-      const { data, error, count } = await (supabase as any)
+      const { data, error } = await (supabase as any)
         .from('amazon_connections')
         .select(`
           *,
@@ -63,21 +56,15 @@ export const useAmazonConnections = () => {
       console.log('Data present:', !!data);
       console.log('Data length:', data?.length || 0);
       console.log('Error present:', !!error);
-      console.log('Count:', count);
       
       if (error) {
         console.error('=== Supabase Query Error ===');
-        console.error('Error message:', error.message);
-        console.error('Error details:', error.details);
-        console.error('Error hint:', error.hint);
-        console.error('Error code:', error.code);
-        console.error('Full error object:', error);
+        console.error('Error details:', error);
         throw error;
       }
 
       if (!data) {
         console.log('=== No Data Returned ===');
-        console.log('Query returned null/undefined data');
         setConnections([]);
         setError(null);
         return;
@@ -88,45 +75,54 @@ export const useAmazonConnections = () => {
 
       const formattedConnections: AmazonConnection[] = data.map((conn: any, index: number) => {
         console.log(`=== Processing Connection ${index + 1} ===`);
-        console.log('Connection ID:', conn.id);
-        console.log('User ID:', conn.user_id);
-        console.log('Profile ID:', conn.profile_id);
-        console.log('Profile Name:', conn.profile_name);
-        console.log('Status:', conn.status);
-        console.log('Created At:', conn.created_at);
-        console.log('Marketplace ID:', conn.marketplace_id);
-        console.log('Last Sync At:', conn.last_sync_at);
-        console.log('Campaigns Data:', conn.campaigns);
+        console.log('Connection details:', {
+          id: conn.id,
+          profile_id: conn.profile_id,
+          profile_name: conn.profile_name,
+          status: conn.status,
+          marketplace_id: conn.marketplace_id,
+          last_sync_at: conn.last_sync_at,
+          campaigns: conn.campaigns
+        });
         
         const campaignCount = Array.isArray(conn.campaigns) ? conn.campaigns.length : 0;
         const hasBeenSynced = conn.last_sync_at && campaignCount > 0;
         const isActive = conn.status === 'active';
-        const needsSync = isActive && (!conn.last_sync_at || campaignCount === 0);
         
-        console.log('Computed values:');
-        console.log('- Campaign count:', campaignCount);
-        console.log('- Has been synced:', hasBeenSynced);
-        console.log('- Is active:', isActive);
-        console.log('- Needs sync:', needsSync);
-        
-        // Determine connection status based on profile availability and sync status
+        // Improved connection status determination
         let connectionStatus: 'connected' | 'disconnected' | 'error' | 'setup_required';
         let setupRequiredReason: string | undefined;
         
         if (!isActive) {
           connectionStatus = 'error';
-          console.log('Status determination: error (not active)');
+          console.log('Status: error (connection not active)');
         } else if (!conn.profile_id || conn.profile_id === 'setup_required_no_profiles_found') {
           connectionStatus = 'setup_required';
           setupRequiredReason = 'no_advertising_profiles';
-          console.log('Status determination: setup_required (no valid profile)');
-        } else if (needsSync) {
-          connectionStatus = 'setup_required'; // Needs data sync
+          console.log('Status: setup_required (no valid advertising profile)');
+        } else if (!conn.last_sync_at) {
+          connectionStatus = 'setup_required';
           setupRequiredReason = 'needs_sync';
-          console.log('Status determination: setup_required (needs sync)');
+          console.log('Status: setup_required (never synced)');
+        } else if (campaignCount === 0) {
+          // If synced but no campaigns, could be either no campaigns exist or needs re-sync
+          connectionStatus = 'setup_required';
+          setupRequiredReason = 'needs_sync';
+          console.log('Status: setup_required (synced but no campaigns found)');
         } else {
           connectionStatus = 'connected';
-          console.log('Status determination: connected');
+          console.log('Status: connected (fully operational)');
+        }
+
+        // Check token expiry
+        if (conn.token_expires_at) {
+          const tokenExpiry = new Date(conn.token_expires_at);
+          const now = new Date();
+          if (tokenExpiry <= now) {
+            connectionStatus = 'error';
+            setupRequiredReason = 'token_expired';
+            console.log('Status overridden to error (token expired)');
+          }
         }
         
         const formatted = {
@@ -139,11 +135,10 @@ export const useAmazonConnections = () => {
           profile_name: conn.profile_name,
           last_sync_at: conn.last_sync_at,
           campaign_count: campaignCount,
-          needs_sync: needsSync,
+          needs_sync: !hasBeenSynced || campaignCount === 0,
           setup_required_reason: setupRequiredReason
         };
         
-        console.log(`=== Formatted Connection ${index + 1} ===`);
         console.log('Final formatted connection:', formatted);
         return formatted;
       });
@@ -151,25 +146,18 @@ export const useAmazonConnections = () => {
       console.log('=== Final Processing Results ===');
       console.log('Total connections processed:', formattedConnections.length);
       console.log('Connection statuses:', formattedConnections.map(c => ({ id: c.id, status: c.status })));
-      console.log('All formatted connections:', formattedConnections);
       
       setConnections(formattedConnections);
       setError(null);
       
-      console.log('=== Fetch Connections Completed Successfully ===');
     } catch (err) {
       console.error('=== Fetch Connections Error ===');
-      console.error('Error type:', typeof err);
-      console.error('Error name:', err instanceof Error ? err.name : 'Unknown');
-      console.error('Error message:', err instanceof Error ? err.message : String(err));
-      console.error('Error stack:', err instanceof Error ? err.stack : 'No stack trace');
-      console.error('Full error object:', err);
+      console.error('Error details:', err);
       
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch connections';
       setError(errorMessage);
       setConnections([]);
       
-      // Show user-friendly error toast
       toast({
         title: "Connection Error",
         description: "Failed to load your Amazon connections. Please refresh the page.",
@@ -178,28 +166,21 @@ export const useAmazonConnections = () => {
     } finally {
       setLoading(false);
       fetchingRef.current = false;
-      console.log('=== Fetch Connections Process Ended ===');
     }
   };
 
   useEffect(() => {
-    console.log('=== useEffect Triggered ===');
-    console.log('User changed:', !!user);
     fetchConnections();
   }, [user]);
 
   const refreshConnections = async () => {
     console.log('=== Manual Refresh Triggered ===');
-    console.log('Timestamp:', new Date().toISOString());
     await fetchConnections();
   };
 
   const initiateConnection = async (redirectUri: string) => {
     try {
       console.log('=== Initiating Amazon Connection ===');
-      console.log('Redirect URI:', redirectUri);
-      console.log('User ID:', user?.id);
-      console.log('Timestamp:', new Date().toISOString());
       
       toast({
         title: "Connecting to Amazon",
@@ -213,13 +194,11 @@ export const useAmazonConnections = () => {
       console.log('=== OAuth Init Response ===');
       console.log('Data:', data);
       console.log('Error:', error);
-      console.log('Response timestamp:', new Date().toISOString());
 
       if (error) {
         console.error('=== OAuth Init Error ===');
         console.error('Error details:', error);
         
-        // Extract user-friendly error message
         let userMessage = 'Failed to initialize Amazon connection';
         if (typeof error === 'object' && error.message) {
           userMessage = error.message;
@@ -233,22 +212,15 @@ export const useAmazonConnections = () => {
       if (data?.error) {
         console.error('=== OAuth Init Returned Error ===');
         console.error('Server error:', data.error);
-        console.error('Server details:', data.details);
         throw new Error(data.details || data.error);
       }
 
       if (data?.authUrl) {
         console.log('=== Redirecting to Amazon ===');
-        console.log('Auth URL received:', data.authUrl);
-        console.log('Redirect timestamp:', new Date().toISOString());
-        
-        // Add a small delay to ensure logs are captured and UI updates
         setTimeout(() => {
           window.location.href = data.authUrl;
         }, 100);
       } else {
-        console.error('=== No Auth URL Received ===');
-        console.error('Data received:', data);
         throw new Error('No authorization URL received from server');
       }
     } catch (err) {
@@ -272,9 +244,7 @@ export const useAmazonConnections = () => {
     try {
       console.log('=== Syncing Connection ===');
       console.log('Connection ID:', connectionId);
-      console.log('Timestamp:', new Date().toISOString());
       
-      // Show loading toast
       toast({
         title: "Sync Started",
         description: "Fetching your campaign data from Amazon. This may take a few moments...",
@@ -305,9 +275,7 @@ export const useAmazonConnections = () => {
       if (data?.error) {
         console.error('=== Sync Returned Error ===');
         console.error('Server error:', data.error);
-        console.error('Server details:', data.details);
         
-        // Handle specific error cases with improved messaging
         if (data.requiresSetup || data.error === 'Profile setup required') {
           toast({
             title: "Amazon Advertising Setup Required",
@@ -375,9 +343,6 @@ export const useAmazonConnections = () => {
         .delete()
         .eq('id', connectionId);
 
-      console.log('=== Delete Response ===');
-      console.log('Error:', error);
-
       if (error) {
         console.error('=== Delete Error ===');
         console.error('Error details:', error);
@@ -411,39 +376,25 @@ export const useAmazonConnections = () => {
     const cacheKey = `${code}-${state}`;
     
     console.log('=== OAuth Callback Started ===');
-    console.log('Code present:', !!code);
-    console.log('State:', state);
-    console.log('Cache key:', cacheKey);
     
-    // Check if we're already processing this exact callback
     if (oauthCallbackCache.current.has(cacheKey)) {
       console.log('=== Duplicate Callback Detected ===');
-      console.log('OAuth callback already in progress for this code/state, waiting for existing request...');
       try {
         const result = await oauthCallbackCache.current.get(cacheKey);
-        console.log('=== Duplicate Callback Resolved ===');
-        console.log('Result:', result);
         return result;
       } catch (err) {
-        console.error('=== Duplicate Callback Error ===');
-        console.error('Error:', err);
-        // Remove failed promise from cache and retry
         oauthCallbackCache.current.delete(cacheKey);
         throw err;
       }
     }
 
     try {
-      console.log('=== Processing New OAuth Callback ===');
-      
-      // Create and cache the promise to prevent duplicate requests
       const callbackPromise = supabase.functions.invoke('amazon-oauth-callback', {
         body: { code, state }
       }).then(async ({ data, error }) => {
         console.log('=== OAuth Callback Response ===');
         console.log('Data:', data);
         console.log('Error:', error);
-        console.log('Response timestamp:', new Date().toISOString());
 
         if (error) {
           console.error('=== OAuth Callback Error ===');
@@ -462,11 +413,9 @@ export const useAmazonConnections = () => {
         if (data?.error || !data?.success) {
           console.error('=== OAuth Callback Returned Error ===');
           console.error('Server error:', data?.error);
-          console.error('Server details:', data?.details);
           throw new Error(data?.details || data?.error || 'Callback processing failed');
         }
 
-        // Force refresh connections after successful callback
         console.log('=== Refreshing Connections After Callback ===');
         await fetchConnections();
         
@@ -475,30 +424,19 @@ export const useAmazonConnections = () => {
           message: data?.message || 'Connection successful'
         };
         console.log('=== OAuth Callback Success ===');
-        console.log('Final result:', result);
         return result;
       });
 
-      // Cache the promise
       oauthCallbackCache.current.set(cacheKey, callbackPromise);
-      console.log('=== Callback Promise Cached ===');
-
       const result = await callbackPromise;
-      
-      // Clean up the cache after successful completion
       oauthCallbackCache.current.delete(cacheKey);
-      console.log('=== Callback Cache Cleaned Up ===');
       
       return result;
     } catch (err) {
       console.error('=== OAuth Callback Process Error ===');
-      console.error('Error type:', typeof err);
-      console.error('Error message:', err instanceof Error ? err.message : String(err));
-      console.error('Full error:', err);
+      console.error('Error:', err);
       
-      // Clean up the cache on error
       oauthCallbackCache.current.delete(cacheKey);
-      console.log('=== Callback Cache Cleaned Up After Error ===');
       throw err;
     }
   };

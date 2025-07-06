@@ -14,15 +14,57 @@ serve(async (req) => {
   }
 
   try {
+    console.log('=== Amazon Force Sync Function Started ===');
+    console.log('Request method:', req.method);
+    console.log('Timestamp:', new Date().toISOString());
+    
     const { connectionId } = await req.json();
-    console.log('=== Force Sync Started ===');
     console.log('Connection ID:', connectionId);
     
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    if (!connectionId) {
+      console.error('No connection ID provided');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Connection ID is required',
+          details: 'Please provide a valid connection ID'
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const amazonClientId = Deno.env.get('AMAZON_CLIENT_ID');
+    const amazonClientSecret = Deno.env.get('AMAZON_CLIENT_SECRET');
+    
+    console.log('Environment check:', {
+      supabaseUrl: !!supabaseUrl,
+      supabaseKey: !!supabaseKey,
+      amazonClientId: !!amazonClientId,
+      amazonClientSecret: !!amazonClientSecret
+    });
+
+    if (!supabaseUrl || !supabaseKey || !amazonClientId || !amazonClientSecret) {
+      console.error('Missing environment variables');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Server configuration error',
+          details: 'Missing required environment variables'
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Get connection details
+    console.log('Fetching connection details...');
     const { data: connection, error: connError } = await supabase
       .from('amazon_connections')
       .select('*')
@@ -31,36 +73,99 @@ serve(async (req) => {
 
     if (connError || !connection) {
       console.error('Connection not found:', connError);
-      throw new Error('Connection not found');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Connection not found',
+          details: `Failed to retrieve connection: ${connError?.message || 'Connection does not exist'}`
+        }),
+        {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
     console.log('Connection found:', {
       id: connection.id,
       profile_id: connection.profile_id,
       marketplace_id: connection.marketplace_id,
-      status: connection.status
+      status: connection.status,
+      has_access_token: !!connection.access_token,
+      token_expires_at: connection.token_expires_at
     });
-
-    const amazonClientId = Deno.env.get('AMAZON_CLIENT_ID');
-    if (!amazonClientId) {
-      throw new Error('Amazon Client ID not configured');
-    }
 
     // Check if token needs refresh
     const tokenExpiry = new Date(connection.token_expires_at);
     const now = new Date();
     
     if (tokenExpiry <= now) {
-      console.log('Token expired, needs refresh');
-      throw new Error('Token expired - please reconnect your Amazon account');
+      console.log('Token expired, attempting refresh...');
+      
+      try {
+        const refreshResponse = await fetch('https://api.amazon.com/auth/o2/token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            grant_type: 'refresh_token',
+            refresh_token: connection.refresh_token,
+            client_id: amazonClientId,
+            client_secret: amazonClientSecret,
+          }),
+        });
+
+        if (refreshResponse.ok) {
+          const tokenData = await refreshResponse.json();
+          
+          // Update connection with new token
+          await supabase
+            .from('amazon_connections')
+            .update({
+              access_token: tokenData.access_token,
+              token_expires_at: new Date(Date.now() + (tokenData.expires_in * 1000)).toISOString(),
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', connectionId);
+          
+          connection.access_token = tokenData.access_token;
+          console.log('Token refreshed successfully');
+        } else {
+          console.error('Token refresh failed:', refreshResponse.status);
+          return new Response(
+            JSON.stringify({ 
+              error: 'Token expired - please reconnect your Amazon account',
+              details: 'Authentication token has expired and could not be refreshed',
+              requiresReconnection: true
+            }),
+            {
+              status: 401,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
+      } catch (refreshError) {
+        console.error('Token refresh error:', refreshError);
+        return new Response(
+          JSON.stringify({ 
+            error: 'Token refresh failed',
+            details: 'Please reconnect your Amazon account',
+            requiresReconnection: true
+          }),
+          {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
     }
 
     let campaignsSynced = 0;
     let profilesFound = 0;
 
-    // First, try to get profiles if we don't have any
-    if (!connection.profile_id) {
-      console.log('No profile_id found, attempting to fetch profiles...');
+    // First, try to get profiles if we don't have any or have placeholder
+    if (!connection.profile_id || connection.profile_id === 'setup_required_no_profiles_found') {
+      console.log('No valid profile_id found, attempting to fetch profiles...');
       
       try {
         const profilesResponse = await fetch('https://advertising-api.amazon.com/v2/profiles', {
@@ -69,6 +174,8 @@ serve(async (req) => {
             'Amazon-Advertising-API-ClientId': amazonClientId,
           },
         });
+
+        console.log('Profiles API response status:', profilesResponse.status);
 
         if (profilesResponse.ok) {
           const profiles = await profilesResponse.json();
@@ -79,7 +186,7 @@ serve(async (req) => {
             const profile = profiles[0]; // Use first profile
             
             // Update connection with profile info
-            await supabase
+            const { error: updateError } = await supabase
               .from('amazon_connections')
               .update({
                 profile_id: profile.profileId.toString(),
@@ -89,29 +196,40 @@ serve(async (req) => {
               })
               .eq('id', connectionId);
             
-            console.log('Updated connection with profile:', profile.profileId);
-            
-            // Now proceed with campaign sync using this profile
-            connection.profile_id = profile.profileId.toString();
+            if (updateError) {
+              console.error('Error updating connection with profile:', updateError);
+            } else {
+              console.log('Updated connection with profile:', profile.profileId);
+              connection.profile_id = profile.profileId.toString();
+            }
+          } else {
+            console.log('No advertising profiles found in response');
           }
         } else {
-          console.log('Profiles API call failed:', profilesResponse.status, profilesResponse.statusText);
+          const errorText = await profilesResponse.text();
+          console.log('Profiles API call failed:', profilesResponse.status, profilesResponse.statusText, errorText);
         }
       } catch (profileError) {
         console.error('Error fetching profiles:', profileError);
       }
     }
 
-    // Try to sync campaigns regardless of profile status
+    // Try to sync campaigns regardless of profile status (force sync)
+    console.log('Attempting to fetch campaigns (force sync)...');
+    
     try {
-      console.log('Attempting to fetch campaigns...');
+      const headers = {
+        'Authorization': `Bearer ${connection.access_token}`,
+        'Amazon-Advertising-API-ClientId': amazonClientId,
+      };
       
+      // Add profile scope if we have a valid profile ID
+      if (connection.profile_id && connection.profile_id !== 'setup_required_no_profiles_found') {
+        headers['Amazon-Advertising-API-Scope'] = connection.profile_id;
+      }
+
       const campaignsResponse = await fetch('https://advertising-api.amazon.com/v2/campaigns', {
-        headers: {
-          'Authorization': `Bearer ${connection.access_token}`,
-          'Amazon-Advertising-API-ClientId': amazonClientId,
-          ...(connection.profile_id && { 'Amazon-Advertising-API-Scope': connection.profile_id }),
-        },
+        headers: headers,
       });
 
       console.log('Campaigns API response status:', campaignsResponse.status);
@@ -123,7 +241,7 @@ serve(async (req) => {
         // Process and store campaigns
         for (const campaign of campaigns) {
           try {
-            await supabase
+            const { error: upsertError } = await supabase
               .from('campaigns')
               .upsert({
                 connection_id: connectionId,
@@ -140,24 +258,63 @@ serve(async (req) => {
               }, {
                 onConflict: 'amazon_campaign_id,connection_id'
               });
+
+            if (upsertError) {
+              console.error('Error upserting campaign:', campaign.campaignId, upsertError);
+            } else {
+              campaignsSynced++;
+            }
           } catch (campaignError) {
-            console.error('Error upserting campaign:', campaign.campaignId, campaignError);
+            console.error('Error processing campaign:', campaign.campaignId, campaignError);
           }
         }
-
-        campaignsSynced = campaigns.length;
       } else {
         const errorText = await campaignsResponse.text();
         console.error('Campaigns API error:', campaignsResponse.status, errorText);
-        throw new Error(`Failed to fetch campaigns: ${campaignsResponse.statusText}`);
+        
+        if (campaignsResponse.status === 401) {
+          return new Response(
+            JSON.stringify({ 
+              error: 'Authentication failed',
+              details: 'Amazon API authentication failed. Please reconnect your account.',
+              requiresReconnection: true
+            }),
+            {
+              status: 401,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        } else {
+          return new Response(
+            JSON.stringify({ 
+              error: `Failed to fetch campaigns: ${campaignsResponse.statusText}`,
+              details: `Amazon API returned status ${campaignsResponse.status}`,
+              statusCode: campaignsResponse.status
+            }),
+            {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
       }
     } catch (campaignError) {
       console.error('Campaign sync error:', campaignError);
-      throw campaignError;
+      return new Response(
+        JSON.stringify({ 
+          error: 'Campaign sync failed',
+          details: 'Network error while fetching campaigns. Please try again.',
+          originalError: campaignError.message
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
     // Update connection sync timestamp and status
-    await supabase
+    const { error: updateError } = await supabase
       .from('amazon_connections')
       .update({ 
         last_sync_at: new Date().toISOString(),
@@ -165,6 +322,10 @@ serve(async (req) => {
         updated_at: new Date().toISOString()
       })
       .eq('id', connectionId);
+
+    if (updateError) {
+      console.error('Connection update error:', updateError);
+    }
 
     console.log('=== Force Sync Complete ===');
     console.log('Profiles found:', profilesFound);
@@ -187,11 +348,17 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error('Error in amazon-force-sync:', error);
+    console.error('=== Amazon Force Sync Function Error ===');
+    console.error('Error type:', typeof error);
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    
     return new Response(
       JSON.stringify({ 
-        error: error.message,
-        message: 'Force sync failed - please check your Amazon account setup and try again.'
+        error: 'Internal server error',
+        details: 'Force sync failed - please check your Amazon account setup and try again.',
+        timestamp: new Date().toISOString()
       }),
       {
         status: 500,
