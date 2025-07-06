@@ -16,7 +16,15 @@ const AmazonCallbackPage = () => {
   const [details, setDetails] = useState<string>('');
   const [retryCount, setRetryCount] = useState(0);
   const processingRef = useRef(false);
+  const mountedRef = useRef(true);
   const maxRetries = 2;
+
+  useEffect(() => {
+    // Component mount protection
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     console.log('=== AmazonCallbackPage Component Mounted ===');
@@ -33,7 +41,12 @@ const AmazonCallbackPage = () => {
     
     const processCallback = async () => {
       try {
-        console.log('=== Amazon Callback Page Loaded ===');
+        if (!mountedRef.current) {
+          console.log('Component unmounted, aborting callback processing');
+          return;
+        }
+
+        console.log('=== Amazon Callback Page Processing Started ===');
         console.log('Current URL:', window.location.href);
         
         // Extract parameters from URL
@@ -44,7 +57,7 @@ const AmazonCallbackPage = () => {
 
         console.log('=== URL Parameters ===');
         console.log('Authorization code present:', !!code);
-        console.log('State parameter:', state);
+        console.log('State parameter present:', !!state);
         console.log('Error parameter:', error);
         console.log('Error description:', errorDescription);
         
@@ -53,6 +66,8 @@ const AmazonCallbackPage = () => {
           console.error('=== OAuth Error from Amazon ===');
           console.error('Error:', error);
           console.error('Description:', errorDescription);
+          
+          if (!mountedRef.current) return;
           
           setStatus('error');
           setMessage('Amazon authorization failed');
@@ -86,13 +101,18 @@ const AmazonCallbackPage = () => {
             variant: "destructive",
           });
           
-          setTimeout(() => navigate('/settings'), 5000);
+          setTimeout(() => {
+            if (mountedRef.current) navigate('/settings');
+          }, 5000);
           return;
         }
 
         // Validate required parameters
         if (!code) {
           console.error('=== Missing Authorization Code ===');
+          
+          if (!mountedRef.current) return;
+          
           setStatus('error');
           setMessage('No authorization code received');
           setDetails('The authorization process was incomplete. Please try connecting again.');
@@ -103,12 +123,17 @@ const AmazonCallbackPage = () => {
             variant: "destructive",
           });
           
-          setTimeout(() => navigate('/settings'), 5000);
+          setTimeout(() => {
+            if (mountedRef.current) navigate('/settings');
+          }, 5000);
           return;
         }
 
         if (!state) {
           console.error('=== Missing State Parameter ===');
+          
+          if (!mountedRef.current) return;
+          
           setStatus('error');
           setMessage('Security validation failed');
           setDetails('The state parameter is missing. Please try connecting again.');
@@ -119,17 +144,23 @@ const AmazonCallbackPage = () => {
             variant: "destructive",
           });
           
-          setTimeout(() => navigate('/settings'), 5000);
+          setTimeout(() => {
+            if (mountedRef.current) navigate('/settings');
+          }, 5000);
           return;
         }
 
         console.log('=== Starting OAuth Callback Processing ===');
+        
+        if (!mountedRef.current) return;
         setMessage('Exchanging authorization code for access token...');
         
         // Process the OAuth callback
         const result = await handleOAuthCallback(code, state);
         console.log('=== OAuth Callback Completed Successfully ===');
         console.log('Result:', result);
+        
+        if (!mountedRef.current) return;
         
         setStatus('success');
         setMessage('Amazon account connected successfully!');
@@ -149,11 +180,15 @@ const AmazonCallbackPage = () => {
         }
         
         // Redirect to settings page after success
-        setTimeout(() => navigate('/settings'), 3000);
+        setTimeout(() => {
+          if (mountedRef.current) navigate('/settings');
+        }, 3000);
         
       } catch (error) {
         console.error('=== Callback Processing Error ===');
         console.error('Error details:', error);
+        
+        if (!mountedRef.current) return;
         
         setStatus('error');
         setMessage('Failed to process Amazon connection');
@@ -183,6 +218,9 @@ const AmazonCallbackPage = () => {
           } else if (error.message.includes('Server error') || error.message.includes('500')) {
             userMessage = 'Server error occurred. Please try again in a few moments.';
             shouldRetry = retryCount < maxRetries;
+          } else if (error.message.includes('Invalid state parameter') || 
+                     error.message.includes('State parameter could not be decoded')) {
+            userMessage = 'Security validation failed. Please try connecting again from the settings page.';
           } else {
             userMessage = error.message;
           }
@@ -197,21 +235,26 @@ const AmazonCallbackPage = () => {
         });
         
         // Auto-retry for certain errors
-        if (shouldRetry) {
+        if (shouldRetry && mountedRef.current) {
           setRetryCount(prev => prev + 1);
           setTimeout(() => {
             console.log('=== Auto-retry triggered ===');
-            processingRef.current = false;
-            window.location.reload();
+            if (mountedRef.current) {
+              processingRef.current = false;
+              window.location.reload();
+            }
           }, 3000);
           return;
         }
         
         // Redirect to settings after showing error
-        setTimeout(() => navigate('/settings'), 5000);
+        setTimeout(() => {
+          if (mountedRef.current) navigate('/settings');
+        }, 5000);
       } finally {
-        if (!processingRef.current) return;
-        processingRef.current = false;
+        if (mountedRef.current) {
+          processingRef.current = false;
+        }
       }
     };
 

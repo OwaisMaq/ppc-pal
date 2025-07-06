@@ -16,7 +16,6 @@ serve(async (req) => {
   try {
     console.log('=== Amazon OAuth Init Started ===');
     console.log('Request method:', req.method);
-    console.log('Request headers:', Object.fromEntries(req.headers.entries()));
     
     let requestBody;
     try {
@@ -74,14 +73,13 @@ serve(async (req) => {
     console.log('=== Environment Variables Check ===');
     console.log('Amazon Client ID present:', !!amazonClientId);
     console.log('Amazon Client Secret present:', !!amazonClientSecret);
-    console.log('Amazon Client ID length:', amazonClientId?.length || 0);
     
-    if (!amazonClientId) {
-      console.error('AMAZON_CLIENT_ID environment variable not set');
+    if (!amazonClientId || !amazonClientSecret) {
+      console.error('Missing Amazon credentials');
       return new Response(
         JSON.stringify({ 
           error: 'Server configuration error',
-          details: 'Amazon Client ID not configured'
+          details: 'Amazon credentials not configured'
         }),
         {
           status: 500,
@@ -90,33 +88,10 @@ serve(async (req) => {
       );
     }
 
-    if (!amazonClientSecret) {
-      console.error('AMAZON_CLIENT_SECRET environment variable not set');
-      return new Response(
-        JSON.stringify({ 
-          error: 'Server configuration error',
-          details: 'Amazon Client Secret not configured'
-        }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-
-    // Generate state parameter for security
-    console.log('=== Generating Security State ===');
-    const state = crypto.randomUUID();
-    console.log('Generated state parameter:', state);
-    console.log('State parameter length:', state.length);
-    
     // Initialize Supabase client
     console.log('=== Supabase Client Setup ===');
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    
-    console.log('Supabase URL present:', !!supabaseUrl);
-    console.log('Supabase Service Role Key present:', !!supabaseKey);
     
     if (!supabaseUrl || !supabaseKey) {
       console.error('Missing Supabase configuration');
@@ -133,15 +108,13 @@ serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
-    console.log('Supabase client created successfully');
 
     // Get user from auth header
     console.log('=== User Authentication Check ===');
     const authHeader = req.headers.get('authorization');
-    console.log('Auth header present:', !!authHeader);
     
-    if (!authHeader) {
-      console.error('No authorization header provided');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.error('Invalid or missing authorization header');
       return new Response(
         JSON.stringify({ 
           error: 'Authentication required',
@@ -154,51 +127,20 @@ serve(async (req) => {
       );
     }
 
-    if (!authHeader.startsWith('Bearer ')) {
-      console.error('Invalid authorization header format');
-      return new Response(
-        JSON.stringify({ 
-          error: 'Invalid authentication format',
-          details: 'Authorization header must be in Bearer format'
-        }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-
     const token = authHeader.replace('Bearer ', '');
-    console.log('Token extracted, length:', token.length);
     
     try {
       const { data: userData, error: userError } = await supabase.auth.getUser(token);
       
       console.log('=== User Authentication Result ===');
-      console.log('User data present:', !!userData);
-      console.log('User error:', userError);
+      console.log('User authenticated:', !!userData?.user);
       console.log('User ID:', userData?.user?.id);
-      console.log('User email:', userData?.user?.email);
       
-      if (userError) {
+      if (userError || !userData?.user) {
         console.error('User authentication failed:', userError);
         return new Response(
           JSON.stringify({ 
             error: 'Authentication failed',
-            details: userError.message
-          }),
-          {
-            status: 401,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          }
-        );
-      }
-
-      if (!userData?.user) {
-        console.error('No user data returned from authentication');
-        return new Response(
-          JSON.stringify({ 
-            error: 'Invalid user session',
             details: 'Please log in again'
           }),
           {
@@ -208,38 +150,36 @@ serve(async (req) => {
         );
       }
 
-      console.log('User authenticated successfully:', userData.user.id);
-    } catch (authError) {
-      console.error('Authentication process failed:', authError);
-      return new Response(
-        JSON.stringify({ 
-          error: 'Authentication error',
-          details: authError.message
-        }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
+      // Use the callback URL - should be the deployed URL
+      const finalRedirectUri = 'https://ppcpal.online/amazon-callback';
+      console.log('=== OAuth URL Construction ===');
+      console.log('Using final redirect URI:', finalRedirectUri);
 
-    // Use the correct redirect URI - should be the deployed URL
-    const finalRedirectUri = 'https://ppcpal.online/amazon-callback';
-    console.log('=== OAuth URL Construction ===');
-    console.log('Using final redirect URI:', finalRedirectUri);
+      // Generate state parameter with user ID and redirect URI
+      const stateData = {
+        user_id: userData.user.id,
+        redirect_uri: finalRedirectUri,
+        timestamp: Date.now()
+      };
+      
+      console.log('=== State Parameter Generation ===');
+      console.log('State data:', { user_id: stateData.user_id, redirect_uri: stateData.redirect_uri });
+      
+      // Encode state as base64 JSON
+      const state = btoa(JSON.stringify(stateData));
+      console.log('Generated state parameter (base64):', state);
 
-    // Amazon OAuth URL parameters
-    const scope = 'advertising::campaign_management';
-    const responseType = 'code';
-    
-    console.log('OAuth parameters:');
-    console.log('- Client ID:', amazonClientId.substring(0, 8) + '...');
-    console.log('- Scope:', scope);
-    console.log('- Response Type:', responseType);
-    console.log('- Redirect URI:', finalRedirectUri);
-    console.log('- State:', state);
-    
-    try {
+      // Amazon OAuth URL parameters
+      const scope = 'advertising::campaign_management';
+      const responseType = 'code';
+      
+      console.log('OAuth parameters:');
+      console.log('- Client ID:', amazonClientId.substring(0, 8) + '...');
+      console.log('- Scope:', scope);
+      console.log('- Response Type:', responseType);
+      console.log('- Redirect URI:', finalRedirectUri);
+      console.log('- State length:', state.length);
+      
       const authUrl = new URL('https://www.amazon.com/ap/oa');
       authUrl.searchParams.set('client_id', amazonClientId);
       authUrl.searchParams.set('scope', scope);
@@ -250,7 +190,6 @@ serve(async (req) => {
       const finalAuthUrl = authUrl.toString();
       console.log('=== Generated Amazon OAuth URL ===');
       console.log('Auth URL length:', finalAuthUrl.length);
-      console.log('Auth URL:', finalAuthUrl);
       
       // Validate the constructed URL
       try {
@@ -270,15 +209,14 @@ serve(async (req) => {
         );
       }
 
-      console.log('=== Successful Response Preparation ===');
       const responseData = { 
         authUrl: finalAuthUrl, 
         state: state,
-        timestamp: new Date().toISOString(),
-        clientId: amazonClientId.substring(0, 8) + '...'
+        timestamp: new Date().toISOString()
       };
       
-      console.log('Response data:', responseData);
+      console.log('=== OAuth Init Successful ===');
+      console.log('Response prepared successfully');
 
       return new Response(
         JSON.stringify(responseData),
@@ -287,35 +225,28 @@ serve(async (req) => {
           status: 200
         }
       );
-    } catch (urlError) {
-      console.error('URL construction failed:', urlError);
+    } catch (authError) {
+      console.error('Authentication process failed:', authError);
       return new Response(
         JSON.stringify({ 
-          error: 'URL construction failed',
-          details: urlError.message
+          error: 'Authentication error',
+          details: authError.message
         }),
         {
-          status: 500,
+          status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );
     }
   } catch (error) {
     console.error('=== Amazon OAuth Init Error ===');
-    console.error('Error type:', typeof error);
-    console.error('Error name:', error.name);
-    console.error('Error message:', error.message);
-    console.error('Error stack:', error.stack);
-    console.error('Full error object:', error);
+    console.error('Error details:', error);
     
     const errorResponse = {
       error: 'Server error',
       details: error.message || 'An unexpected error occurred',
-      timestamp: new Date().toISOString(),
-      stack: error.stack?.split('\n').slice(0, 3).join('\n')
+      timestamp: new Date().toISOString()
     };
-    
-    console.log('Error response:', errorResponse);
     
     return new Response(
       JSON.stringify(errorResponse),

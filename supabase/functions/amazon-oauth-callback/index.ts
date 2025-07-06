@@ -21,7 +21,7 @@ serve(async (req) => {
     const { code, state, error: oauthError } = await req.json()
     
     console.log('=== Amazon OAuth Callback ===')
-    console.log('Received callback with:', { code: !!code, state, error: oauthError })
+    console.log('Received callback with:', { code: !!code, state: !!state, error: oauthError })
 
     if (oauthError) {
       console.error('OAuth error from Amazon:', oauthError)
@@ -39,17 +39,36 @@ serve(async (req) => {
       )
     }
 
+    if (!state) {
+      console.error('No state parameter received')
+      return new Response(
+        JSON.stringify({ error: 'No state parameter received' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     // Parse state to get user_id and redirect_uri
     let userId, redirectUri
     try {
+      console.log('=== Parsing State Parameter ===')
+      console.log('Raw state:', state)
+      console.log('State length:', state.length)
+      
       const stateData = JSON.parse(atob(state))
+      console.log('Decoded state data:', stateData)
+      
       userId = stateData.user_id
       redirectUri = stateData.redirect_uri
+      
       console.log('Parsed state:', { userId: !!userId, redirectUri })
     } catch (e) {
-      console.error('Failed to parse state:', e)
+      console.error('Failed to parse state parameter:', e)
+      console.error('State value was:', state)
       return new Response(
-        JSON.stringify({ error: 'Invalid state parameter' }),
+        JSON.stringify({ 
+          error: 'Invalid state parameter',
+          details: 'State parameter could not be decoded' 
+        }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -75,7 +94,9 @@ serve(async (req) => {
     }
 
     // Exchange authorization code for access token
-    console.log('Exchanging authorization code for tokens...')
+    console.log('=== Exchanging Authorization Code ===')
+    console.log('Using redirect URI for token exchange:', redirectUri)
+    
     const tokenResponse = await fetch('https://api.amazon.com/auth/o2/token', {
       method: 'POST',
       headers: {
@@ -126,7 +147,7 @@ serve(async (req) => {
     const tokenExpiresAt = new Date(Date.now() + ((expires_in - 300) * 1000)).toISOString() // 5 min buffer
 
     // Get advertising profiles with retry logic
-    console.log('Fetching advertising profiles...')
+    console.log('=== Fetching Advertising Profiles ===')
     let profiles = []
     let connectionStatus = 'setup_required'
     let profileId = 'setup_required_no_profiles_found'
@@ -136,6 +157,7 @@ serve(async (req) => {
 
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
+        console.log(`Profile fetch attempt ${attempt}/3`)
         const profilesResponse = await fetch('https://advertising-api.amazon.com/v2/profiles', {
           headers: {
             'Authorization': `Bearer ${access_token}`,
@@ -254,7 +276,9 @@ serve(async (req) => {
     }
 
     // Create new connection
-    console.log('Creating new connection...')
+    console.log('=== Creating New Connection ===')
+    console.log('Connection details:', { userId, profileId, profileName, marketplaceId, status: connectionStatus })
+    
     const { data, error } = await supabaseClient
       .from('amazon_connections')
       .insert({
