@@ -6,6 +6,7 @@ import { AmazonConnectionOperations } from './amazonConnectionOperations';
 import { SyncResponseHandler } from './amazon/syncResponseHandler';
 import { SyncErrorHandler } from './amazon/syncErrorHandler';
 import { SyncResponse } from './amazon/types';
+import { AmazonApiClient, AmazonApiConfig } from './amazon/amazonApiClient';
 
 export class AmazonSyncService {
   private toast: typeof toast;
@@ -22,7 +23,7 @@ export class AmazonSyncService {
 
   async syncConnection(connectionId: string, refreshConnections: () => Promise<void>) {
     try {
-      console.log('=== Sync Connection Started ===');
+      console.log('=== Enhanced Sync Connection Started ===');
       console.log('Connection ID:', connectionId);
       
       // Step 1: Get auth headers with session validation
@@ -58,37 +59,193 @@ export class AmazonSyncService {
         id: connectionData.id,
         status: connectionData.status,
         profile_id: connectionData.profile_id,
-        profile_name: connectionData.profile_name
+        profile_name: connectionData.profile_name,
+        marketplace_id: connectionData.marketplace_id
       });
 
-      // Step 3: Show sync started message
-      this.toast.info("Sync Started", {
-        description: "Fetching your campaign data from Amazon. Please wait..."
-      });
+      // Step 3: Validate profile configuration
+      if (!connectionData.profile_id || connectionData.profile_id === 'setup_required_no_profiles_found') {
+        console.log('Connection requires profile setup');
+        await this.operations.updateConnectionStatus(connectionId, 'setup_required', 'Profile configuration required');
+        
+        this.toast.error("Profile Setup Required", {
+          description: "Please set up your Amazon Advertising profile first."
+        });
+        return;
+      }
+
+      // Step 4: Check token expiry and refresh if needed
+      const tokenExpiry = new Date(connectionData.token_expires_at);
+      const now = new Date();
       
-      // Step 4: Call Amazon Sync Function with proper headers and connectionId
-      console.log('=== Calling Amazon Sync Function ===');
-      console.log('Headers being sent:', {
-        hasAuth: !!headers.Authorization,
-        authLength: headers.Authorization?.length || 0
-      });
-      
-      const { data, error } = await supabase.functions.invoke('amazon-sync', {
-        body: { connectionId }, // Always send the specific connectionId
-        headers
-      });
+      if (tokenExpiry <= now) {
+        console.log('Token expired, sync via edge function required');
+        this.toast.info("Token Refresh Required", {
+          description: "Token has expired. Using edge function to refresh and sync..."
+        });
+        
+        // Fall back to edge function for token refresh + sync
+        await this.syncViaEdgeFunction(connectionId, headers, refreshConnections);
+        return;
+      }
 
-      console.log('=== Sync Response Received ===');
-      console.log('Data present:', !!data);
-      console.log('Error present:', !!error);
-      console.log('Response data:', data);
-      console.log('Response error:', error);
-
-      // Handle response using the response handler
-      await this.responseHandler.handleSyncResponse(data, error, connectionId, refreshConnections);
+      // Step 5: Try direct API sync first (new approach)
+      console.log('=== Attempting Direct API Sync ===');
+      try {
+        await this.syncViaDirectApi(connectionData, refreshConnections);
+      } catch (directApiError) {
+        console.log('=== Direct API sync failed, falling back to edge function ===');
+        console.log('Direct API error:', directApiError);
+        
+        // Fall back to edge function
+        await this.syncViaEdgeFunction(connectionId, headers, refreshConnections);
+      }
       
     } catch (err) {
       await this.errorHandler.handleGeneralError(err, connectionId);
+    }
+  }
+
+  private async syncViaDirectApi(connectionData: any, refreshConnections: () => Promise<void>) {
+    console.log('=== Direct API Sync Started ===');
+    
+    // Create API client configuration
+    const apiConfig: AmazonApiConfig = {
+      profileId: connectionData.profile_id,
+      countryCode: connectionData.marketplace_id || 'US',
+      accessToken: connectionData.access_token,
+      clientId: process.env.AMAZON_CLIENT_ID
+    };
+    
+    const apiClient = new AmazonApiClient(apiConfig);
+    console.log('API Client created with config:', {
+      profileId: apiConfig.profileId,
+      countryCode: apiConfig.countryCode,
+      hasToken: !!apiConfig.accessToken
+    });
+
+    // Test API access with profile validation
+    console.log('=== Testing API Access ===');
+    const profilesResponse = await apiClient.getProfiles();
+    
+    if (!profilesResponse.success) {
+      console.error('Profile validation failed:', profilesResponse.error);
+      
+      if (profilesResponse.error?.requiresReauth) {
+        await this.operations.updateConnectionStatus(
+          connectionData.id, 
+          'error', 
+          'Token expired or invalid - reconnection required'
+        );
+        throw new Error('Token expired - please reconnect your Amazon account');
+      }
+      
+      throw new Error(`API access failed: ${profilesResponse.error?.message}`);
+    }
+
+    console.log('API access validated successfully');
+
+    // Fetch campaigns
+    console.log('=== Fetching Campaigns via Direct API ===');
+    const campaignsResponse = await apiClient.getCampaigns({ state: 'enabled,paused' });
+    
+    if (!campaignsResponse.success) {
+      console.error('Campaign fetch failed:', campaignsResponse.error);
+      throw new Error(`Failed to fetch campaigns: ${campaignsResponse.error?.message}`);
+    }
+
+    const campaigns = campaignsResponse.data || [];
+    console.log(`Fetched ${campaigns.length} campaigns via direct API`);
+
+    // Process and store campaigns
+    let successCount = 0;
+    for (const campaign of campaigns) {
+      try {
+        const campaignData = {
+          connection_id: connectionData.id,
+          amazon_campaign_id: campaign.campaignId?.toString(),
+          name: campaign.name || 'Unnamed Campaign',
+          campaign_type: campaign.campaignType || 'sponsoredProducts',
+          targeting_type: campaign.targetingType,
+          status: this.mapCampaignStatus(campaign.state),
+          budget: campaign.budget ? parseFloat(campaign.budget) : null,
+          daily_budget: campaign.dailyBudget ? parseFloat(campaign.dailyBudget) : null,
+          start_date: campaign.startDate,
+          end_date: campaign.endDate,
+          data_source: 'amazon_api_direct',
+          last_updated: new Date().toISOString()
+        };
+
+        const { error: insertError } = await supabase
+          .from('campaigns')
+          .upsert(campaignData, {
+            onConflict: 'connection_id,amazon_campaign_id',
+            ignoreDuplicates: false
+          });
+
+        if (insertError) {
+          console.error(`Failed to store campaign ${campaignData.amazon_campaign_id}:`, insertError);
+        } else {
+          successCount++;
+        }
+      } catch (err) {
+        console.error('Error processing campaign:', err);
+      }
+    }
+
+    // Update connection status
+    await supabase
+      .from('amazon_connections')
+      .update({
+        status: 'active',
+        campaign_count: successCount,
+        last_sync_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', connectionData.id);
+
+    console.log(`=== Direct API Sync Complete: ${successCount} campaigns synced ===`);
+    
+    this.toast.success("Sync Complete", {
+      description: `Successfully synced ${successCount} campaigns via direct API connection`
+    });
+
+    await refreshConnections();
+  }
+
+  private async syncViaEdgeFunction(connectionId: string, headers: any, refreshConnections: () => Promise<void>) {
+    console.log('=== Edge Function Sync Started ===');
+    
+    // Show sync started message
+    this.toast.info("Sync Started", {
+      description: "Fetching your campaign data from Amazon. Please wait..."
+    });
+    
+    // Call Amazon Sync Function
+    const { data, error } = await supabase.functions.invoke('amazon-sync', {
+      body: { connectionId },
+      headers
+    });
+
+    console.log('=== Edge Function Sync Response ===');
+    console.log('Data present:', !!data);
+    console.log('Error present:', !!error);
+
+    // Handle response using the response handler
+    await this.responseHandler.handleSyncResponse(data, error, connectionId, refreshConnections);
+  }
+
+  private mapCampaignStatus(amazonStatus: string): 'enabled' | 'paused' | 'archived' {
+    switch (amazonStatus?.toLowerCase()) {
+      case 'enabled':
+      case 'active':
+        return 'enabled';
+      case 'paused':
+        return 'paused';
+      case 'archived':
+        return 'archived';
+      default:
+        return 'paused';
     }
   }
 }
