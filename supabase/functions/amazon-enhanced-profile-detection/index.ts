@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -183,7 +182,8 @@ serve(async (req) => {
       errors: [],
       regionsChecked: [],
       strategiesAttempted: 0,
-      detectionLog: []
+      detectionLog: [],
+      fullErrorDetails: [] // New: Store full error responses for debugging
     }
 
     console.log('=== Starting Multi-Strategy Profile Detection ===')
@@ -199,7 +199,9 @@ serve(async (req) => {
         startTime: new Date().toISOString(),
         success: false,
         profilesFound: 0,
-        error: null
+        error: null,
+        httpStatus: null,
+        fullErrorResponse: null
       }
 
       try {
@@ -211,6 +213,7 @@ serve(async (req) => {
         }
 
         console.log('Making request with headers:', Object.keys(headers))
+        console.log('Access token length:', connection.access_token?.length || 0)
 
         const controller = new AbortController()
         const timeout = setTimeout(() => {
@@ -230,6 +233,8 @@ serve(async (req) => {
           ok: profilesResponse.ok,
           statusText: profilesResponse.statusText
         })
+
+        strategyLog.httpStatus = profilesResponse.status
 
         if (profilesResponse.ok) {
           const profiles = await profilesResponse.json()
@@ -268,22 +273,73 @@ serve(async (req) => {
             }
           }
         } else {
-          const errorText = await profilesResponse.text().catch(() => 'Could not read error response')
+          // Enhanced error handling - capture full error response
+          let errorText = ''
+          let errorJson = null
+          
+          try {
+            errorText = await profilesResponse.text()
+            // Try to parse as JSON for structured error information
+            try {
+              errorJson = JSON.parse(errorText)
+            } catch (jsonError) {
+              // Not JSON, keep as text
+            }
+          } catch (textError) {
+            errorText = 'Could not read error response'
+          }
+
+          const fullErrorDetails = {
+            status: profilesResponse.status,
+            statusText: profilesResponse.statusText,
+            headers: Object.fromEntries(profilesResponse.headers.entries()),
+            body: errorText,
+            parsedBody: errorJson,
+            strategy: strategy.name,
+            endpoint: strategy.endpoint,
+            requestHeaders: {
+              'Authorization': `Bearer ${connection.access_token?.substring(0, 20)}...`,
+              'Amazon-Advertising-API-ClientId': clientId?.substring(0, 8) + '...',
+              'Content-Type': 'application/json'
+            }
+          }
+
+          detectionResults.fullErrorDetails.push(fullErrorDetails)
+          strategyLog.fullErrorResponse = fullErrorDetails
+
           const errorMsg = `${strategy.name} failed with status ${profilesResponse.status}: ${errorText.substring(0, 200)}`
-          console.error(errorMsg)
+          console.error('=== DETAILED ERROR ANALYSIS ===')
+          console.error('Full error details:', JSON.stringify(fullErrorDetails, null, 2))
+          
           strategyLog.error = errorMsg
           
-          if (profilesResponse.status === 401) {
-            detectionResults.errors.push(`Authentication failed for ${strategy.name} - token may be expired`)
+          // Enhanced error categorization with specific guidance
+          if (profilesResponse.status === 400) {
+            const guidance = 'Bad Request - This often indicates an invalid access token or incorrect OAuth scope. Please reconnect your Amazon account.'
+            detectionResults.errors.push(`${strategy.name}: ${guidance}`)
+            console.error(`${strategy.name} - 400 Bad Request Analysis:`, {
+              possibleCauses: [
+                'Invalid or malformed access token',
+                'Incorrect OAuth scope (should be cpc_advertising:campaign_management)',
+                'Token not granted proper permissions',
+                'API client ID mismatch'
+              ],
+              recommendedAction: 'Reconnect Amazon account with proper scope'
+            })
+          } else if (profilesResponse.status === 401) {
+            detectionResults.errors.push(`Authentication failed for ${strategy.name} - token may be expired or invalid`)
+            console.error(`${strategy.name} - 401 Unauthorized: Token is invalid or expired`)
           } else if (profilesResponse.status === 403) {
-            detectionResults.errors.push(`Access denied for ${strategy.name} - check API permissions`)
+            detectionResults.errors.push(`Access denied for ${strategy.name} - insufficient API permissions`)
+            console.error(`${strategy.name} - 403 Forbidden: Insufficient permissions for advertising API`)
           } else {
             detectionResults.errors.push(errorMsg)
           }
         }
       } catch (error) {
         const errorMsg = `${strategy.name} error: ${error.message}`
-        console.error(errorMsg)
+        console.error('=== STRATEGY ERROR ===', errorMsg)
+        console.error('Error stack:', error.stack)
         strategyLog.error = errorMsg
         
         if (error.name === 'AbortError') {
@@ -305,7 +361,7 @@ serve(async (req) => {
     console.log('Regions checked:', detectionResults.regionsChecked.length)
     console.log('Strategies attempted:', detectionResults.strategiesAttempted)
     console.log('Errors encountered:', detectionResults.errors.length)
-    console.log('Detection log:', detectionResults.detectionLog)
+    console.log('Full error details count:', detectionResults.fullErrorDetails.length)
 
     if (detectionResults.allProfiles.length > 0) {
       // Enhanced profile sorting with preference for US and larger profile IDs
@@ -340,7 +396,8 @@ serve(async (req) => {
             regionsChecked: detectionResults.regionsChecked,
             strategiesAttempted: detectionResults.strategiesAttempted,
             tokenExpiresIn: `${hoursUntilExpiry} hours`,
-            detectionLog: detectionResults.detectionLog
+            detectionLog: detectionResults.detectionLog,
+            scopeUsed: 'cpc_advertising:campaign_management'
           },
           message: `Successfully detected ${sortedProfiles.length} advertising profile${sortedProfiles.length === 1 ? '' : 's'}`,
           nextSteps: [
@@ -352,12 +409,14 @@ serve(async (req) => {
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     } else {
-      // Enhanced error analysis and guidance
+      // Enhanced error analysis with full error details
       console.log('No profiles found despite detection attempts')
+      console.log('Full error details for analysis:', JSON.stringify(detectionResults.fullErrorDetails, null, 2))
       
+      const has400Errors = detectionResults.fullErrorDetails.some(err => err.status === 400)
       const hasAuthErrors = detectionResults.errors.some(err => 
         err.includes('Authentication') || err.includes('401') || err.includes('403')
-      )
+      ) || detectionResults.fullErrorDetails.some(err => err.status === 401 || err.status === 403)
       
       const hasTimeoutErrors = detectionResults.errors.some(err => 
         err.includes('timed out') || err.includes('timeout')
@@ -365,9 +424,20 @@ serve(async (req) => {
       
       let primaryReason = 'No advertising profiles found'
       let detailedGuidance = []
+      let requiresReconnection = false
       
-      if (hasAuthErrors) {
+      if (has400Errors) {
+        primaryReason = 'Bad Request - Invalid token or incorrect OAuth scope'
+        requiresReconnection = true
+        detailedGuidance = [
+          'Your Amazon connection may have been created with incorrect OAuth scope',
+          'Please reconnect your Amazon account to ensure proper API permissions',
+          'The connection should use "cpc_advertising:campaign_management" scope',
+          'This will grant access to your advertising profiles and campaign data'
+        ]
+      } else if (hasAuthErrors) {
         primaryReason = 'Authentication issues detected'
+        requiresReconnection = true
         detailedGuidance = [
           'Your Amazon token may have expired or been revoked',
           'Try reconnecting your Amazon account with fresh permissions',
@@ -395,26 +465,38 @@ serve(async (req) => {
           profiles: [],
           error: 'No advertising profiles detected',
           primaryReason,
+          requiresReconnection,
           detectionSummary: {
             strategiesAttempted: detectionResults.strategiesAttempted,
             regionsChecked: detectionResults.regionsChecked.length,
             errorsEncountered: detectionResults.errors.length,
             tokenExpiresIn: `${hoursUntilExpiry} hours`,
-            detectionLog: detectionResults.detectionLog
+            detectionLog: detectionResults.detectionLog,
+            fullErrorDetails: detectionResults.fullErrorDetails,
+            scopeUsed: 'cpc_advertising:campaign_management'
           },
           detailedGuidance,
           troubleshooting: {
+            badRequestErrors: has400Errors,
             authenticationIssues: hasAuthErrors,
             timeoutIssues: hasTimeoutErrors,
             serverIssues: false,
-            accountHasAdvertisingAccess: false
+            accountHasAdvertisingAccess: false,
+            tokenScopeIssue: has400Errors
           },
-          nextSteps: hasAuthErrors ? 
-            ['Reconnect your Amazon account', 'Try Enhanced Sync again'] :
+          nextSteps: has400Errors || hasAuthErrors ? 
+            ['Reconnect your Amazon account with proper scope', 'Try Enhanced Sync again'] :
             hasTimeoutErrors ?
             ['Wait a few minutes', 'Try Enhanced Sync again', 'Check connection stability'] :
             ['Complete Amazon Advertising setup', 'Create first campaign', 'Use Enhanced Sync'],
-          errors: detectionResults.errors.length > 0 ? detectionResults.errors : undefined
+          errors: detectionResults.errors.length > 0 ? detectionResults.errors : undefined,
+          debugInfo: {
+            connectionId: connection.id,
+            profileId: connection.profile_id,
+            tokenLength: connection.access_token?.length || 0,
+            clientIdPresent: !!clientId,
+            allErrorResponses: detectionResults.fullErrorDetails
+          }
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )

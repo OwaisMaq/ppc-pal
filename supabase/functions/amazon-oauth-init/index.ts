@@ -169,13 +169,13 @@ serve(async (req) => {
       const state = btoa(JSON.stringify(stateData));
       console.log('Generated state parameter (base64):', state);
 
-      // Amazon OAuth URL parameters
-      const scope = 'advertising::campaign_management';
+      // Updated scope for Amazon Advertising API - this is the key fix
+      const scope = 'cpc_advertising:campaign_management';
       const responseType = 'code';
       
       console.log('OAuth parameters:');
       console.log('- Client ID:', amazonClientId.substring(0, 8) + '...');
-      console.log('- Scope:', scope);
+      console.log('- Scope (UPDATED):', scope);
       console.log('- Response Type:', responseType);
       console.log('- Redirect URI:', finalRedirectUri);
       console.log('- State length:', state.length);
@@ -212,11 +212,12 @@ serve(async (req) => {
       const responseData = { 
         authUrl: finalAuthUrl, 
         state: state,
+        scope: scope, // Include scope in response for debugging
         timestamp: new Date().toISOString()
       };
       
       console.log('=== OAuth Init Successful ===');
-      console.log('Response prepared successfully');
+      console.log('Response prepared successfully with updated scope');
 
       return new Response(
         JSON.stringify(responseData),
