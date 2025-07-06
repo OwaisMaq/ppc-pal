@@ -29,6 +29,27 @@ export interface TokenValidationResult {
   error?: string;
 }
 
+export interface AccountValidationResult {
+  success: boolean;
+  validation: {
+    isValid: boolean;
+    hasAdvertisingAccount: boolean;
+    hasActiveProfiles: boolean;
+    hasCampaigns: boolean;
+    issues: string[];
+    recommendations: string[];
+    profilesFound: number;
+    campaignsFound: number;
+  };
+  summary: {
+    accountReady: boolean;
+    setupRequired: boolean;
+    canSync: boolean;
+    nextSteps: string[];
+  };
+  message: string;
+}
+
 export const useEnhancedAmazonSync = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [steps, setSteps] = useState<SyncStep[]>([]);
@@ -93,62 +114,90 @@ export const useEnhancedAmazonSync = () => {
     }
   };
 
-  const validateToken = async (connection: any): Promise<TokenValidationResult> => {
-    console.log('=== Token Validation Started ===');
+  const refreshTokenIfNeeded = async (connectionId: string): Promise<boolean> => {
+    console.log('=== Token Refresh Check ===');
     
     try {
-      if (!connection.token_expires_at) {
-        console.error('No token expiry information available');
-        return {
-          isValid: false,
-          hoursUntilExpiry: 0,
-          requiresRefresh: true,
-          error: 'No token expiry information'
-        };
-      }
-
-      const tokenExpiry = new Date(connection.token_expires_at);
-      const now = new Date();
-      const hoursUntilExpiry = Math.round((tokenExpiry.getTime() - now.getTime()) / (1000 * 60 * 60));
+      addStep('Checking token expiry', 'pending', 'Validating Amazon access token');
       
-      console.log('Token validation details:', {
-        expires: tokenExpiry.toISOString(),
-        now: now.toISOString(),
-        hoursUntilExpiry,
-        isExpired: tokenExpiry <= now
+      const headers = await getAuthHeaders();
+      const { data, error } = await supabase.functions.invoke('amazon-token-refresh', {
+        body: { connectionId },
+        headers
       });
 
-      if (tokenExpiry <= now) {
-        console.error(`Token expired ${Math.abs(hoursUntilExpiry)} hours ago`);
-        return {
-          isValid: false,
-          hoursUntilExpiry,
-          requiresRefresh: true,
-          error: `Token expired ${Math.abs(hoursUntilExpiry)} hours ago`
-        };
+      if (error) {
+        console.error('Token refresh error:', error);
+        updateLastStep('error', `Token refresh failed: ${error.message}`);
+        return false;
       }
 
-      // Check if token expires within the next 24 hours
-      const requiresRefresh = hoursUntilExpiry <= 24;
+      if (data?.requiresReconnection) {
+        updateLastStep('error', 'Amazon connection expired - reconnection required');
+        return false;
+      }
+
+      if (data?.refreshed) {
+        updateLastStep('success', `Token refreshed - expires in ${data.hoursUntilExpiry} hours`);
+      } else {
+        updateLastStep('success', `Token valid - expires in ${data.hoursUntilExpiry} hours`);
+      }
+
+      return true;
+    } catch (err) {
+      console.error('Token refresh check error:', err);
+      updateLastStep('error', `Token validation failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      return false;
+    }
+  };
+
+  const validateAmazonAccount = async (connectionId: string): Promise<AccountValidationResult | null> => {
+    console.log('=== Account Validation Started ===');
+    
+    try {
+      addStep('Validating Amazon account setup', 'pending', 'Checking advertising account configuration');
       
-      if (requiresRefresh) {
-        console.warn(`Token expires in ${hoursUntilExpiry} hours - refresh recommended`);
+      const headers = await getAuthHeaders();
+      const { data, error } = await supabase.functions.invoke('amazon-account-validation', {
+        body: { connectionId },
+        headers
+      });
+
+      if (error) {
+        console.error('Account validation error:', error);
+        updateLastStep('error', `Account validation failed: ${error.message}`);
+        return null;
       }
 
-      return {
-        isValid: true,
-        hoursUntilExpiry,
-        requiresRefresh,
-        error: undefined
-      };
-    } catch (error) {
-      console.error('Token validation error:', error);
-      return {
-        isValid: false,
-        hoursUntilExpiry: 0,
-        requiresRefresh: true,
-        error: error instanceof Error ? error.message : 'Unknown validation error'
-      };
+      const validation = data as AccountValidationResult;
+      
+      if (validation.validation.isValid) {
+        if (validation.validation.hasCampaigns) {
+          updateLastStep('success', 
+            `Account validated - ${validation.validation.profilesFound} profiles, ${validation.validation.campaignsFound} campaigns`
+          );
+        } else {
+          updateLastStep('warning', 
+            `Account setup complete but no campaigns found - ${validation.validation.profilesFound} profiles detected`
+          );
+        }
+      } else {
+        updateLastStep('error', 
+          `Account setup issues: ${validation.validation.issues.join(', ')}`
+        );
+        
+        if (validation.validation.recommendations.length > 0) {
+          addStep('Setup recommendations', 'info', 
+            validation.validation.recommendations.join(' • ')
+          );
+        }
+      }
+
+      return validation;
+    } catch (err) {
+      console.error('Account validation error:', err);
+      updateLastStep('error', `Account validation failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      return null;
     }
   };
 
@@ -285,6 +334,28 @@ export const useEnhancedAmazonSync = () => {
     addStep('Running connection recovery', 'pending', 'Detecting and configuring advertising profiles automatically');
     
     try {
+      // Step 1: Refresh token if needed
+      const tokenValid = await refreshTokenIfNeeded(connectionId);
+      if (!tokenValid) {
+        return { 
+          success: false, 
+          error: 'Token refresh required',
+          requiresReconnection: true
+        };
+      }
+
+      // Step 2: Validate account setup
+      const accountValidation = await validateAmazonAccount(connectionId);
+      if (!accountValidation?.validation.isValid) {
+        return {
+          success: false,
+          error: accountValidation?.validation.issues.join(', ') || 'Account validation failed',
+          guidance: accountValidation?.validation.recommendations?.[0] || 'Account setup required',
+          nextSteps: accountValidation?.validation.recommendations || []
+        };
+      }
+
+      // Step 3: Enhanced profile detection
       const profileResult = await runEnhancedProfileDetection(connectionId);
       
       if (profileResult.success && profileResult.profiles.length > 0) {
@@ -387,158 +458,63 @@ export const useEnhancedAmazonSync = () => {
         .single();
 
       if (connectionError || !connection) {
-        updateLastStep('error', 'Connection not found');
+        updateLastStep('error', 'Connection not found or access denied');
         toast({
           title: "Connection Error",
-          description: "Could not find the Amazon connection.",
+          description: "Amazon connection not found. Please reconnect your account.",
           variant: "destructive",
         });
         return;
       }
-      updateLastStep('success', `Connection validated: ${connection.profile_name || 'Amazon account'}`);
 
-      // Enhanced token validity check
-      addStep('Checking token validity', 'pending', 'Verifying Amazon API token');
-      const tokenValidation = await validateToken(connection);
-      
-      if (!tokenValidation.isValid) {
-        updateLastStep('error', tokenValidation.error || 'Token validation failed');
-        toast({
-          title: "Token Invalid",
-          description: "Please reconnect your Amazon account.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      if (tokenValidation.requiresRefresh) {
-        updateLastStep('warning', `Token expires in ${tokenValidation.hoursUntilExpiry} hours - consider refreshing`);
-      } else {
-        updateLastStep('success', `Token valid for ${tokenValidation.hoursUntilExpiry} hours`);
-      }
+      updateLastStep('success', `Connection found: ${connection.profile_name || 'Amazon Account'}`);
 
-      // Enhanced profile validation and recovery
-      addStep('Validating profile configuration', 'pending', 'Checking advertising profile setup');
-      
-      const isValidProfile = connection.profile_id && 
-                           connection.profile_id !== 'setup_required_no_profiles_found' &&
-                           /^\d+$/.test(connection.profile_id);
-      
-      if (!isValidProfile) {
-        updateLastStep('warning', `Profile issue: ${connection.profile_id || 'No profile ID'}`);
-        
-        const recoveryResult = await runConnectionRecovery(connectionId);
-        
-        if (!recoveryResult.success) {
-          if (recoveryResult.requiresReconnection) {
-            toast({
-              title: "Reconnection Required",
-              description: "Please reconnect your Amazon account.",
-              variant: "destructive",
-            });
-            return;
-          } else {
-            toast({
-              title: "Setup Required",
-              description: recoveryResult.guidance || "Complete Amazon Advertising setup at advertising.amazon.com",
-              variant: "destructive",
-            });
-            return;
-          }
-        }
+      // Run enhanced connection recovery
+      console.log('=== Starting Connection Recovery ===');
+      const recoveryResult = await runConnectionRecovery(connectionId);
 
-        addStep('Profile recovery completed', 'success', 
-          `Successfully configured ${recoveryResult.profilesFound} profile${recoveryResult.profilesFound === 1 ? '' : 's'}`
+      if (recoveryResult.success) {
+        addStep('Enhanced sync completed', 'success', 
+          `Successfully configured Amazon connection with ${recoveryResult.profilesFound} profile${recoveryResult.profilesFound === 1 ? '' : 's'}`
         );
-      } else {
-        updateLastStep('success', `Profile validated: ${connection.profile_id}`);
-      }
-
-      // Enhanced campaign sync with detailed error handling
-      addStep('Syncing campaigns', 'pending', 'Fetching campaign data from Amazon');
-      
-      const { data: syncData, error: syncError } = await supabase.functions.invoke('amazon-sync', {
-        body: { connectionId },
-        headers
-      });
-
-      if (syncError) {
-        updateLastStep('error', `Sync failed: ${syncError.message}`);
-        toast({
-          title: "Sync Failed",
-          description: syncError.message || "Failed to sync campaign data",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      if (syncData?.error) {
-        updateLastStep('error', `Amazon API error: ${syncData.error}`);
         
-        if (syncData.requiresSetup) {
-          addStep('Amazon Advertising setup required', 'warning', 
-            'Visit advertising.amazon.com to create your first campaign.');
-          
-          toast({
-            title: "Setup Required",
-            description: "Complete Amazon Advertising setup and create campaigns.",
-            variant: "destructive",
-          });
-        } else if (syncData.requiresReconnection) {
-          addStep('Reconnection required', 'warning', 
-            'Please reconnect your Amazon account.');
+        toast({
+          title: "Enhanced Sync Successful",
+          description: `Amazon connection is now properly configured and ready for campaign sync.`,
+        });
+      } else {
+        if (recoveryResult.requiresReconnection) {
+          addStep('Reconnection required', 'error', 
+            'Please reconnect your Amazon account to resolve authentication issues'
+          );
           
           toast({
             title: "Reconnection Required",
-            description: "Please reconnect your Amazon account.",
+            description: "Your Amazon connection needs to be re-established. Please reconnect your account.",
             variant: "destructive",
           });
         } else {
+          addStep('Setup guidance provided', 'warning', 
+            recoveryResult.guidance || 'Additional setup required'
+          );
+          
           toast({
-            title: "Sync Error",
-            description: syncData.details || syncData.error,
+            title: "Setup Required",
+            description: recoveryResult.guidance || "Additional Amazon Advertising setup is required.",
             variant: "destructive",
           });
         }
-        return;
       }
 
-      // Success handling
-      const campaignCount = syncData?.campaignsSynced || syncData?.campaignCount || 0;
-      updateLastStep('success', `Successfully synced ${campaignCount} campaigns`);
-      
-      if (campaignCount > 0) {
-        addStep('Campaign import completed', 'success', 
-          `${campaignCount} campaigns imported and ready for optimization.`
-        );
-        
-        toast({
-          title: "Enhanced Sync Complete!",
-          description: `Successfully synced ${campaignCount} campaigns.`,
-        });
-      } else {
-        addStep('Sync completed successfully', 'success', 
-          'Sync successful, but no campaigns found. This is normal for new accounts.'
-        );
-        
-        addStep('Next steps', 'info', 
-          'Create campaigns at advertising.amazon.com to see them here.'
-        );
-        
-        toast({
-          title: "Sync Complete",
-          description: "Sync completed. Create campaigns in Amazon Advertising to see them here.",
-        });
-      }
-
-    } catch (err) {
-      console.error('Enhanced sync error:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-      addStep('Unexpected error', 'error', `Critical error: ${errorMessage}`);
+    } catch (error) {
+      console.error('Enhanced sync error:', error);
+      addStep('Enhanced sync failed', 'error', 
+        `Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
       
       toast({
         title: "Sync Failed",
-        description: "An unexpected error occurred. Please try again.",
+        description: "An unexpected error occurred during enhanced sync.",
         variant: "destructive",
       });
     } finally {
@@ -546,62 +522,13 @@ export const useEnhancedAmazonSync = () => {
     }
   };
 
-  const debugConnection = async (connectionId: string) => {
-    console.log('=== Debug Connection Utility Started ===');
-    
-    try {
-      addStep('Starting connection debug', 'pending', 'Analyzing connection details');
-      
-      // Get connection details
-      const { data: connection, error: fetchError } = await supabase
-        .from('amazon_connections')
-        .select('*')
-        .eq('id', connectionId)
-        .single();
-
-      if (fetchError || !connection) {
-        updateLastStep('error', 'Connection not found or access denied');
-        return { success: false, error: 'Connection not found' };
-      }
-
-      // Validate token
-      const tokenValidation = await validateToken(connection);
-      
-      // Log comprehensive debug information
-      const debugInfo = {
-        connectionId: connection.id,
-        profileId: connection.profile_id,
-        profileName: connection.profile_name,
-        marketplaceId: connection.marketplace_id,
-        status: connection.status,
-        lastSync: connection.last_sync_at,
-        tokenValidation,
-        hasValidProfile: connection.profile_id && 
-                        connection.profile_id !== 'setup_required_no_profiles_found' &&
-                        /^\d+$/.test(connection.profile_id)
-      };
-
-      console.log('=== Complete Debug Information ===');
-      console.log(JSON.stringify(debugInfo, null, 2));
-      
-      updateLastStep('success', 'Debug analysis complete - check console for details', debugInfo);
-      
-      return { success: true, debugInfo };
-    } catch (error) {
-      console.error('Debug utility error:', error);
-      updateLastStep('error', `Debug failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
-    }
-  };
-
   return {
-    steps,
     isRunning,
-    runEnhancedSync,
-    runEnhancedProfileDetection,
-    runConnectionRecovery,
-    debugConnection,
-    validateToken,
+    steps,
     clearSteps,
+    runEnhancedSync,
+    runConnectionRecovery,
+    validateAmazonAccount,
+    refreshTokenIfNeeded
   };
 };

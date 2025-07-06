@@ -1,5 +1,5 @@
 
-project_id = "ucbkcxupzjbblnzyiyui"
+project_id = "17b4545b-ec6d-4eec-834b-0ab0991f6ed8"
 
 [api]
 enabled = true
@@ -12,10 +12,10 @@ max_rows = 1000
 enabled = true
 port = 54324
 site_url = "http://localhost:3000"
-additional_redirect_urls = ["https://lovableproject.com"]
+additional_redirect_urls = ["https://lovable.app"]
 jwt_expiry = 3600
-enable_signup = true
-enable_email_confirmations = false
+refresh_token_rotation_enabled = true
+security_update_password_require_reauthentication = true
 
 [auth.email]
 enable_signup = true
@@ -25,54 +25,51 @@ enable_confirmations = false
 [db]
 port = 54322
 
-[studio]
+[storage]
 enabled = true
 port = 54323
+file_size_limit = "50MiB"
+image_transformation = "enabled"
 
-[inbucket]
+[edge_functions]
 enabled = true
 port = 54324
-smtp_port = 54325
-pop3_port = 54326
-
-[functions.amazon-oauth]
-verify_jwt = true
 
 [functions.amazon-oauth-init]
 verify_jwt = true
 
-[functions.amazon-oauth-callback]
+[functions.amazon-oauth-callback] 
 verify_jwt = false
 
 [functions.amazon-enhanced-profile-detection]
+verify_jwt = true
+
+[functions.amazon-token-refresh]
+verify_jwt = true
+
+[functions.amazon-account-validation]
+verify_jwt = true
+
+[functions.amazon-sync]
+verify_jwt = true
+
+[functions.amazon-force-sync]
 verify_jwt = true
 
 [functions.amazon-test-connection]
 verify_jwt = true
 
 [functions.amazon-update-connection-profiles]
-verify_jwt = false
+verify_jwt = true
 
 [functions.amazon-retry-profiles]
-verify_jwt = false
-
-[functions.sync-amazon-data]
-verify_jwt = true
-
-[functions.run-optimization]
-verify_jwt = true
-
-[functions.ai-optimize]
 verify_jwt = true
 
 [functions.check-subscription]
-verify_jwt = true
-
-[functions.create-checkout]
 verify_jwt = true
 
 [functions.customer-portal]
 verify_jwt = true
 
 [functions.scheduled-optimization]
-verify_jwt = false
+verify_jwt = true
