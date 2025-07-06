@@ -9,15 +9,17 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  console.log('=== Amazon OAuth Init Function Started ===');
+  console.log('Request method:', req.method);
+  console.log('Request URL:', req.url);
+  console.log('Request headers:', Object.fromEntries(req.headers.entries()));
+
   if (req.method === 'OPTIONS') {
+    console.log('Handling CORS preflight request');
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    console.log('=== Amazon OAuth Init Started ===');
-    console.log('Request method:', req.method);
-    console.log('Request URL:', req.url);
-    
     // Get environment variables first
     const amazonClientId = Deno.env.get('AMAZON_CLIENT_ID');
     const amazonClientSecret = Deno.env.get('AMAZON_CLIENT_SECRET');
@@ -63,6 +65,7 @@ serve(async (req) => {
     try {
       const bodyText = await req.text();
       console.log('Raw request body:', bodyText);
+      console.log('Request body length:', bodyText?.length || 0);
       
       if (!bodyText || bodyText.trim() === '') {
         console.error('Empty request body received');
@@ -82,6 +85,7 @@ serve(async (req) => {
       console.log('Request body parsed successfully:', requestBody);
     } catch (parseError) {
       console.error('Failed to parse request body:', parseError);
+      console.error('Parse error details:', parseError.message);
       return new Response(
         JSON.stringify({ 
           error: 'Invalid request body format',
@@ -95,11 +99,13 @@ serve(async (req) => {
     }
 
     const { redirectUri } = requestBody;
-    console.log('Requested redirect URI:', redirectUri);
+    console.log('Extracted redirect URI:', redirectUri);
+    console.log('Redirect URI type:', typeof redirectUri);
     
     // Validate redirect URI
     if (!redirectUri) {
-      console.error('No redirect URI provided');
+      console.error('No redirect URI provided in request body');
+      console.error('Request body keys:', Object.keys(requestBody || {}));
       return new Response(
         JSON.stringify({ 
           error: 'Redirect URI is required'
@@ -118,6 +124,8 @@ serve(async (req) => {
     // Get user from auth header
     console.log('=== User Authentication Check ===');
     const authHeader = req.headers.get('authorization');
+    console.log('Auth header present:', !!authHeader);
+    console.log('Auth header format valid:', authHeader?.startsWith('Bearer '));
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       console.error('Invalid or missing authorization header');
@@ -133,14 +141,18 @@ serve(async (req) => {
     }
 
     const token = authHeader.replace('Bearer ', '');
+    console.log('Token extracted, length:', token.length);
     
     let userData;
     try {
+      console.log('Attempting to get user with token...');
       const { data: userResponse, error: userError } = await supabase.auth.getUser(token);
       
       console.log('=== User Authentication Result ===');
+      console.log('User response present:', !!userResponse);
       console.log('User authenticated:', !!userResponse?.user);
       console.log('User ID:', userResponse?.user?.id);
+      console.log('User error:', userError);
       
       if (userError || !userResponse?.user) {
         console.error('User authentication failed:', userError);
@@ -209,6 +221,7 @@ serve(async (req) => {
     const finalAuthUrl = authUrl.toString();
     console.log('=== Generated Amazon OAuth URL ===');
     console.log('Auth URL length:', finalAuthUrl.length);
+    console.log('Auth URL preview:', finalAuthUrl.substring(0, 100) + '...');
     
     // Validate the constructed URL
     try {
@@ -236,6 +249,7 @@ serve(async (req) => {
     
     console.log('=== OAuth Init Successful ===');
     console.log('Response prepared successfully');
+    console.log('Response data keys:', Object.keys(responseData));
 
     return new Response(
       JSON.stringify(responseData),
@@ -247,7 +261,8 @@ serve(async (req) => {
     
   } catch (error) {
     console.error('=== Amazon OAuth Init Error ===');
-    console.error('Error details:', error);
+    console.error('Error type:', error.constructor.name);
+    console.error('Error message:', error.message);
     console.error('Error stack:', error.stack);
     
     const errorResponse = {
