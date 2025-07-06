@@ -45,27 +45,32 @@ export class AmazonConnectionOperations {
 
     try {
       // Validate redirect URI first
-      if (!redirectUri || !redirectUri.startsWith('https://')) {
+      if (!redirectUri || typeof redirectUri !== 'string') {
         throw new Error('Invalid redirect URI provided');
+      }
+
+      try {
+        new URL(redirectUri);
+      } catch {
+        throw new Error('Redirect URI must be a valid URL');
       }
 
       // Get auth headers
       const headers = await this.getAuthHeaders();
       console.log('Auth headers prepared successfully');
 
-      // Prepare request body with explicit JSON structure
+      // Prepare request body with explicit structure
       const requestBody = {
-        redirectUri: redirectUri
+        redirectUri: redirectUri.trim()
       };
 
-      console.log('=== Making request to amazon-oauth-init ===');
+      console.log('=== Making Request to Amazon OAuth Init ===');
       console.log('Request body:', JSON.stringify(requestBody, null, 2));
-      console.log('Headers (auth redacted):', { 
+      console.log('Headers (auth token redacted):', { 
         ...headers, 
         Authorization: `Bearer ${headers.Authorization.substring(7, 27)}...` 
       });
 
-      // Use supabase.functions.invoke with detailed logging
       console.log('Calling edge function...');
       const response = await supabase.functions.invoke('amazon-oauth-init', {
         body: requestBody,
@@ -73,16 +78,17 @@ export class AmazonConnectionOperations {
       });
 
       console.log('=== Edge Function Response Analysis ===');
-      console.log('Response received:', {
+      console.log('Response structure:', {
         hasData: !!response.data,
         hasError: !!response.error,
         dataKeys: response.data ? Object.keys(response.data) : [],
-        errorDetails: response.error
+        errorType: typeof response.error,
+        errorKeys: response.error && typeof response.error === 'object' ? Object.keys(response.error) : []
       });
 
-      // Handle edge function errors first
+      // Handle Supabase client errors (network, etc.)
       if (response.error) {
-        console.error('=== Edge Function Error ===');
+        console.error('=== Supabase Client Error ===');
         console.error('Error object:', response.error);
         
         let errorMessage = 'Failed to initialize Amazon connection';
@@ -104,14 +110,17 @@ export class AmazonConnectionOperations {
 
       // Check for valid response data
       if (!response.data) {
-        console.error('No response data received');
+        console.error('No response data received from edge function');
         throw new Error('No response received from server');
       }
 
-      // Check for server-side errors in response data
+      console.log('=== Response Data Analysis ===');
+      console.log('Response data:', response.data);
+
+      // Check for application-level errors in response data
       if (response.data.error) {
-        console.error('=== Server Error in Response ===');
-        console.error('Server error:', response.data.error);
+        console.error('=== Application Error in Response ===');
+        console.error('Application error:', response.data.error);
         console.error('Error details:', response.data.details);
         console.error('Debug info:', response.data.debug);
         
@@ -131,24 +140,41 @@ export class AmazonConnectionOperations {
         throw new Error(errorMessage);
       }
 
-      // Validate auth URL presence
-      if (!response.data.authUrl) {
-        console.error('=== Missing Auth URL ===');
+      // Validate that we received an auth URL
+      if (!response.data.authUrl || typeof response.data.authUrl !== 'string') {
+        console.error('=== Missing or Invalid Auth URL ===');
         console.error('Response data structure:', Object.keys(response.data));
-        throw new Error('No authorization URL received from server');
+        console.error('Auth URL value:', response.data.authUrl);
+        throw new Error('No valid authorization URL received from server');
+      }
+
+      // Validate the auth URL format
+      try {
+        const authUrl = new URL(response.data.authUrl);
+        if (!authUrl.hostname.includes('amazon.com')) {
+          throw new Error('Invalid Amazon authorization URL received');
+        }
+        console.log('Auth URL validation passed:', {
+          hostname: authUrl.hostname,
+          pathname: authUrl.pathname,
+          hasParams: authUrl.searchParams.toString().length > 0
+        });
+      } catch (urlError) {
+        console.error('Auth URL validation failed:', urlError);
+        throw new Error('Invalid authorization URL format received');
       }
 
       console.log('=== Success! Redirecting to Amazon ===');
-      console.log('Auth URL validated, length:', response.data.authUrl.length);
+      console.log('Auth URL length:', response.data.authUrl.length);
       
-      // Perform redirect
+      // Perform the redirect to Amazon OAuth
       window.location.href = response.data.authUrl;
       
     } catch (err) {
       console.error('=== Connection Initiation Failed ===');
       console.error('Error details:', err);
       console.error('Error type:', typeof err);
-      console.error('Error stack:', err instanceof Error ? err.stack : 'No stack');
+      console.error('Error stack:', err instanceof Error ? err.stack : 'No stack available');
       
       let userMessage = 'Failed to connect to Amazon';
       
@@ -157,13 +183,15 @@ export class AmazonConnectionOperations {
         
         // Provide specific guidance for common issues
         if (err.message.includes('Authentication') || err.message.includes('sign in')) {
-          userMessage = 'Authentication failed. Please refresh the page and try again.';
+          userMessage = 'Authentication failed. Please refresh the page and try signing in again.';
         } else if (err.message.includes('Server configuration')) {
-          userMessage = 'Server configuration issue. Please contact support.';
+          userMessage = 'Server configuration issue. Please contact support if this persists.';
+        } else if (err.message.includes('Invalid redirect URI')) {
+          userMessage = 'Configuration error with redirect URL. Please contact support.';
         }
       }
       
-      // Only show toast if we haven't already shown one
+      // Only show toast if we haven't already shown one for this specific error
       if (!err.message || !err.message.includes('Failed to initialize Amazon connection')) {
         this.toast({
           title: "Connection Failed",
