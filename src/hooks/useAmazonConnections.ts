@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,6 +14,7 @@ export interface AmazonConnection {
   last_sync_at?: string;
   campaign_count?: number;
   needs_sync?: boolean;
+  setup_required_reason?: string;
 }
 
 export const useAmazonConnections = () => {
@@ -111,15 +111,18 @@ export const useAmazonConnections = () => {
         
         // Determine connection status based on profile availability and sync status
         let connectionStatus: 'connected' | 'disconnected' | 'error' | 'setup_required';
+        let setupRequiredReason: string | undefined;
         
         if (!isActive) {
           connectionStatus = 'error';
           console.log('Status determination: error (not active)');
         } else if (!conn.profile_id || conn.profile_id === 'setup_required_no_profiles_found') {
           connectionStatus = 'setup_required';
+          setupRequiredReason = 'no_advertising_profiles';
           console.log('Status determination: setup_required (no valid profile)');
         } else if (needsSync) {
           connectionStatus = 'setup_required'; // Needs data sync
+          setupRequiredReason = 'needs_sync';
           console.log('Status determination: setup_required (needs sync)');
         } else {
           connectionStatus = 'connected';
@@ -136,7 +139,8 @@ export const useAmazonConnections = () => {
           profile_name: conn.profile_name,
           last_sync_at: conn.last_sync_at,
           campaign_count: campaignCount,
-          needs_sync: needsSync
+          needs_sync: needsSync,
+          setup_required_reason: setupRequiredReason
         };
         
         console.log(`=== Formatted Connection ${index + 1} ===`);
@@ -303,17 +307,17 @@ export const useAmazonConnections = () => {
         console.error('Server error:', data.error);
         console.error('Server details:', data.details);
         
-        // Handle specific error cases
-        if (data.requiresSetup) {
+        // Handle specific error cases with improved messaging
+        if (data.requiresSetup || data.error === 'Profile setup required') {
           toast({
-            title: "Setup Required",
-            description: data.details || "Please set up your Amazon Advertising account first",
+            title: "Amazon Advertising Setup Required",
+            description: "Please set up your Amazon Advertising account at advertising.amazon.com first, then try 'Force Sync' to import your campaigns.",
             variant: "destructive",
           });
         } else if (data.requiresReconnection) {
           toast({
             title: "Reconnection Required",
-            description: data.details || "Please reconnect your Amazon account",
+            description: data.details || "Please reconnect your Amazon account to continue syncing",
             variant: "destructive",
           });
         } else {

@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Trash2, CheckCircle, AlertTriangle, XCircle, Clock, Zap } from 'lucide-react';
+import { RefreshCw, Trash2, CheckCircle, AlertTriangle, XCircle, Clock, Zap, ExternalLink } from 'lucide-react';
 import { AmazonConnection } from '@/hooks/useAmazonConnections';
 
 interface ConnectionSummaryTableProps {
@@ -33,7 +33,7 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
       case 'connected':
         return <Badge variant="default">Connected</Badge>;
       case 'setup_required':
-        return <Badge variant="secondary">Sync Required</Badge>;
+        return <Badge variant="secondary">Setup Required</Badge>;
       case 'error':
         return <Badge variant="destructive">Error</Badge>;
       default:
@@ -45,9 +45,9 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
     if (connection.status === 'connected') {
       return `${connection.campaign_count || 0} campaigns synced`;
     } else if (connection.status === 'setup_required') {
-      if (!connection.profile_id) {
-        return 'No advertising profiles found - try Force Sync or set up Amazon Advertising first';
-      } else if (connection.needs_sync) {
+      if (connection.setup_required_reason === 'no_advertising_profiles') {
+        return 'No advertising profiles found - Set up Amazon Advertising first';
+      } else if (connection.setup_required_reason === 'needs_sync') {
         return 'Campaign data needs to be synced from Amazon';
       }
       return 'Setup required';
@@ -60,7 +60,7 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
   const getActionButtons = (connection: AmazonConnection) => {
     const buttons = [];
     
-    if (connection.status === 'setup_required' && connection.profile_id) {
+    if (connection.status === 'setup_required' && connection.setup_required_reason === 'needs_sync') {
       buttons.push(
         <Button
           key="sync"
@@ -88,8 +88,8 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
       );
     }
 
-    // Add Force Sync button for connections that need it
-    if (connection.status === 'setup_required' && !connection.profile_id && onForceSync) {
+    // Add Force Sync button for connections that need advertising profile setup
+    if (connection.status === 'setup_required' && connection.setup_required_reason === 'no_advertising_profiles' && onForceSync) {
       buttons.push(
         <Button
           key="force-sync"
@@ -160,7 +160,10 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
                     </div>
                     {connection.campaign_count === 0 && connection.status === 'setup_required' && (
                       <div className="text-xs text-gray-500">
-                        Click sync to import
+                        {connection.setup_required_reason === 'no_advertising_profiles' 
+                          ? 'Setup required' 
+                          : 'Click sync to import'
+                        }
                       </div>
                     )}
                   </TableCell>
@@ -192,21 +195,50 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
         </div>
         
         {connections.some(c => c.status === 'setup_required') && (
-          <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
-              <div>
-                <h4 className="font-medium text-yellow-800">Campaign Sync Required</h4>
-                <p className="text-sm text-yellow-700 mt-1">
-                  Your Amazon account is connected, but campaign data hasn't been synced yet. 
-                  Click "Sync Campaigns" to import your campaign data and view performance metrics.
-                </p>
-                <p className="text-xs text-yellow-600 mt-2">
-                  If no advertising profiles are showing, try "Force Sync" - this may occur due to API delays or temporary issues. 
-                  Make sure your Amazon account has active campaigns with recent activity for best results.
-                </p>
+          <div className="mt-4 space-y-3">
+            {connections.some(c => c.setup_required_reason === 'no_advertising_profiles') && (
+              <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-orange-600 mt-0.5" />
+                  <div className="flex-1">
+                    <h4 className="font-medium text-orange-800">Amazon Advertising Setup Required</h4>
+                    <p className="text-sm text-orange-700 mt-1">
+                      Your Amazon account is connected, but no advertising profiles were found. 
+                      You need to set up Amazon Advertising first.
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => window.open('https://advertising.amazon.com', '_blank')}
+                        className="text-orange-700 border-orange-300 hover:bg-orange-50"
+                      >
+                        <ExternalLink className="h-4 w-4 mr-1" />
+                        Set up Amazon Advertising
+                      </Button>
+                      <span className="text-xs text-orange-600 self-center">
+                        After setup, use "Force Sync" to import your campaigns
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
+            
+            {connections.some(c => c.setup_required_reason === 'needs_sync') && (
+              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
+                  <div>
+                    <h4 className="font-medium text-yellow-800">Campaign Sync Required</h4>
+                    <p className="text-sm text-yellow-700 mt-1">
+                      Your Amazon account is connected with advertising profiles, but campaign data hasn't been synced yet. 
+                      Click "Sync Campaigns" to import your campaign data and view performance metrics.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </CardContent>
