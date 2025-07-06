@@ -53,7 +53,7 @@ export class AmazonConnectionOperations {
       const headers = await this.getAuthHeaders();
       console.log('Auth headers prepared successfully');
 
-      // Prepare request body - make sure it's exactly what the edge function expects
+      // Prepare request body - ensure it matches what the edge function expects
       const requestBody = {
         redirectUri: redirectUri
       };
@@ -65,48 +65,90 @@ export class AmazonConnectionOperations {
         Authorization: `Bearer ${headers.Authorization.substring(0, 20)}...` 
       });
 
-      // Use supabase.functions.invoke with proper error handling
+      // Use supabase.functions.invoke with enhanced error handling
       const response = await supabase.functions.invoke('amazon-oauth-init', {
         body: requestBody,
         headers: headers
       });
 
       console.log('=== Raw Response from Edge Function ===');
+      console.log('Response structure:', {
+        hasData: !!response.data,
+        hasError: !!response.error,
+        dataType: typeof response.data,
+        errorType: typeof response.error
+      });
       console.log('Response data:', response.data);
       console.log('Response error:', response.error);
 
-      // Handle edge function errors
+      // Handle edge function errors with detailed logging
       if (response.error) {
-        console.error('=== Edge Function Error ===');
-        console.error('Error details:', response.error);
+        console.error('=== Edge Function Error Details ===');
+        console.error('Error object:', response.error);
+        console.error('Error message:', response.error.message);
+        console.error('Error context:', response.error.context);
         
         let errorMessage = 'Failed to initialize Amazon connection';
+        let debugInfo = '';
         
-        // Parse error message if possible
+        // Extract detailed error information
         if (response.error.message) {
           errorMessage = response.error.message;
         } else if (typeof response.error === 'string') {
           errorMessage = response.error;
         }
+
+        // Check if we have debug information from the edge function
+        if (response.data && response.data.debug) {
+          debugInfo = JSON.stringify(response.data.debug, null, 2);
+          console.error('Debug info from edge function:', debugInfo);
+        }
+        
+        // Show detailed error message to user
+        this.toast({
+          title: "Connection Failed",
+          description: `${errorMessage}${debugInfo ? `\n\nDebug: ${debugInfo}` : ''}`,
+          variant: "destructive",
+        });
         
         throw new Error(errorMessage);
       }
 
       // Check if we have valid response data
       if (!response.data) {
-        console.error('No response data received');
+        console.error('No response data received from edge function');
         throw new Error('No response received from server');
       }
 
-      // Check for error in response data
+      // Check for error in response data (edge function might return error in data)
       if (response.data.error) {
-        console.error('Server returned error:', response.data.error);
+        console.error('=== Server Returned Error in Data ===');
+        console.error('Error details:', response.data.error);
+        console.error('Error message:', response.data.details);
+        console.error('Debug info:', response.data.debug);
+        
+        let errorMessage = response.data.details || response.data.error;
+        
+        // Include debug information if available
+        if (response.data.debug) {
+          const debugInfo = JSON.stringify(response.data.debug, null, 2);
+          console.error('Debug details:', debugInfo);
+          errorMessage += `\n\nDebug: ${debugInfo}`;
+        }
+        
+        this.toast({
+          title: "Connection Failed",
+          description: errorMessage,
+          variant: "destructive",
+        });
+        
         throw new Error(response.data.details || response.data.error);
       }
 
       // Check for auth URL in response
       if (!response.data.authUrl) {
-        console.error('No auth URL in response:', response.data);
+        console.error('=== Missing Auth URL in Response ===');
+        console.error('Response data:', response.data);
         throw new Error('No authorization URL received from server');
       }
 
@@ -120,6 +162,7 @@ export class AmazonConnectionOperations {
       console.error('=== Connection Initiation Error ===');
       console.error('Error type:', typeof err);
       console.error('Error details:', err);
+      console.error('Error stack:', err instanceof Error ? err.stack : 'No stack trace');
       
       let userMessage = 'Failed to connect to Amazon';
       
@@ -136,11 +179,14 @@ export class AmazonConnectionOperations {
         }
       }
       
-      this.toast({
-        title: "Connection Failed",
-        description: userMessage,
-        variant: "destructive",
-      });
+      // Only show toast if we haven't already shown one
+      if (!err.message || !err.message.includes('Debug:')) {
+        this.toast({
+          title: "Connection Failed",
+          description: userMessage,
+          variant: "destructive",
+        });
+      }
       
       throw new Error(userMessage);
     }
