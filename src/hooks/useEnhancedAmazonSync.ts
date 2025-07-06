@@ -56,16 +56,14 @@ export const useEnhancedAmazonSync = () => {
   const { toast } = useToast();
 
   const addStep = (step: string, status: SyncStep['status'], details?: string, data?: any) => {
-    const newStep: SyncStep = {
+    console.log(`[Enhanced Sync] ${step}:`, details || '', data || '');
+    setSteps(prev => [...prev, {
       step,
       status,
       details,
       data,
       timestamp: new Date()
-    };
-    setSteps(prev => [...prev, newStep]);
-    console.log(`[Enhanced Sync] ${step}:`, { status, details, data });
-    return newStep;
+    }]);
   };
 
   const updateLastStep = (status: SyncStep['status'], details?: string, data?: any) => {
@@ -75,510 +73,375 @@ export const useEnhancedAmazonSync = () => {
         updated[updated.length - 1] = {
           ...updated[updated.length - 1],
           status,
-          details,
-          data
+          details: details || updated[updated.length - 1].details,
+          data: data || updated[updated.length - 1].data
         };
       }
       return updated;
     });
   };
 
-  const clearSteps = () => {
-    setSteps([]);
-  };
+  const validateToken = async (connectionId: string): Promise<TokenValidationResult> => {
+    console.log('=== Token Refresh Check ===');
+    addStep('Token Validation', 'pending', 'Checking token expiry and refreshing if needed...');
 
-  const getAuthHeaders = async () => {
-    console.log('=== Getting Auth Headers ===');
-    
     try {
+      console.log('[Enhanced Sync] Checking token expiry:', { connectionId });
+      
+      // Get auth headers
+      console.log('=== Getting Auth Headers ===');
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
-      if (sessionError) {
+      if (sessionError || !session?.access_token) {
         console.error('Session error:', sessionError);
-        throw new Error(`Session error: ${sessionError.message}`);
-      }
-      
-      if (!session?.access_token) {
-        console.error('No access token in session');
-        throw new Error('No valid session found. Please sign in again.');
+        throw new Error('Authentication session not found');
       }
       
       console.log('Auth headers prepared successfully');
-      return {
-        'Authorization': `Bearer ${session.access_token}`,
-        'Content-Type': 'application/json'
-      };
-    } catch (error) {
-      console.error('Failed to get auth headers:', error);
-      throw error;
-    }
-  };
 
-  const refreshTokenIfNeeded = async (connectionId: string): Promise<boolean> => {
-    console.log('=== Token Refresh Check ===');
-    
-    try {
-      addStep('Checking token expiry', 'pending', 'Validating Amazon access token');
-      
-      const headers = await getAuthHeaders();
       const { data, error } = await supabase.functions.invoke('amazon-token-refresh', {
         body: { connectionId },
-        headers
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        }
       });
 
       if (error) {
         console.error('Token refresh error:', error);
         updateLastStep('error', `Token refresh failed: ${error.message}`);
-        return false;
+        return {
+          isValid: false,
+          hoursUntilExpiry: 0,
+          requiresRefresh: true,
+          error: error.message
+        };
       }
 
-      if (data?.requiresReconnection) {
-        updateLastStep('error', 'Amazon connection expired - reconnection required');
-        return false;
+      if (!data.success) {
+        updateLastStep('warning', data.details || data.error);
+        return {
+          isValid: false,
+          hoursUntilExpiry: data.hoursUntilExpiry || 0,
+          requiresRefresh: true,
+          error: data.error
+        };
       }
 
-      if (data?.refreshed) {
-        updateLastStep('success', `Token refreshed - expires in ${data.hoursUntilExpiry} hours`);
-      } else {
-        updateLastStep('success', `Token valid - expires in ${data.hoursUntilExpiry} hours`);
-      }
+      updateLastStep('success', data.refreshed ? 
+        `Token refreshed successfully (expires in ${data.hoursUntilExpiry} hours)` : 
+        `Token valid (expires in ${data.hoursUntilExpiry} hours)`
+      );
 
-      return true;
-    } catch (err) {
-      console.error('Token refresh check error:', err);
-      updateLastStep('error', `Token validation failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
-      return false;
+      return {
+        isValid: true,
+        hoursUntilExpiry: data.hoursUntilExpiry,
+        requiresRefresh: false
+      };
+
+    } catch (error) {
+      console.error('Token validation error:', error);
+      updateLastStep('error', `Token validation failed: ${error.message}`);
+      return {
+        isValid: false,
+        hoursUntilExpiry: 0,
+        requiresRefresh: true,
+        error: error.message
+      };
     }
   };
 
-  const validateAmazonAccount = async (connectionId: string): Promise<AccountValidationResult | null> => {
+  const validateAccount = async (connectionId: string): Promise<AccountValidationResult> => {
     console.log('=== Account Validation Started ===');
-    
+    addStep('Account Validation', 'pending', 'Validating Amazon account setup and permissions...');
+
     try {
-      addStep('Validating Amazon account setup', 'pending', 'Checking advertising account configuration');
+      console.log('[Enhanced Sync] Validating Amazon account setup:', { connectionId });
       
-      const headers = await getAuthHeaders();
+      // Get auth headers
+      console.log('=== Getting Auth Headers ===');
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session?.access_token) {
+        console.error('Session error:', sessionError);
+        throw new Error('Authentication session not found');
+      }
+      
+      console.log('Auth headers prepared successfully');
+
       const { data, error } = await supabase.functions.invoke('amazon-account-validation', {
         body: { connectionId },
-        headers
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        }
       });
 
       if (error) {
         console.error('Account validation error:', error);
         updateLastStep('error', `Account validation failed: ${error.message}`);
-        return null;
+        throw new Error(`Account validation failed: ${error.message}`);
       }
 
-      const validation = data as AccountValidationResult;
-      
-      if (validation.validation.isValid) {
-        if (validation.validation.hasCampaigns) {
-          updateLastStep('success', 
-            `Account validated - ${validation.validation.profilesFound} profiles, ${validation.validation.campaignsFound} campaigns`
-          );
-        } else {
-          updateLastStep('warning', 
-            `Account setup complete but no campaigns found - ${validation.validation.profilesFound} profiles detected`
-          );
-        }
-      } else {
-        updateLastStep('error', 
-          `Account setup issues: ${validation.validation.issues.join(', ')}`
-        );
-        
-        if (validation.validation.recommendations.length > 0) {
-          addStep('Setup recommendations', 'info', 
-            validation.validation.recommendations.join(' • ')
-          );
-        }
+      if (!data.success) {
+        updateLastStep('warning', data.details || data.error);
+        return {
+          success: false,
+          validation: {
+            isValid: false,
+            hasAdvertisingAccount: false,
+            hasActiveProfiles: false,
+            hasCampaigns: false,
+            issues: [data.error],
+            recommendations: ['Reconnect Amazon account'],
+            profilesFound: 0,
+            campaignsFound: 0
+          },
+          summary: {
+            accountReady: false,
+            setupRequired: true,
+            canSync: false,
+            nextSteps: ['Reconnect Amazon account']
+          },
+          message: data.error
+        };
       }
 
-      return validation;
-    } catch (err) {
-      console.error('Account validation error:', err);
-      updateLastStep('error', `Account validation failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
-      return null;
+      updateLastStep('success', `Account validation complete: ${data.message}`, {
+        profilesFound: data.validation.profilesFound,
+        campaignsFound: data.validation.campaignsFound,
+        issues: data.validation.issues
+      });
+
+      return data;
+
+    } catch (error) {
+      console.error('Account validation error:', error);
+      updateLastStep('error', `Account validation failed: ${error.message}`);
+      return {
+        success: false,
+        validation: {
+          isValid: false,
+          hasAdvertisingAccount: false,
+          hasActiveProfiles: false,
+          hasCampaigns: false,
+          issues: [error.message],
+          recommendations: ['Check connection and try again'],
+          profilesFound: 0,
+          campaignsFound: 0
+        },
+        summary: {
+          accountReady: false,
+          setupRequired: true,
+          canSync: false,
+          nextSteps: ['Check connection and try again']
+        },
+        message: `Validation failed: ${error.message}`
+      };
     }
   };
 
-  const runEnhancedProfileDetection = async (connectionId: string): Promise<ProfileDetectionResult> => {
+  const detectProfiles = async (connectionId: string): Promise<ProfileDetectionResult> => {
     console.log('=== Enhanced Profile Detection Started ===');
-    
+    addStep('Profile Detection', 'pending', 'Scanning all Amazon regions for advertising profiles...');
+
     try {
-      addStep('Starting enhanced profile detection', 'pending', 'Scanning multiple regions for advertising profiles');
+      console.log('[Enhanced Sync] Starting enhanced profile detection:', { connectionId });
       
-      const headers = await getAuthHeaders();
+      // Get auth headers
+      console.log('=== Getting Auth Headers ===');
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session?.access_token) {
+        console.error('Session error:', sessionError);
+        throw new Error('Authentication session not found');
+      }
+      
+      console.log('Auth headers prepared successfully');
       console.log('Headers prepared, invoking enhanced detection function...');
-      
+
       const { data, error } = await supabase.functions.invoke('amazon-enhanced-profile-detection', {
         body: { connectionId },
-        headers
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        }
       });
 
       console.log('Enhanced detection response received:', { data: !!data, error: !!error });
 
       if (error) {
         console.error('Enhanced profile detection error:', error);
-        updateLastStep('error', `Detection failed: ${error.message}`);
+        updateLastStep('error', `Profile detection failed: ${error.message}`);
         return {
           success: false,
           profiles: [],
           errors: [error.message],
-          primaryReason: 'Function invocation error'
+          primaryReason: 'API Error',
+          detailedGuidance: ['Check your internet connection', 'Verify Amazon API credentials'],
+          nextSteps: ['Try again later', 'Contact support if issue persists']
         };
       }
 
-      console.log('Enhanced detection data received:', Object.keys(data || {}));
-
-      if (data?.success && data.profiles?.length > 0) {
-        const summary = data.detectionSummary || {};
-        updateLastStep('success', 
-          `Successfully detected ${data.profiles.length} advertising profiles across ${summary.successfulRegions || 0} regions`,
-          { 
-            profilesFound: data.profiles.length,
-            regionsChecked: summary.regionsChecked || 0,
-            successfulRegions: summary.successfulRegions || 0,
-            primaryRegion: summary.primaryRegion || 'Unknown'
-          }
-        );
-        
-        // Add regional breakdown if multiple regions found profiles
-        if (summary.successfulRegions > 1) {
-          addStep('Multi-region detection success', 'info', 
-            `Profiles detected across ${summary.successfulRegions} regions. Primary region: ${summary.primaryRegion}`
-          );
-        }
-        
-        return {
-          success: true,
-          profiles: data.profiles,
-          detectionSummary: summary,
-          nextSteps: data.nextSteps
-        };
-      } else {
-        const reason = data?.primaryReason || 'No advertising profiles found';
-        const guidance = data?.detailedGuidance || ['Amazon Advertising setup required'];
-        const troubleshooting = data?.troubleshooting || {};
-        
-        if (troubleshooting.authenticationIssues) {
-          updateLastStep('error', 'Authentication issues detected across regions', {
-            requiresReconnection: true,
-            authenticationIssues: true
-          });
-        } else {
-          updateLastStep('warning', reason, { 
-            regionsChecked: data?.detectionSummary?.regionsChecked || 0,
-            successfulRegions: data?.detectionSummary?.successfulRegions || 0,
-            detectionResults: data?.detectionSummary?.detectionResults || []
-          });
-        }
-        
-        if (guidance && guidance.length > 0) {
-          addStep('Setup guidance', 'info', guidance.join(' • '));
-        }
-        
+      if (!data.success) {
+        updateLastStep('warning', `No profiles found: ${data.error || 'Unknown error'}`, {
+          profilesFound: 0,
+          regionsChecked: 3
+        });
         return {
           success: false,
           profiles: [],
-          errors: data?.errors || ['No advertising profiles detected'],
-          primaryReason: reason,
-          detailedGuidance: guidance,
-          troubleshooting,
-          nextSteps: data?.nextSteps || []
+          errors: data.errors || [data.error || 'No profiles found'],
+          primaryReason: 'No Advertising Profiles',
+          detailedGuidance: [
+            'Set up Amazon Advertising account at advertising.amazon.com',
+            'Create at least one advertising campaign',
+            'Wait 24 hours after setup for API access'
+          ],
+          nextSteps: [
+            'Visit advertising.amazon.com',
+            'Complete account setup',
+            'Try connection again'
+          ]
         };
       }
-    } catch (err) {
-      console.error('Enhanced profile detection error:', err);
-      updateLastStep('error', `Unexpected error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+
+      updateLastStep('success', `Found ${data.profiles.length} profiles across ${data.detectionSummary.regionsDetected.length} regions`, {
+        profilesFound: data.profiles.length,
+        regionsChecked: 3,
+        primaryRegion: data.detectionSummary.primaryRegion
+      });
+
+      return {
+        success: true,
+        profiles: data.profiles,
+        detectionSummary: data.detectionSummary,
+        nextSteps: data.detectionSummary.syncRecommendations
+      };
+
+    } catch (error) {
+      console.error('Enhanced profile detection error:', error);
+      updateLastStep('error', `Profile detection failed: ${error.message}`);
       return {
         success: false,
         profiles: [],
-        errors: [err instanceof Error ? err.message : 'Unknown error'],
-        primaryReason: 'Unexpected error during detection'
+        errors: [error.message],
+        primaryReason: 'Network Error',
+        detailedGuidance: ['Check your internet connection', 'Try again in a few minutes'],
+        nextSteps: ['Retry profile detection', 'Contact support if issue persists']
       };
     }
   };
 
-  const updateConnectionWithProfiles = async (connectionId: string, profiles: any[]) => {
-    console.log('=== Updating Connection with Enhanced Profile Data ===');
-    
-    if (!profiles || profiles.length === 0) {
-      throw new Error('No profiles provided for connection update');
-    }
-
-    const primaryProfile = profiles[0];
-    const profileId = primaryProfile.profileId.toString();
-    const profileName = `${primaryProfile.countryCode} Profile (${primaryProfile.detectedRegion || 'Unknown Region'})`;
-    const marketplaceId = primaryProfile.accountInfo?.marketplaceStringId || 
-                         primaryProfile.marketplaceStringId ||
-                         primaryProfile.countryCode;
-
-    console.log('Updating connection with enhanced profile data:', {
-      profileId,
-      profileName,
-      marketplaceId,
-      detectedRegion: primaryProfile.detectedRegion,
-      profileCount: profiles.length
-    });
-
-    const { error: updateError } = await supabase
-      .from('amazon_connections')
-      .update({
-        profile_id: profileId,
-        profile_name: profileName,
-        marketplace_id: marketplaceId,
-        status: 'active',
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', connectionId);
-
-    if (updateError) {
-      console.error('Failed to update connection:', updateError);
-      throw new Error(`Failed to update connection: ${updateError.message}`);
-    }
-
-    return { profileId, profileName, marketplaceId, profileCount: profiles.length };
-  };
-
-  const runConnectionRecovery = async (connectionId: string) => {
-    addStep('Running enhanced connection recovery', 'pending', 'Intelligent profile detection and configuration with multi-region support');
-    
-    try {
-      // Step 1: Refresh token if needed
-      const tokenValid = await refreshTokenIfNeeded(connectionId);
-      if (!tokenValid) {
-        return { 
-          success: false, 
-          error: 'Token refresh required',
-          requiresReconnection: true
-        };
-      }
-
-      // Step 2: Validate account setup
-      const accountValidation = await validateAmazonAccount(connectionId);
-      if (!accountValidation?.validation.isValid) {
-        return {
-          success: false,
-          error: accountValidation?.validation.issues.join(', ') || 'Account validation failed',
-          guidance: accountValidation?.validation.recommendations?.[0] || 'Account setup required',
-          nextSteps: accountValidation?.validation.recommendations || []
-        };
-      }
-
-      // Step 3: Enhanced profile detection with multi-region support
-      const profileResult = await runEnhancedProfileDetection(connectionId);
-      
-      if (profileResult.success && profileResult.profiles.length > 0) {
-        addStep('Configuring enhanced connection', 'pending', 
-          `Found ${profileResult.profiles.length} profile${profileResult.profiles.length === 1 ? '' : 's'} across multiple regions - setting up optimal configuration`);
-        
-        try {
-          const updatedProfile = await updateConnectionWithProfiles(connectionId, profileResult.profiles);
-          updateLastStep('success', 
-            `Enhanced connection configured with ${updatedProfile.profileName}`,
-            {
-              ...updatedProfile,
-              detectedRegion: profileResult.profiles[0]?.detectedRegion,
-              multiRegionSupport: profileResult.profiles.length > 1
-            }
-          );
-          
-          if (profileResult.profiles.length > 1) {
-            addStep('Multi-region optimization enabled', 'info', 
-              `${profileResult.profiles.length} profiles available across regions. Enhanced sync capabilities activated.`);
-          }
-          
-          return { success: true, profilesFound: profileResult.profiles.length };
-        } catch (updateErr) {
-          updateLastStep('error', `Failed to update connection: ${updateErr.message}`);
-          return { success: false, error: updateErr.message };
-        }
-      } else {
-        const troubleshooting = profileResult.troubleshooting || {};
-        
-        if (troubleshooting.authenticationIssues) {
-          addStep('Authentication issues detected', 'error', 
-            'Your Amazon connection has authentication problems across multiple regions. Please reconnect your account.');
-          
-          return { 
-            success: false, 
-            error: 'Authentication required',
-            requiresReconnection: true
-          };
-        } else {
-          addStep('No advertising profiles found', 'warning', 
-            profileResult.primaryReason || 'No advertising profiles found in your Amazon account across all regions.'
-          );
-          
-          if (profileResult.detailedGuidance && profileResult.detailedGuidance.length > 0) {
-            addStep('Setup instructions', 'info', 
-              'To resolve: ' + profileResult.detailedGuidance.join(' → ')
-            );
-          }
-          
-          return { 
-            success: false, 
-            error: profileResult.primaryReason || 'No advertising profiles found',
-            guidance: profileResult.detailedGuidance?.[0] || 'Amazon Advertising setup required',
-            nextSteps: profileResult.nextSteps || []
-          };
-        }
-      }
-    } catch (err) {
-      updateLastStep('error', `Enhanced recovery failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
-      return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
-    }
-  };
-
-  const debugConnection = async (connectionId: string) => {
-    console.log('=== Enhanced Debug Connection Started ===');
-    
-    try {
-      addStep('Starting enhanced connection debug', 'pending', 'Running comprehensive connection analysis with multi-region support');
-      
-      // Token validation check
-      const tokenValid = await refreshTokenIfNeeded(connectionId);
-      
-      // Account validation check
-      const accountValidation = await validateAmazonAccount(connectionId);
-      
-      // Enhanced profile detection test
-      const profileResult = await runEnhancedProfileDetection(connectionId);
-      
-      if (tokenValid && accountValidation?.validation.isValid && profileResult.success) {
-        updateLastStep('success', 'All enhanced connection checks passed successfully');
-        return { success: true };
-      } else {
-        const issues = [];
-        if (!tokenValid) issues.push('Token validation failed');
-        if (!accountValidation?.validation.isValid) issues.push('Account validation failed');
-        if (!profileResult.success) issues.push('Enhanced profile detection failed');
-        
-        updateLastStep('warning', `Enhanced debug found issues: ${issues.join(', ')}`);
-        return { success: false, issues };
-      }
-    } catch (err) {
-      console.error('Enhanced debug connection error:', err);
-      updateLastStep('error', `Enhanced debug failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
-      return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
-    }
-  };
-
   const runEnhancedSync = async (connectionId: string) => {
-    if (isRunning) {
-      toast({
-        title: "Enhanced Sync in Progress",
-        description: "Please wait for the current enhanced sync to complete.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setIsRunning(true);
-    setSteps([]);
+    console.log('[Enhanced Sync] Running enhanced sync:', { connectionId });
 
     try {
-      console.log('=== Enhanced Amazon Sync Started ===');
-      addStep('Initializing enhanced sync with multi-region support', 'pending', `Starting intelligent sync for connection: ${connectionId}`);
-
-      // Validate session and get auth headers
-      addStep('Validating authentication', 'pending', 'Checking session and preparing API headers');
-      let headers;
-      try {
-        headers = await getAuthHeaders();
-        updateLastStep('success', 'Authentication validated');
-      } catch (authError) {
-        updateLastStep('error', `Authentication failed: ${authError.message}`);
-        toast({
-          title: "Authentication Error",
-          description: "Please sign in again to continue.",
-          variant: "destructive",
-        });
+      // Step 1: Validate and refresh token
+      const tokenResult = await validateToken(connectionId);
+      if (!tokenResult.isValid && tokenResult.requiresRefresh) {
+        addStep('Sync Failed', 'error', 'Cannot proceed without valid token');
         return;
       }
 
-      // Validate connection
-      addStep('Validating Amazon connection', 'pending', 'Verifying connection exists');
-      const { data: connection, error: connectionError } = await supabase
-        .from('amazon_connections')
-        .select('*')
-        .eq('id', connectionId)
-        .single();
-
-      if (connectionError || !connection) {
-        updateLastStep('error', 'Connection not found or access denied');
-        toast({
-          title: "Connection Error",
-          description: "Amazon connection not found. Please reconnect your account.",
-          variant: "destructive",
-        });
+      // Step 2: Validate account
+      const accountResult = await validateAccount(connectionId);
+      if (!accountResult.success) {
+        addStep('Sync Failed', 'error', 'Account validation failed - cannot proceed with sync');
         return;
       }
 
-      updateLastStep('success', `Connection found: ${connection.profile_name || 'Amazon Account'}`);
-
-      // Run enhanced connection recovery with multi-region support
-      console.log('=== Starting Enhanced Intelligent Recovery ===');
-      const recoveryResult = await runConnectionRecovery(connectionId);
-
-      if (recoveryResult.success) {
-        addStep('Enhanced sync completed successfully', 'success', 
-          `Successfully configured Amazon connection with ${recoveryResult.profilesFound} profile${recoveryResult.profilesFound === 1 ? '' : 's'} - enhanced multi-region sync capabilities activated`
-        );
-        
-        toast({
-          title: "Enhanced Sync Successful",
-          description: `Amazon connection is now properly configured with multi-region support and ready for advanced campaign sync.`,
-        });
-      } else {
-        if (recoveryResult.requiresReconnection) {
-          addStep('Reconnection required', 'error', 
-            'Please reconnect your Amazon account to resolve authentication issues across all regions'
-          );
-          
-          toast({
-            title: "Reconnection Required",
-            description: "Your Amazon connection needs to be re-established. Please reconnect your account.",
-            variant: "destructive",
-          });
-        } else {
-          addStep('Setup guidance provided', 'warning', 
-            recoveryResult.guidance || 'Additional setup required'
-          );
-          
-          toast({
-            title: "Setup Required", 
-            description: recoveryResult.guidance || "Additional Amazon Advertising setup is required.",
-            variant: "destructive",
-          });
-        }
+      // Step 3: Detect profiles
+      const profileResult = await detectProfiles(connectionId);
+      if (!profileResult.success) {
+        addStep('Sync Incomplete', 'warning', 'No profiles found - setup required');
+        return;
       }
+
+      addStep('Enhanced Sync Complete', 'success', 'All validation steps completed successfully');
 
     } catch (error) {
       console.error('Enhanced sync error:', error);
-      addStep('Enhanced sync failed', 'error', 
-        `Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
-      
-      toast({
-        title: "Enhanced Sync Failed",
-        description: "An unexpected error occurred during enhanced sync.",
-        variant: "destructive",
-      });
+      addStep('Sync Failed', 'error', `Unexpected error: ${error.message}`);
     } finally {
       setIsRunning(false);
     }
   };
 
+  const runConnectionRecovery = async (connectionId: string) => {
+    console.log('[Enhanced Sync] Running enhanced connection recovery:', { connectionId });
+    
+    // This is a simplified recovery - just run the enhanced sync
+    await runEnhancedSync(connectionId);
+    
+    const hasErrors = steps.some(step => step.status === 'error');
+    const profileDetectionStep = steps.find(step => step.step === 'Profile Detection');
+    const profilesFound = profileDetectionStep?.data?.profilesFound || 0;
+    
+    return {
+      success: !hasErrors && profilesFound > 0,
+      profilesFound,
+      requiresReconnection: hasErrors,
+      guidance: hasErrors ? 'Please check the errors above and try reconnecting' : 'Recovery completed successfully'
+    };
+  };
+
+  const runEnhancedProfileDetection = async (connectionId: string) => {
+    setIsRunning(true);
+    try {
+      return await detectProfiles(connectionId);
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
+  const debugConnection = async (connectionId: string) => {
+    console.log('=== Enhanced Debug Connection Started ===');
+    setIsRunning(true);
+    
+    try {
+      console.log('[Enhanced Sync] Starting enhanced connection debug:', { connectionId });
+      
+      // Run all diagnostic steps
+      await validateToken(connectionId);
+      await validateAccount(connectionId);
+      await detectProfiles(connectionId);
+      
+      const hasErrors = steps.some(step => step.status === 'error');
+      const issues = steps.filter(step => step.status === 'error').map(step => step.details || step.step);
+      
+      return {
+        success: !hasErrors,
+        issues,
+        message: hasErrors ? 'Debug found issues - see steps above' : 'Debug completed successfully'
+      };
+      
+    } catch (error) {
+      console.error('Debug connection error:', error);
+      return {
+        success: false,
+        issues: [error.message],
+        message: 'Debug failed with error'
+      };
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
+  const clearSteps = () => {
+    setSteps([]);
+  };
+
   return {
-    isRunning,
     steps,
-    clearSteps,
+    isRunning,
     runEnhancedSync,
     runConnectionRecovery,
     runEnhancedProfileDetection,
-    validateAmazonAccount,
-    refreshTokenIfNeeded,
-    debugConnection
+    debugConnection,
+    clearSteps,
+    validateToken,
+    validateAccount,
+    detectProfiles,
+    addStep,
+    updateLastStep
   };
 };

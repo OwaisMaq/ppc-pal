@@ -26,6 +26,7 @@ serve(async (req) => {
       console.error('No valid authorization header');
       return new Response(
         JSON.stringify({ 
+          success: false,
           error: 'Authentication required',
           details: 'Please log in to refresh Amazon tokens'
         }),
@@ -40,6 +41,7 @@ serve(async (req) => {
       console.error('User authentication failed:', userError);
       return new Response(
         JSON.stringify({ 
+          success: false,
           error: 'Authentication failed',
           details: 'Please log in again'
         }),
@@ -50,10 +52,18 @@ serve(async (req) => {
     let requestBody;
     try {
       const bodyText = await req.text();
-      console.log('Raw request body:', bodyText);
+      console.log('Raw request body length:', bodyText.length);
       
       if (!bodyText || bodyText.trim() === '') {
-        throw new Error('Empty request body');
+        // If no body, return error
+        return new Response(
+          JSON.stringify({ 
+            success: false,
+            error: 'Request body is required',
+            details: 'Please provide connectionId in request body'
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
       
       requestBody = JSON.parse(bodyText);
@@ -61,8 +71,9 @@ serve(async (req) => {
       console.error('Failed to parse request body:', parseError);
       return new Response(
         JSON.stringify({ 
+          success: false,
           error: 'Invalid request format',
-          details: 'Request body must be valid JSON'
+          details: 'Request body must be valid JSON with connectionId field'
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -73,8 +84,9 @@ serve(async (req) => {
     if (!connectionId) {
       return new Response(
         JSON.stringify({ 
+          success: false,
           error: 'Connection ID is required',
-          details: 'Please provide a valid Amazon connection ID'
+          details: 'Please provide a valid Amazon connection ID in the request body'
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -94,6 +106,7 @@ serve(async (req) => {
       console.error('Connection not found:', connectionError);
       return new Response(
         JSON.stringify({ 
+          success: false,
           error: 'Connection not found',
           details: 'Could not find the specified Amazon connection'
         }),
@@ -132,6 +145,7 @@ serve(async (req) => {
       console.error('Missing Amazon credentials');
       return new Response(
         JSON.stringify({ 
+          success: false,
           error: 'Server configuration error',
           details: 'Amazon credentials not configured'
         }),
@@ -170,6 +184,7 @@ serve(async (req) => {
 
         return new Response(
           JSON.stringify({ 
+            success: false,
             error: 'Token refresh failed',
             details: 'Your Amazon connection has expired. Please reconnect your account.',
             requiresReconnection: true
@@ -185,6 +200,7 @@ serve(async (req) => {
         console.error('No access token in refresh response');
         return new Response(
           JSON.stringify({ 
+            success: false,
             error: 'Invalid refresh response',
             details: 'Amazon did not provide a valid access token'
           }),
@@ -210,6 +226,7 @@ serve(async (req) => {
         console.error('Failed to update connection:', updateError);
         return new Response(
           JSON.stringify({ 
+            success: false,
             error: 'Failed to update connection',
             details: updateError.message
           }),
@@ -232,6 +249,7 @@ serve(async (req) => {
       console.error('Token refresh network error:', refreshError);
       return new Response(
         JSON.stringify({ 
+          success: false,
           error: 'Network error during token refresh',
           details: refreshError.message || 'Could not connect to Amazon token service'
         }),
@@ -245,6 +263,7 @@ serve(async (req) => {
     
     return new Response(
       JSON.stringify({ 
+        success: false,
         error: 'Internal server error',
         details: error.message || 'An unexpected error occurred',
         timestamp: new Date().toISOString()
