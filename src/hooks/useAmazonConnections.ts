@@ -144,9 +144,8 @@ export const useAmazonConnections = () => {
           });
           
           const campaignCount = Array.isArray(conn.campaigns) ? conn.campaigns.length : 0;
-          const hasBeenSynced = conn.last_sync_at && campaignCount > 0;
           
-          // Use the database status directly, but determine setup_required_reason
+          // Use the database status as the primary source of truth
           let connectionStatus = conn.status;
           let setupRequiredReason: string | undefined;
           
@@ -155,41 +154,50 @@ export const useAmazonConnections = () => {
           const now = new Date();
           if (tokenExpiry <= now && connectionStatus !== 'expired') {
             connectionStatus = 'expired';
+            setupRequiredReason = 'token_expired';
             console.log('Status: expired (token expired)');
             await updateConnectionStatus(conn.id, 'error', 'Token expired');
-          } else if (connectionStatus !== 'active') {
-            console.log('Status from DB:', connectionStatus);
           } else {
-            // Validate profile configuration for active connections
-            const profileValidation = validateProfileConfiguration(conn);
-            
-            if (!profileValidation.isValid) {
-              connectionStatus = 'setup_required';
-              setupRequiredReason = 'no_advertising_profiles';
-              console.log('Status: setup_required (profile validation failed):', profileValidation.reason);
-              await updateConnectionStatus(conn.id, 'warning', profileValidation.reason);
-            } else if (!conn.last_sync_at) {
-              connectionStatus = 'setup_required';
-              setupRequiredReason = 'needs_sync';
-              console.log('Status: setup_required (never synced)');
-            } else if (campaignCount === 0) {
-              // If synced but no campaigns, could indicate API issues or no campaigns exist
-              connectionStatus = 'setup_required';
-              setupRequiredReason = 'needs_sync';
-              console.log('Status: setup_required (synced but no campaigns found)');
-              await updateConnectionStatus(conn.id, 'warning', 'No campaigns found after sync');
-            } else {
-              connectionStatus = 'active';
-              console.log('Status: active (fully operational)');
+            // For non-expired connections, interpret the status more intelligently
+            switch (connectionStatus) {
+              case 'active':
+                // Active means successfully synced, regardless of campaign count
+                console.log('Status: active (confirmed by database)');
+                break;
+                
+              case 'setup_required':
+                // Validate what kind of setup is required
+                const profileValidation = validateProfileConfiguration(conn);
+                if (!profileValidation.isValid) {
+                  setupRequiredReason = 'no_advertising_profiles';
+                  console.log('Status: setup_required (no advertising profiles)');
+                } else if (!conn.last_sync_at) {
+                  setupRequiredReason = 'needs_sync';
+                  console.log('Status: setup_required (needs initial sync)');
+                } else {
+                  // Connection is properly configured, might just need a sync
+                  connectionStatus = 'active';
+                  console.log('Status: active (setup completed, sync successful)');
+                }
+                break;
+                
+              case 'warning':
+                // Warning status - connection works but has issues
+                console.log('Status: warning (connection has issues but functional)');
+                break;
+                
+              case 'error':
+                setupRequiredReason = 'connection_error';
+                console.log('Status: error (connection has errors)');
+                break;
+                
+              default:
+                console.log('Status from DB:', connectionStatus);
             }
           }
 
-          // Set setup_required_reason based on status and conditions
-          if (connectionStatus === 'expired') {
-            setupRequiredReason = 'token_expired';
-          } else if (connectionStatus === 'error') {
-            setupRequiredReason = 'connection_error';
-          }
+          // Determine needs_sync flag
+          const needsSync = !conn.last_sync_at || connectionStatus === 'setup_required';
           
           const formatted = {
             id: conn.id,
@@ -201,7 +209,7 @@ export const useAmazonConnections = () => {
             profile_name: conn.profile_name,
             last_sync_at: conn.last_sync_at,
             campaign_count: campaignCount,
-            needs_sync: !hasBeenSynced || campaignCount === 0,
+            needs_sync: needsSync,
             setup_required_reason: setupRequiredReason
           };
           
@@ -309,7 +317,7 @@ export const useAmazonConnections = () => {
 
   const syncConnection = async (connectionId: string) => {
     try {
-      console.log('=== Enhanced Sync Connection ===');
+      console.log('=== Sync Connection ===');
       console.log('Connection ID:', connectionId);
       
       // First, validate the connection exists and get its current state
@@ -329,11 +337,11 @@ export const useAmazonConnections = () => {
       // Validate profile before attempting sync
       const profileValidation = validateProfileConfiguration(connectionData);
       if (!profileValidation.isValid) {
-        console.log('Profile validation failed, suggesting force sync:', profileValidation.reason);
+        console.log('Profile validation failed, suggesting enhanced sync:', profileValidation.reason);
         
         toast({
           title: "Profile Setup Required",
-          description: `${profileValidation.reason}. Try using "Force Sync" to refresh your advertising profiles, or reconnect your account.`,
+          description: `${profileValidation.reason}. Try using "Enhanced Sync" to refresh your advertising profiles, or reconnect your account.`,
           variant: "destructive",
         });
         
@@ -344,7 +352,7 @@ export const useAmazonConnections = () => {
       
       toast({
         title: "Sync Started",
-        description: "Fetching your campaign data from Amazon. This may take a few moments...",
+        description: "Fetching your campaign data from Amazon. Please wait...",
       });
       
       const { data, error } = await supabase.functions.invoke('amazon-sync', {
@@ -377,7 +385,7 @@ export const useAmazonConnections = () => {
         if (data.requiresSetup || data.error === 'Profile setup required') {
           toast({
             title: "Amazon Advertising Setup Required",
-            description: "Please set up your Amazon Advertising account at advertising.amazon.com first, then try 'Force Sync' to import your campaigns.",
+            description: "Please set up your Amazon Advertising account at advertising.amazon.com first, then try 'Enhanced Sync' to import your campaigns.",
             variant: "destructive",
           });
           await updateConnectionStatus(connectionId, 'warning', 'Amazon Advertising setup required');
@@ -401,19 +409,23 @@ export const useAmazonConnections = () => {
         return;
       }
 
+      // Handle successful sync responses
       const campaignCount = data?.campaignsSynced || data?.campaignCount || 0;
+      const syncStatus = data?.syncStatus || 'success';
       
-      if (campaignCount > 0) {
+      if (syncStatus === 'success_no_campaigns' || campaignCount === 0) {
+        // Successful sync but no campaigns found - this is normal and should be active
+        await updateConnectionStatus(connectionId, 'active', 'Sync successful');
+        toast({
+          title: "Sync Complete",
+          description: data?.message || "Sync completed successfully. No campaigns found in your Amazon account - this is normal for new advertising accounts.",
+        });
+      } else {
+        // Successful sync with campaigns
         await updateConnectionStatus(connectionId, 'active', 'Sync successful');
         toast({
           title: "Sync Complete",
           description: `Successfully synced ${campaignCount} campaigns from Amazon.`,
-        });
-      } else {
-        await updateConnectionStatus(connectionId, 'warning', 'No campaigns found');
-        toast({
-          title: "Sync Complete",
-          description: "Sync completed, but no campaigns were found. Please check your Amazon Advertising account.",
         });
       }
 

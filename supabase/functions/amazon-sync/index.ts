@@ -285,15 +285,16 @@ serve(async (req) => {
       )
     }
 
+    // Handle successful API call but no campaigns found
     if (!campaigns || campaigns.length === 0) {
-      console.log('No campaigns found')
+      console.log('No campaigns found - this is normal for new advertising accounts')
       
-      // Update sync timestamp even if no campaigns
+      // Update sync timestamp and set status to active (successful sync with no campaigns)
       await supabaseClient
         .from('amazon_connections')
         .update({ 
           last_sync_at: new Date().toISOString(),
-          status: 'active',
+          status: 'active', // Important: Mark as active even with 0 campaigns
           updated_at: new Date().toISOString()
         })
         .eq('id', connectionId)
@@ -301,8 +302,11 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           success: true,
-          message: 'Sync completed but no campaigns found in your Amazon account',
-          campaignCount: 0
+          message: 'Sync completed successfully. No campaigns found in your Amazon Advertising account.',
+          campaignCount: 0,
+          campaignsSynced: 0,
+          syncStatus: 'success_no_campaigns', // New field to distinguish success types
+          details: 'This is normal for new advertising accounts. Create campaigns in Amazon Advertising to see them here.'
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
@@ -372,7 +376,8 @@ serve(async (req) => {
         success: true,
         message: `Successfully synced ${campaigns.length} campaigns from Amazon`,
         campaignCount: campaigns.length,
-        campaignsSynced: campaigns.length
+        campaignsSynced: campaigns.length,
+        syncStatus: 'success_with_campaigns'
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
