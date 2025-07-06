@@ -50,19 +50,22 @@ export class AmazonConnectionOperations {
         throw new Error('Invalid redirect URI provided');
       }
 
-      // Make sure we have proper request body
+      // Get auth headers first
+      const headers = await this.getAuthHeaders();
+      console.log('=== Auth Headers Prepared ===');
+
+      // Make sure we have proper request body - the edge function expects 'redirectUri' not 'redirect_uri'
       const requestBody = {
         redirectUri: redirectUri
       };
 
       console.log('=== Calling OAuth Init Function ===');
       console.log('Request body:', requestBody);
+      console.log('Headers:', { ...headers, Authorization: 'Bearer [REDACTED]' });
 
       const { data, error } = await supabase.functions.invoke('amazon-oauth-init', {
         body: requestBody,
-        headers: {
-          'Content-Type': 'application/json'
-        }
+        headers: headers
       });
 
       console.log('=== OAuth Init Response ===');
@@ -71,11 +74,21 @@ export class AmazonConnectionOperations {
 
       if (error) {
         console.error('OAuth init error:', error);
-        throw new Error(error.message || 'Failed to initialize OAuth flow');
+        console.error('Error details:', JSON.stringify(error, null, 2));
+        
+        // Enhanced error handling for different error types
+        if (error.message?.includes('Edge Function returned a non-2xx status code')) {
+          throw new Error('Server configuration error. Please contact support.');
+        } else if (error.message?.includes('Network')) {
+          throw new Error('Network error. Please check your connection and try again.');
+        } else {
+          throw new Error(error.message || 'Failed to initialize OAuth flow');
+        }
       }
 
       if (!data || !data.authUrl) {
         console.error('No auth URL received from server');
+        console.error('Response data:', data);
         throw new Error('No authorization URL received from server');
       }
 
