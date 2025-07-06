@@ -14,6 +14,8 @@ serve(async (req) => {
 
   try {
     console.log('=== Amazon Token Refresh Started ===');
+    console.log('Request method:', req.method);
+    console.log('Request headers:', Object.fromEntries(req.headers.entries()));
     
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -22,6 +24,9 @@ serve(async (req) => {
 
     // Get user authentication
     const authHeader = req.headers.get('authorization');
+    console.log('Auth header present:', !!authHeader);
+    console.log('Auth header format valid:', authHeader?.startsWith('Bearer '));
+    
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       console.error('No valid authorization header');
       return new Response(
@@ -51,18 +56,23 @@ serve(async (req) => {
     try {
       const bodyText = await req.text();
       console.log('Raw request body:', bodyText);
+      console.log('Request body length:', bodyText?.length || 0);
       
       if (!bodyText || bodyText.trim() === '') {
+        console.error('Empty request body detected');
         throw new Error('Empty request body');
       }
       
       requestBody = JSON.parse(bodyText);
+      console.log('Parsed request body:', requestBody);
     } catch (parseError) {
       console.error('Failed to parse request body:', parseError);
+      console.error('Parse error details:', parseError.message);
       return new Response(
         JSON.stringify({ 
           error: 'Invalid request format',
-          details: 'Request body must be valid JSON'
+          details: 'Request body must be valid JSON',
+          parseError: parseError.message
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -71,6 +81,7 @@ serve(async (req) => {
     const { connectionId } = requestBody;
 
     if (!connectionId) {
+      console.error('Missing connectionId in request body');
       return new Response(
         JSON.stringify({ 
           error: 'Connection ID is required',
@@ -81,6 +92,7 @@ serve(async (req) => {
     }
 
     console.log('Refreshing token for connection:', connectionId);
+    console.log('User ID:', userData.user.id);
 
     // Get connection details
     const { data: connection, error: connectionError } = await supabaseClient
@@ -89,6 +101,13 @@ serve(async (req) => {
       .eq('id', connectionId)
       .eq('user_id', userData.user.id)
       .single();
+
+    console.log('Connection query result:', { 
+      connectionFound: !!connection, 
+      connectionError: connectionError?.message,
+      connectionStatus: connection?.status,
+      connectionProfileId: connection?.profile_id
+    });
 
     if (connectionError || !connection) {
       console.error('Connection not found:', connectionError);
