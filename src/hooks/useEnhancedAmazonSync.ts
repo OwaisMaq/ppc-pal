@@ -50,6 +50,17 @@ export interface AccountValidationResult {
   message: string;
 }
 
+export interface CampaignSyncResult {
+  success: boolean;
+  campaignsSynced: number;
+  campaignCount: number;
+  syncStatus: string;
+  message: string;
+  error?: string;
+  requiresReconnection?: boolean;
+  requiresSetup?: boolean;
+}
+
 export const useEnhancedAmazonSync = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [steps, setSteps] = useState<SyncStep[]>([]);
@@ -88,8 +99,6 @@ export const useEnhancedAmazonSync = () => {
     try {
       console.log('[Enhanced Sync] Checking token expiry:', { connectionId });
       
-      // Get auth headers
-      console.log('=== Getting Auth Headers ===');
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError || !session?.access_token) {
@@ -157,8 +166,6 @@ export const useEnhancedAmazonSync = () => {
     try {
       console.log('[Enhanced Sync] Validating Amazon account setup:', { connectionId });
       
-      // Get auth headers
-      console.log('=== Getting Auth Headers ===');
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError || !session?.access_token) {
@@ -246,8 +253,6 @@ export const useEnhancedAmazonSync = () => {
     try {
       console.log('[Enhanced Sync] Starting enhanced profile detection:', { connectionId });
       
-      // Get auth headers
-      console.log('=== Getting Auth Headers ===');
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError || !session?.access_token) {
@@ -337,7 +342,6 @@ export const useEnhancedAmazonSync = () => {
         return false;
       }
 
-      // Use the first profile as primary
       const primaryProfile = profiles[0];
       console.log('=== Updating Connection with Profiles ===');
       console.log('Primary profile:', primaryProfile);
@@ -371,6 +375,158 @@ export const useEnhancedAmazonSync = () => {
     }
   };
 
+  const syncCampaigns = async (connectionId: string): Promise<CampaignSyncResult> => {
+    console.log('=== Campaign Sync Started ===');
+    addStep('Campaign Sync', 'pending', 'Fetching campaign data from Amazon Ads API...');
+
+    try {
+      console.log('[Enhanced Sync] Starting campaign sync:', { connectionId });
+      
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session?.access_token) {
+        console.error('Session error:', sessionError);
+        throw new Error('Authentication session not found');
+      }
+      
+      console.log('Auth headers prepared successfully');
+
+      const { data, error } = await supabase.functions.invoke('amazon-sync', {
+        body: { connectionId },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        }
+      });
+
+      console.log('Campaign sync response received:', { data: !!data, error: !!error });
+
+      if (error) {
+        console.error('Campaign sync error:', error);
+        updateLastStep('error', `Campaign sync failed: ${error.message}`);
+        return {
+          success: false,
+          campaignsSynced: 0,
+          campaignCount: 0,
+          syncStatus: 'error',
+          message: 'Campaign sync failed',
+          error: error.message
+        };
+      }
+
+      if (!data.success) {
+        if (data.requiresReconnection) {
+          updateLastStep('error', `Campaign sync failed: ${data.error}`, {
+            requiresReconnection: true
+          });
+          return {
+            success: false,
+            campaignsSynced: 0,
+            campaignCount: 0,
+            syncStatus: 'error',
+            message: data.message || 'Token expired - reconnection required',
+            error: data.error,
+            requiresReconnection: true
+          };
+        }
+
+        if (data.requiresSetup) {
+          updateLastStep('warning', `Campaign sync incomplete: ${data.error}`, {
+            requiresSetup: true
+          });
+          return {
+            success: false,
+            campaignsSynced: 0,
+            campaignCount: 0,
+            syncStatus: 'setup_required',
+            message: data.message || 'Amazon Advertising setup required',
+            error: data.error,
+            requiresSetup: true
+          };
+        }
+
+        updateLastStep('warning', `Campaign sync completed with issues: ${data.error}`);
+        return {
+          success: false,
+          campaignsSynced: data.campaignsSynced || 0,
+          campaignCount: data.campaignCount || 0,
+          syncStatus: data.syncStatus || 'warning',
+          message: data.message || 'Sync completed with issues',
+          error: data.error
+        };
+      }
+
+      const campaignCount = data.campaignsSynced || data.campaignCount || 0;
+      updateLastStep('success', `Successfully synced ${campaignCount} campaigns`, {
+        campaignsSynced: campaignCount,
+        syncStatus: data.syncStatus
+      });
+
+      return {
+        success: true,
+        campaignsSynced: campaignCount,
+        campaignCount: campaignCount,
+        syncStatus: data.syncStatus || 'success',
+        message: data.message || `Successfully synced ${campaignCount} campaigns`
+      };
+
+    } catch (error) {
+      console.error('Campaign sync error:', error);
+      updateLastStep('error', `Campaign sync failed: ${error.message}`);
+      return {
+        success: false,
+        campaignsSynced: 0,
+        campaignCount: 0,
+        syncStatus: 'error',
+        message: `Campaign sync failed: ${error.message}`,
+        error: error.message
+      };
+    }
+  };
+
+  const updateConnectionStatus = async (connectionId: string, profilesFound: number, campaignsSynced: number): Promise<void> => {
+    try {
+      console.log('=== Updating Connection Status ===');
+      addStep('Status Update', 'pending', 'Updating connection status...');
+
+      let status: 'active' | 'setup_required' | 'warning' | 'error' = 'active';
+      let setupRequiredReason: string | null = null;
+
+      if (profilesFound === 0) {
+        status = 'setup_required';
+        setupRequiredReason = 'no_advertising_profiles';
+      } else if (campaignsSynced === 0) {
+        status = 'setup_required';
+        setupRequiredReason = 'needs_sync';
+      } else {
+        status = 'active';
+        setupRequiredReason = null;
+      }
+
+      const { error } = await supabase
+        .from('amazon_connections')
+        .update({
+          status,
+          setup_required_reason: setupRequiredReason,
+          campaign_count: campaignsSynced,
+          last_sync_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', connectionId);
+
+      if (error) {
+        console.error('Failed to update connection status:', error);
+        updateLastStep('error', `Failed to update connection status: ${error.message}`);
+        return;
+      }
+
+      updateLastStep('success', `Connection status updated: ${status} (${campaignsSynced} campaigns)`);
+
+    } catch (error) {
+      console.error('Error updating connection status:', error);
+      updateLastStep('error', `Status update failed: ${error.message}`);
+    }
+  };
+
   const runEnhancedSync = async (connectionId: string) => {
     setIsRunning(true);
     console.log('[Enhanced Sync] Running enhanced sync:', { connectionId });
@@ -394,6 +550,7 @@ export const useEnhancedAmazonSync = () => {
       const profileResult = await detectProfiles(connectionId);
       if (!profileResult.success) {
         addStep('Sync Incomplete', 'warning', 'No profiles found - setup required');
+        await updateConnectionStatus(connectionId, 0, 0);
         return;
       }
 
@@ -401,10 +558,29 @@ export const useEnhancedAmazonSync = () => {
       const updateSuccess = await updateConnectionWithProfiles(connectionId, profileResult.profiles);
       if (!updateSuccess) {
         addStep('Sync Warning', 'warning', 'Profiles found but connection update failed');
+        await updateConnectionStatus(connectionId, profileResult.profiles.length, 0);
         return;
       }
 
-      addStep('Enhanced Sync Complete', 'success', 'All validation steps completed successfully and connection updated');
+      // Step 5: Sync campaigns
+      const campaignResult = await syncCampaigns(connectionId);
+      
+      // Step 6: Update final connection status
+      await updateConnectionStatus(connectionId, profileResult.profiles.length, campaignResult.campaignsSynced);
+
+      if (campaignResult.success) {
+        addStep('Enhanced Sync Complete', 'success', 
+          `Successfully completed enhanced sync: ${campaignResult.campaignsSynced} campaigns synced`);
+      } else if (campaignResult.requiresReconnection) {
+        addStep('Sync Failed - Reconnection Required', 'error', 
+          'Token expired or invalid - please reconnect your Amazon account');
+      } else if (campaignResult.requiresSetup) {
+        addStep('Sync Incomplete - Setup Required', 'warning', 
+          'Profile updated but no campaigns found - Amazon Advertising setup may be required');
+      } else {
+        addStep('Sync Completed with Issues', 'warning', 
+          `Profile updated but campaign sync had issues: ${campaignResult.error}`);
+      }
 
     } catch (error) {
       console.error('Enhanced sync error:', error);
@@ -417,22 +593,25 @@ export const useEnhancedAmazonSync = () => {
   const runConnectionRecovery = async (connectionId: string) => {
     console.log('[Enhanced Sync] Running enhanced connection recovery:', { connectionId });
     
-    // Run the enhanced sync which now includes profile updating
+    // Run the enhanced sync which now includes both profile and campaign sync
     await runEnhancedSync(connectionId);
     
     const hasErrors = steps.some(step => step.status === 'error');
     const profileDetectionStep = steps.find(step => step.step === 'Profile Detection');
     const profilesFound = profileDetectionStep?.data?.profilesFound || 0;
-    const profileUpdateStep = steps.find(step => step.step === 'Profile Update');
-    const connectionUpdated = profileUpdateStep?.status === 'success';
+    const campaignSyncStep = steps.find(step => step.step === 'Campaign Sync');
+    const campaignsSynced = campaignSyncStep?.data?.campaignsSynced || 0;
     
     return {
-      success: !hasErrors && profilesFound > 0 && connectionUpdated,
+      success: !hasErrors && profilesFound > 0 && campaignsSynced >= 0,
       profilesFound,
-      requiresReconnection: hasErrors,
+      campaignsSynced,
+      requiresReconnection: steps.some(step => step.data?.requiresReconnection),
+      requiresSetup: steps.some(step => step.data?.requiresSetup),
       guidance: hasErrors ? 'Please check the errors above and try reconnecting' : 
-                connectionUpdated ? 'Connection successfully updated with profiles' :
-                'Recovery completed successfully'
+                campaignsSynced > 0 ? `Successfully synced ${campaignsSynced} campaigns` :
+                profilesFound > 0 ? 'Profile updated but no campaigns found - may need Amazon Advertising setup' :
+                'Recovery completed but no profiles found'
     };
   };
 
@@ -452,14 +631,17 @@ export const useEnhancedAmazonSync = () => {
     try {
       console.log('[Enhanced Sync] Starting enhanced connection debug:', { connectionId });
       
-      // Run all diagnostic steps
+      // Run all diagnostic steps including campaign sync
       await validateToken(connectionId);
       await validateAccount(connectionId);
       const profileResult = await detectProfiles(connectionId);
       
-      // If profiles found, try to update connection
+      // If profiles found, try to update connection and sync campaigns
       if (profileResult.success && profileResult.profiles.length > 0) {
-        await updateConnectionWithProfiles(connectionId, profileResult.profiles);
+        const updateSuccess = await updateConnectionWithProfiles(connectionId, profileResult.profiles);
+        if (updateSuccess) {
+          await syncCampaigns(connectionId);
+        }
       }
       
       const hasErrors = steps.some(step => step.status === 'error');
@@ -498,6 +680,7 @@ export const useEnhancedAmazonSync = () => {
     validateToken,
     validateAccount,
     detectProfiles,
+    syncCampaigns,
     addStep,
     updateLastStep
   };

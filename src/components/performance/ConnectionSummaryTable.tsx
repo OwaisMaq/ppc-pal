@@ -87,14 +87,17 @@ const ConnectionSummaryTable = ({
       case 'no_advertising_profiles':
         return 'No advertising profiles found - Amazon Advertising setup required';
       case 'needs_sync':
-        return 'Ready for campaign sync';
+        return 'Profile configured - ready for campaign sync';
       case 'token_expired':
         return 'Access token has expired - reconnection required';
       case 'connection_error':
         return 'Technical connection issue detected';
       default:
         if (connection.status === 'active') {
-          return `${connection.campaign_count || 0} campaigns synced`;
+          const campaignCount = connection.campaign_count || 0;
+          return campaignCount > 0 
+            ? `${campaignCount} campaigns synced successfully`
+            : 'Connection active - campaigns not yet synced';
         }
         return 'Status unknown';
     }
@@ -110,6 +113,11 @@ const ConnectionSummaryTable = ({
 
   const requiresSetup = (connection: AmazonConnection) => {
     return connection.setup_required_reason === 'no_advertising_profiles';
+  };
+
+  const needsEnhancedSync = (connection: AmazonConnection) => {
+    return connection.status === 'setup_required' || 
+           (connection.status === 'active' && (connection.campaign_count || 0) === 0);
   };
 
   if (connections.length === 0) {
@@ -131,12 +139,23 @@ const ConnectionSummaryTable = ({
                     <div className="flex items-center gap-3 mb-2">
                       <h3 className="font-medium">{connection.profileName}</h3>
                       {getStatusBadge(connection)}
+                      {needsEnhancedSync(connection) && (
+                        <Badge variant="outline" className="text-blue-600 border-blue-300">
+                          <Zap className="h-3 w-3 mr-1" />
+                          Enhanced Sync Available
+                        </Badge>
+                      )}
                     </div>
                     
                     <div className="space-y-1 text-sm text-gray-600">
                       <p>{getStatusDescription(connection)}</p>
                       {connection.marketplace_id && (
                         <p>Marketplace: {connection.marketplace_id}</p>
+                      )}
+                      {connection.campaign_count > 0 && (
+                        <p className="text-green-600 font-medium">
+                          {connection.campaign_count} campaigns detected
+                        </p>
                       )}
                       {connection.last_sync_at && (
                         <p>
@@ -170,6 +189,28 @@ const ConnectionSummaryTable = ({
                               >
                                 <Settings className="h-3 w-3 mr-1" />
                                 Enhanced Sync
+                              </Button>
+                            </div>
+                          </div>
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
+                    {needsEnhancedSync(connection) && !requiresSetup(connection) && (
+                      <Alert className="mt-3 border-blue-200 bg-blue-50">
+                        <Zap className="h-4 w-4 text-blue-600" />
+                        <AlertDescription className="text-blue-800">
+                          <div className="space-y-2">
+                            <span>Enhanced sync can detect profiles and sync campaigns in one process</span>
+                            <div className="flex gap-2">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => setShowEnhancedSync(connection.id)}
+                                className="text-blue-600 border-blue-300 hover:bg-blue-50"
+                              >
+                                <Zap className="h-3 w-3 mr-1" />
+                                Run Enhanced Sync
                               </Button>
                             </div>
                           </div>
@@ -281,7 +322,7 @@ const ConnectionSummaryTable = ({
             <div className="space-y-2">
               <p><strong>Enhanced Sync Available:</strong> For connections with setup issues:</p>
               <ul className="list-disc list-inside text-sm space-y-1 ml-4">
-                <li><strong>Enhanced Sync:</strong> Advanced profile detection across multiple regions and endpoints</li>
+                <li><strong>Enhanced Sync:</strong> Advanced profile detection across multiple regions and complete campaign sync</li>
                 <li><strong>Force Sync:</strong> Quick retry with basic profile detection</li>
                 <li><strong>Setup Guide:</strong> Step-by-step instructions for Amazon Advertising</li>
                 <li><strong>Regular Sync:</strong> Standard sync for properly configured connections</li>

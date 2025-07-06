@@ -116,6 +116,11 @@ const PerformanceSummary = () => {
     );
   }
 
+  // Calculate total campaigns across all connections
+  const totalCampaignsFromConnections = connections.reduce((total, conn) => {
+    return total + (conn.campaign_count || 0);
+  }, 0);
+
   // Show performance metrics if we have data
   const mockMetrics = [
     {
@@ -140,8 +145,8 @@ const PerformanceSummary = () => {
       icon: TrendingUp
     },
     {
-      title: 'Total Orders',
-      value: metrics?.totalOrders ? metrics.totalOrders.toString() : '0',
+      title: 'Total Campaigns',
+      value: totalCampaignsFromConnections > 0 ? totalCampaignsFromConnections.toString() : campaigns.length.toString(),
       change: '+0.8%',
       trend: 'up',
       icon: Target
@@ -154,7 +159,7 @@ const PerformanceSummary = () => {
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Performance Summary</h2>
         <p className="text-gray-600">
           {hasData 
-            ? `Overview of your Amazon campaign performance - showing ${campaigns.length} campaigns`
+            ? `Overview of your Amazon campaign performance - showing ${totalCampaignsFromConnections || campaigns.length} campaigns`
             : 'Connect and sync your Amazon account to view performance data'
           }
         </p>
@@ -166,7 +171,7 @@ const PerformanceSummary = () => {
           <AlertCircle className="h-4 w-4 text-orange-600" />
           <AlertDescription className="text-orange-800">
             {connections.some(c => c.status === 'setup_required') 
-              ? "Your Amazon connection needs to be synced. Use the 'Sync' button in the connection table below to fetch your campaign data."
+              ? "Your Amazon connection needs to be synced. Use the 'Enhanced Sync' button in the connection table below to detect profiles and fetch your campaign data."
               : "No campaign data found. Make sure you have active campaigns in your Amazon Ads account."
             }
           </AlertDescription>
@@ -174,7 +179,7 @@ const PerformanceSummary = () => {
       )}
 
       {/* Key Performance Metrics */}
-      {hasData && metrics && (
+      {(hasData || totalCampaignsFromConnections > 0) && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {mockMetrics.map((metric, index) => {
             const IconComponent = metric.icon;
@@ -228,14 +233,21 @@ const PerformanceSummary = () => {
         <Card>
           <CardHeader>
             <CardTitle>Campaign Data</CardTitle>
-            <CardDescription>No campaign data available</CardDescription>
+            <CardDescription>
+              {totalCampaignsFromConnections > 0 
+                ? `${totalCampaignsFromConnections} campaigns detected but not yet displayed in table` 
+                : "No campaign data available"
+              }
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <Alert className="border-orange-200 bg-orange-50">
               <AlertCircle className="h-4 w-4 text-orange-600" />
               <AlertDescription className="text-orange-800">
                 {connections.length > 0 
-                  ? "Your Amazon connection is active but no campaign data has been synced yet. Try the 'Sync' button in the connection table above."
+                  ? totalCampaignsFromConnections > 0
+                    ? `Your connections show ${totalCampaignsFromConnections} campaigns but they haven't been loaded into the performance view yet. Try refreshing or syncing again.`
+                    : "Your Amazon connection is active but no campaign data has been synced yet. Try the 'Enhanced Sync' button in the connection table above."
                   : "Connect your Amazon account to start viewing campaign data."
                 }
               </AlertDescription>
@@ -253,7 +265,7 @@ const PerformanceSummary = () => {
       )}
 
       {/* Data Quality Information */}
-      {hasData && dataQuality && (
+      {(hasData || totalCampaignsFromConnections > 0) && dataQuality && (
         <Card>
           <CardHeader>
             <CardTitle>Data Quality Information</CardTitle>
@@ -262,7 +274,9 @@ const PerformanceSummary = () => {
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
-                <div className="text-2xl font-bold text-blue-600">{campaigns.length}</div>
+                <div className="text-2xl font-bold text-blue-600">
+                  {totalCampaignsFromConnections || campaigns.length}
+                </div>
                 <div className="text-sm text-gray-600">Total Campaigns</div>
               </div>
               <div>
