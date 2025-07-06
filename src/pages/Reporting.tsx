@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import AuthenticatedLayout from '@/components/AuthenticatedLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -53,6 +52,10 @@ const Reporting = () => {
   console.log('Final filtered campaigns:', filteredCampaigns.length);
   console.log('Loading:', loading);
 
+  const handleRefreshCampaigns = () => {
+    refreshCampaigns();
+  };
+
   return (
     <AuthenticatedLayout>
       <div className="space-y-6">
@@ -69,7 +72,7 @@ const Reporting = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button 
-              onClick={refreshCampaigns} 
+              onClick={handleRefreshCampaigns} 
               variant="outline" 
               disabled={loading}
               className="flex items-center gap-2"
