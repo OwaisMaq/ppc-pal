@@ -169,13 +169,14 @@ serve(async (req) => {
       const state = btoa(JSON.stringify(stateData));
       console.log('Generated state parameter (base64):', state);
 
-      // FIXED SCOPE - This is the correct scope for Amazon Advertising API
-      const scope = 'cpc_advertising:campaign_management';
+      // FIXED SCOPE - Use the correct Amazon Advertising API scope
+      // The correct scope for Amazon Advertising API is 'advertising::campaign_management'
+      const scope = 'advertising::campaign_management';
       const responseType = 'code';
       
       console.log('OAuth parameters:');
       console.log('- Client ID:', amazonClientId.substring(0, 8) + '...');
-      console.log('- Scope (FIXED):', scope);
+      console.log('- Scope (CORRECTED):', scope);
       console.log('- Response Type:', responseType);
       console.log('- Redirect URI:', finalRedirectUri);
       console.log('- State length:', state.length);
@@ -217,7 +218,7 @@ serve(async (req) => {
       };
       
       console.log('=== OAuth Init Successful ===');
-      console.log('Response prepared successfully with correct scope');
+      console.log('Response prepared successfully with corrected scope');
 
       return new Response(
         JSON.stringify(responseData),
