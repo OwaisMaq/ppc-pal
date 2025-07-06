@@ -1,12 +1,43 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { toast as ToastFunction } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/use-toast';
+
+type ToastFunction = ReturnType<typeof useToast>['toast'];
 
 export class AmazonConnectionOperations {
-  private toast: ToastFunction['toast'];
+  private toast: ToastFunction;
 
-  constructor(toast: ToastFunction['toast']) {
+  constructor(toast: ToastFunction) {
     this.toast = toast;
+  }
+
+  async getAuthHeaders(): Promise<Record<string, string>> {
+    console.log('=== Getting Auth Headers ===');
+    
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        console.error('Session error:', error);
+        throw new Error('Authentication failed - please sign in again');
+      }
+      
+      if (!session?.access_token) {
+        console.error('No valid session found');
+        throw new Error('No valid session - please sign in again');
+      }
+      
+      console.log('Valid session found, preparing headers');
+      
+      return {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json'
+      };
+      
+    } catch (err) {
+      console.error('Auth header preparation failed:', err);
+      throw new Error(err instanceof Error ? err.message : 'Authentication failed');
+    }
   }
 
   async initiateConnection(redirectUri: string): Promise<void> {
