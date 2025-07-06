@@ -26,6 +26,33 @@ export const useAmazonConnections = () => {
   const oauthCallbackCache = useRef<Map<string, Promise<any>>>(new Map());
   const fetchingRef = useRef(false);
 
+  const getAuthHeaders = async () => {
+    console.log('=== Getting Auth Headers for Amazon Operations ===');
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    console.log('Session validation:', {
+      hasSession: !!session,
+      hasAccessToken: !!session?.access_token,
+      sessionError: sessionError?.message,
+      tokenLength: session?.access_token?.length || 0
+    });
+    
+    if (sessionError) {
+      console.error('Session error in Amazon connections:', sessionError);
+      throw new Error(`Session error: ${sessionError.message}`);
+    }
+    
+    if (!session?.access_token) {
+      console.error('No access token available for Amazon operations');
+      throw new Error('Authentication required. Please sign in again.');
+    }
+    
+    return {
+      'Authorization': `Bearer ${session.access_token}`,
+      'Content-Type': 'application/json'
+    };
+  };
+
   const updateConnectionStatus = async (connectionId: string, status: 'active' | 'error' | 'warning', reason?: string) => {
     try {
       console.log(`=== Updating Connection Status ===`);
@@ -320,32 +347,23 @@ export const useAmazonConnections = () => {
       console.log('=== Sync Connection Started ===');
       console.log('Connection ID:', connectionId);
       
-      // Step 1: Fetch fresh session to ensure we have valid auth
-      console.log('=== Fetching Fresh Session ===');
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError) {
-        console.error('=== Session Fetch Error ===');
-        console.error('Session error:', sessionError);
-        throw new Error('Failed to get authentication session. Please sign in again.');
-      }
-      
-      if (!session?.access_token) {
-        console.error('=== No Valid Session Found ===');
-        console.error('Session exists:', !!session);
-        console.error('Access token exists:', !!session?.access_token);
+      // Step 1: Get auth headers with session validation
+      console.log('=== Getting Auth Headers ===');
+      let headers;
+      try {
+        headers = await getAuthHeaders();
+        console.log('Auth headers prepared successfully');
+      } catch (authError) {
+        console.error('=== Auth Header Error ===');
+        console.error('Auth error:', authError);
         
         toast({
           title: "Authentication Required",
-          description: "Please sign in again to sync your Amazon connection.",
+          description: authError.message || "Please sign in again to sync your Amazon connection.",
           variant: "destructive",
         });
         return;
       }
-      
-      console.log('=== Fresh Session Retrieved Successfully ===');
-      console.log('Session user ID:', session.user?.id);
-      console.log('Access token length:', session.access_token.length);
       
       // Step 2: Validate the connection exists and get its current state
       console.log('=== Validating Connection ===');
@@ -389,16 +407,12 @@ export const useAmazonConnections = () => {
         description: "Fetching your campaign data from Amazon. Please wait...",
       });
       
-      // Step 5: Call Amazon Sync Function with fresh session
+      // Step 5: Call Amazon Sync Function with proper headers
       console.log('=== Calling Amazon Sync Function ===');
-      console.log('Using fresh access token (first 20 chars):', session.access_token.substring(0, 20) + '...');
       
       const { data, error } = await supabase.functions.invoke('amazon-sync', {
         body: { connectionId },
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        }
+        headers
       });
 
       console.log('=== Sync Response Received ===');

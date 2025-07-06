@@ -56,14 +56,52 @@ export const useEnhancedAmazonSync = () => {
     setSteps([]);
   };
 
+  const getAuthHeaders = async () => {
+    console.log('=== Getting Auth Headers ===');
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    console.log('Session check result:', {
+      hasSession: !!session,
+      hasAccessToken: !!session?.access_token,
+      sessionError: sessionError?.message,
+      tokenLength: session?.access_token?.length || 0
+    });
+    
+    if (sessionError) {
+      console.error('Session error:', sessionError);
+      throw new Error(`Session error: ${sessionError.message}`);
+    }
+    
+    if (!session?.access_token) {
+      console.error('No access token in session');
+      throw new Error('No valid session found. Please sign in again.');
+    }
+    
+    const headers = {
+      'Authorization': `Bearer ${session.access_token}`,
+      'Content-Type': 'application/json'
+    };
+    
+    console.log('Auth headers prepared:', {
+      hasAuthHeader: !!headers.Authorization,
+      authHeaderLength: headers.Authorization.length,
+      contentType: headers['Content-Type']
+    });
+    
+    return headers;
+  };
+
   const runEnhancedProfileDetection = async (connectionId: string): Promise<ProfileDetectionResult> => {
     console.log('=== Enhanced Profile Detection Started ===');
     
     try {
       addStep('Starting enhanced profile detection', 'pending', 'Attempting multiple detection strategies');
       
+      const headers = await getAuthHeaders();
+      
       const { data, error } = await supabase.functions.invoke('amazon-enhanced-profile-detection', {
-        body: { connectionId }
+        body: { connectionId },
+        headers
       });
 
       if (error) {
@@ -125,11 +163,14 @@ export const useEnhancedAmazonSync = () => {
       if (profileResult.success && profileResult.profiles.length > 0) {
         addStep('Updating connection with found profiles', 'pending');
         
+        const headers = await getAuthHeaders();
+        
         const { error: updateError } = await supabase.functions.invoke('amazon-update-connection-profiles', {
           body: { 
             connectionId, 
             profiles: profileResult.profiles 
-          }
+          },
+          headers
         });
 
         if (updateError) {
@@ -168,7 +209,23 @@ export const useEnhancedAmazonSync = () => {
       console.log('=== Enhanced Amazon Sync Started ===');
       addStep('Initializing enhanced sync', 'pending', `Connection ID: ${connectionId}`);
 
-      // Step 1: Validate connection
+      // Step 1: Validate session and get auth headers
+      addStep('Validating session and authentication', 'pending');
+      let headers;
+      try {
+        headers = await getAuthHeaders();
+        updateLastStep('success', 'Session validated and auth headers prepared');
+      } catch (authError) {
+        updateLastStep('error', `Authentication failed: ${authError.message}`);
+        toast({
+          title: "Authentication Error",
+          description: "Please sign in again to continue with enhanced sync.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Step 2: Validate connection
       addStep('Validating connection', 'pending');
       const { data: connection, error: connectionError } = await supabase
         .from('amazon_connections')
@@ -187,7 +244,7 @@ export const useEnhancedAmazonSync = () => {
       }
       updateLastStep('success', `Connection found: ${connection.profile_name || 'Unknown'}`);
 
-      // Step 2: Check token validity
+      // Step 3: Check token validity
       addStep('Checking token validity', 'pending');
       const tokenExpiry = new Date(connection.token_expires_at);
       const now = new Date();
@@ -204,7 +261,7 @@ export const useEnhancedAmazonSync = () => {
       }
       updateLastStep('success', `Token valid until ${tokenExpiry.toLocaleDateString()}`);
 
-      // Step 3: Check profile configuration
+      // Step 4: Check profile configuration
       addStep('Checking profile configuration', 'pending');
       if (!connection.profile_id || connection.profile_id === 'setup_required_no_profiles_found') {
         updateLastStep('warning', 'No advertising profiles configured');
@@ -230,11 +287,12 @@ export const useEnhancedAmazonSync = () => {
         updateLastStep('success', `Profile configured: ${connection.profile_id}`);
       }
 
-      // Step 4: Attempt campaign sync
-      addStep('Syncing campaigns', 'pending', 'Fetching campaign data from Amazon');
+      // Step 5: Attempt campaign sync with proper authentication
+      addStep('Syncing campaigns', 'pending', 'Fetching campaign data from Amazon with enhanced authentication');
       
       const { data: syncData, error: syncError } = await supabase.functions.invoke('amazon-sync', {
-        body: { connectionId }
+        body: { connectionId },
+        headers
       });
 
       if (syncError) {
@@ -269,7 +327,7 @@ export const useEnhancedAmazonSync = () => {
         return;
       }
 
-      // Step 5: Success
+      // Step 6: Success
       const campaignCount = syncData?.campaignsSynced || syncData?.campaignCount || 0;
       updateLastStep('success', `Successfully synced ${campaignCount} campaigns`);
       

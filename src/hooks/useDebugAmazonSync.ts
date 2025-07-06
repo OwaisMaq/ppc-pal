@@ -51,6 +51,19 @@ export const useDebugAmazonSync = () => {
     setDebugSteps([]);
   };
 
+  const getAuthHeaders = async () => {
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError || !session?.access_token) {
+      throw new Error('Failed to get valid session for API calls');
+    }
+    
+    return {
+      'Authorization': `Bearer ${session.access_token}`,
+      'Content-Type': 'application/json'
+    };
+  };
+
   const runDebugSync = async () => {
     if (!user) {
       toast({
@@ -74,7 +87,20 @@ export const useDebugAmazonSync = () => {
         return;
       }
 
-      // Step 2: Fetch Amazon connections
+      // Step 2: Verify session and auth headers
+      addDebugStep("Checking session and auth headers", "pending");
+      try {
+        const headers = await getAuthHeaders();
+        updateLastStep("success", "Session and auth headers validated", { 
+          hasAuthHeader: !!headers.Authorization,
+          tokenLength: headers.Authorization.length 
+        });
+      } catch (headerError) {
+        updateLastStep("error", "Failed to get auth headers", { error: headerError.message });
+        return;
+      }
+
+      // Step 3: Fetch Amazon connections
       addDebugStep("Fetching Amazon connections", "pending");
       const { data: connections, error: connectionsError } = await supabase
         .from('amazon_connections')
@@ -104,7 +130,7 @@ export const useDebugAmazonSync = () => {
         }))
       });
 
-      // Step 3: Analyze each connection
+      // Step 4: Analyze each connection
       for (const connection of connections) {
         addDebugStep(`Analyzing connection: ${connection.profile_name}`, "pending");
         
@@ -126,12 +152,15 @@ export const useDebugAmazonSync = () => {
           });
         }
 
-        // Step 4: Test Amazon API connectivity
+        // Step 5: Test Amazon API connectivity with proper headers
         addDebugStep(`Testing Amazon API connectivity`, "pending");
         
         try {
+          const headers = await getAuthHeaders();
+          
           const { data: testResult, error: testError } = await supabase.functions.invoke('amazon-test-connection', {
-            body: { connectionId: connection.id }
+            body: { connectionId: connection.id },
+            headers
           });
 
           if (testError) {
@@ -146,30 +175,32 @@ export const useDebugAmazonSync = () => {
 
           updateLastStep("success", "API connectivity confirmed", testResult);
 
-          // Step 5: Attempt Force Sync
+          // Step 6: Attempt Enhanced Profile Detection with proper headers
           addDebugStep(`Running enhanced profile detection`, "pending");
           
-          const { data: forceSyncResult, error: forceSyncError } = await supabase.functions.invoke('amazon-force-sync', {
-            body: { connectionId: connection.id }
+          const { data: forceSyncResult, error: forceSyncError } = await supabase.functions.invoke('amazon-enhanced-profile-detection', {
+            body: { connectionId: connection.id },
+            headers
           });
 
           if (forceSyncError) {
-            updateLastStep("error", "Force sync failed", forceSyncError);
+            updateLastStep("error", "Enhanced profile detection failed", forceSyncError);
             continue;
           }
 
           if (forceSyncResult?.error) {
-            updateLastStep("warning", "Force sync completed with issues", forceSyncResult);
+            updateLastStep("warning", "Enhanced profile detection completed with issues", forceSyncResult);
           } else {
-            updateLastStep("success", "Force sync completed successfully", forceSyncResult);
+            updateLastStep("success", "Enhanced profile detection completed successfully", forceSyncResult);
           }
 
-          // Step 6: Attempt regular sync if profiles were found
-          if (forceSyncResult?.success && forceSyncResult?.activeProfilesFound > 0) {
+          // Step 7: Attempt regular sync if profiles were found
+          if (forceSyncResult?.success && forceSyncResult?.profiles?.length > 0) {
             addDebugStep(`Testing regular campaign sync`, "pending");
             
             const { data: syncResult, error: syncError } = await supabase.functions.invoke('amazon-sync', {
-              body: { connectionId: connection.id }
+              body: { connectionId: connection.id },
+              headers
             });
 
             if (syncError) {
@@ -203,7 +234,7 @@ export const useDebugAmazonSync = () => {
         recommendations.push("Set up Amazon Advertising at advertising.amazon.com");
       }
       if (!hasActiveCampaigns) {
-        recommendations.push("Use Force Sync to attempt profile detection");
+        recommendations.push("Use Enhanced Sync to attempt profile detection");
         recommendations.push("Verify your Amazon Advertising account has active campaigns");
       }
 
