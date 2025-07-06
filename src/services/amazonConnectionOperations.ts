@@ -37,7 +37,7 @@ export class AmazonConnectionOperations {
     };
   }
 
-  async updateConnectionStatus(connectionId: string, status: 'active' | 'error' | 'warning', reason?: string) {
+  async updateConnectionStatus(connectionId: string, status: 'active' | 'expired' | 'error' | 'pending' | 'warning' | 'setup_required', reason?: string) {
     try {
       console.log(`=== Updating Connection Status ===`);
       console.log('Connection ID:', connectionId);
