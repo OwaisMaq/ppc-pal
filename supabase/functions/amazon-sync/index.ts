@@ -19,9 +19,6 @@ serve(async (req) => {
     console.log('Auth header present:', !!authHeader)
     console.log('Auth header format:', authHeader ? 
       (authHeader.startsWith('Bearer ') ? 'Bearer token format' : 'Invalid format') : 'missing')
-    console.log('Auth header length:', authHeader ? authHeader.length : 0)
-    console.log('Request method:', req.method)
-    console.log('Request headers:', Object.fromEntries(req.headers.entries()))
 
     // Create Supabase clients
     const supabaseAdmin = createClient(
@@ -41,7 +38,7 @@ serve(async (req) => {
       }
     )
 
-    // Enhanced user verification with detailed logging
+    // Enhanced user verification
     console.log('=== User Authentication Verification ===')
     const { data: { user }, error: authError } = await supabaseUser.auth.getUser()
     
@@ -49,42 +46,17 @@ serve(async (req) => {
       userExists: !!user,
       userId: user?.id,
       userEmail: user?.email,
-      authError: authError?.message,
-      authErrorCode: authError?.code
+      authError: authError?.message
     })
     
-    if (authError) {
-      console.error('=== Authentication Error Details ===')
-      console.error('Error type:', typeof authError)
-      console.error('Error message:', authError.message)
-      console.error('Error code:', authError.code)
-      console.error('Full error object:', JSON.stringify(authError, null, 2))
+    if (authError || !user) {
+      console.error('Authentication failed:', authError?.message || 'No user found')
       
       return new Response(
         JSON.stringify({ 
           error: 'Authentication failed',
-          details: authError.message,
-          errorCode: authError.code,
-          debugInfo: 'Check browser console for detailed authentication logs'
-        }),
-        { 
-          status: 401, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
-    }
-
-    if (!user) {
-      console.error('=== No User Found After Auth Check ===')
-      console.error('Auth header was:', authHeader ? 'present' : 'missing')
-      console.error('Supabase URL configured:', !!Deno.env.get('SUPABASE_URL'))
-      console.error('Anon key configured:', !!Deno.env.get('SUPABASE_ANON_KEY'))
-      
-      return new Response(
-        JSON.stringify({ 
-          error: 'User not authenticated',
-          details: 'Valid session not found. Please sign in again.',
-          debugInfo: 'Authentication token may be expired or invalid'
+          details: authError?.message || 'Valid session not found. Please sign in again.',
+          requiresReauth: true
         }),
         { 
           status: 401, 
@@ -94,28 +66,12 @@ serve(async (req) => {
     }
 
     console.log('=== User Authentication Successful ===')
-    console.log('Authenticated user ID:', user.id)
-    console.log('User email:', user.email)
-    console.log('User created at:', user.created_at)
 
-    // Parse request body with error handling
-    let requestBody
-    try {
-      requestBody = await req.json()
-    } catch (parseError) {
-      console.error('=== Request Body Parse Error ===')
-      console.error('Parse error:', parseError)
-      return new Response(
-        JSON.stringify({ error: 'Invalid request body' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    const { connectionId } = requestBody
+    // Parse request body
+    const { connectionId } = await req.json()
     
     console.log('=== Amazon Sync Request Details ===')
     console.log('Connection ID:', connectionId)
-    console.log('Request body keys:', Object.keys(requestBody))
 
     if (!connectionId) {
       return new Response(
@@ -124,7 +80,7 @@ serve(async (req) => {
       )
     }
 
-    // Enhanced connection verification with detailed logging
+    // Enhanced connection verification
     console.log('=== Database Connection Verification ===')
     const { data: connection, error: fetchError } = await supabaseAdmin
       .from('amazon_connections')
@@ -136,45 +92,11 @@ serve(async (req) => {
     console.log('Connection query result:', {
       connectionFound: !!connection,
       fetchError: fetchError?.message,
-      fetchErrorCode: fetchError?.code,
-      connectionUserId: connection?.user_id,
-      requestUserId: user.id,
       userIdMatch: connection?.user_id === user.id
     })
 
-    if (fetchError) {
-      console.error('=== Connection Fetch Error ===')
-      console.error('Error details:', fetchError)
-      console.error('Error code:', fetchError.code)
-      console.error('Error hint:', fetchError.hint)
-      
-      return new Response(
-        JSON.stringify({ 
-          error: 'Failed to fetch connection',
-          details: fetchError.message,
-          errorCode: fetchError.code
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    if (!connection) {
-      console.error('=== Connection Not Found ===')
-      console.error('Searched for connection ID:', connectionId)
-      console.error('With user ID:', user.id)
-      
-      // Additional debug: check if connection exists for any user
-      const { data: anyConnection } = await supabaseAdmin
-        .from('amazon_connections')
-        .select('id, user_id')
-        .eq('id', connectionId)
-        .single()
-      
-      console.log('Connection exists for other user:', !!anyConnection)
-      if (anyConnection) {
-        console.log('Connection belongs to user:', anyConnection.user_id)
-        console.log('Current user:', user.id)
-      }
+    if (fetchError || !connection) {
+      console.error('Connection not found or access denied:', fetchError?.message)
       
       return new Response(
         JSON.stringify({ 
@@ -186,31 +108,24 @@ serve(async (req) => {
     }
 
     console.log('=== Connection Details ===')
-    console.log('Connection ID:', connection.id)
     console.log('Profile ID:', connection.profile_id)
     console.log('Status:', connection.status)
     console.log('Profile Name:', connection.profile_name)
     console.log('Marketplace ID:', connection.marketplace_id)
-    console.log('Token expires at:', connection.token_expires_at)
-    console.log('Last sync at:', connection.last_sync_at)
 
     // Enhanced token validation
     const tokenExpiry = new Date(connection.token_expires_at)
     const now = new Date()
     const tokenValid = tokenExpiry > now
-    const timeUntilExpiry = tokenExpiry.getTime() - now.getTime()
     
     console.log('=== Token Validation ===')
     console.log('Token expiry:', tokenExpiry.toISOString())
     console.log('Current time:', now.toISOString())
     console.log('Token valid:', tokenValid)
-    console.log('Time until expiry (minutes):', Math.round(timeUntilExpiry / (1000 * 60)))
     
     if (!tokenValid) {
-      console.error('=== Token Expired ===')
-      console.error('Token expired by (minutes):', Math.round(Math.abs(timeUntilExpiry) / (1000 * 60)))
+      console.error('Token has expired')
       
-      // Update connection status
       await supabaseAdmin
         .from('amazon_connections')
         .update({ 
@@ -237,12 +152,9 @@ serve(async (req) => {
     console.log('=== Amazon API Credentials Check ===')
     console.log('Client ID configured:', !!clientId)
     console.log('Client Secret configured:', !!clientSecret)
-    console.log('Access token length:', connection.access_token?.length || 0)
     
     if (!clientId || !clientSecret) {
-      console.error('=== Missing Amazon Credentials ===')
-      console.error('Client ID missing:', !clientId)
-      console.error('Client Secret missing:', !clientSecret)
+      console.error('Missing Amazon credentials')
       
       return new Response(
         JSON.stringify({ 
@@ -253,9 +165,16 @@ serve(async (req) => {
       )
     }
 
-    // Handle profile setup requirements
-    if (connection.profile_id === 'setup_required_no_profiles_found') {
-      console.log('=== Attempting Profile Recovery ===')
+    // Enhanced profile validation and recovery
+    console.log('=== Profile Validation ===')
+    let currentProfileId = connection.profile_id
+    
+    if (!currentProfileId || 
+        currentProfileId === 'setup_required_no_profiles_found' || 
+        currentProfileId === 'invalid' ||
+        currentProfileId.includes('error')) {
+      
+      console.log('Invalid profile detected, attempting recovery...')
       
       const profilesResponse = await fetch('https://advertising-api.amazon.com/v2/profiles', {
         headers: {
@@ -267,13 +186,12 @@ serve(async (req) => {
 
       console.log('Profile recovery response:', {
         status: profilesResponse.status,
-        statusText: profilesResponse.statusText,
         ok: profilesResponse.ok
       })
 
       if (profilesResponse.ok) {
         const profiles = await profilesResponse.json()
-        console.log('Recovered profiles:', profiles.length)
+        console.log('Profiles found during recovery:', profiles.length)
 
         if (profiles && profiles.length > 0) {
           const firstProfile = profiles[0]
@@ -281,26 +199,22 @@ serve(async (req) => {
           const profileName = firstProfile.countryCode || `Profile ${firstProfile.profileId}`
           const marketplaceId = firstProfile.accountInfo?.marketplaceStringId || firstProfile.countryCode
 
-          // Update connection with found profile
+          // Update connection with recovered profile
           await supabaseAdmin
             .from('amazon_connections')
             .update({
               profile_id: profileId,
               profile_name: profileName,
               marketplace_id: marketplaceId,
-              status: 'setup_required',
+              status: 'active',
               updated_at: new Date().toISOString()
             })
             .eq('id', connectionId)
 
-          // Update local connection object
-          connection.profile_id = profileId
-          connection.profile_name = profileName
-          connection.marketplace_id = marketplaceId
-          
+          currentProfileId = profileId
           console.log('Profile recovery successful:', { profileId, profileName })
         } else {
-          console.log('=== No Profiles Found During Recovery ===')
+          console.log('No profiles found during recovery')
           
           await supabaseAdmin
             .from('amazon_connections')
@@ -313,7 +227,7 @@ serve(async (req) => {
           return new Response(
             JSON.stringify({ 
               error: 'No advertising profiles found',
-              details: 'Please set up Amazon Advertising first at advertising.amazon.com, then try again',
+              details: 'Please set up Amazon Advertising first at advertising.amazon.com, then try Enhanced Sync',
               requiresSetup: true
             }),
             { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -321,18 +235,8 @@ serve(async (req) => {
         }
       } else {
         const errorText = await profilesResponse.text()
-        console.error('=== Profile Recovery Failed ===')
-        console.error('Response status:', profilesResponse.status)
-        console.error('Response text:', errorText)
+        console.error('Profile recovery failed:', profilesResponse.status, errorText)
         
-        await supabaseAdmin
-          .from('amazon_connections')
-          .update({ 
-            status: 'error',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', connectionId)
-
         return new Response(
           JSON.stringify({ 
             error: 'Failed to access Amazon Advertising API during profile recovery',
@@ -344,49 +248,41 @@ serve(async (req) => {
       }
     }
 
-    // Validate final profile configuration
-    if (!connection.profile_id || connection.profile_id === 'invalid') {
-      console.error('=== Invalid Profile Configuration ===')
-      console.error('Profile ID:', connection.profile_id)
+    // Final profile validation
+    if (!currentProfileId || !/^\d+$/.test(currentProfileId)) {
+      console.error('Invalid profile configuration after recovery')
       
-      await supabaseAdmin
-        .from('amazon_connections')
-        .update({ 
-          status: 'error',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', connectionId)
-
       return new Response(
         JSON.stringify({ 
           error: 'Invalid profile configuration',
-          details: 'Profile ID is missing or invalid. Please reconnect your Amazon account.'
+          details: 'Profile ID is missing or invalid. Please use Enhanced Sync or reconnect your account.'
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Enhanced campaign fetching with detailed API logging
-    console.log('=== Amazon API Campaign Fetch ===')
-    console.log('Using profile ID:', connection.profile_id)
+    // Enhanced campaign fetching with proper headers
+    console.log('=== Enhanced Campaign Fetch ===')
+    console.log('Using profile ID:', currentProfileId)
     
     const campaignHeaders = {
       'Authorization': `Bearer ${connection.access_token}`,
       'Amazon-Advertising-API-ClientId': clientId,
-      'Amazon-Advertising-API-Scope': connection.profile_id,
+      'Amazon-Advertising-API-Scope': currentProfileId,
       'Content-Type': 'application/json',
     }
     
-    console.log('Request headers (sensitive data masked):', {
-      'Authorization': 'Bearer [MASKED]',
-      'Amazon-Advertising-API-ClientId': clientId,
-      'Amazon-Advertising-API-Scope': connection.profile_id,
-      'Content-Type': 'application/json'
+    console.log('Campaign API headers configured:', {
+      hasAuth: !!campaignHeaders['Authorization'],
+      hasClientId: !!campaignHeaders['Amazon-Advertising-API-ClientId'],
+      hasScope: !!campaignHeaders['Amazon-Advertising-API-Scope'],
+      scopeValue: campaignHeaders['Amazon-Advertising-API-Scope']
     })
 
     let campaigns = []
     let lastError = null
 
+    // Multiple retry attempts with exponential backoff
     for (let attempt = 1; attempt <= 3; attempt++) {
       console.log(`=== Campaign Fetch Attempt ${attempt} ===`)
       
@@ -398,22 +294,19 @@ serve(async (req) => {
         console.log('Campaign API response:', {
           status: campaignsResponse.status,
           statusText: campaignsResponse.statusText,
-          ok: campaignsResponse.ok,
-          headers: Object.fromEntries(campaignsResponse.headers.entries())
+          ok: campaignsResponse.ok
         })
 
         if (campaignsResponse.ok) {
           campaigns = await campaignsResponse.json()
           console.log(`Campaign fetch successful (attempt ${attempt}):`, {
-            campaignCount: campaigns.length,
-            campaignIds: campaigns.slice(0, 3).map(c => c.campaignId)
+            campaignCount: campaigns.length
           })
           break
         } else {
           const errorText = await campaignsResponse.text()
           console.error(`Campaign fetch failed (attempt ${attempt}):`, {
             status: campaignsResponse.status,
-            statusText: campaignsResponse.statusText,
             errorBody: errorText
           })
           
@@ -423,8 +316,9 @@ serve(async (req) => {
             text: errorText 
           }
           
+          // Handle specific error codes
           if (campaignsResponse.status === 401) {
-            console.error('=== 401 Unauthorized - Token Invalid ===')
+            console.error('401 Unauthorized - Token or scope invalid')
             
             await supabaseAdmin
               .from('amazon_connections')
@@ -446,37 +340,27 @@ serve(async (req) => {
           }
           
           if (campaignsResponse.status === 403) {
-            console.error('=== 403 Forbidden - Access Denied ===')
+            console.error('403 Forbidden - Access denied or profile scope invalid')
             
-            await supabaseAdmin
-              .from('amazon_connections')
-              .update({ 
-                status: 'error',
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', connectionId)
-
             return new Response(
               JSON.stringify({ 
                 error: 'Access denied to Amazon Advertising API',
-                details: 'Amazon API returned 403 Forbidden. Please check your Amazon Advertising account permissions.',
-                apiResponse: errorText
+                details: 'Amazon API returned 403 Forbidden. The profile scope may be invalid or you may not have access to this advertising profile.',
+                apiResponse: errorText,
+                currentProfileId: currentProfileId
               }),
               { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             )
           }
         }
       } catch (fetchError) {
-        console.error(`Campaign fetch network error (attempt ${attempt}):`, {
-          errorMessage: fetchError.message,
-          errorType: fetchError.constructor.name
-        })
+        console.error(`Campaign fetch network error (attempt ${attempt}):`, fetchError.message)
         lastError = { message: fetchError.message, type: 'network_error' }
       }
       
-      // Wait before retry
+      // Wait before retry with exponential backoff
       if (attempt < 3) {
-        const waitTime = 1000 * attempt
+        const waitTime = 1000 * Math.pow(2, attempt - 1)
         console.log(`Waiting ${waitTime}ms before retry...`)
         await new Promise(resolve => setTimeout(resolve, waitTime))
       }
@@ -484,8 +368,7 @@ serve(async (req) => {
 
     // Handle final failure after all retries
     if (campaigns.length === 0 && lastError) {
-      console.error('=== All Campaign Fetch Attempts Failed ===')
-      console.error('Final error:', lastError)
+      console.error('All campaign fetch attempts failed:', lastError)
       
       await supabaseAdmin
         .from('amazon_connections')
@@ -498,8 +381,9 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           error: 'Failed to fetch campaigns from Amazon after multiple attempts',
-          details: lastError.text || lastError.message || 'Network or API error',
-          lastError: lastError
+          details: lastError.text || lastError.message || 'API communication failed',
+          lastError: lastError,
+          profileId: currentProfileId
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
@@ -507,7 +391,7 @@ serve(async (req) => {
 
     // Handle successful API call but no campaigns
     if (!campaigns || campaigns.length === 0) {
-      console.log('=== Successful API Call - No Campaigns Found ===')
+      console.log('Successful API call - No campaigns found')
       
       await supabaseAdmin
         .from('amazon_connections')
@@ -533,14 +417,7 @@ serve(async (req) => {
 
     // Process and save campaigns
     console.log('=== Processing Campaigns for Database ===')
-    const campaignInserts = campaigns.map((campaign, index) => {
-      console.log(`Processing campaign ${index + 1}:`, {
-        id: campaign.campaignId,
-        name: campaign.name,
-        type: campaign.campaignType,
-        state: campaign.state
-      })
-      
+    const campaignInserts = campaigns.map((campaign) => {
       return {
         connection_id: connectionId,
         amazon_campaign_id: campaign.campaignId.toString(),
@@ -558,7 +435,7 @@ serve(async (req) => {
       }
     })
 
-    console.log('=== Database Upsert ===')
+    console.log('Upserting campaigns:', campaignInserts.length)
     const { error: campaignError } = await supabaseAdmin
       .from('campaigns')
       .upsert(campaignInserts, {
@@ -567,8 +444,7 @@ serve(async (req) => {
       })
 
     if (campaignError) {
-      console.error('=== Campaign Upsert Error ===')
-      console.error('Error details:', campaignError)
+      console.error('Campaign upsert error:', campaignError)
       
       await supabaseAdmin
         .from('amazon_connections')
@@ -599,11 +475,7 @@ serve(async (req) => {
       .eq('id', connectionId)
 
     console.log('=== Amazon Sync Completed Successfully ===')
-    console.log('Final results:', {
-      campaignsSynced: campaigns.length,
-      connectionStatus: 'active',
-      syncTimestamp: new Date().toISOString()
-    })
+    console.log('Campaigns synced:', campaigns.length)
 
     return new Response(
       JSON.stringify({
@@ -612,18 +484,15 @@ serve(async (req) => {
         campaignCount: campaigns.length,
         campaignsSynced: campaigns.length,
         syncStatus: 'success_with_campaigns',
-        syncTimestamp: new Date().toISOString()
+        syncTimestamp: new Date().toISOString(),
+        profileId: currentProfileId
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error) {
     console.error('=== Unexpected Amazon Sync Error ===')
-    console.error('Error type:', typeof error)
-    console.error('Error name:', error?.constructor?.name)
-    console.error('Error message:', error?.message)
-    console.error('Error stack:', error?.stack)
-    console.error('Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2))
+    console.error('Error details:', error)
     
     return new Response(
       JSON.stringify({ 

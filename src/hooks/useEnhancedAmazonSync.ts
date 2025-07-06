@@ -91,11 +91,36 @@ export const useEnhancedAmazonSync = () => {
     return headers;
   };
 
+  const validateProfileConfiguration = (profileId: string): { isValid: boolean; reason?: string } => {
+    console.log('=== Validating Profile Configuration ===');
+    console.log('Profile ID:', profileId);
+
+    if (!profileId) {
+      return { isValid: false, reason: 'No profile ID configured' };
+    }
+
+    if (profileId === 'setup_required_no_profiles_found') {
+      return { isValid: false, reason: 'No advertising profiles found during setup' };
+    }
+
+    if (profileId.includes('error') || profileId === 'invalid') {
+      return { isValid: false, reason: 'Invalid profile configuration detected' };
+    }
+
+    // Amazon profile IDs should be numeric strings
+    if (!/^\d+$/.test(profileId)) {
+      return { isValid: false, reason: 'Profile ID format appears invalid (should be numeric)' };
+    }
+
+    console.log('Profile configuration is valid');
+    return { isValid: true };
+  };
+
   const runEnhancedProfileDetection = async (connectionId: string): Promise<ProfileDetectionResult> => {
     console.log('=== Enhanced Profile Detection Started ===');
     
     try {
-      addStep('Starting enhanced profile detection', 'pending', 'Attempting multiple detection strategies');
+      addStep('Starting enhanced profile detection', 'pending', 'Using multiple detection strategies across regions');
       
       const headers = await getAuthHeaders();
       
@@ -116,27 +141,35 @@ export const useEnhancedAmazonSync = () => {
         };
       }
 
-      if (data?.success) {
+      if (data?.success && data.profiles?.length > 0) {
         updateLastStep('success', 
-          `Found ${data.profiles?.length || 0} profiles across ${data.regions?.length || 0} regions`,
-          data
+          `Found ${data.profiles.length} advertising profiles across ${data.regions?.length || 0} regions`,
+          { 
+            profilesFound: data.profiles.length,
+            regionsChecked: data.regions?.length || 0,
+            profileIds: data.profiles.map(p => p.profileId).slice(0, 3)
+          }
         );
         return {
           success: true,
-          profiles: data.profiles || [],
+          profiles: data.profiles,
           errors: data.errors || [],
           regions: data.regions || [],
           totalAttempts: data.totalAttempts || 0
         };
       } else {
         updateLastStep('warning', 
-          data?.message || 'No profiles found despite enhanced detection',
-          data
+          'No advertising profiles found despite enhanced detection',
+          { 
+            regionsChecked: data?.regions?.length || 0,
+            errors: data?.errors || [],
+            suggestion: 'Amazon Advertising account setup may be required'
+          }
         );
         return {
           success: false,
           profiles: [],
-          errors: data?.errors || ['No profiles detected'],
+          errors: data?.errors || ['No advertising profiles detected'],
           regions: data?.regions || [],
           totalAttempts: data?.totalAttempts || 0
         };
@@ -154,41 +187,91 @@ export const useEnhancedAmazonSync = () => {
     }
   };
 
+  const updateConnectionWithProfiles = async (connectionId: string, profiles: any[]) => {
+    console.log('=== Updating Connection with Profiles ===');
+    console.log('Profiles to update:', profiles.length);
+    
+    if (!profiles || profiles.length === 0) {
+      throw new Error('No profiles provided for connection update');
+    }
+
+    // Use the first valid profile (they're usually sorted by preference)
+    const primaryProfile = profiles[0];
+    const profileId = primaryProfile.profileId.toString();
+    const profileName = primaryProfile.countryCode || 
+                       primaryProfile.marketplace || 
+                       `Profile ${primaryProfile.profileId}`;
+    const marketplaceId = primaryProfile.accountInfo?.marketplaceStringId || 
+                         primaryProfile.countryCode;
+
+    console.log('Updating connection with profile:', {
+      profileId,
+      profileName,
+      marketplaceId
+    });
+
+    const { error: updateError } = await supabase
+      .from('amazon_connections')
+      .update({
+        profile_id: profileId,
+        profile_name: profileName,
+        marketplace_id: marketplaceId,
+        status: 'active',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', connectionId);
+
+    if (updateError) {
+      console.error('Failed to update connection:', updateError);
+      throw new Error(`Failed to update connection: ${updateError.message}`);
+    }
+
+    console.log('Connection updated successfully');
+    return { profileId, profileName, marketplaceId };
+  };
+
   const runConnectionRecovery = async (connectionId: string) => {
-    addStep('Running connection recovery', 'pending', 'Attempting to recover and update connection');
+    addStep('Running connection recovery', 'pending', 'Attempting to detect and configure advertising profiles');
     
     try {
+      // Step 1: Enhanced profile detection
       const profileResult = await runEnhancedProfileDetection(connectionId);
       
       if (profileResult.success && profileResult.profiles.length > 0) {
-        addStep('Updating connection with found profiles', 'pending');
+        addStep('Updating connection with detected profiles', 'pending');
         
-        const headers = await getAuthHeaders();
-        
-        const { error: updateError } = await supabase.functions.invoke('amazon-update-connection-profiles', {
-          body: { 
-            connectionId, 
-            profiles: profileResult.profiles 
-          },
-          headers
-        });
-
-        if (updateError) {
-          updateLastStep('error', `Failed to update connection: ${updateError.message}`);
-          return false;
-        } else {
-          updateLastStep('success', 'Connection updated with advertising profiles');
-          return true;
+        try {
+          const updatedProfile = await updateConnectionWithProfiles(connectionId, profileResult.profiles);
+          updateLastStep('success', 
+            `Connection updated with profile: ${updatedProfile.profileName}`,
+            updatedProfile
+          );
+          return { success: true, profilesFound: profileResult.profiles.length };
+        } catch (updateErr) {
+          updateLastStep('error', `Failed to update connection: ${updateErr.message}`);
+          return { success: false, error: updateErr.message };
         }
       } else {
-        addStep('No profiles to update', 'warning', 
-          'Enhanced detection found no advertising profiles. Account may need Amazon Advertising setup.'
+        addStep('No advertising profiles found', 'warning', 
+          `Enhanced detection checked ${profileResult.regions.length} regions but found no advertising profiles. ` +
+          'This usually means Amazon Advertising is not set up for this account.'
         );
-        return false;
+        
+        // Provide helpful guidance
+        addStep('Setup guidance', 'warning', 
+          'To resolve this: 1. Visit advertising.amazon.com, 2. Complete your advertising account setup, ' +
+          '3. Create at least one campaign, 4. Return here and try Enhanced Sync again'
+        );
+        
+        return { 
+          success: false, 
+          error: 'No advertising profiles found',
+          guidance: 'Amazon Advertising setup required'
+        };
       }
     } catch (err) {
       updateLastStep('error', `Recovery failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
-      return false;
+      return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
     }
   };
 
@@ -250,8 +333,8 @@ export const useEnhancedAmazonSync = () => {
       const now = new Date();
       
       if (tokenExpiry <= now) {
-        updateLastStep('error', 'Access token has expired');
-        addStep('Token refresh required', 'warning', 'Please reconnect your Amazon account');
+        updateLastStep('error', `Access token expired on ${tokenExpiry.toLocaleDateString()}`);
+        addStep('Token refresh required', 'warning', 'Please reconnect your Amazon account to refresh the token');
         toast({
           title: "Token Expired",
           description: "Please reconnect your Amazon account to continue.",
@@ -261,34 +344,44 @@ export const useEnhancedAmazonSync = () => {
       }
       updateLastStep('success', `Token valid until ${tokenExpiry.toLocaleDateString()}`);
 
-      // Step 4: Check profile configuration
-      addStep('Checking profile configuration', 'pending');
-      if (!connection.profile_id || connection.profile_id === 'setup_required_no_profiles_found') {
-        updateLastStep('warning', 'No advertising profiles configured');
+      // Step 4: Enhanced profile validation and recovery
+      addStep('Validating profile configuration', 'pending');
+      const profileValidation = validateProfileConfiguration(connection.profile_id);
+      
+      if (!profileValidation.isValid) {
+        updateLastStep('warning', `Profile issue detected: ${profileValidation.reason}`);
         
-        // Run connection recovery
-        const recoverySuccess = await runConnectionRecovery(connectionId);
+        // Attempt automatic recovery
+        const recoveryResult = await runConnectionRecovery(connectionId);
         
-        if (!recoverySuccess) {
-          addStep('Setup guidance', 'warning', 
-            'Amazon Advertising setup may be required. Please visit advertising.amazon.com to set up your advertising account.'
-          );
+        if (!recoveryResult.success) {
+          if (recoveryResult.guidance) {
+            addStep('Setup Required', 'warning', 
+              'Amazon Advertising setup is required before campaign sync can proceed. ' +
+              'Please visit advertising.amazon.com to complete setup.'
+            );
+          }
+          
           toast({
-            title: "Setup Required",
-            description: "Amazon Advertising setup is required. Please check the detailed guidance below.",
+            title: "Profile Setup Required",
+            description: recoveryResult.error || "Amazon Advertising account setup is required.",
             variant: "destructive",
           });
           return;
         }
 
-        // If recovery was successful, continue with sync
-        addStep('Profile recovery successful', 'success', 'Proceeding with campaign sync');
+        // Profile recovery was successful, continue with sync
+        addStep('Profile recovery successful', 'success', 
+          `Successfully configured ${recoveryResult.profilesFound} advertising profile(s)`
+        );
       } else {
-        updateLastStep('success', `Profile configured: ${connection.profile_id}`);
+        updateLastStep('success', `Profile validated: ${connection.profile_id}`);
       }
 
-      // Step 5: Attempt campaign sync with proper authentication
-      addStep('Syncing campaigns', 'pending', 'Fetching campaign data from Amazon with enhanced authentication');
+      // Step 5: Enhanced campaign sync with proper headers
+      addStep('Syncing campaigns with enhanced API headers', 'pending', 
+        'Using properly configured Amazon Advertising API headers'
+      );
       
       const { data: syncData, error: syncError } = await supabase.functions.invoke('amazon-sync', {
         body: { connectionId },
@@ -311,11 +404,11 @@ export const useEnhancedAmazonSync = () => {
         // Provide specific guidance based on error type
         if (syncData.requiresSetup) {
           addStep('Amazon Advertising setup required', 'warning', 
-            'Visit advertising.amazon.com to complete your advertising account setup'
+            'Your Amazon account needs advertising setup. Visit advertising.amazon.com to get started.'
           );
         } else if (syncData.requiresReconnection) {
           addStep('Reconnection required', 'warning', 
-            'Your Amazon connection needs to be refreshed'
+            'Your Amazon connection needs to be refreshed. Please reconnect your account.'
           );
         }
         
@@ -327,22 +420,30 @@ export const useEnhancedAmazonSync = () => {
         return;
       }
 
-      // Step 6: Success
+      // Step 6: Success handling
       const campaignCount = syncData?.campaignsSynced || syncData?.campaignCount || 0;
       updateLastStep('success', `Successfully synced ${campaignCount} campaigns`);
       
-      addStep('Sync completed', 'success', 
-        campaignCount > 0 
-          ? `${campaignCount} campaigns imported successfully`
-          : 'Sync completed, but no campaigns were found in your Amazon account'
-      );
-
-      toast({
-        title: "Sync Complete",
-        description: campaignCount > 0 
-          ? `Successfully synced ${campaignCount} campaigns`
-          : "Sync completed, but no campaigns found",
-      });
+      if (campaignCount > 0) {
+        addStep('Campaign import completed', 'success', 
+          `${campaignCount} campaigns imported and ready for optimization`
+        );
+        
+        toast({
+          title: "Sync Complete!",
+          description: `Successfully synced ${campaignCount} campaigns from Amazon.`,
+        });
+      } else {
+        addStep('Sync completed - No campaigns found', 'success', 
+          'Sync was successful, but no campaigns were found in your Amazon Advertising account. ' +
+          'This is normal for new accounts. Create campaigns in Amazon Advertising to see them here.'
+        );
+        
+        toast({
+          title: "Sync Complete",
+          description: "Sync completed successfully. No campaigns found - this is normal for new advertising accounts.",
+        });
+      }
 
     } catch (err) {
       console.error('Enhanced sync error:', err);
@@ -351,7 +452,7 @@ export const useEnhancedAmazonSync = () => {
       
       toast({
         title: "Sync Failed",
-        description: "An unexpected error occurred during sync",
+        description: "An unexpected error occurred during sync. Please try again.",
         variant: "destructive",
       });
     } finally {

@@ -64,11 +64,19 @@ export const useDebugAmazonSync = () => {
     };
   };
 
+  const validateProfileConfiguration = (profileId: string) => {
+    if (!profileId) return { isValid: false, reason: 'No profile ID' };
+    if (profileId === 'setup_required_no_profiles_found') return { isValid: false, reason: 'No advertising profiles found' };
+    if (profileId.includes('error') || profileId === 'invalid') return { isValid: false, reason: 'Invalid profile ID' };
+    if (!/^\d+$/.test(profileId)) return { isValid: false, reason: 'Profile ID should be numeric' };
+    return { isValid: true };
+  };
+
   const runDebugSync = async () => {
     if (!user) {
       toast({
         title: "Authentication Required",
-        description: "Please log in to run debug sync",
+        description: "Please log in to run debug analysis",
         variant: "destructive",
       });
       return;
@@ -78,17 +86,15 @@ export const useDebugAmazonSync = () => {
     setDebugSteps([]);
 
     try {
-      // Step 1: Check user authentication
+      // Step 1: Authentication check
       addDebugStep("Verifying user authentication", "pending");
-      if (user) {
-        updateLastStep("success", `Authenticated as: ${user.email}`, { userId: user.id });
-      } else {
-        updateLastStep("error", "No authenticated user found");
-        return;
-      }
+      updateLastStep("success", `Authenticated as: ${user.email}`, { 
+        userId: user.id,
+        email: user.email 
+      });
 
-      // Step 2: Verify session and auth headers
-      addDebugStep("Checking session and auth headers", "pending");
+      // Step 2: Session validation
+      addDebugStep("Validating session and auth headers", "pending");
       try {
         const headers = await getAuthHeaders();
         updateLastStep("success", "Session and auth headers validated", { 
@@ -96,12 +102,12 @@ export const useDebugAmazonSync = () => {
           tokenLength: headers.Authorization.length 
         });
       } catch (headerError) {
-        updateLastStep("error", "Failed to get auth headers", { error: headerError.message });
+        updateLastStep("error", "Auth header validation failed", { error: headerError.message });
         return;
       }
 
-      // Step 3: Fetch Amazon connections
-      addDebugStep("Fetching Amazon connections", "pending");
+      // Step 3: Fetch connections with enhanced validation
+      addDebugStep("Fetching and analyzing Amazon connections", "pending");
       const { data: connections, error: connectionsError } = await supabase
         .from('amazon_connections')
         .select('*')
@@ -113,47 +119,69 @@ export const useDebugAmazonSync = () => {
       }
 
       if (!connections || connections.length === 0) {
-        updateLastStep("warning", "No Amazon connections found", { connectionsCount: 0 });
-        addDebugStep("Recommendation", "warning", "Connect your Amazon account first", {
-          action: "Go to Settings > Amazon Account Setup"
+        updateLastStep("warning", "No Amazon connections found", { 
+          connectionsCount: 0,
+          recommendation: "Connect your Amazon account first" 
         });
         return;
       }
 
       updateLastStep("success", `Found ${connections.length} connection(s)`, { 
+        connectionsCount: connections.length,
         connections: connections.map(c => ({
           id: c.id,
           profile_id: c.profile_id,
           profile_name: c.profile_name,
           status: c.status,
-          marketplace_id: c.marketplace_id
+          marketplace_id: c.marketplace_id,
+          last_sync_at: c.last_sync_at
         }))
       });
 
-      // Step 4: Analyze each connection
-      for (const connection of connections) {
-        addDebugStep(`Analyzing connection: ${connection.profile_name}`, "pending");
+      // Step 4: Detailed connection analysis
+      for (const [index, connection] of connections.entries()) {
+        addDebugStep(`Analyzing connection ${index + 1}: ${connection.profile_name || 'Unnamed'}`, "pending");
         
-        // Check token expiry
+        const analysis = {
+          connectionId: connection.id,
+          profileId: connection.profile_id,
+          profileName: connection.profile_name,
+          status: connection.status,
+          marketplaceId: connection.marketplace_id,
+          lastSync: connection.last_sync_at,
+          issues: [],
+          recommendations: []
+        };
+
+        // Token expiry check
         const tokenExpiry = new Date(connection.token_expires_at);
         const now = new Date();
         const isTokenExpired = tokenExpiry <= now;
+        const hoursUntilExpiry = Math.round((tokenExpiry.getTime() - now.getTime()) / (1000 * 60 * 60));
         
         if (isTokenExpired) {
+          analysis.issues.push(`Token expired ${Math.abs(hoursUntilExpiry)} hours ago`);
+          analysis.recommendations.push("Reconnect Amazon account to refresh token");
           updateLastStep("error", "Access token has expired", {
             tokenExpiry: tokenExpiry.toISOString(),
-            currentTime: now.toISOString()
+            expiredHoursAgo: Math.abs(hoursUntilExpiry)
           });
           continue;
         } else {
-          updateLastStep("success", "Token is valid", {
-            expiresIn: Math.round((tokenExpiry.getTime() - now.getTime()) / (1000 * 60 * 60)),
-            unit: "hours"
-          });
+          analysis.issues.push(`Token expires in ${hoursUntilExpiry} hours`);
         }
 
-        // Step 5: Test Amazon API connectivity with proper headers
-        addDebugStep(`Testing Amazon API connectivity`, "pending");
+        // Profile validation
+        const profileValidation = validateProfileConfiguration(connection.profile_id);
+        if (!profileValidation.isValid) {
+          analysis.issues.push(`Profile issue: ${profileValidation.reason}`);
+          analysis.recommendations.push("Use Enhanced Sync to detect advertising profiles");
+        }
+
+        updateLastStep("success", "Connection analysis completed", analysis);
+
+        // Step 5: API connectivity test
+        addDebugStep(`Testing Amazon API connectivity for connection ${index + 1}`, "pending");
         
         try {
           const headers = await getAuthHeaders();
@@ -164,39 +192,52 @@ export const useDebugAmazonSync = () => {
           });
 
           if (testError) {
-            updateLastStep("error", "API test failed", testError);
+            updateLastStep("error", "API connectivity test failed", { 
+              error: testError.message,
+              recommendation: "Check connection status and try reconnecting"
+            });
             continue;
           }
 
           if (testResult?.error) {
-            updateLastStep("error", "API connectivity issue", testResult);
+            updateLastStep("warning", "API connectivity issues detected", {
+              apiError: testResult.error,
+              details: testResult.details,
+              recommendation: testResult.requiresReconnection ? "Reconnect account" : "Try Enhanced Sync"
+            });
             continue;
           }
 
           updateLastStep("success", "API connectivity confirmed", testResult);
 
-          // Step 6: Attempt Enhanced Profile Detection with proper headers
-          addDebugStep(`Running enhanced profile detection`, "pending");
-          
-          const { data: forceSyncResult, error: forceSyncError } = await supabase.functions.invoke('amazon-enhanced-profile-detection', {
-            body: { connectionId: connection.id },
-            headers
-          });
+          // Step 6: Enhanced profile detection test
+          if (!profileValidation.isValid) {
+            addDebugStep(`Testing enhanced profile detection for connection ${index + 1}`, "pending");
+            
+            const { data: profileResult, error: profileError } = await supabase.functions.invoke('amazon-enhanced-profile-detection', {
+              body: { connectionId: connection.id },
+              headers
+            });
 
-          if (forceSyncError) {
-            updateLastStep("error", "Enhanced profile detection failed", forceSyncError);
-            continue;
+            if (profileError) {
+              updateLastStep("error", "Enhanced profile detection failed", profileError);
+            } else if (profileResult?.success) {
+              updateLastStep("success", "Enhanced profile detection successful", {
+                profilesFound: profileResult.profiles?.length || 0,
+                regionsChecked: profileResult.regions?.length || 0,
+                recommendation: "Use Enhanced Sync to configure these profiles"
+              });
+            } else {
+              updateLastStep("warning", "No advertising profiles found", {
+                regionsChecked: profileResult?.regions?.length || 0,
+                recommendation: "Set up Amazon Advertising at advertising.amazon.com"
+              });
+            }
           }
 
-          if (forceSyncResult?.error) {
-            updateLastStep("warning", "Enhanced profile detection completed with issues", forceSyncResult);
-          } else {
-            updateLastStep("success", "Enhanced profile detection completed successfully", forceSyncResult);
-          }
-
-          // Step 7: Attempt regular sync if profiles were found
-          if (forceSyncResult?.success && forceSyncResult?.profiles?.length > 0) {
-            addDebugStep(`Testing regular campaign sync`, "pending");
+          // Step 7: Campaign sync test (only if profile is valid)
+          if (profileValidation.isValid) {
+            addDebugStep(`Testing campaign sync for connection ${index + 1}`, "pending");
             
             const { data: syncResult, error: syncError } = await supabase.functions.invoke('amazon-sync', {
               body: { connectionId: connection.id },
@@ -204,57 +245,106 @@ export const useDebugAmazonSync = () => {
             });
 
             if (syncError) {
-              updateLastStep("error", "Regular sync failed", syncError);
+              updateLastStep("error", "Campaign sync test failed", {
+                error: syncError.message,
+                recommendation: "Check API headers and profile configuration"
+              });
             } else if (syncResult?.error) {
-              updateLastStep("warning", "Sync completed with warnings", syncResult);
+              updateLastStep("warning", "Campaign sync completed with issues", {
+                syncError: syncResult.error,
+                details: syncResult.details,
+                recommendation: syncResult.requiresSetup ? "Set up Amazon Advertising" : "Try Enhanced Sync"
+              });
             } else {
-              updateLastStep("success", "Regular sync successful", syncResult);
+              updateLastStep("success", "Campaign sync test successful", {
+                campaignCount: syncResult?.campaignsSynced || syncResult?.campaignCount || 0
+              });
             }
           }
 
         } catch (error) {
-          updateLastStep("error", "Unexpected error during API tests", { 
-            error: error instanceof Error ? error.message : String(error) 
+          updateLastStep("error", "Unexpected error during connection tests", { 
+            error: error instanceof Error ? error.message : String(error),
+            recommendation: "Check network connection and try again"
           });
         }
       }
 
-      // Final recommendations
-      addDebugStep("Generating recommendations", "pending");
-      const recommendations = [];
+      // Step 8: Generate comprehensive recommendations
+      addDebugStep("Generating diagnostic recommendations", "pending");
       
+      const recommendations = [];
       const hasExpiredConnections = connections.some(c => new Date(c.token_expires_at) <= new Date());
-      const hasNoProfiles = connections.some(c => c.profile_id === 'setup_required_no_profiles_found');
-      const hasActiveCampaigns = connections.some(c => c.status === 'active');
+      const hasInvalidProfiles = connections.some(c => !validateProfileConfiguration(c.profile_id).isValid);
+      const hasNoSyncHistory = connections.some(c => !c.last_sync_at);
+      const hasErrorStatus = connections.some(c => c.status === 'error');
 
       if (hasExpiredConnections) {
-        recommendations.push("Reconnect expired Amazon accounts");
-      }
-      if (hasNoProfiles) {
-        recommendations.push("Set up Amazon Advertising at advertising.amazon.com");
-      }
-      if (!hasActiveCampaigns) {
-        recommendations.push("Use Enhanced Sync to attempt profile detection");
-        recommendations.push("Verify your Amazon Advertising account has active campaigns");
+        recommendations.push({
+          issue: "Expired token connections found",
+          action: "Reconnect affected Amazon accounts",
+          priority: "high"
+        });
       }
 
-      updateLastStep("success", "Debug analysis complete", { recommendations });
+      if (hasInvalidProfiles) {
+        recommendations.push({
+          issue: "Invalid advertising profile configurations",
+          action: "Use Enhanced Sync to detect and configure profiles",
+          priority: "high"
+        });
+      }
+
+      if (hasNoSyncHistory) {
+        recommendations.push({
+          issue: "Connections have never been synced",
+          action: "Run initial sync to import campaign data",
+          priority: "medium"
+        });
+      }
+
+      if (hasErrorStatus) {
+        recommendations.push({
+          issue: "Connections in error state",
+          action: "Check connection logs and try Enhanced Sync",
+          priority: "medium"
+        });
+      }
+
+      if (connections.every(c => validateProfileConfiguration(c.profile_id).isValid)) {
+        recommendations.push({
+          issue: "All connections appear properly configured",
+          action: "Regular sync should work normally",
+          priority: "low"
+        });
+      }
+
+      updateLastStep("success", "Diagnostic analysis complete", { 
+        totalConnections: connections.length,
+        recommendations: recommendations,
+        summary: {
+          expiredTokens: hasExpiredConnections,
+          invalidProfiles: hasInvalidProfiles,
+          noSyncHistory: hasNoSyncHistory,
+          errorStates: hasErrorStatus
+        }
+      });
 
       toast({
         title: "Debug Analysis Complete",
-        description: `Analyzed ${connections.length} connection(s). Check results above.`,
+        description: `Analyzed ${connections.length} connection(s). Check detailed results above.`,
       });
 
     } catch (error) {
-      console.error('Debug sync error:', error);
-      addDebugStep("Debug process failed", "error", 
+      console.error('Debug analysis error:', error);
+      addDebugStep("Debug analysis failed", "error", 
         error instanceof Error ? error.message : "Unknown error occurred", 
         error
       );
       
       toast({
         title: "Debug Failed",
-        description: "An error occurred during debug analysis. Check the results for details.",
+        description: "An error occurred during diagnostic analysis.",
         variant: "destructive",
       });
     } finally {
