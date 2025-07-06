@@ -54,7 +54,7 @@ const PerformanceSummary = () => {
 
   const handleForceSync = async (connectionId: string) => {
     console.log('Force syncing connection:', connectionId);
-    // For now, we'll use the regular sync function - this can be enhanced later
+    // Enhanced force sync - will be implemented by the enhanced sync system
     await syncConnection(connectionId);
   };
 
@@ -191,7 +191,7 @@ const PerformanceSummary = () => {
         </div>
       )}
 
-      {/* Connection Summary Table */}
+      {/* Enhanced Connection Summary Table */}
       <ConnectionSummaryTable 
         connections={connections}
         onSync={syncConnection}
@@ -220,7 +220,7 @@ const PerformanceSummary = () => {
               <AlertCircle className="h-4 w-4 text-orange-600" />
               <AlertDescription className="text-orange-800">
                 {connections.length > 0 
-                  ? "Your Amazon connection is active but no campaign data has been synced yet. Click 'Sync' to fetch your campaign data."
+                  ? "Your Amazon connection is active but no campaign data has been synced yet. Try the 'Enhanced Sync' option for advanced profile detection and troubleshooting."
                   : "Connect your Amazon account to start viewing campaign data."
                 }
               </AlertDescription>

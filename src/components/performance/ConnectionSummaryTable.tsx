@@ -11,11 +11,13 @@ import {
   Clock, 
   Zap,
   Info,
-  ExternalLink
+  ExternalLink,
+  Settings
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { AmazonConnection } from '@/hooks/useAmazonConnections';
 import AmazonSetupGuide from '@/components/AmazonSetupGuide';
+import EnhancedAmazonSync from '@/components/EnhancedAmazonSync';
 
 interface ConnectionSummaryTableProps {
   connections: AmazonConnection[];
@@ -31,6 +33,7 @@ const ConnectionSummaryTable = ({
   onForceSync 
 }: ConnectionSummaryTableProps) => {
   const [showSetupGuide, setShowSetupGuide] = useState<string | null>(null);
+  const [showEnhancedSync, setShowEnhancedSync] = useState<string | null>(null);
 
   const getStatusBadge = (connection: AmazonConnection) => {
     switch (connection.status) {
@@ -149,15 +152,26 @@ const ConnectionSummaryTable = ({
                       <Alert className="mt-3">
                         <Info className="h-4 w-4" />
                         <AlertDescription>
-                          <div className="flex items-center justify-between">
+                          <div className="space-y-2">
                             <span>Amazon Advertising setup required to sync campaigns</span>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => setShowSetupGuide(connection.id)}
-                            >
-                              Setup Guide
-                            </Button>
+                            <div className="flex gap-2">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => setShowSetupGuide(connection.id)}
+                              >
+                                Setup Guide
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => setShowEnhancedSync(connection.id)}
+                                className="text-blue-600 border-blue-300 hover:bg-blue-50"
+                              >
+                                <Settings className="h-3 w-3 mr-1" />
+                                Enhanced Sync
+                              </Button>
+                            </div>
                           </div>
                         </AlertDescription>
                       </Alert>
@@ -231,6 +245,29 @@ const ConnectionSummaryTable = ({
                     />
                   </div>
                 )}
+
+                {showEnhancedSync === connection.id && (
+                  <div className="mt-4 p-4 bg-gray-50 border rounded-lg">
+                    <div className="flex justify-between items-center mb-4">
+                      <h4 className="font-medium">Enhanced Sync & Recovery</h4>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => setShowEnhancedSync(null)}
+                      >
+                        ×
+                      </Button>
+                    </div>
+                    <EnhancedAmazonSync 
+                      connectionId={connection.id}
+                      connectionName={connection.profileName}
+                      onSyncComplete={() => {
+                        setShowEnhancedSync(null);
+                        // Trigger a refresh of connections if callback is available
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -242,11 +279,12 @@ const ConnectionSummaryTable = ({
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
             <div className="space-y-2">
-              <p><strong>Need help?</strong> Some connections require additional setup:</p>
+              <p><strong>Enhanced Sync Available:</strong> For connections with setup issues:</p>
               <ul className="list-disc list-inside text-sm space-y-1 ml-4">
-                <li><strong>Force Sync:</strong> Attempts enhanced profile detection and campaign import</li>
+                <li><strong>Enhanced Sync:</strong> Advanced profile detection across multiple regions and endpoints</li>
+                <li><strong>Force Sync:</strong> Quick retry with basic profile detection</li>
                 <li><strong>Setup Guide:</strong> Step-by-step instructions for Amazon Advertising</li>
-                <li><strong>Regular Sync:</strong> Imports campaigns from already configured profiles</li>
+                <li><strong>Regular Sync:</strong> Standard sync for properly configured connections</li>
               </ul>
               <div className="pt-2">
                 <Button 
