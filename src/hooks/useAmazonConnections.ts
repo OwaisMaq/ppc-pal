@@ -16,6 +16,7 @@ export interface AmazonConnection {
   campaign_count?: number;
   needs_sync?: boolean;
   setup_required_reason?: string;
+  token_expires_at: string;
 }
 
 export const useAmazonConnections = () => {
