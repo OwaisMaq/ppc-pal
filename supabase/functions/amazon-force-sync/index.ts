@@ -94,7 +94,7 @@ serve(async (req) => {
       token_expires_at: connection.token_expires_at
     });
 
-    // Check if token needs refresh
+    // Enhanced token refresh logic
     const tokenExpiry = new Date(connection.token_expires_at);
     const now = new Date();
     
@@ -131,7 +131,8 @@ serve(async (req) => {
           connection.access_token = tokenData.access_token;
           console.log('Token refreshed successfully');
         } else {
-          console.error('Token refresh failed:', refreshResponse.status);
+          const errorText = await refreshResponse.text();
+          console.error('Token refresh failed:', refreshResponse.status, errorText);
           return new Response(
             JSON.stringify({ 
               error: 'Token expired - please reconnect your Amazon account',
@@ -162,10 +163,17 @@ serve(async (req) => {
 
     let campaignsSynced = 0;
     let profilesFound = 0;
+    let profilesUpdated = false;
 
-    // First, try to get profiles if we don't have any or have placeholder
-    if (!connection.profile_id || connection.profile_id === 'setup_required_no_profiles_found') {
-      console.log('No valid profile_id found, attempting to fetch profiles...');
+    // Enhanced profile detection and validation
+    console.log('=== Enhanced Profile Detection ===');
+    const shouldFetchProfiles = !connection.profile_id || 
+                               connection.profile_id === 'setup_required_no_profiles_found' ||
+                               connection.profile_id === 'invalid' ||
+                               connection.profile_id.includes('error');
+
+    if (shouldFetchProfiles) {
+      console.log('Fetching advertising profiles from Amazon...');
       
       try {
         const profilesResponse = await fetch('https://advertising-api.amazon.com/v2/profiles', {
@@ -176,46 +184,92 @@ serve(async (req) => {
         });
 
         console.log('Profiles API response status:', profilesResponse.status);
+        console.log('Profiles API response headers:', Object.fromEntries(profilesResponse.headers.entries()));
 
         if (profilesResponse.ok) {
           const profiles = await profilesResponse.json();
-          console.log('Profiles response:', profiles);
+          console.log('Profiles API response:', profiles);
           
-          if (profiles && profiles.length > 0) {
+          if (profiles && Array.isArray(profiles) && profiles.length > 0) {
             profilesFound = profiles.length;
-            const profile = profiles[0]; // Use first profile
+            console.log(`Found ${profilesFound} advertising profiles`);
             
-            // Update connection with profile info
-            const { error: updateError } = await supabase
+            // Enhanced profile selection logic
+            let selectedProfile = profiles[0]; // Default to first profile
+            
+            // Prefer active profiles
+            const activeProfiles = profiles.filter(p => p.accountInfo?.marketplaceStringId);
+            if (activeProfiles.length > 0) {
+              selectedProfile = activeProfiles[0];
+              console.log('Selected active profile:', selectedProfile.profileId);
+            }
+            
+            // Validate profile data
+            if (selectedProfile.profileId && selectedProfile.countryCode) {
+              const { error: updateError } = await supabase
+                .from('amazon_connections')
+                .update({
+                  profile_id: selectedProfile.profileId.toString(),
+                  profile_name: selectedProfile.accountInfo?.name || `${selectedProfile.countryCode} Account`,
+                  marketplace_id: selectedProfile.countryCode,
+                  status: 'active',
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', connectionId);
+              
+              if (updateError) {
+                console.error('Error updating connection with profile:', updateError);
+              } else {
+                console.log('Updated connection with profile:', selectedProfile.profileId);
+                connection.profile_id = selectedProfile.profileId.toString();
+                profilesUpdated = true;
+              }
+            } else {
+              console.error('Invalid profile data structure:', selectedProfile);
+            }
+          } else {
+            console.log('No advertising profiles found or invalid response structure');
+            console.log('Response type:', typeof profiles);
+            console.log('Response array check:', Array.isArray(profiles));
+            console.log('Response length:', profiles?.length);
+            
+            // Update connection to reflect no profiles found
+            await supabase
               .from('amazon_connections')
               .update({
-                profile_id: profile.profileId.toString(),
-                profile_name: profile.accountInfo?.name || `${profile.countryCode} Account`,
-                marketplace_id: profile.countryCode,
+                profile_id: 'setup_required_no_profiles_found',
+                status: 'active', // Keep connection active but mark profile issue
                 updated_at: new Date().toISOString()
               })
               .eq('id', connectionId);
-            
-            if (updateError) {
-              console.error('Error updating connection with profile:', updateError);
-            } else {
-              console.log('Updated connection with profile:', profile.profileId);
-              connection.profile_id = profile.profileId.toString();
-            }
-          } else {
-            console.log('No advertising profiles found in response');
           }
         } else {
           const errorText = await profilesResponse.text();
-          console.log('Profiles API call failed:', profilesResponse.status, profilesResponse.statusText, errorText);
+          console.error('Profiles API call failed:', profilesResponse.status, profilesResponse.statusText, errorText);
+          
+          if (profilesResponse.status === 401) {
+            return new Response(
+              JSON.stringify({ 
+                error: 'Authentication failed',
+                details: 'Amazon API authentication failed. Please reconnect your account.',
+                requiresReconnection: true
+              }),
+              {
+                status: 401,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              }
+            );
+          }
         }
       } catch (profileError) {
         console.error('Error fetching profiles:', profileError);
       }
+    } else {
+      console.log('Using existing profile ID:', connection.profile_id);
     }
 
-    // Try to sync campaigns regardless of profile status (force sync)
-    console.log('Attempting to fetch campaigns (force sync)...');
+    // Enhanced campaign sync with better error handling
+    console.log('=== Enhanced Campaign Sync ===');
     
     try {
       const headers = {
@@ -224,49 +278,64 @@ serve(async (req) => {
       };
       
       // Add profile scope if we have a valid profile ID
-      if (connection.profile_id && connection.profile_id !== 'setup_required_no_profiles_found') {
+      if (connection.profile_id && 
+          connection.profile_id !== 'setup_required_no_profiles_found' &&
+          connection.profile_id !== 'invalid' &&
+          !connection.profile_id.includes('error')) {
         headers['Amazon-Advertising-API-Scope'] = connection.profile_id;
+        console.log('Using profile scope:', connection.profile_id);
+      } else {
+        console.log('No valid profile ID available for scope');
       }
 
+      console.log('Making campaigns API request with headers:', Object.keys(headers));
+      
       const campaignsResponse = await fetch('https://advertising-api.amazon.com/v2/campaigns', {
         headers: headers,
       });
 
       console.log('Campaigns API response status:', campaignsResponse.status);
+      console.log('Campaigns API response headers:', Object.fromEntries(campaignsResponse.headers.entries()));
       
       if (campaignsResponse.ok) {
         const campaigns = await campaignsResponse.json();
-        console.log(`Found ${campaigns.length} campaigns to sync`);
+        console.log(`Found ${Array.isArray(campaigns) ? campaigns.length : 'invalid'} campaigns to sync`);
 
-        // Process and store campaigns
-        for (const campaign of campaigns) {
-          try {
-            const { error: upsertError } = await supabase
-              .from('campaigns')
-              .upsert({
-                connection_id: connectionId,
-                amazon_campaign_id: campaign.campaignId.toString(),
-                name: campaign.name,
-                campaign_type: campaign.campaignType,
-                targeting_type: campaign.targetingType,
-                status: campaign.state?.toLowerCase() || 'paused',
-                daily_budget: campaign.dailyBudget,
-                start_date: campaign.startDate,
-                end_date: campaign.endDate,
-                data_source: 'api',
-                last_updated: new Date().toISOString(),
-              }, {
-                onConflict: 'amazon_campaign_id,connection_id'
-              });
+        if (Array.isArray(campaigns)) {
+          // Process and store campaigns with enhanced error handling
+          for (const campaign of campaigns) {
+            try {
+              console.log('Processing campaign:', campaign.campaignId, campaign.name);
+              
+              const { error: upsertError } = await supabase
+                .from('campaigns')
+                .upsert({
+                  connection_id: connectionId,
+                  amazon_campaign_id: campaign.campaignId.toString(),
+                  name: campaign.name,
+                  campaign_type: campaign.campaignType,
+                  targeting_type: campaign.targetingType,
+                  status: campaign.state?.toLowerCase() || 'paused',
+                  daily_budget: campaign.dailyBudget,
+                  start_date: campaign.startDate,
+                  end_date: campaign.endDate,
+                  data_source: 'api',
+                  last_updated: new Date().toISOString(),
+                }, {
+                  onConflict: 'amazon_campaign_id,connection_id'
+                });
 
-            if (upsertError) {
-              console.error('Error upserting campaign:', campaign.campaignId, upsertError);
-            } else {
-              campaignsSynced++;
+              if (upsertError) {
+                console.error('Error upserting campaign:', campaign.campaignId, upsertError);
+              } else {
+                campaignsSynced++;
+              }
+            } catch (campaignError) {
+              console.error('Error processing campaign:', campaign.campaignId, campaignError);
             }
-          } catch (campaignError) {
-            console.error('Error processing campaign:', campaign.campaignId, campaignError);
           }
+        } else {
+          console.error('Invalid campaigns response format:', typeof campaigns);
         }
       } else {
         const errorText = await campaignsResponse.text();
@@ -281,6 +350,18 @@ serve(async (req) => {
             }),
             {
               status: 401,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        } else if (campaignsResponse.status === 403) {
+          return new Response(
+            JSON.stringify({ 
+              error: 'Access denied',
+              details: 'Amazon API access denied. This may indicate missing advertising profiles or insufficient permissions.',
+              requiresSetup: true
+            }),
+            {
+              status: 403,
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             }
           );
@@ -314,13 +395,19 @@ serve(async (req) => {
     }
 
     // Update connection sync timestamp and status
+    const updateData = { 
+      last_sync_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    // Only update status if we successfully synced campaigns or found profiles
+    if (campaignsSynced > 0 || profilesUpdated) {
+      updateData.status = 'active';
+    }
+
     const { error: updateError } = await supabase
       .from('amazon_connections')
-      .update({ 
-        last_sync_at: new Date().toISOString(),
-        status: 'active',
-        updated_at: new Date().toISOString()
-      })
+      .update(updateData)
       .eq('id', connectionId);
 
     if (updateError) {
@@ -329,11 +416,18 @@ serve(async (req) => {
 
     console.log('=== Force Sync Complete ===');
     console.log('Profiles found:', profilesFound);
+    console.log('Profiles updated:', profilesUpdated);
     console.log('Campaigns synced:', campaignsSynced);
 
-    let message = `Successfully synced ${campaignsSynced} campaigns.`;
-    if (profilesFound > 0) {
-      message += ` Also found and configured ${profilesFound} advertising profile(s).`;
+    let message = '';
+    if (profilesFound > 0 && campaignsSynced > 0) {
+      message = `Found ${profilesFound} advertising profile(s) and synced ${campaignsSynced} campaigns.`;
+    } else if (profilesFound > 0) {
+      message = `Found ${profilesFound} advertising profile(s), but no campaigns were found. Please check your Amazon Advertising account.`;
+    } else if (campaignsSynced > 0) {
+      message = `Successfully synced ${campaignsSynced} campaigns.`;
+    } else {
+      message = 'No advertising profiles or campaigns found. Please ensure your Amazon Advertising account is set up properly.';
     }
 
     return new Response(
@@ -341,6 +435,7 @@ serve(async (req) => {
         success: true, 
         campaignCount: campaignsSynced,
         profileCount: profilesFound,
+        profilesUpdated,
         message
       }),
       {

@@ -8,7 +8,7 @@ export interface ConnectionStatus {
   status: 'healthy' | 'warning' | 'error';
   lastSync: string | null;
   campaignCount: number;
-  profileStatus: 'active' | 'missing' | 'expired';
+  profileStatus: 'active' | 'missing' | 'expired' | 'invalid';
   tokenExpiry: string;
   issues: string[];
 }
@@ -25,6 +25,8 @@ export const useConnectionStatus = () => {
     }
 
     try {
+      console.log('=== Connection Status Check Started ===');
+      
       const { data: connections, error } = await supabase
         .from('amazon_connections')
         .select(`
@@ -33,33 +35,66 @@ export const useConnectionStatus = () => {
         `)
         .eq('user_id', user.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching connections:', error);
+        throw error;
+      }
+
+      console.log('Raw connections data:', connections);
 
       const connectionStatuses: ConnectionStatus[] = connections.map(conn => {
         const issues: string[] = [];
         let status: 'healthy' | 'warning' | 'error' = 'healthy';
+        
+        console.log(`=== Analyzing Connection ${conn.id} ===`);
+        console.log('Connection details:', {
+          profile_id: conn.profile_id,
+          status: conn.status,
+          token_expires_at: conn.token_expires_at,
+          last_sync_at: conn.last_sync_at
+        });
         
         // Check token expiry
         const tokenExpiry = new Date(conn.token_expires_at);
         const now = new Date();
         const hoursUntilExpiry = (tokenExpiry.getTime() - now.getTime()) / (1000 * 60 * 60);
         
-        let profileStatus: 'active' | 'missing' | 'expired' = 'active';
+        let profileStatus: 'active' | 'missing' | 'expired' | 'invalid' = 'active';
         
         if (tokenExpiry <= now) {
           issues.push('Access token has expired');
           status = 'error';
           profileStatus = 'expired';
+          console.log('Token expired for connection:', conn.id);
         } else if (hoursUntilExpiry < 24) {
           issues.push('Access token expires soon');
-          status = 'warning';
+          if (status !== 'error') status = 'warning';
+          console.log('Token expires soon for connection:', conn.id);
         }
 
-        // Check profile status
-        if (!conn.profile_id || conn.profile_id === 'setup_required_no_profiles_found') {
-          issues.push('No advertising profile configured');
+        // Enhanced profile validation
+        if (!conn.profile_id) {
+          issues.push('No profile ID configured');
           status = 'error';
           profileStatus = 'missing';
+          console.log('No profile ID for connection:', conn.id);
+        } else if (conn.profile_id === 'setup_required_no_profiles_found') {
+          issues.push('No advertising profiles found - Amazon Advertising setup required');
+          status = 'error';
+          profileStatus = 'missing';
+          console.log('No advertising profiles found for connection:', conn.id);
+        } else if (conn.profile_id === 'invalid' || conn.profile_id.includes('error')) {
+          issues.push('Invalid profile configuration detected');
+          status = 'error';
+          profileStatus = 'invalid';
+          console.log('Invalid profile for connection:', conn.id);
+        }
+
+        // Check connection status
+        if (conn.status !== 'active') {
+          issues.push(`Connection status is ${conn.status}`);
+          status = 'error';
+          console.log('Connection not active:', conn.id, conn.status);
         }
 
         // Check sync status
@@ -67,6 +102,7 @@ export const useConnectionStatus = () => {
         if (!conn.last_sync_at) {
           issues.push('Never synced with Amazon');
           if (status !== 'error') status = 'warning';
+          console.log('Never synced:', conn.id);
         } else {
           const lastSync = new Date(conn.last_sync_at);
           const daysSinceSync = (now.getTime() - lastSync.getTime()) / (1000 * 60 * 60 * 24);
@@ -74,16 +110,18 @@ export const useConnectionStatus = () => {
           if (daysSinceSync > 7) {
             issues.push('Last sync was over a week ago');
             if (status !== 'error') status = 'warning';
+            console.log('Sync overdue for connection:', conn.id);
           }
         }
 
         // Check campaign data
-        if (campaignCount === 0) {
-          issues.push('No campaigns found');
+        if (campaignCount === 0 && conn.last_sync_at) {
+          issues.push('No campaigns found after sync - may indicate API or setup issues');
           if (status !== 'error') status = 'warning';
+          console.log('No campaigns after sync for connection:', conn.id);
         }
 
-        return {
+        const connectionStatus = {
           id: conn.id,
           status,
           lastSync: conn.last_sync_at,
@@ -92,11 +130,19 @@ export const useConnectionStatus = () => {
           tokenExpiry: conn.token_expires_at,
           issues
         };
+
+        console.log('Final connection status:', connectionStatus);
+        return connectionStatus;
       });
+
+      console.log('=== Connection Status Analysis Complete ===');
+      console.log('Total connections analyzed:', connectionStatuses.length);
+      console.log('Status summary:', connectionStatuses.map(c => ({ id: c.id, status: c.status, issues: c.issues.length })));
 
       setStatuses(connectionStatuses);
     } catch (error) {
-      console.error('Error checking connection statuses:', error);
+      console.error('=== Connection Status Check Error ===');
+      console.error('Error details:', error);
     } finally {
       setLoading(false);
     }

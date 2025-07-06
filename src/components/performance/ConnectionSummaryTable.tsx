@@ -41,29 +41,36 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
     }
   };
 
-  const getStatusDescription = (connection: AmazonConnection) => {
+  const getEnhancedStatusDescription = (connection: AmazonConnection) => {
     if (connection.status === 'connected') {
-      return `${connection.campaign_count || 0} campaigns synced`;
+      return `${connection.campaign_count || 0} campaigns synced successfully`;
     } else if (connection.status === 'setup_required') {
       if (connection.setup_required_reason === 'no_advertising_profiles') {
-        return 'No advertising profiles found - Set up Amazon Advertising first';
+        return 'No advertising profiles found - Amazon Advertising setup required';
       } else if (connection.setup_required_reason === 'needs_sync') {
-        return 'Campaign data needs to be synced from Amazon';
+        return 'Ready to sync - Click "Sync Campaigns" to import data';
       } else if (connection.setup_required_reason === 'token_expired') {
         return 'Access token expired - please reconnect';
+      } else if (connection.setup_required_reason === 'connection_inactive') {
+        return 'Connection inactive - please reconnect';
       }
-      return 'Setup required';
+      return 'Setup required - please check connection';
     } else if (connection.status === 'error') {
+      if (connection.setup_required_reason === 'token_expired') {
+        return 'Access token expired - reconnection required';
+      } else if (connection.setup_required_reason === 'connection_inactive') {
+        return 'Connection inactive - please check status';
+      }
       return 'Connection error - please reconnect';
     }
-    return 'Status unknown';
+    return 'Status unknown - please refresh';
   };
 
   const getActionButtons = (connection: AmazonConnection) => {
     const buttons = [];
     
-    if (connection.setup_required_reason === 'token_expired' || connection.status === 'error') {
-      // For expired tokens or errors, suggest reconnection
+    if (connection.setup_required_reason === 'token_expired' || 
+        (connection.status === 'error' && connection.setup_required_reason?.includes('token'))) {
       buttons.push(
         <Button
           key="reconnect"
@@ -99,13 +106,15 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
           className="text-gray-600 border-gray-600 hover:bg-gray-50"
         >
           <RefreshCw className="h-4 w-4 mr-1" />
-          Refresh
+          Refresh Data
         </Button>
       );
     }
 
-    // Add Force Sync button for connections that need advertising profile setup
-    if (connection.status === 'setup_required' && connection.setup_required_reason === 'no_advertising_profiles' && onForceSync) {
+    // Enhanced Force Sync button logic
+    if (connection.status === 'setup_required' && 
+        connection.setup_required_reason === 'no_advertising_profiles' && 
+        onForceSync) {
       buttons.push(
         <Button
           key="force-sync"
@@ -116,6 +125,24 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
         >
           <Zap className="h-4 w-4 mr-1" />
           Force Sync
+        </Button>
+      );
+    }
+
+    // Add diagnostic force sync for error states
+    if (connection.status === 'error' && 
+        connection.setup_required_reason !== 'token_expired' && 
+        onForceSync) {
+      buttons.push(
+        <Button
+          key="force-sync-diagnostic"
+          variant="outline"
+          size="sm"
+          onClick={() => onForceSync(connection.id)}
+          className="text-purple-600 border-purple-600 hover:bg-purple-50"
+        >
+          <Zap className="h-4 w-4 mr-1" />
+          Diagnostic Sync
         </Button>
       );
     }
@@ -175,9 +202,9 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Account</TableHead>
+                <TableHead>Account Status</TableHead>
                 <TableHead>Marketplace</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Connection Status</TableHead>
                 <TableHead>Campaign Count</TableHead>
                 <TableHead>Last Sync</TableHead>
                 <TableHead>Actions</TableHead>
@@ -194,7 +221,7 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
                         <div>
                           <div className="font-medium">{connection.profileName}</div>
                           <div className="text-sm text-gray-500">
-                            {getStatusDescription(connection)}
+                            {getEnhancedStatusDescription(connection)}
                           </div>
                         </div>
                       </div>
@@ -211,11 +238,13 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
                       <div className="font-medium">
                         {connection.campaign_count || 0}
                       </div>
-                      {connection.campaign_count === 0 && connection.status === 'setup_required' && (
+                      {connection.campaign_count === 0 && (
                         <div className="text-xs text-gray-500">
-                          {connection.setup_required_reason === 'no_advertising_profiles' 
-                            ? 'Setup required' 
-                            : 'Click sync to import'
+                          {connection.status === 'setup_required' 
+                            ? (connection.setup_required_reason === 'no_advertising_profiles' 
+                                ? 'Setup required' 
+                                : 'Ready to sync')
+                            : 'No campaigns found'
                           }
                         </div>
                       )}
@@ -231,7 +260,7 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
                       )}
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         {getActionButtons(connection)}
                         <Button
                           variant="ghost"
@@ -250,6 +279,7 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
           </Table>
         </div>
         
+        {/* Enhanced help sections */}
         {connections.some(c => c.status === 'setup_required') && (
           <div className="mt-4 space-y-3">
             {connections.some(c => c.setup_required_reason === 'no_advertising_profiles') && (
@@ -260,7 +290,7 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
                     <h4 className="font-medium text-orange-800">Amazon Advertising Setup Required</h4>
                     <p className="text-sm text-orange-700 mt-1">
                       Your Amazon account is connected, but no advertising profiles were found. 
-                      You need to set up Amazon Advertising first.
+                      You need to set up Amazon Advertising first, then use "Force Sync" to detect your profiles.
                     </p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Button 
@@ -273,7 +303,7 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
                         Set up Amazon Advertising
                       </Button>
                       <span className="text-xs text-orange-600 self-center">
-                        After setup, use "Force Sync" to import your campaigns
+                        After setup, use "Force Sync" to detect and import your campaigns
                       </span>
                     </div>
                   </div>
@@ -286,9 +316,9 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
                 <div className="flex items-start gap-3">
                   <RefreshCw className="h-5 w-5 text-blue-600 mt-0.5" />
                   <div>
-                    <h4 className="font-medium text-blue-800">Campaign Sync Required</h4>
+                    <h4 className="font-medium text-blue-800">Ready to Sync Campaigns</h4>
                     <p className="text-sm text-blue-700 mt-1">
-                      Your Amazon account is connected with advertising profiles, but campaign data hasn't been synced yet. 
+                      Your Amazon account is connected with valid advertising profiles. 
                       Click "Sync Campaigns" to import your campaign data and view performance metrics.
                     </p>
                   </div>
@@ -309,6 +339,22 @@ const ConnectionSummaryTable = ({ connections, onSync, onDelete, onForceSync }: 
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Diagnostic information for errors */}
+        {connections.some(c => c.status === 'error') && (
+          <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-gray-600 mt-0.5" />
+              <div>
+                <h4 className="font-medium text-gray-800">Troubleshooting</h4>
+                <p className="text-sm text-gray-700 mt-1">
+                  If you're experiencing connection issues, try "Diagnostic Sync" to get detailed information 
+                  about your Amazon account setup, or reconnect your account if authentication has failed.
+                </p>
+              </div>
+            </div>
           </div>
         )}
       </CardContent>

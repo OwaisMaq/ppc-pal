@@ -27,6 +27,64 @@ export const useAmazonConnections = () => {
   const oauthCallbackCache = useRef<Map<string, Promise<any>>>(new Map());
   const fetchingRef = useRef(false);
 
+  const updateConnectionStatus = async (connectionId: string, status: 'active' | 'error' | 'warning', reason?: string) => {
+    try {
+      console.log(`=== Updating Connection Status ===`);
+      console.log('Connection ID:', connectionId);
+      console.log('New status:', status);
+      console.log('Reason:', reason);
+
+      const updateData: any = {
+        status,
+        updated_at: new Date().toISOString()
+      };
+
+      // If there's an error reason, we might want to store it
+      if (reason && status === 'error') {
+        console.log('Storing error reason for connection');
+      }
+
+      const { error: updateError } = await supabase
+        .from('amazon_connections')
+        .update(updateData)
+        .eq('id', connectionId);
+
+      if (updateError) {
+        console.error('Failed to update connection status:', updateError);
+      } else {
+        console.log('Connection status updated successfully');
+      }
+    } catch (err) {
+      console.error('Error updating connection status:', err);
+    }
+  };
+
+  const validateProfileConfiguration = (connection: any): { isValid: boolean; reason?: string } => {
+    console.log('=== Validating Profile Configuration ===');
+    console.log('Profile ID:', connection.profile_id);
+    console.log('Profile Name:', connection.profile_name);
+
+    if (!connection.profile_id) {
+      return { isValid: false, reason: 'No profile ID configured' };
+    }
+
+    if (connection.profile_id === 'setup_required_no_profiles_found') {
+      return { isValid: false, reason: 'No advertising profiles found' };
+    }
+
+    if (connection.profile_id.includes('error') || connection.profile_id === 'invalid') {
+      return { isValid: false, reason: 'Invalid profile configuration' };
+    }
+
+    // Check if profile ID looks like a valid Amazon profile ID (should be numeric)
+    if (!/^\d+$/.test(connection.profile_id)) {
+      return { isValid: false, reason: 'Profile ID format appears invalid' };
+    }
+
+    console.log('Profile configuration is valid');
+    return { isValid: true };
+  };
+
   const fetchConnections = async () => {
     if (!user) {
       console.log('=== No User Found ===');
@@ -44,7 +102,7 @@ export const useAmazonConnections = () => {
     setLoading(true);
 
     try {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('amazon_connections')
         .select(`
           *,
@@ -73,75 +131,84 @@ export const useAmazonConnections = () => {
       console.log('=== Processing Connection Data ===');
       console.log('Raw connection data from DB:', data);
 
-      const formattedConnections: AmazonConnection[] = data.map((conn: any, index: number) => {
-        console.log(`=== Processing Connection ${index + 1} ===`);
-        console.log('Connection details:', {
-          id: conn.id,
-          profile_id: conn.profile_id,
-          profile_name: conn.profile_name,
-          status: conn.status,
-          marketplace_id: conn.marketplace_id,
-          last_sync_at: conn.last_sync_at,
-          campaigns: conn.campaigns
-        });
-        
-        const campaignCount = Array.isArray(conn.campaigns) ? conn.campaigns.length : 0;
-        const hasBeenSynced = conn.last_sync_at && campaignCount > 0;
-        const isActive = conn.status === 'active';
-        
-        // Improved connection status determination
-        let connectionStatus: 'connected' | 'disconnected' | 'error' | 'setup_required';
-        let setupRequiredReason: string | undefined;
-        
-        if (!isActive) {
-          connectionStatus = 'error';
-          console.log('Status: error (connection not active)');
-        } else if (!conn.profile_id || conn.profile_id === 'setup_required_no_profiles_found') {
-          connectionStatus = 'setup_required';
-          setupRequiredReason = 'no_advertising_profiles';
-          console.log('Status: setup_required (no valid advertising profile)');
-        } else if (!conn.last_sync_at) {
-          connectionStatus = 'setup_required';
-          setupRequiredReason = 'needs_sync';
-          console.log('Status: setup_required (never synced)');
-        } else if (campaignCount === 0) {
-          // If synced but no campaigns, could be either no campaigns exist or needs re-sync
-          connectionStatus = 'setup_required';
-          setupRequiredReason = 'needs_sync';
-          console.log('Status: setup_required (synced but no campaigns found)');
-        } else {
-          connectionStatus = 'connected';
-          console.log('Status: connected (fully operational)');
-        }
-
-        // Check token expiry
-        if (conn.token_expires_at) {
+      const formattedConnections: AmazonConnection[] = await Promise.all(
+        data.map(async (conn: any, index: number) => {
+          console.log(`=== Processing Connection ${index + 1} ===`);
+          console.log('Connection details:', {
+            id: conn.id,
+            profile_id: conn.profile_id,
+            profile_name: conn.profile_name,
+            status: conn.status,
+            marketplace_id: conn.marketplace_id,
+            last_sync_at: conn.last_sync_at,
+            campaigns: conn.campaigns
+          });
+          
+          const campaignCount = Array.isArray(conn.campaigns) ? conn.campaigns.length : 0;
+          const hasBeenSynced = conn.last_sync_at && campaignCount > 0;
+          const isActive = conn.status === 'active';
+          
+          // Enhanced connection status determination
+          let connectionStatus: 'connected' | 'disconnected' | 'error' | 'setup_required';
+          let setupRequiredReason: string | undefined;
+          
+          // Check token expiry first
           const tokenExpiry = new Date(conn.token_expires_at);
           const now = new Date();
           if (tokenExpiry <= now) {
             connectionStatus = 'error';
             setupRequiredReason = 'token_expired';
-            console.log('Status overridden to error (token expired)');
+            console.log('Status: error (token expired)');
+            await updateConnectionStatus(conn.id, 'error', 'Token expired');
+          } else if (!isActive) {
+            connectionStatus = 'error';
+            setupRequiredReason = 'connection_inactive';
+            console.log('Status: error (connection not active)');
+            await updateConnectionStatus(conn.id, 'error', 'Connection inactive');
+          } else {
+            // Validate profile configuration
+            const profileValidation = validateProfileConfiguration(conn);
+            
+            if (!profileValidation.isValid) {
+              connectionStatus = 'setup_required';
+              setupRequiredReason = 'no_advertising_profiles';
+              console.log('Status: setup_required (profile validation failed):', profileValidation.reason);
+              await updateConnectionStatus(conn.id, 'warning', profileValidation.reason);
+            } else if (!conn.last_sync_at) {
+              connectionStatus = 'setup_required';
+              setupRequiredReason = 'needs_sync';
+              console.log('Status: setup_required (never synced)');
+            } else if (campaignCount === 0) {
+              // If synced but no campaigns, could indicate API issues or no campaigns exist
+              connectionStatus = 'setup_required';
+              setupRequiredReason = 'needs_sync';
+              console.log('Status: setup_required (synced but no campaigns found)');
+              await updateConnectionStatus(conn.id, 'warning', 'No campaigns found after sync');
+            } else {
+              connectionStatus = 'connected';
+              console.log('Status: connected (fully operational)');
+              await updateConnectionStatus(conn.id, 'active');
+            }
           }
-        }
-        
-        const formatted = {
-          id: conn.id,
-          status: connectionStatus,
-          profileName: conn.profile_name || `${conn.marketplace_id} Profile` || 'Amazon Profile',
-          connectedAt: conn.created_at,
-          marketplace_id: conn.marketplace_id,
-          profile_id: conn.profile_id,
-          profile_name: conn.profile_name,
-          last_sync_at: conn.last_sync_at,
-          campaign_count: campaignCount,
-          needs_sync: !hasBeenSynced || campaignCount === 0,
-          setup_required_reason: setupRequiredReason
-        };
-        
-        console.log('Final formatted connection:', formatted);
-        return formatted;
-      });
+          
+          const formatted = {
+            id: conn.id,
+            status: connectionStatus,
+            profileName: conn.profile_name || `${conn.marketplace_id} Profile` || 'Amazon Profile',
+            connectedAt: conn.created_at,
+            marketplace_id: conn.marketplace_id,
+            profile_id: conn.profile_id,
+            profile_name: conn.profile_name,
+            last_sync_at: conn.last_sync_at,
+            campaign_count: campaignCount,
+            needs_sync: !hasBeenSynced || campaignCount === 0,
+            setup_required_reason: setupRequiredReason
+          };
+          
+          console.log('Final formatted connection:', formatted);
+          return formatted;
+        })
+      );
 
       console.log('=== Final Processing Results ===');
       console.log('Total connections processed:', formattedConnections.length);
@@ -242,8 +309,38 @@ export const useAmazonConnections = () => {
 
   const syncConnection = async (connectionId: string) => {
     try {
-      console.log('=== Syncing Connection ===');
+      console.log('=== Enhanced Sync Connection ===');
       console.log('Connection ID:', connectionId);
+      
+      // First, validate the connection exists and get its current state
+      const { data: connectionData, error: connectionError } = await supabase
+        .from('amazon_connections')
+        .select('*')
+        .eq('id', connectionId)
+        .single();
+
+      if (connectionError || !connectionData) {
+        console.error('Connection not found:', connectionError);
+        throw new Error('Connection not found or access denied');
+      }
+
+      console.log('Connection data before sync:', connectionData);
+
+      // Validate profile before attempting sync
+      const profileValidation = validateProfileConfiguration(connectionData);
+      if (!profileValidation.isValid) {
+        console.log('Profile validation failed, suggesting force sync:', profileValidation.reason);
+        
+        toast({
+          title: "Profile Setup Required",
+          description: `${profileValidation.reason}. Try using "Force Sync" to refresh your advertising profiles, or reconnect your account.`,
+          variant: "destructive",
+        });
+        
+        await updateConnectionStatus(connectionId, 'warning', profileValidation.reason);
+        await refreshConnections();
+        return;
+      }
       
       toast({
         title: "Sync Started",
@@ -269,6 +366,7 @@ export const useAmazonConnections = () => {
           userMessage = error;
         }
         
+        await updateConnectionStatus(connectionId, 'error', userMessage);
         throw new Error(userMessage);
       }
 
@@ -282,18 +380,21 @@ export const useAmazonConnections = () => {
             description: "Please set up your Amazon Advertising account at advertising.amazon.com first, then try 'Force Sync' to import your campaigns.",
             variant: "destructive",
           });
+          await updateConnectionStatus(connectionId, 'warning', 'Amazon Advertising setup required');
         } else if (data.requiresReconnection) {
           toast({
             title: "Reconnection Required",
             description: data.details || "Please reconnect your Amazon account to continue syncing",
             variant: "destructive",
           });
+          await updateConnectionStatus(connectionId, 'error', 'Token expired or invalid');
         } else {
           toast({
             title: "Sync Failed",
             description: data.details || data.error,
             variant: "destructive",
           });
+          await updateConnectionStatus(connectionId, 'error', data.error);
         }
         
         await refreshConnections();
@@ -302,12 +403,19 @@ export const useAmazonConnections = () => {
 
       const campaignCount = data?.campaignsSynced || data?.campaignCount || 0;
       
-      toast({
-        title: "Sync Complete",
-        description: campaignCount > 0 
-          ? `Successfully synced ${campaignCount} campaigns from Amazon.`
-          : "Sync completed, but no campaigns were found. Please check your Amazon Advertising account.",
-      });
+      if (campaignCount > 0) {
+        await updateConnectionStatus(connectionId, 'active', 'Sync successful');
+        toast({
+          title: "Sync Complete",
+          description: `Successfully synced ${campaignCount} campaigns from Amazon.`,
+        });
+      } else {
+        await updateConnectionStatus(connectionId, 'warning', 'No campaigns found');
+        toast({
+          title: "Sync Complete",
+          description: "Sync completed, but no campaigns were found. Please check your Amazon Advertising account.",
+        });
+      }
 
       await refreshConnections();
     } catch (err) {
@@ -318,10 +426,13 @@ export const useAmazonConnections = () => {
       if (err instanceof Error) {
         if (err.message.includes('Authentication') || err.message.includes('auth')) {
           userMessage = 'Please reconnect your Amazon account and try again.';
+          await updateConnectionStatus(connectionId, 'error', 'Authentication failed');
         } else if (err.message.includes('Network') || err.message.includes('fetch')) {
           userMessage = 'Network error. Please check your connection and try again.';
+          await updateConnectionStatus(connectionId, 'warning', 'Network error');
         } else {
           userMessage = err.message;
+          await updateConnectionStatus(connectionId, 'error', err.message);
         }
       }
       
