@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -64,11 +65,6 @@ export const useAmazonConnections = () => {
         status,
         updated_at: new Date().toISOString()
       };
-
-      // If there's an error reason, we might want to store it
-      if (reason && status === 'error') {
-        console.log('Storing error reason for connection');
-      }
 
       const { error: updateError } = await supabase
         .from('amazon_connections')
@@ -409,6 +405,10 @@ export const useAmazonConnections = () => {
       
       // Step 5: Call Amazon Sync Function with proper headers
       console.log('=== Calling Amazon Sync Function ===');
+      console.log('Headers being sent:', {
+        hasAuth: !!headers.Authorization,
+        authLength: headers.Authorization?.length || 0
+      });
       
       const { data, error } = await supabase.functions.invoke('amazon-sync', {
         body: { connectionId },
@@ -641,13 +641,39 @@ export const useAmazonConnections = () => {
           throw enhancedError;
         }
 
-        console.log('=== Refreshing Connections After Callback ===');
+        console.log('=== OAuth Callback Successful - Starting Auto-Sync ===');
+        
+        // Step 1: Refresh connections to get the new connection
         await fetchConnections();
+        
+        // Step 2: Auto-sync the new connection if it exists and needs sync
+        if (data?.connectionId) {
+          console.log('=== Auto-Syncing New Connection ===');
+          console.log('Connection ID:', data.connectionId);
+          
+          // Wait a moment for the connection to be fully created
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          try {
+            await syncConnection(data.connectionId);
+          } catch (syncError) {
+            console.error('=== Auto-Sync Failed ===');
+            console.error('Sync error:', syncError);
+            
+            // Don't throw the error - just log it and continue with callback success
+            toast({
+              title: "Connection Created",
+              description: "Amazon account connected but initial sync failed. Please try syncing manually.",
+              variant: "destructive",
+            });
+          }
+        }
         
         const result = { 
           profileCount: data?.profile_count || 0,
           message: data?.message || 'Connection successful',
-          status: data?.status || 'active'
+          status: data?.status || 'active',
+          connectionId: data?.connectionId
         };
         console.log('=== OAuth Callback Success ===', result);
         return result;

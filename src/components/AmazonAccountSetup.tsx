@@ -6,9 +6,11 @@ import { ExternalLink, AlertTriangle, CheckCircle, RefreshCw } from 'lucide-reac
 import { useAmazonConnections } from '@/hooks/useAmazonConnections';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import ConnectionSummaryTable from '@/components/performance/ConnectionSummaryTable';
 
 const AmazonAccountSetup = () => {
+  const { user } = useAuth();
   const { 
     connections, 
     loading, 
@@ -40,9 +42,54 @@ const AmazonAccountSetup = () => {
     }
   };
 
+  const handleSync = async (connectionId: string) => {
+    console.log('=== Manual Sync Button Clicked ===');
+    console.log('Connection ID:', connectionId);
+    console.log('User ID:', user?.id);
+    
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to sync your Amazon connection.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    await syncConnection(connectionId);
+  };
+
   const handleForceSync = async (connectionId: string) => {
     try {
-      console.log('Force syncing connection:', connectionId);
+      console.log('=== Force Sync Button Clicked ===');
+      console.log('Connection ID:', connectionId);
+      console.log('User ID:', user?.id);
+      
+      if (!user) {
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in to use force sync.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Get auth headers for the force sync call
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session?.access_token) {
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in again to use force sync.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      const headers = {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json'
+      };
       
       toast({
         title: "Force Sync Started",
@@ -50,7 +97,8 @@ const AmazonAccountSetup = () => {
       });
       
       const { data, error } = await supabase.functions.invoke('amazon-force-sync', {
-        body: { connectionId }
+        body: { connectionId },
+        headers
       });
 
       if (error) {
@@ -194,7 +242,7 @@ const AmazonAccountSetup = () => {
       {connections.length > 0 && (
         <ConnectionSummaryTable 
           connections={connections}
-          onSync={syncConnection}
+          onSync={handleSync}
           onDelete={deleteConnection}
           onForceSync={handleForceSync}
         />
