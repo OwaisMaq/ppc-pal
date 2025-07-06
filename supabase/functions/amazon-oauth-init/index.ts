@@ -69,7 +69,7 @@ serve(async (req) => {
         return new Response(
           JSON.stringify({ 
             error: 'Invalid request',
-            details: 'Request body is required and cannot be empty'
+            details: 'Request body is required'
           }),
           {
             status: 400,
@@ -102,22 +102,7 @@ serve(async (req) => {
       console.error('No redirect URI provided');
       return new Response(
         JSON.stringify({ 
-          error: 'Redirect URI is required',
-          details: 'Please provide a valid redirect URI'
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-
-    if (!redirectUri.startsWith('https://')) {
-      console.error('Invalid redirect URI scheme:', redirectUri);
-      return new Response(
-        JSON.stringify({ 
-          error: 'Invalid redirect URI',
-          details: 'Redirect URI must use HTTPS'
+          error: 'Redirect URI is required'
         }),
         {
           status: 400,
@@ -138,8 +123,7 @@ serve(async (req) => {
       console.error('Invalid or missing authorization header');
       return new Response(
         JSON.stringify({ 
-          error: 'Authentication required',
-          details: 'Please log in to connect your Amazon account'
+          error: 'Authentication required'
         }),
         {
           status: 401,
@@ -162,8 +146,7 @@ serve(async (req) => {
         console.error('User authentication failed:', userError);
         return new Response(
           JSON.stringify({ 
-            error: 'Authentication failed',
-            details: 'Please log in again'
+            error: 'Authentication failed'
           }),
           {
             status: 401,
@@ -177,8 +160,7 @@ serve(async (req) => {
       console.error('Authentication process failed:', authError);
       return new Response(
         JSON.stringify({ 
-          error: 'Authentication error',
-          details: authError.message || 'Authentication failed'
+          error: 'Authentication error'
         }),
         {
           status: 401,
@@ -187,8 +169,8 @@ serve(async (req) => {
       );
     }
 
-    // Use the callback URL - should be the deployed URL
-    const finalRedirectUri = 'https://ppcpal.online/amazon-callback';
+    // Use the provided redirect URI
+    const finalRedirectUri = redirectUri;
     console.log('=== OAuth URL Construction ===');
     console.log('Using final redirect URI:', finalRedirectUri);
 
@@ -236,8 +218,7 @@ serve(async (req) => {
       console.error('Auth URL validation: FAILED', urlError);
       return new Response(
         JSON.stringify({ 
-          error: 'URL generation failed',
-          details: 'Generated auth URL is invalid'
+          error: 'URL generation failed'
         }),
         {
           status: 500,
