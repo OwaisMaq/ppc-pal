@@ -297,8 +297,29 @@ export const useEnhancedAmazonSync = () => {
     try {
       addStep('Starting connection debug', 'pending', 'Running comprehensive connection analysis');
       
-      // Token validation check
-      const tokenValid = await refreshTokenIfNeeded(connectionId);
+      // Get connection details first to check if it's new
+      const { data: connection, error: connectionError } = await supabase
+        .from('amazon_connections')
+        .select('*')
+        .eq('id', connectionId)
+        .single();
+
+      if (connectionError || !connection) {
+        updateLastStep('error', 'Connection not found');
+        return { success: false, error: 'Connection not found' };
+      }
+
+      // Check if connection is very new (less than 5 minutes old)
+      const connectionAge = Math.round((Date.now() - new Date(connection.created_at).getTime()) / (1000 * 60));
+      const isNewConnection = connectionAge < 5;
+
+      // Token validation check (skip for very new connections)
+      let tokenValid = true;
+      if (!isNewConnection) {
+        tokenValid = await refreshTokenIfNeeded(connectionId);
+      } else {
+        addStep('Token validation skipped', 'info', 'Connection is newly created, token is fresh');
+      }
       
       // Account validation check
       const accountValidation = await validateAmazonAccount(connectionId);
@@ -368,14 +389,44 @@ export const useEnhancedAmazonSync = () => {
     addStep('Running connection recovery', 'pending', 'Detecting and configuring advertising profiles automatically');
     
     try {
-      // Step 1: Refresh token if needed
-      const tokenValid = await refreshTokenIfNeeded(connectionId);
-      if (!tokenValid) {
+      // Get connection details first to check if it's new
+      const { data: connection, error: connectionError } = await supabase
+        .from('amazon_connections')
+        .select('*')
+        .eq('id', connectionId)
+        .single();
+
+      if (connectionError || !connection) {
         return { 
           success: false, 
-          error: 'Token refresh required',
+          error: 'Connection not found',
           requiresReconnection: true
         };
+      }
+
+      // Check if connection is very new (less than 5 minutes old)
+      const connectionAge = Math.round((Date.now() - new Date(connection.created_at).getTime()) / (1000 * 60));
+      const isNewConnection = connectionAge < 5;
+
+      console.log('Connection age check:', {
+        created: connection.created_at,
+        ageMinutes: connectionAge,
+        isNew: isNewConnection
+      });
+
+      // Step 1: Refresh token if needed (skip for very new connections)
+      let tokenValid = true;
+      if (!isNewConnection) {
+        tokenValid = await refreshTokenIfNeeded(connectionId);
+        if (!tokenValid) {
+          return { 
+            success: false, 
+            error: 'Token refresh required',
+            requiresReconnection: true
+          };
+        }
+      } else {
+        addStep('Token validation skipped', 'info', 'Connection is newly created, token is fresh');
       }
 
       // Step 2: Validate account setup

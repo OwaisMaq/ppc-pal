@@ -128,9 +128,12 @@ serve(async (req) => {
     console.log('Token refresh check:', {
       expires: tokenExpiry.toISOString(),
       hoursUntilExpiry,
-      needsRefresh: hoursUntilExpiry <= 24
+      needsRefresh: hoursUntilExpiry <= 24,
+      connectionCreated: connection.created_at,
+      connectionAge: Math.round((now.getTime() - new Date(connection.created_at).getTime()) / (1000 * 60))
     });
 
+    // Skip refresh if token is still valid (more than 24 hours remaining)
     if (hoursUntilExpiry > 24) {
       return new Response(
         JSON.stringify({
@@ -138,6 +141,22 @@ serve(async (req) => {
           message: 'Token is still valid',
           hoursUntilExpiry,
           refreshed: false
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Skip refresh if connection was just created (less than 5 minutes ago)
+    const connectionAge = Math.round((now.getTime() - new Date(connection.created_at).getTime()) / (1000 * 60));
+    if (connectionAge < 5) {
+      console.log('Connection is very new, skipping refresh');
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'Token is newly created, no refresh needed',
+          hoursUntilExpiry,
+          refreshed: false,
+          connectionAge
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
