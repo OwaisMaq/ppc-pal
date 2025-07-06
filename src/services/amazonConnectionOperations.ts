@@ -1,71 +1,86 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { toast as ToastFunction } from '@/hooks/use-toast';
 
 export class AmazonConnectionOperations {
-  private toast: ReturnType<typeof useToast>['toast'];
+  private toast: ToastFunction['toast'];
 
-  constructor(toast: ReturnType<typeof useToast>['toast']) {
+  constructor(toast: ToastFunction['toast']) {
     this.toast = toast;
   }
 
-  async getAuthHeaders() {
-    const { data: { session }, error } = await supabase.auth.getSession();
-    
-    if (error) {
-      console.error('Session error:', error);
-      throw new Error('Authentication failed. Please sign in again.');
-    }
-    
-    if (!session?.access_token) {
-      throw new Error('No valid session found. Please sign in again.');
-    }
-    
-    return {
-      'Authorization': `Bearer ${session.access_token}`,
-      'Content-Type': 'application/json'
-    };
-  }
+  async initiateConnection(redirectUri: string): Promise<void> {
+    console.log('=== Initiating Amazon Connection ===');
+    console.log('Redirect URI:', redirectUri);
 
-  async initiateConnection(redirectUri: string) {
     try {
-      console.log('=== Initiating Amazon Connection ===');
-      console.log('Redirect URI:', redirectUri);
-      
-      const headers = await this.getAuthHeaders();
-      
+      // Ensure we have a valid redirect URI
+      if (!redirectUri || !redirectUri.startsWith('https://')) {
+        throw new Error('Invalid redirect URI provided');
+      }
+
+      // Make sure we have proper request body
+      const requestBody = {
+        redirectUri: redirectUri
+      };
+
+      console.log('=== Calling OAuth Init Function ===');
+      console.log('Request body:', requestBody);
+
       const { data, error } = await supabase.functions.invoke('amazon-oauth-init', {
-        body: { redirectUri },
-        headers
+        body: requestBody,
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
+
+      console.log('=== OAuth Init Response ===');
+      console.log('Data present:', !!data);
+      console.log('Error present:', !!error);
 
       if (error) {
         console.error('OAuth init error:', error);
-        throw new Error(error.message || 'Failed to initialize Amazon connection');
+        throw new Error(error.message || 'Failed to initialize OAuth flow');
       }
 
-      if (!data?.authUrl) {
-        console.error('No auth URL returned:', data);
-        throw new Error('Invalid response from Amazon OAuth service');
+      if (!data || !data.authUrl) {
+        console.error('No auth URL received from server');
+        throw new Error('No authorization URL received from server');
       }
 
-      console.log('Auth URL generated, redirecting...');
+      console.log('=== Redirecting to Amazon OAuth ===');
+      console.log('Auth URL received, redirecting...');
+      
+      // Redirect to Amazon OAuth page
       window.location.href = data.authUrl;
+      
     } catch (err) {
       console.error('Connection initiation error:', err);
-      throw err;
+      
+      let userMessage = 'Failed to initiate Amazon connection';
+      if (err instanceof Error) {
+        if (err.message.includes('Edge Function returned a non-2xx status code')) {
+          userMessage = 'Server configuration error. Please contact support.';
+        } else if (err.message.includes('Network')) {
+          userMessage = 'Network error. Please check your connection and try again.';
+        } else {
+          userMessage = err.message;
+        }
+      }
+      
+      throw new Error(userMessage);
     }
   }
 
   async updateConnectionStatus(
     connectionId: string, 
-    status: 'active' | 'expired' | 'error' | 'pending' | 'warning' | 'setup_required',
-    setupRequiredReason?: string | null
-  ) {
+    status: 'active' | 'expired' | 'error' | 'pending' | 'warning' | 'setup_required', 
+    reason?: string
+  ): Promise<void> {
     console.log('=== Updating Connection Status ===');
     console.log('Connection ID:', connectionId);
-    console.log('New Status:', status);
-    console.log('Setup Required Reason:', setupRequiredReason);
+    console.log('New status:', status);
+    console.log('Reason:', reason);
 
     try {
       const updateData: any = {
@@ -73,34 +88,35 @@ export class AmazonConnectionOperations {
         updated_at: new Date().toISOString()
       };
 
-      // Handle setup_required_reason field
-      if (setupRequiredReason !== undefined) {
-        updateData.setup_required_reason = setupRequiredReason;
+      if (reason) {
+        updateData.setup_required_reason = reason;
       }
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('amazon_connections')
         .update(updateData)
-        .eq('id', connectionId);
+        .eq('id', connectionId)
+        .select()
+        .single();
 
       if (error) {
         console.error('Failed to update connection status:', error);
         throw error;
       }
 
-      console.log('Connection status updated successfully');
+      console.log('Connection status updated successfully:', data);
     } catch (err) {
       console.error('Error updating connection status:', err);
-      throw err;
+      // Don't throw here to avoid breaking the sync flow
     }
   }
 
   async deleteConnection(connectionId: string): Promise<boolean> {
-    try {
-      console.log('=== Deleting Connection ===');
-      console.log('Connection ID:', connectionId);
+    console.log('=== Deleting Amazon Connection ===');
+    console.log('Connection ID:', connectionId);
 
-      // First delete related campaigns
+    try {
+      // Delete campaigns first (due to foreign key constraints)
       const { error: campaignsError } = await supabase
         .from('campaigns')
         .delete()
@@ -108,9 +124,15 @@ export class AmazonConnectionOperations {
 
       if (campaignsError) {
         console.error('Failed to delete campaigns:', campaignsError);
+        this.toast({
+          title: "Delete Failed",
+          description: "Failed to delete associated campaigns",
+          variant: "destructive",
+        });
+        return false;
       }
 
-      // Then delete the connection
+      // Delete the connection
       const { error: connectionError } = await supabase
         .from('amazon_connections')
         .delete()
@@ -128,10 +150,9 @@ export class AmazonConnectionOperations {
 
       this.toast({
         title: "Connection Deleted",
-        description: "Amazon connection has been removed successfully",
+        description: "Amazon connection and associated data have been removed",
       });
 
-      console.log('Connection deleted successfully');
       return true;
     } catch (err) {
       console.error('Delete connection error:', err);
@@ -141,33 +162,6 @@ export class AmazonConnectionOperations {
         variant: "destructive",
       });
       return false;
-    }
-  }
-
-  async updateCampaignCount(connectionId: string, campaignCount: number) {
-    console.log('=== Updating Campaign Count ===');
-    console.log('Connection ID:', connectionId);
-    console.log('Campaign Count:', campaignCount);
-
-    try {
-      const { error } = await supabase
-        .from('amazon_connections')
-        .update({
-          campaign_count: campaignCount,
-          updated_at: new Date().toISOString(),
-          last_sync_at: new Date().toISOString()
-        })
-        .eq('id', connectionId);
-
-      if (error) {
-        console.error('Failed to update campaign count:', error);
-        throw error;
-      }
-
-      console.log('Campaign count updated successfully');
-    } catch (err) {
-      console.error('Error updating campaign count:', err);
-      throw err;
     }
   }
 }

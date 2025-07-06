@@ -16,10 +16,69 @@ serve(async (req) => {
   try {
     console.log('=== Amazon OAuth Init Started ===');
     console.log('Request method:', req.method);
+    console.log('Request URL:', req.url);
     
+    // Get environment variables first
+    const amazonClientId = Deno.env.get('AMAZON_CLIENT_ID');
+    const amazonClientSecret = Deno.env.get('AMAZON_CLIENT_SECRET');
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    console.log('=== Environment Variables Check ===');
+    console.log('Amazon Client ID present:', !!amazonClientId);
+    console.log('Amazon Client Secret present:', !!amazonClientSecret);
+    console.log('Supabase URL present:', !!supabaseUrl);
+    console.log('Supabase Key present:', !!supabaseKey);
+    
+    if (!amazonClientId || !amazonClientSecret) {
+      console.error('Missing Amazon credentials');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Server configuration error',
+          details: 'Amazon credentials not configured'
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('Missing Supabase configuration');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Server configuration error',
+          details: 'Supabase configuration incomplete'
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Parse request body safely
     let requestBody;
     try {
-      requestBody = await req.json();
+      const bodyText = await req.text();
+      console.log('Raw request body:', bodyText);
+      
+      if (!bodyText || bodyText.trim() === '') {
+        console.error('Empty request body received');
+        return new Response(
+          JSON.stringify({ 
+            error: 'Invalid request',
+            details: 'Request body is required and cannot be empty'
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+      
+      requestBody = JSON.parse(bodyText);
       console.log('Request body parsed successfully:', requestBody);
     } catch (parseError) {
       console.error('Failed to parse request body:', parseError);
@@ -66,47 +125,9 @@ serve(async (req) => {
         }
       );
     }
-    
-    const amazonClientId = Deno.env.get('AMAZON_CLIENT_ID');
-    const amazonClientSecret = Deno.env.get('AMAZON_CLIENT_SECRET');
-    
-    console.log('=== Environment Variables Check ===');
-    console.log('Amazon Client ID present:', !!amazonClientId);
-    console.log('Amazon Client Secret present:', !!amazonClientSecret);
-    
-    if (!amazonClientId || !amazonClientSecret) {
-      console.error('Missing Amazon credentials');
-      return new Response(
-        JSON.stringify({ 
-          error: 'Server configuration error',
-          details: 'Amazon credentials not configured'
-        }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
 
     // Initialize Supabase client
     console.log('=== Supabase Client Setup ===');
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    
-    if (!supabaseUrl || !supabaseKey) {
-      console.error('Missing Supabase configuration');
-      return new Response(
-        JSON.stringify({ 
-          error: 'Server configuration error',
-          details: 'Supabase configuration incomplete'
-        }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Get user from auth header
@@ -129,14 +150,15 @@ serve(async (req) => {
 
     const token = authHeader.replace('Bearer ', '');
     
+    let userData;
     try {
-      const { data: userData, error: userError } = await supabase.auth.getUser(token);
+      const { data: userResponse, error: userError } = await supabase.auth.getUser(token);
       
       console.log('=== User Authentication Result ===');
-      console.log('User authenticated:', !!userData?.user);
-      console.log('User ID:', userData?.user?.id);
+      console.log('User authenticated:', !!userResponse?.user);
+      console.log('User ID:', userResponse?.user?.id);
       
-      if (userError || !userData?.user) {
+      if (userError || !userResponse?.user) {
         console.error('User authentication failed:', userError);
         return new Response(
           JSON.stringify({ 
@@ -149,90 +171,14 @@ serve(async (req) => {
           }
         );
       }
-
-      // Use the callback URL - should be the deployed URL
-      const finalRedirectUri = 'https://ppcpal.online/amazon-callback';
-      console.log('=== OAuth URL Construction ===');
-      console.log('Using final redirect URI:', finalRedirectUri);
-
-      // Generate state parameter with user ID and redirect URI
-      const stateData = {
-        user_id: userData.user.id,
-        redirect_uri: finalRedirectUri,
-        timestamp: Date.now()
-      };
       
-      console.log('=== State Parameter Generation ===');
-      console.log('State data:', { user_id: stateData.user_id, redirect_uri: stateData.redirect_uri });
-      
-      // Encode state as base64 JSON
-      const state = btoa(JSON.stringify(stateData));
-      console.log('Generated state parameter (base64):', state);
-
-      // FIXED SCOPE - Use the correct Amazon Advertising API scope
-      // The correct scope for Amazon Advertising API is 'advertising::campaign_management'
-      const scope = 'advertising::campaign_management';
-      const responseType = 'code';
-      
-      console.log('OAuth parameters:');
-      console.log('- Client ID:', amazonClientId.substring(0, 8) + '...');
-      console.log('- Scope (CORRECTED):', scope);
-      console.log('- Response Type:', responseType);
-      console.log('- Redirect URI:', finalRedirectUri);
-      console.log('- State length:', state.length);
-      
-      const authUrl = new URL('https://www.amazon.com/ap/oa');
-      authUrl.searchParams.set('client_id', amazonClientId);
-      authUrl.searchParams.set('scope', scope);
-      authUrl.searchParams.set('response_type', responseType);
-      authUrl.searchParams.set('redirect_uri', finalRedirectUri);
-      authUrl.searchParams.set('state', state);
-
-      const finalAuthUrl = authUrl.toString();
-      console.log('=== Generated Amazon OAuth URL ===');
-      console.log('Auth URL length:', finalAuthUrl.length);
-      
-      // Validate the constructed URL
-      try {
-        new URL(finalAuthUrl);
-        console.log('Auth URL validation: PASSED');
-      } catch (urlError) {
-        console.error('Auth URL validation: FAILED', urlError);
-        return new Response(
-          JSON.stringify({ 
-            error: 'URL generation failed',
-            details: 'Generated auth URL is invalid'
-          }),
-          {
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          }
-        );
-      }
-
-      const responseData = { 
-        authUrl: finalAuthUrl, 
-        state: state,
-        scope: scope,
-        timestamp: new Date().toISOString()
-      };
-      
-      console.log('=== OAuth Init Successful ===');
-      console.log('Response prepared successfully with corrected scope');
-
-      return new Response(
-        JSON.stringify(responseData),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200
-        }
-      );
+      userData = userResponse;
     } catch (authError) {
       console.error('Authentication process failed:', authError);
       return new Response(
         JSON.stringify({ 
           error: 'Authentication error',
-          details: authError.message
+          details: authError.message || 'Authentication failed'
         }),
         {
           status: 401,
@@ -240,9 +186,88 @@ serve(async (req) => {
         }
       );
     }
+
+    // Use the callback URL - should be the deployed URL
+    const finalRedirectUri = 'https://ppcpal.online/amazon-callback';
+    console.log('=== OAuth URL Construction ===');
+    console.log('Using final redirect URI:', finalRedirectUri);
+
+    // Generate state parameter with user ID and redirect URI
+    const stateData = {
+      user_id: userData.user.id,
+      redirect_uri: finalRedirectUri,
+      timestamp: Date.now()
+    };
+    
+    console.log('=== State Parameter Generation ===');
+    console.log('State data:', { user_id: stateData.user_id, redirect_uri: stateData.redirect_uri });
+    
+    // Encode state as base64 JSON
+    const state = btoa(JSON.stringify(stateData));
+    console.log('Generated state parameter (base64):', state.substring(0, 50) + '...');
+
+    // Use the correct Amazon Advertising API scope
+    const scope = 'advertising::campaign_management';
+    const responseType = 'code';
+    
+    console.log('OAuth parameters:');
+    console.log('- Client ID:', amazonClientId.substring(0, 8) + '...');
+    console.log('- Scope:', scope);
+    console.log('- Response Type:', responseType);
+    console.log('- Redirect URI:', finalRedirectUri);
+    console.log('- State length:', state.length);
+    
+    const authUrl = new URL('https://www.amazon.com/ap/oa');
+    authUrl.searchParams.set('client_id', amazonClientId);
+    authUrl.searchParams.set('scope', scope);
+    authUrl.searchParams.set('response_type', responseType);
+    authUrl.searchParams.set('redirect_uri', finalRedirectUri);
+    authUrl.searchParams.set('state', state);
+
+    const finalAuthUrl = authUrl.toString();
+    console.log('=== Generated Amazon OAuth URL ===');
+    console.log('Auth URL length:', finalAuthUrl.length);
+    
+    // Validate the constructed URL
+    try {
+      new URL(finalAuthUrl);
+      console.log('Auth URL validation: PASSED');
+    } catch (urlError) {
+      console.error('Auth URL validation: FAILED', urlError);
+      return new Response(
+        JSON.stringify({ 
+          error: 'URL generation failed',
+          details: 'Generated auth URL is invalid'
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    const responseData = { 
+      authUrl: finalAuthUrl, 
+      state: state,
+      scope: scope,
+      timestamp: new Date().toISOString()
+    };
+    
+    console.log('=== OAuth Init Successful ===');
+    console.log('Response prepared successfully');
+
+    return new Response(
+      JSON.stringify(responseData),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200
+      }
+    );
+    
   } catch (error) {
     console.error('=== Amazon OAuth Init Error ===');
     console.error('Error details:', error);
+    console.error('Error stack:', error.stack);
     
     const errorResponse = {
       error: 'Server error',
