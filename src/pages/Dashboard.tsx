@@ -1,6 +1,7 @@
 
 import React from 'react';
 import AuthenticatedLayout from '@/components/AuthenticatedLayout';
+import PerformanceSummary from '@/components/PerformanceSummary';
 
 const Dashboard = () => {
   return (
@@ -10,9 +11,12 @@ const Dashboard = () => {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-gray-600 mt-2">
-            Welcome to your dashboard.
+            Overview of your Amazon advertising performance and campaign metrics.
           </p>
         </div>
+
+        {/* Performance Summary */}
+        <PerformanceSummary />
       </div>
     </AuthenticatedLayout>
   );

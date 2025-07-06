@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +27,7 @@ const PerformanceSummary = () => {
     hasData,
     hasRealData,
     dataQuality,
+    recommendations,
     formatCurrency,
     formatPercentage
   } = usePerformanceSummary();
@@ -37,6 +39,7 @@ const PerformanceSummary = () => {
   console.log('Has real data:', hasRealData);
   console.log('Loading:', loading);
   console.log('Metrics:', metrics);
+  console.log('Data Quality:', dataQuality);
 
   // Add periodic refresh to ensure fresh data
   useEffect(() => {
@@ -54,7 +57,6 @@ const PerformanceSummary = () => {
 
   const handleForceSync = async (connectionId: string) => {
     console.log('Force syncing connection:', connectionId);
-    // Enhanced force sync - will be implemented by the enhanced sync system
     await syncConnection(connectionId);
   };
 
@@ -158,8 +160,21 @@ const PerformanceSummary = () => {
         </p>
       </div>
 
+      {/* Data Quality Alert */}
+      {connections.length > 0 && !hasData && (
+        <Alert className="border-orange-200 bg-orange-50">
+          <AlertCircle className="h-4 w-4 text-orange-600" />
+          <AlertDescription className="text-orange-800">
+            {connections.some(c => c.status === 'setup_required') 
+              ? "Your Amazon connection needs to be synced. Use the 'Sync' button in the connection table below to fetch your campaign data."
+              : "No campaign data found. Make sure you have active campaigns in your Amazon Ads account."
+            }
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Key Performance Metrics */}
-      {hasData && (
+      {hasData && metrics && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {mockMetrics.map((metric, index) => {
             const IconComponent = metric.icon;
@@ -220,7 +235,7 @@ const PerformanceSummary = () => {
               <AlertCircle className="h-4 w-4 text-orange-600" />
               <AlertDescription className="text-orange-800">
                 {connections.length > 0 
-                  ? "Your Amazon connection is active but no campaign data has been synced yet. Try the 'Enhanced Sync' option for advanced profile detection and troubleshooting."
+                  ? "Your Amazon connection is active but no campaign data has been synced yet. Try the 'Sync' button in the connection table above."
                   : "Connect your Amazon account to start viewing campaign data."
                 }
               </AlertDescription>
@@ -268,6 +283,21 @@ const PerformanceSummary = () => {
                 </Badge>
               </div>
             </div>
+            
+            {/* Recommendations */}
+            {recommendations.length > 0 && (
+              <div className="mt-4">
+                <h4 className="font-medium text-gray-900 mb-2">Recommendations:</h4>
+                <ul className="text-sm text-gray-600 space-y-1">
+                  {recommendations.map((rec, index) => (
+                    <li key={index} className="flex items-start">
+                      <span className="text-blue-500 mr-2">•</span>
+                      {rec}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
