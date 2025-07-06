@@ -4,6 +4,19 @@ import { useToast } from '@/hooks/use-toast';
 import { validateProfileConfiguration } from '@/utils/amazonConnectionValidation';
 import { AmazonConnectionOperations } from './amazonConnectionOperations';
 
+interface SyncResponse {
+  success: boolean;
+  message: string;
+  campaignsSynced?: number;
+  campaignCount?: number;
+  syncStatus?: string;
+  error?: string;
+  errorType?: string;
+  requiresReconnection?: boolean;
+  requiresSetup?: boolean;
+  details?: string;
+}
+
 export class AmazonSyncService {
   private toast: ReturnType<typeof useToast>['toast'];
   private operations: AmazonConnectionOperations;
@@ -56,29 +69,13 @@ export class AmazonSyncService {
         profile_name: connectionData.profile_name
       });
 
-      // Step 3: Validate profile before attempting sync
-      const profileValidation = validateProfileConfiguration(connectionData);
-      if (!profileValidation.isValid) {
-        console.log('Profile validation failed:', profileValidation.reason);
-        
-        this.toast({
-          title: "Profile Setup Required",
-          description: `${profileValidation.reason}. Try using "Enhanced Sync" to refresh your advertising profiles, or reconnect your account.`,
-          variant: "destructive",
-        });
-        
-        await this.operations.updateConnectionStatus(connectionId, 'warning', profileValidation.reason);
-        await refreshConnections();
-        return;
-      }
-      
-      // Step 4: Show sync started message
+      // Step 3: Show sync started message
       this.toast({
         title: "Sync Started",
         description: "Fetching your campaign data from Amazon. Please wait...",
       });
       
-      // Step 5: Call Amazon Sync Function with proper headers
+      // Step 4: Call Amazon Sync Function with proper headers and connectionId
       console.log('=== Calling Amazon Sync Function ===');
       console.log('Headers being sent:', {
         hasAuth: !!headers.Authorization,
@@ -86,7 +83,7 @@ export class AmazonSyncService {
       });
       
       const { data, error } = await supabase.functions.invoke('amazon-sync', {
-        body: { connectionId },
+        body: { connectionId }, // Always send the specific connectionId
         headers
       });
 
@@ -132,8 +129,8 @@ export class AmazonSyncService {
     }
   }
 
-  private async handleSyncResponse(data: any, error: any, connectionId: string, refreshConnections: () => Promise<void>) {
-    // Step 6: Handle edge function errors
+  private async handleSyncResponse(data: SyncResponse, error: any, connectionId: string, refreshConnections: () => Promise<void>) {
+    // Step 5: Handle edge function errors
     if (error) {
       console.error('=== Sync Edge Function Error ===');
       console.error('Error type:', typeof error);
@@ -160,21 +157,21 @@ export class AmazonSyncService {
       throw new Error(userMessage);
     }
 
-    // Step 7: Handle server response errors
-    if (data?.error) {
+    // Step 6: Handle server response - check for success first
+    if (!data.success && data.error) {
       console.error('=== Sync Server Response Error ===');
       console.error('Server error:', data.error);
       console.error('Error type:', data.errorType);
       console.error('Requires reconnection:', data.requiresReconnection);
       console.error('Requires setup:', data.requiresSetup);
       
-      if (data.requiresSetup || data.error === 'Profile setup required') {
+      if (data.requiresSetup) {
         this.toast({
           title: "Amazon Advertising Setup Required",
-          description: "Please set up your Amazon Advertising account at advertising.amazon.com first, then try 'Enhanced Sync' to import your campaigns.",
+          description: data.details || "Please set up your Amazon Advertising account at advertising.amazon.com first, then try 'Enhanced Sync' to import your campaigns.",
           variant: "destructive",
         });
-        await this.operations.updateConnectionStatus(connectionId, 'warning', 'Amazon Advertising setup required');
+        await this.operations.updateConnectionStatus(connectionId, 'setup_required', 'Amazon Advertising setup required');
       } else if (data.requiresReconnection) {
         this.toast({
           title: "Reconnection Required",
@@ -195,24 +192,24 @@ export class AmazonSyncService {
       return;
     }
 
-    // Step 8: Handle successful sync responses
+    // Step 7: Handle successful sync responses
     console.log('=== Sync Successful ===');
-    const campaignCount = data?.campaignsSynced || data?.campaignCount || 0;
-    const syncStatus = data?.syncStatus || 'success';
+    const campaignCount = data.campaignsSynced || data.campaignCount || 0;
+    const syncStatus = data.syncStatus || 'success';
     
     if (syncStatus === 'success_no_campaigns' || campaignCount === 0) {
       // Successful sync but no campaigns found - this is normal and should be active
       await this.operations.updateConnectionStatus(connectionId, 'active', 'Sync successful');
       this.toast({
         title: "Sync Complete",
-        description: data?.message || "Sync completed successfully. No campaigns found in your Amazon account - this is normal for new advertising accounts.",
+        description: data.message || "Sync completed successfully. No campaigns found in your Amazon account - this is normal for new advertising accounts.",
       });
     } else {
       // Successful sync with campaigns
       await this.operations.updateConnectionStatus(connectionId, 'active', 'Sync successful');
       this.toast({
         title: "Sync Complete",
-        description: `Successfully synced ${campaignCount} campaigns from Amazon.`,
+        description: data.message || `Successfully synced ${campaignCount} campaigns from Amazon.`,
       });
     }
 

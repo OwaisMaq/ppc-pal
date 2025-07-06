@@ -351,7 +351,7 @@ export const useEnhancedAmazonSync = () => {
         profile_id: profileId,
         profile_name: profileName,
         marketplace_id: marketplaceId,
-        status: 'active',
+        status: 'active', // Set to active once profile is configured
         updated_at: new Date().toISOString()
       })
       .eq('id', connectionId);
@@ -533,7 +533,7 @@ export const useEnhancedAmazonSync = () => {
           );
           
           toast({
-            title: "Setup Required",
+            title: "Setup Required", 
             description: recoveryResult.guidance || "Additional Amazon Advertising setup is required.",
             variant: "destructive",
           });
