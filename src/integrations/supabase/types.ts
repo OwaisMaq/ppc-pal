@@ -74,6 +74,7 @@ export type Database = {
       amazon_connections: {
         Row: {
           access_token: string
+          campaign_count: number | null
           created_at: string
           id: string
           last_sync_at: string | null
@@ -81,6 +82,7 @@ export type Database = {
           profile_id: string
           profile_name: string | null
           refresh_token: string
+          setup_required_reason: string | null
           status: Database["public"]["Enums"]["api_connection_status"]
           token_expires_at: string
           updated_at: string
@@ -88,6 +90,7 @@ export type Database = {
         }
         Insert: {
           access_token: string
+          campaign_count?: number | null
           created_at?: string
           id?: string
           last_sync_at?: string | null
@@ -95,6 +98,7 @@ export type Database = {
           profile_id: string
           profile_name?: string | null
           refresh_token: string
+          setup_required_reason?: string | null
           status?: Database["public"]["Enums"]["api_connection_status"]
           token_expires_at: string
           updated_at?: string
@@ -102,6 +106,7 @@ export type Database = {
         }
         Update: {
           access_token?: string
+          campaign_count?: number | null
           created_at?: string
           id?: string
           last_sync_at?: string | null
@@ -109,6 +114,7 @@ export type Database = {
           profile_id?: string
           profile_name?: string | null
           refresh_token?: string
+          setup_required_reason?: string | null
           status?: Database["public"]["Enums"]["api_connection_status"]
           token_expires_at?: string
           updated_at?: string
