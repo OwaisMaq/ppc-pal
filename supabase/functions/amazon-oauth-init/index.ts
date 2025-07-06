@@ -1,4 +1,5 @@
 
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
@@ -169,13 +170,13 @@ serve(async (req) => {
       const state = btoa(JSON.stringify(stateData));
       console.log('Generated state parameter (base64):', state);
 
-      // CORRECTED SCOPE - Using the exact scope format Amazon expects
-      const scope = 'cpc_advertising:campaign_management';
+      // CORRECTED SCOPE - Using double colons as per Amazon Advertising API documentation
+      const scope = 'advertising::campaign_management';
       const responseType = 'code';
       
       console.log('OAuth parameters:');
       console.log('- Client ID:', amazonClientId.substring(0, 8) + '...');
-      console.log('- Scope (CORRECTED TO SINGLE COLON):', scope);
+      console.log('- Scope (CORRECTED TO DOUBLE COLONS):', scope);
       console.log('- Response Type:', responseType);
       console.log('- Redirect URI:', finalRedirectUri);
       console.log('- State length:', state.length);
@@ -217,7 +218,7 @@ serve(async (req) => {
       };
       
       console.log('=== OAuth Init Successful ===');
-      console.log('Response prepared successfully with corrected scope');
+      console.log('Response prepared successfully with corrected double colon scope');
 
       return new Response(
         JSON.stringify(responseData),
@@ -258,3 +259,4 @@ serve(async (req) => {
     );
   }
 });
+
