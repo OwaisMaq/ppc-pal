@@ -5,12 +5,11 @@ import { Button } from '@/components/ui/button';
 import { ExternalLink, AlertTriangle, CheckCircle, RefreshCw } from 'lucide-react';
 import { useAmazonConnections } from '@/hooks/useAmazonConnections';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
 import ConnectionSummaryTable from '@/components/performance/ConnectionSummaryTable';
+import ConnectionRecovery from '@/components/ConnectionRecovery';
+import EnhancedAmazonSync from '@/components/EnhancedAmazonSync';
 
 const AmazonAccountSetup = () => {
-  const { user } = useAuth();
   const { 
     connections, 
     loading, 
@@ -25,120 +24,15 @@ const AmazonAccountSetup = () => {
   const handleConnect = async () => {
     try {
       console.log('=== Amazon Connect Button Clicked ===');
-      console.log('Starting Amazon connection process...');
-      
-      // Use the deployed URL for the redirect
       const redirectUri = 'https://ppcpal.online/amazon-callback';
-      console.log('Using redirect URI:', redirectUri);
-      
       await initiateConnection(redirectUri);
     } catch (err) {
-      console.error('=== Connect Error ===');
-      console.error('Error type:', typeof err);
-      console.error('Error message:', err instanceof Error ? err.message : String(err));
-      console.error('Full error:', err);
-      
-      // The error handling is now done in the hook, so we don't need to show another toast here
+      console.error('Connect error:', err);
     }
   };
 
   const handleSync = async (connectionId: string) => {
-    console.log('=== Manual Sync Button Clicked ===');
-    console.log('Connection ID:', connectionId);
-    console.log('User ID:', user?.id);
-    
-    if (!user) {
-      toast({
-        title: "Authentication Required",
-        description: "Please sign in to sync your Amazon connection.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
     await syncConnection(connectionId);
-  };
-
-  const handleForceSync = async (connectionId: string) => {
-    try {
-      console.log('=== Force Sync Button Clicked ===');
-      console.log('Connection ID:', connectionId);
-      console.log('User ID:', user?.id);
-      
-      if (!user) {
-        toast({
-          title: "Authentication Required",
-          description: "Please sign in to use force sync.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      // Get auth headers for the force sync call
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError || !session?.access_token) {
-        toast({
-          title: "Authentication Required",
-          description: "Please sign in again to use force sync.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      const headers = {
-        'Authorization': `Bearer ${session.access_token}`,
-        'Content-Type': 'application/json'
-      };
-      
-      toast({
-        title: "Force Sync Started",
-        description: "Attempting to fetch campaigns even without detected profiles. This may take a few moments...",
-      });
-      
-      const { data, error } = await supabase.functions.invoke('amazon-force-sync', {
-        body: { connectionId },
-        headers
-      });
-
-      if (error) {
-        console.error('Force sync error:', error);
-        
-        let userMessage = 'Failed to force sync campaign data';
-        if (typeof error === 'object' && error.message) {
-          userMessage = error.message;
-        } else if (typeof error === 'string') {
-          userMessage = error;
-        }
-        
-        throw new Error(userMessage);
-      }
-
-      if (data?.error) {
-        console.error('Force sync returned error:', data.error);
-        throw new Error(data.details || data.error);
-      }
-
-      toast({
-        title: "Force Sync Complete",
-        description: data?.message || `Successfully synced ${data?.campaignCount || 0} campaigns from Amazon.`,
-      });
-
-      await refreshConnections();
-    } catch (err) {
-      console.error('Error force syncing connection:', err);
-      
-      let userMessage = 'Failed to force sync campaign data';
-      if (err instanceof Error) {
-        userMessage = err.message;
-      }
-      
-      toast({
-        title: "Force Sync Failed",
-        description: userMessage,
-        variant: "destructive",
-      });
-    }
   };
 
   if (loading) {
@@ -239,12 +133,36 @@ const AmazonAccountSetup = () => {
         </CardContent>
       </Card>
 
+      {/* Show connection recovery for problematic connections */}
+      {connections.map((connection) => (
+        <ConnectionRecovery
+          key={`recovery-${connection.id}`}
+          connectionId={connection.id}
+          connectionName={connection.profileName}
+          profileId={connection.profile_id}
+          onRecoveryComplete={refreshConnections}
+        />
+      ))}
+
+      {/* Enhanced Sync for connections that need it */}
+      {connections.length > 0 && connections.some(conn => 
+        conn.status === 'setup_required' || 
+        conn.status === 'warning' || 
+        !conn.profile_id ||
+        conn.profile_id === 'setup_required_no_profiles_found'
+      ) && (
+        <EnhancedAmazonSync
+          connectionId={connections[0].id}
+          connectionName={connections[0].profileName}
+          onSyncComplete={refreshConnections}
+        />
+      )}
+
       {connections.length > 0 && (
         <ConnectionSummaryTable 
           connections={connections}
           onSync={handleSync}
           onDelete={deleteConnection}
-          onForceSync={handleForceSync}
         />
       )}
     </div>

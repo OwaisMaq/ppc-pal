@@ -13,10 +13,23 @@ serve(async (req) => {
   }
 
   try {
-    // Enhanced authentication
+    console.log('=== Enhanced Profile Detection Started ===')
+    
+    // Enhanced authentication with better error handling
     const authHeader = req.headers.get('authorization')
-    console.log('=== Enhanced Profile Detection Authentication ===')
     console.log('Auth header present:', !!authHeader)
+
+    if (!authHeader) {
+      console.error('No authorization header provided')
+      return new Response(
+        JSON.stringify({ 
+          error: 'Authentication required',
+          details: 'Please sign in to use enhanced profile detection',
+          requiresAuth: true
+        }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -29,7 +42,7 @@ serve(async (req) => {
       {
         global: {
           headers: {
-            Authorization: authHeader || '',
+            Authorization: authHeader,
           },
         },
       }
@@ -42,17 +55,30 @@ serve(async (req) => {
       console.error('Authentication failed:', authError?.message)
       return new Response(
         JSON.stringify({ 
-          error: 'Authentication required',
-          details: 'Please sign in to use enhanced profile detection',
+          error: 'Authentication failed',
+          details: 'Please sign in again to use enhanced profile detection',
           requiresAuth: true
         }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    const { connectionId } = await req.json()
+    let requestBody
+    try {
+      requestBody = await req.json()
+    } catch (parseError) {
+      console.error('Failed to parse request body:', parseError)
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid request format',
+          details: 'Request body must be valid JSON'
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const { connectionId } = requestBody
     
-    console.log('=== Enhanced Profile Detection Started ===')
     console.log('Connection ID:', connectionId)
     console.log('User ID:', user.id)
 
@@ -78,7 +104,7 @@ serve(async (req) => {
       console.error('Connection not found or access denied:', fetchError?.message)
       return new Response(
         JSON.stringify({ 
-          error: 'Connection not found or access denied',
+          error: 'Connection not found',
           details: 'Could not find the specified Amazon connection for your account',
           requiresReconnection: true
         }),
@@ -86,7 +112,7 @@ serve(async (req) => {
       )
     }
 
-    console.log('Connection details:', {
+    console.log('Connection found:', {
       profile_id: connection.profile_id,
       status: connection.status,
       profile_name: connection.profile_name,
@@ -101,7 +127,6 @@ serve(async (req) => {
     if (tokenExpiry <= now) {
       console.error('Token has expired')
       
-      // Update connection status
       await supabaseClient
         .from('amazon_connections')
         .update({ 
@@ -113,7 +138,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           error: 'Access token has expired',
-          details: `Your Amazon token expired ${Math.abs(hoursUntilExpiry)} hours ago. Please reconnect your Amazon account to refresh the token.`,
+          details: `Your Amazon token expired ${Math.abs(hoursUntilExpiry)} hours ago. Please reconnect your Amazon account.`,
           requiresReconnection: true,
           expiredHours: Math.abs(hoursUntilExpiry)
         }),
@@ -127,7 +152,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           error: 'Server configuration error',
-          details: 'Amazon API credentials not properly configured on server'
+          details: 'Amazon API credentials not configured properly'
         }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
@@ -143,11 +168,11 @@ serve(async (req) => {
       accountDetails: null
     }
 
-    console.log('=== Starting Advanced Multi-Strategy Profile Detection ===')
+    console.log('=== Starting Multi-Strategy Profile Detection ===')
 
-    // Strategy 1: Standard profile endpoint with retry mechanism
-    console.log('=== Strategy 1: Standard Profile Detection with Retry ===')
-    for (let attempt = 1; attempt <= 3; attempt++) {
+    // Strategy 1: Standard profile endpoint with retry
+    console.log('=== Strategy 1: Standard Profile Detection ===')
+    for (let attempt = 1; attempt <= 2; attempt++) {
       detectionResults.strategiesAttempted++
       
       try {
@@ -155,119 +180,109 @@ serve(async (req) => {
           'Authorization': `Bearer ${connection.access_token}`,
           'Amazon-Advertising-API-ClientId': clientId,
           'Content-Type': 'application/json',
-          'User-Agent': `Enhanced-Profile-Detection/1.0-attempt-${attempt}`
+          'User-Agent': `Enhanced-Profile-Detection/1.0`
         }
+
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 8000) // 8 second timeout
 
         const profilesResponse = await fetch('https://advertising-api.amazon.com/v2/profiles', {
           headers: standardHeaders,
-          timeout: 10000 // 10 second timeout
+          signal: controller.signal
         })
 
-        console.log(`Standard profile API response (attempt ${attempt}):`, {
+        clearTimeout(timeout)
+
+        console.log(`Profile API response (attempt ${attempt}):`, {
           status: profilesResponse.status,
-          ok: profilesResponse.ok,
-          statusText: profilesResponse.statusText
+          ok: profilesResponse.ok
         })
 
         if (profilesResponse.ok) {
           const profiles = await profilesResponse.json()
-          console.log(`Standard profiles found (attempt ${attempt}):`, profiles.length)
+          console.log(`Profiles found (attempt ${attempt}):`, profiles?.length || 0)
           
           if (profiles && Array.isArray(profiles) && profiles.length > 0) {
-            // Enhanced profile validation
             const validProfiles = profiles.filter(profile => {
-              const isValid = profile.profileId && 
-                            profile.countryCode &&
-                            (profile.accountInfo?.marketplaceStringId || profile.marketplaceStringId)
-              
-              if (!isValid) {
-                console.log('Invalid profile filtered out:', profile)
-              }
-              
-              return isValid
+              return profile.profileId && 
+                     profile.countryCode &&
+                     (profile.accountInfo?.marketplaceStringId || profile.marketplaceStringId)
             })
             
             detectionResults.allProfiles.push(...validProfiles)
             detectionResults.regionsChecked.push('standard-api')
-            
-            console.log(`Added ${validProfiles.length} valid profiles from standard API`)
-            break // Success, no need to retry
+            console.log(`Added ${validProfiles.length} valid profiles`)
+            break
           }
         } else {
-          const errorText = await profilesResponse.text()
-          console.error(`Standard profile fetch failed (attempt ${attempt}):`, profilesResponse.status, errorText)
+          const errorText = await profilesResponse.text().catch(() => 'Unknown error')
+          console.error(`Profile fetch failed (attempt ${attempt}):`, profilesResponse.status, errorText.substring(0, 200))
           
           if (profilesResponse.status === 401) {
-            detectionResults.errors.push(`Authentication failed: Token may be expired or invalid`)
-            break // Don't retry auth errors
+            detectionResults.errors.push('Authentication failed - token may be expired')
+            break
           } else if (profilesResponse.status === 403) {
-            detectionResults.errors.push(`Access denied: Check API permissions and client ID`)
-            break // Don't retry permission errors
+            detectionResults.errors.push('Access denied - check API permissions')
+            break
           } else {
-            detectionResults.errors.push(`Standard API attempt ${attempt} (${profilesResponse.status}): ${errorText}`)
+            detectionResults.errors.push(`API error ${profilesResponse.status}: ${errorText.substring(0, 100)}`)
           }
         }
       } catch (error) {
-        console.error(`Standard profile fetch error (attempt ${attempt}):`, error)
-        detectionResults.errors.push(`Standard API attempt ${attempt}: ${error.message}`)
+        console.error(`Profile fetch error (attempt ${attempt}):`, error.message)
+        detectionResults.errors.push(`Network error (attempt ${attempt}): ${error.message}`)
+        
+        if (error.name === 'AbortError') {
+          detectionResults.errors.push('Request timeout - Amazon API is slow to respond')
+          break
+        }
       }
 
-      // Wait before retry
-      if (attempt < 3) {
-        await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
+      if (attempt < 2) {
+        await new Promise(resolve => setTimeout(resolve, 1000))
       }
     }
 
-    // Strategy 2: Enhanced region-specific detection
-    console.log('=== Strategy 2: Enhanced Region-Specific Detection ===')
+    // Strategy 2: Region-specific detection
+    console.log('=== Strategy 2: Region-Specific Detection ===')
     const regions = [
-      { code: 'NA', endpoint: 'https://advertising-api.amazon.com', name: 'North America', markets: ['US', 'CA', 'MX'] },
-      { code: 'EU', endpoint: 'https://advertising-api-eu.amazon.com', name: 'Europe', markets: ['UK', 'DE', 'FR', 'IT', 'ES'] },
-      { code: 'FE', endpoint: 'https://advertising-api-fe.amazon.com', name: 'Far East', markets: ['JP', 'AU', 'IN'] }
+      { code: 'NA', endpoint: 'https://advertising-api.amazon.com', name: 'North America' },
+      { code: 'EU', endpoint: 'https://advertising-api-eu.amazon.com', name: 'Europe' },
+      { code: 'FE', endpoint: 'https://advertising-api-fe.amazon.com', name: 'Far East' }
     ]
 
     for (const region of regions) {
       detectionResults.strategiesAttempted++
-      console.log(`Checking region: ${region.name} (${region.code}) - Markets: ${region.markets.join(', ')}`)
+      console.log(`Checking region: ${region.name}`)
       
       try {
         const regionHeaders = {
           'Authorization': `Bearer ${connection.access_token}`,
           'Amazon-Advertising-API-ClientId': clientId,
-          'Content-Type': 'application/json',
-          'User-Agent': `Enhanced-Profile-Detection-${region.code}/1.0`,
-          'Accept': 'application/json'
+          'Content-Type': 'application/json'
         }
+
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 6000)
 
         const regionResponse = await fetch(`${region.endpoint}/v2/profiles`, {
           headers: regionHeaders,
-          timeout: 15000 // 15 second timeout for region calls
+          signal: controller.signal
         })
 
-        console.log(`Region ${region.code} response:`, {
-          status: regionResponse.status,
-          ok: regionResponse.ok,
-          statusText: regionResponse.statusText
-        })
+        clearTimeout(timeout)
 
         if (regionResponse.ok) {
           const regionProfiles = await regionResponse.json()
           console.log(`Region ${region.code} profiles:`, regionProfiles?.length || 0)
           
           if (regionProfiles && Array.isArray(regionProfiles) && regionProfiles.length > 0) {
-            // Enhanced duplicate detection
             const existingIds = new Set(detectionResults.allProfiles.map(p => p.profileId))
             const newProfiles = regionProfiles.filter(p => {
-              const isValid = p.profileId && 
-                            !existingIds.has(p.profileId) &&
-                            p.countryCode &&
-                            (p.accountInfo?.marketplaceStringId || p.marketplaceStringId)
-              
-              if (p.profileId && existingIds.has(p.profileId)) {
-                console.log(`Duplicate profile filtered: ${p.profileId}`)
-              }
-              
-              return isValid
+              return p.profileId && 
+                     !existingIds.has(p.profileId) &&
+                     p.countryCode &&
+                     (p.accountInfo?.marketplaceStringId || p.marketplaceStringId)
             })
             
             if (newProfiles.length > 0) {
@@ -277,123 +292,36 @@ serve(async (req) => {
             }
           }
         } else {
-          const errorText = await regionResponse.text()
-          console.error(`Region ${region.code} failed:`, regionResponse.status)
-          detectionResults.errors.push(`${region.name} API (${regionResponse.status}): ${errorText.substring(0, 100)}`)
+          console.log(`Region ${region.code} returned status:`, regionResponse.status)
         }
       } catch (error) {
-        console.error(`Region ${region.code} error:`, error)
-        detectionResults.errors.push(`${region.name} API: ${error.message}`)
+        console.log(`Region ${region.code} error:`, error.message)
       }
 
-      // Small delay between region requests
-      await new Promise(resolve => setTimeout(resolve, 500))
+      await new Promise(resolve => setTimeout(resolve, 300))
     }
 
-    // Strategy 3: Account information and advertising readiness check
-    console.log('=== Strategy 3: Account Information & Advertising Readiness ===')
-    detectionResults.strategiesAttempted++
-    
-    try {
-      // Check account manager for advertising setup status
-      const managerResponse = await fetch('https://advertising-api.amazon.com/v2/manager/accounts', {
-        headers: {
-          'Authorization': `Bearer ${connection.access_token}`,
-          'Amazon-Advertising-API-ClientId': clientId,
-          'Content-Type': 'application/json',
-        },
-      })
-
-      if (managerResponse.ok) {
-        const accountData = await managerResponse.json()
-        console.log('Account manager data:', accountData?.length || 0, 'accounts')
-        
-        if (accountData && Array.isArray(accountData) && accountData.length > 0) {
-          detectionResults.accountDetails = {
-            accountCount: accountData.length,
-            hasAdvertisingAccess: true,
-            accountTypes: accountData.map(acc => acc.type).filter(Boolean)
-          }
-          detectionResults.regionsChecked.push('account-manager')
-        }
-      } else {
-        const errorText = await managerResponse.text()
-        console.log('Account manager check failed:', managerResponse.status, errorText.substring(0, 100))
-        detectionResults.errors.push(`Account manager check (${managerResponse.status}): Account may not have advertising access`)
-      }
-    } catch (error) {
-      console.error('Account manager check error:', error)
-      detectionResults.errors.push(`Account manager check: ${error.message}`)
-    }
-
-    // Strategy 4: Portfolio validation (indicates active advertising setup)
-    console.log('=== Strategy 4: Portfolio & Campaign Activity Check ===')
-    detectionResults.strategiesAttempted++
-    
-    try {
-      const portfolioResponse = await fetch('https://advertising-api.amazon.com/v2/portfolios', {
-        headers: {
-          'Authorization': `Bearer ${connection.access_token}`,
-          'Amazon-Advertising-API-ClientId': clientId,
-          'Content-Type': 'application/json',
-        },
-      })
-
-      if (portfolioResponse.ok) {
-        const portfolios = await portfolioResponse.json()
-        console.log('Portfolios found:', portfolios?.length || 0)
-        
-        if (portfolios && Array.isArray(portfolios) && portfolios.length > 0) {
-          detectionResults.portfolioActivity = true
-          detectionResults.regionsChecked.push('portfolio-check')
-          console.log('Portfolio data confirms active advertising setup')
-        }
-      } else {
-        const errorText = await portfolioResponse.text()
-        console.log('Portfolio fetch info:', portfolioResponse.status, errorText.substring(0, 100))
-        // Don't treat portfolio errors as critical - many accounts won't have portfolios
-      }
-    } catch (error) {
-      console.log('Portfolio validation info:', error.message)
-      // Portfolio errors are informational only
-    }
-
-    // Final results analysis and response
-    console.log('=== Enhanced Detection Results Analysis ===')
+    console.log('=== Detection Results Summary ===')
     console.log('Total profiles found:', detectionResults.allProfiles.length)
-    console.log('Regions/strategies checked:', detectionResults.regionsChecked.length)
-    console.log('Total API attempts:', detectionResults.strategiesAttempted)
+    console.log('Regions checked:', detectionResults.regionsChecked.length)
+    console.log('Strategies attempted:', detectionResults.strategiesAttempted)
     console.log('Errors encountered:', detectionResults.errors.length)
-    console.log('Portfolio activity detected:', detectionResults.portfolioActivity)
-    console.log('Account details:', detectionResults.accountDetails)
 
     if (detectionResults.allProfiles.length > 0) {
-      // Enhanced profile sorting and validation
+      // Sort profiles with preference for US first
       const sortedProfiles = detectionResults.allProfiles
         .filter(profile => {
-          // Final validation pass
-          const isValid = profile.profileId && 
-                         profile.countryCode && 
-                         /^\d+$/.test(profile.profileId.toString())
-          
-          if (!isValid) {
-            console.log('Profile failed final validation:', profile)
-          }
-          
-          return isValid
+          return profile.profileId && 
+                 profile.countryCode && 
+                 /^\d+$/.test(profile.profileId.toString())
         })
         .sort((a, b) => {
-          // Priority sorting: US first, then by profile ID
           if (a.countryCode === 'US' && b.countryCode !== 'US') return -1
           if (b.countryCode === 'US' && a.countryCode !== 'US') return 1
           return parseInt(a.profileId) - parseInt(b.profileId)
         })
 
-      console.log('Final sorted profiles:', sortedProfiles.map(p => ({
-        id: p.profileId,
-        country: p.countryCode,
-        marketplace: p.accountInfo?.marketplaceStringId || p.marketplaceStringId
-      })))
+      console.log('Final sorted profiles:', sortedProfiles.length)
 
       return new Response(
         JSON.stringify({
@@ -403,71 +331,39 @@ serve(async (req) => {
             totalProfilesFound: sortedProfiles.length,
             regionsChecked: detectionResults.regionsChecked,
             strategiesAttempted: detectionResults.strategiesAttempted,
-            portfolioActivityDetected: detectionResults.portfolioActivity,
-            accountDetails: detectionResults.accountDetails,
             tokenExpiresIn: `${hoursUntilExpiry} hours`
           },
-          recommendations: [
-            sortedProfiles.length > 1 ? 
-              `Found ${sortedProfiles.length} advertising profiles. The first profile (${sortedProfiles[0].countryCode}) will be used as primary.` :
-              `Found 1 advertising profile for ${sortedProfiles[0].countryCode} marketplace.`,
-            detectionResults.portfolioActivity ? 
-              'Portfolio activity detected - advertising setup appears complete.' :
-              'No portfolio activity detected - this is normal for new advertising accounts.',
-            `Token expires in ${hoursUntilExpiry} hours. Plan to reconnect before expiration.`
-          ],
-          message: `Successfully detected ${sortedProfiles.length} advertising profile${sortedProfiles.length === 1 ? '' : 's'} using enhanced multi-strategy detection`,
+          message: `Successfully detected ${sortedProfiles.length} advertising profile${sortedProfiles.length === 1 ? '' : 's'}`,
           nextSteps: [
             'Profile configuration will be updated automatically',
-            'Campaign sync can now proceed',
-            'Monitor sync results for any additional issues'
+            'Campaign sync can now proceed'
           ]
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     } else {
-      // Enhanced guidance for no profiles found
-      console.log('No profiles found despite comprehensive detection')
+      // No profiles found - provide detailed guidance
+      console.log('No profiles found despite detection attempts')
       
-      // Analyze why no profiles were found
       const hasAuthErrors = detectionResults.errors.some(err => 
         err.includes('Authentication') || err.includes('401') || err.includes('403')
       )
       
-      const hasServerErrors = detectionResults.errors.some(err => 
-        err.includes('500') || err.includes('502') || err.includes('503')
-      )
-
-      let primaryReason = 'Amazon Advertising account setup incomplete'
+      let primaryReason = 'No advertising profiles found'
       let detailedGuidance = []
       
       if (hasAuthErrors) {
-        primaryReason = 'Authentication or permission issues detected'
+        primaryReason = 'Authentication issues detected'
         detailedGuidance = [
           'Your Amazon token may have expired or been revoked',
           'Try reconnecting your Amazon account',
-          'Ensure your Amazon account has advertising permissions'
-        ]
-      } else if (hasServerErrors) {
-        primaryReason = 'Amazon API connectivity issues'
-        detailedGuidance = [
-          'Amazon Advertising API is experiencing issues',
-          'Try again in a few minutes',
-          'If problems persist, check Amazon Advertising status'
-        ]
-      } else if (detectionResults.accountDetails?.hasAdvertisingAccess) {
-        primaryReason = 'Account has advertising access but no active profiles'
-        detailedGuidance = [
-          'Your account can access advertising APIs but has no advertising profiles',
-          'This usually means no campaigns have been created yet',
-          'Create your first campaign at advertising.amazon.com to generate a profile'
+          'Ensure your account has advertising permissions'
         ]
       } else {
         detailedGuidance = [
-          'Visit advertising.amazon.com and complete account setup',
-          'Accept the Amazon Advertising Terms of Service',
+          'Visit advertising.amazon.com to set up your advertising account',
           'Create at least one advertising campaign',
-          'Wait a few minutes for profile generation, then try Enhanced Sync again'
+          'Wait a few minutes, then try Enhanced Sync again'
         ]
       }
 
@@ -481,20 +377,17 @@ serve(async (req) => {
             strategiesAttempted: detectionResults.strategiesAttempted,
             regionsChecked: detectionResults.regionsChecked.length,
             errorsEncountered: detectionResults.errors.length,
-            portfolioActivityDetected: detectionResults.portfolioActivity,
-            accountDetails: detectionResults.accountDetails,
             tokenExpiresIn: `${hoursUntilExpiry} hours`
           },
           detailedGuidance,
           troubleshooting: {
             authenticationIssues: hasAuthErrors,
-            serverIssues: hasServerErrors,
-            accountHasAdvertisingAccess: detectionResults.accountDetails?.hasAdvertisingAccess || false,
-            portfolioActivity: detectionResults.portfolioActivity
+            serverIssues: false,
+            accountHasAdvertisingAccess: false
           },
           nextSteps: hasAuthErrors ? 
-            ['Reconnect your Amazon account', 'Verify account permissions', 'Try Enhanced Sync again'] :
-            ['Complete Amazon Advertising setup', 'Create first campaign', 'Return and use Enhanced Sync'],
+            ['Reconnect your Amazon account', 'Try Enhanced Sync again'] :
+            ['Complete Amazon Advertising setup', 'Create first campaign', 'Use Enhanced Sync'],
           errors: detectionResults.errors.length > 0 ? detectionResults.errors : undefined
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -502,13 +395,14 @@ serve(async (req) => {
     }
 
   } catch (error) {
-    console.error('=== Enhanced Profile Detection Critical Error ===')
+    console.error('=== Critical Error in Enhanced Profile Detection ===')
     console.error('Error details:', error)
+    console.error('Stack trace:', error.stack)
     
     return new Response(
       JSON.stringify({ 
-        error: 'Internal server error during enhanced profile detection',
-        details: error.message,
+        error: 'Internal server error',
+        details: 'An unexpected error occurred during profile detection',
         timestamp: new Date().toISOString(),
         requiresSupport: true
       }),
