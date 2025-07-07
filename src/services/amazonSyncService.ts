@@ -76,7 +76,7 @@ export class AmazonSyncService {
         return;
       }
 
-      // Now we know success is true, so data is available
+      // Now we know the validation was successful, so we can access the data
       const data = validationResult.data;
 
       // Handle sync results - check the data properties directly since validation passed

@@ -77,7 +77,7 @@ export class EnhancedSyncService {
         return;
       }
 
-      // Handle validated response - now we know success is true, so data is available
+      // Handle validated response - now we know the validation was successful
       await this.handleValidatedSyncResponse(
         validationResult.data,
         connectionId,
