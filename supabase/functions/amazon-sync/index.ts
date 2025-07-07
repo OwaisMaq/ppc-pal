@@ -35,20 +35,12 @@ interface AmazonCampaign {
   endDate?: string;
 }
 
-interface CampaignMetrics {
-  campaignId: string;
-  impressions: number;
-  clicks: number;
-  cost: number;
-  sales14d?: number;
-  orders14d?: number;
-}
-
 interface SyncResponse {
   success: boolean;
   message: string;
   campaignsSynced?: number;
   campaignCount?: number;
+  profilesFound?: number;
   syncStatus?: string;
   error?: string;
   errorType?: string;
@@ -100,7 +92,16 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
     if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Missing Supabase configuration');
+      console.error('Missing Supabase configuration');
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          error: 'Server configuration error', 
+          errorType: 'config_error',
+          message: 'Missing Supabase configuration'
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -108,8 +109,14 @@ serve(async (req) => {
     // Get user from auth header
     const authHeader = req.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.error('Missing or invalid authorization header');
       return new Response(
-        JSON.stringify({ error: 'Authentication required', errorType: 'auth_error' }),
+        JSON.stringify({ 
+          success: false,
+          error: 'Authentication required', 
+          errorType: 'auth_error',
+          message: 'Please log in to sync your Amazon connection'
+        }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -120,7 +127,12 @@ serve(async (req) => {
     if (userError || !userData?.user) {
       console.error('Authentication failed:', userError);
       return new Response(
-        JSON.stringify({ error: 'Invalid authentication', errorType: 'auth_error' }),
+        JSON.stringify({ 
+          success: false,
+          error: 'Invalid authentication', 
+          errorType: 'auth_error',
+          message: 'Please log in again to continue'
+        }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -129,7 +141,23 @@ serve(async (req) => {
     console.log('Authenticated user:', userId);
 
     // Parse request body to get connectionId
-    const { connectionId } = await req.json().catch(() => ({}));
+    let requestBody;
+    try {
+      requestBody = await req.json();
+    } catch (parseError) {
+      console.error('Failed to parse request body:', parseError);
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          error: 'Invalid request format', 
+          errorType: 'request_error',
+          message: 'Request body must be valid JSON'
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { connectionId } = requestBody;
     console.log('Request connectionId:', connectionId);
 
     // Build connection query - either specific connection or all user connections
@@ -137,7 +165,7 @@ serve(async (req) => {
       .from('amazon_connections')
       .select('*')
       .eq('user_id', userId)
-      .in('status', ['active', 'setup_required', 'warning', 'pending']); // Include all relevant statuses
+      .in('status', ['active', 'setup_required', 'warning', 'pending', 'error']); // Include error status for retry attempts
 
     if (connectionId) {
       connectionsQuery = connectionsQuery.eq('id', connectionId);
@@ -152,9 +180,11 @@ serve(async (req) => {
       console.error('Error fetching connections:', connectionsError);
       return new Response(
         JSON.stringify({ 
+          success: false,
           error: 'Failed to fetch connections', 
           errorType: 'database_error',
-          details: connectionsError.message 
+          details: connectionsError.message,
+          message: 'Unable to access your Amazon connections'
         }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -163,16 +193,18 @@ serve(async (req) => {
     if (!connections || connections.length === 0) {
       const message = connectionId 
         ? 'Connection not found or access denied' 
-        : 'No active Amazon connections found';
+        : 'No Amazon connections found';
       
+      console.log('No connections found for sync');
       return new Response(
         JSON.stringify({ 
           success: false,
           message,
           syncStatus: 'no_connections',
-          campaignsSynced: 0
+          campaignsSynced: 0,
+          error: 'No connections available'
         }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -180,6 +212,7 @@ serve(async (req) => {
 
     const syncResults = [];
     let totalCampaignsSynced = 0;
+    let totalProfilesFound = 0;
 
     for (const connection of connections) {
       console.log(`=== Syncing connection ${connection.id} ===`);
@@ -206,6 +239,9 @@ serve(async (req) => {
         // Check if token needs refresh
         const tokenExpiry = new Date(connection.token_expires_at);
         const now = new Date();
+        const hoursUntilExpiry = (tokenExpiry.getTime() - now.getTime()) / (1000 * 60 * 60);
+        
+        console.log(`Token expires in ${hoursUntilExpiry.toFixed(2)} hours`);
         
         if (tokenExpiry <= now) {
           console.log('Token expired, attempting refresh...');
@@ -213,12 +249,12 @@ serve(async (req) => {
           const refreshResult = await refreshAccessToken(connection.refresh_token);
           if (!refreshResult.success) {
             console.error('Token refresh failed:', refreshResult.error);
-            await updateConnectionStatus(supabase, connection.id, 'error', 'Token expired - reconnection required');
+            await updateConnectionStatus(supabase, connection.id, 'error', `Token refresh failed: ${refreshResult.error}`);
             
             syncResults.push({
               connectionId: connection.id,
               success: false,
-              error: 'Token expired',
+              error: 'Token expired - refresh failed',
               requiresReconnection: true
             });
             continue;
@@ -236,28 +272,37 @@ serve(async (req) => {
 
           if (updateError) {
             console.error('Failed to update tokens:', updateError);
+            await updateConnectionStatus(supabase, connection.id, 'error', 'Failed to update authentication tokens');
             continue;
           }
 
           connection.access_token = refreshResult.access_token;
+          connection.token_expires_at = refreshResult.expires_at;
+          console.log('Token refreshed successfully');
         }
 
         // Sync campaigns with enhanced logging
         const campaignSyncResult = await syncCampaignsWithDetailedLogging(supabase, connection);
         totalCampaignsSynced += campaignSyncResult.campaignsCount || 0;
         
+        // Track profiles found
+        if (campaignSyncResult.profilesFound) {
+          totalProfilesFound += campaignSyncResult.profilesFound;
+        }
+        
         syncResults.push({
           connectionId: connection.id,
           profileId: connection.profile_id,
           success: campaignSyncResult.success,
           campaignsCount: campaignSyncResult.campaignsCount,
+          profilesFound: campaignSyncResult.profilesFound,
           error: campaignSyncResult.error
         });
 
         // Update connection status and last sync timestamp
         const newStatus = campaignSyncResult.success ? 'active' : 'warning';
         const statusMessage = campaignSyncResult.success 
-          ? 'Sync successful' 
+          ? null 
           : campaignSyncResult.error || 'Sync completed with issues';
 
         await supabase
@@ -265,13 +310,15 @@ serve(async (req) => {
           .update({ 
             last_sync_at: new Date().toISOString(),
             status: newStatus,
+            campaign_count: campaignSyncResult.campaignsCount || 0,
+            setup_required_reason: statusMessage,
             updated_at: new Date().toISOString()
           })
           .eq('id', connection.id);
 
       } catch (connectionError) {
         console.error(`Error syncing connection ${connection.id}:`, connectionError);
-        await updateConnectionStatus(supabase, connection.id, 'error', connectionError.message);
+        await updateConnectionStatus(supabase, connection.id, 'error', `Sync error: ${connectionError.message}`);
         
         syncResults.push({
           connectionId: connection.id,
@@ -285,6 +332,7 @@ serve(async (req) => {
     console.log('=== Sync Complete ===');
     console.log('Results:', syncResults);
     console.log('Total campaigns synced:', totalCampaignsSynced);
+    console.log('Total profiles found:', totalProfilesFound);
 
     // Prepare standardized response
     const allSuccessful = syncResults.every(result => result.success);
@@ -295,24 +343,28 @@ serve(async (req) => {
       success: allSuccessful,
       campaignsSynced: totalCampaignsSynced,
       campaignCount: totalCampaignsSynced,
-      syncStatus: totalCampaignsSynced > 0 ? 'success' : 'success_no_campaigns'
+      profilesFound: totalProfilesFound,
+      syncStatus: allSuccessful ? 'success' : 'partial_success'
     };
 
     if (allSuccessful) {
       response.message = totalCampaignsSynced > 0 
-        ? `Successfully synced ${totalCampaignsSynced} campaigns`
+        ? `Successfully synced ${totalCampaignsSynced} campaigns from ${totalProfilesFound} profiles`
         : 'Sync completed successfully - no campaigns found in your Amazon account';
     } else if (hasReconnectionRequired) {
+      response.success = false;
       response.error = 'Token expired or invalid';
       response.requiresReconnection = true;
       response.details = 'Please reconnect your Amazon account to continue syncing';
       response.message = 'Reconnection required';
     } else if (hasSetupRequired) {
+      response.success = false;
       response.error = 'Profile setup required';
       response.requiresSetup = true;
       response.details = 'Please set up your Amazon Advertising account at advertising.amazon.com first';
       response.message = 'Amazon Advertising setup required';
     } else {
+      response.success = false;
       response.error = 'Sync completed with errors';
       response.message = 'Some connections failed to sync';
       response.details = syncResults
@@ -350,6 +402,8 @@ async function refreshAccessToken(refreshToken: string) {
       throw new Error('Missing Amazon credentials');
     }
 
+    console.log('Attempting to refresh Amazon access token...');
+    
     const response = await fetch('https://api.amazon.com/auth/o2/token', {
       method: 'POST',
       headers: {
@@ -365,10 +419,12 @@ async function refreshAccessToken(refreshToken: string) {
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error('Token refresh failed:', response.status, errorText);
       throw new Error(`Token refresh failed: ${response.status} ${errorText}`);
     }
 
     const data = await response.json();
+    console.log('Token refresh successful');
     
     return {
       success: true,
@@ -376,6 +432,7 @@ async function refreshAccessToken(refreshToken: string) {
       expires_at: new Date(Date.now() + (data.expires_in * 1000)).toISOString()
     };
   } catch (error) {
+    console.error('Token refresh error:', error);
     return {
       success: false,
       error: error.message
@@ -396,10 +453,15 @@ async function syncCampaignsWithDetailedLogging(supabase: any, connection: any) 
     console.log(`Country Code: ${countryCode}`);
     console.log(`Using endpoint: ${baseEndpoint}`);
     
+    const clientId = Deno.env.get('AMAZON_CLIENT_ID');
+    if (!clientId) {
+      throw new Error('Missing Amazon client ID configuration');
+    }
+    
     // Prepare headers for Amazon API call
     const headers = {
       'Authorization': `Bearer ${connection.access_token}`,
-      'Amazon-Advertising-API-ClientId': Deno.env.get('AMAZON_CLIENT_ID')!,
+      'Amazon-Advertising-API-ClientId': clientId,
       'Amazon-Advertising-API-Scope': connection.profile_id,
       'Content-Type': 'application/json',
     };
@@ -423,7 +485,7 @@ async function syncCampaignsWithDetailedLogging(supabase: any, connection: any) 
     console.log('Status Text:', campaignsResponse.statusText);
     console.log('OK:', campaignsResponse.ok);
 
-    // Log response headers
+    // Log response headers for debugging
     console.log('=== AMAZON API RESPONSE HEADERS ===');
     for (const [key, value] of campaignsResponse.headers.entries()) {
       console.log(`${key}: ${value}`);
@@ -434,15 +496,18 @@ async function syncCampaignsWithDetailedLogging(supabase: any, connection: any) 
       console.error('=== AMAZON API ERROR RESPONSE ===');
       console.error('Error Text:', errorText);
       
-      // Try to parse error as JSON
-      try {
-        const errorJson = JSON.parse(errorText);
-        console.error('Error JSON:', JSON.stringify(errorJson, null, 2));
-      } catch (parseError) {
-        console.error('Could not parse error as JSON');
+      // Enhanced error handling
+      if (campaignsResponse.status === 401) {
+        throw new Error('Authentication failed - token may be expired or invalid');
+      } else if (campaignsResponse.status === 403) {
+        throw new Error('Access forbidden - profile may require setup or permissions');
+      } else if (campaignsResponse.status === 404) {
+        throw new Error('API endpoint not found - check region configuration');
+      } else if (campaignsResponse.status === 429) {
+        throw new Error('Rate limit exceeded - please try again later');
+      } else {
+        throw new Error(`Amazon API error: ${campaignsResponse.status} ${errorText}`);
       }
-      
-      throw new Error(`Amazon API error: ${campaignsResponse.status} ${errorText}`);
     }
 
     // Parse the response
@@ -488,6 +553,7 @@ async function syncCampaignsWithDetailedLogging(supabase: any, connection: any) 
       return {
         success: true,
         campaignsCount: 0,
+        profilesFound: 1,
         message: 'No campaigns found in Amazon account'
       };
     }
@@ -546,6 +612,7 @@ async function syncCampaignsWithDetailedLogging(supabase: any, connection: any) 
     return {
       success: successCount > 0,
       campaignsCount: successCount,
+      profilesFound: 1,
       message: errorCount > 0 
         ? `Synced ${successCount} campaigns with ${errorCount} errors`
         : `Successfully synced ${successCount} campaigns`
@@ -560,6 +627,7 @@ async function syncCampaignsWithDetailedLogging(supabase: any, connection: any) 
     return {
       success: false,
       campaignsCount: 0,
+      profilesFound: 0,
       error: error.message
     };
   }
@@ -590,6 +658,7 @@ async function updateConnectionStatus(supabase: any, connectionId: string, statu
       .from('amazon_connections')
       .update({
         status,
+        setup_required_reason: message,
         updated_at: new Date().toISOString()
       })
       .eq('id', connectionId);
