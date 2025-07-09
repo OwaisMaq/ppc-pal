@@ -85,11 +85,11 @@ export class EnhancedSyncService {
       const data = validationResult.data;
       
       // Check for errors in the validated data - use proper type guard
-      if (!data.success || (data.success && 'error' in data && data.error)) {
+      if (!data.success || data.error) {
         console.log('=== Sync Failed ===');
-        console.log('Error:', 'error' in data ? data.error : 'Unknown error');
-        console.log('Requires setup:', 'requiresSetup' in data ? data.requiresSetup : false);
-        console.log('Requires reconnection:', 'requiresReconnection' in data ? data.requiresReconnection : false);
+        console.log('Error:', data.error);
+        console.log('Requires setup:', data.requiresSetup);
+        console.log('Requires reconnection:', data.requiresReconnection);
         
         await this.handleSyncFailure(data, connectionId);
         await refreshConnections();
@@ -140,11 +140,11 @@ export class EnhancedSyncService {
       await this.operations.updateConnectionStatus(
         connectionId, 
         'error', 
-        ('error' in data ? data.error : null) || 'Unknown sync error'
+        data.error || 'Unknown sync error'
       );
       
       this.toast.error("Sync Failed", {
-        description: data.details || ('error' in data ? data.error : null) || "An error occurred during sync"
+        description: data.details || data.error || "An error occurred during sync"
       });
     }
   }

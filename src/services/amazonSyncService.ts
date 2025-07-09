@@ -80,7 +80,7 @@ export class AmazonSyncService {
       const data = validationResult.data;
 
       // Handle sync results - check the data properties with proper type guards
-      if (!data.success || (data.success && 'error' in data && data.error)) {
+      if (!data.success || data.error) {
         console.log('=== Sync Failed ===');
         await this.handleSyncFailure(data, connectionId);
       } else {
@@ -145,11 +145,11 @@ export class AmazonSyncService {
       await this.operations.updateConnectionStatus(
         connectionId, 
         'error', 
-        ('error' in data ? data.error : null) || 'Unknown sync error'
+        data.error || 'Unknown sync error'
       );
       
       this.toast.error("Sync Failed", {
-        description: data.details || ('error' in data ? data.error : null) || "An error occurred during sync"
+        description: data.details || data.error || "An error occurred during sync"
       });
     }
   }
