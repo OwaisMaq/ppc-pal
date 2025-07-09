@@ -79,7 +79,7 @@ export class AmazonSyncService {
       // Now we know the validation was successful, so we can access the data
       const data = validationResult.data;
 
-      // Handle sync results - check the data properties with proper type guards
+      // Handle sync results - check the data properties directly
       if (!data.success || data.error) {
         console.log('=== Sync Failed ===');
         await this.handleSyncFailure(data, connectionId);
