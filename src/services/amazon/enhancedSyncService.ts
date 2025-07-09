@@ -1,6 +1,7 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { validateSyncResponse } from '@/lib/validation/amazonApiSchemas';
+import { validateSyncResponse, type SyncResponse } from '@/lib/validation/amazonApiSchemas';
 import { errorTracker } from '@/services/errorTracker';
 import { AmazonConnectionOperations } from '../amazonConnectionOperations';
 import { EnhancedSyncValidator } from './enhancedSyncValidator';
@@ -114,7 +115,7 @@ export class EnhancedSyncService {
     }
   }
 
-  private async handleSyncFailure(data: any, connectionId: string): Promise<void> {
+  private async handleSyncFailure(data: SyncResponse, connectionId: string): Promise<void> {
     if (data.requiresSetup) {
       await this.operations.updateConnectionStatus(
         connectionId, 
@@ -148,7 +149,7 @@ export class EnhancedSyncService {
     }
   }
 
-  private async handleSyncSuccess(data: any, connectionId: string): Promise<void> {
+  private async handleSyncSuccess(data: SyncResponse, connectionId: string): Promise<void> {
     const campaignCount = data.campaignCount || data.campaigns_synced || 0;
     const profilesFound = data.profilesFound || 0;
     

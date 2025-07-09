@@ -1,8 +1,9 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { errorTracker } from '@/services/errorTracker';
 import { AmazonConnectionOperations } from './amazonConnectionOperations';
-import { validateSyncResponse } from '@/lib/validation/amazonApiSchemas';
+import { validateSyncResponse, type SyncResponse } from '@/lib/validation/amazonApiSchemas';
 
 export class AmazonSyncService {
   private toast: typeof toast;
@@ -75,7 +76,7 @@ export class AmazonSyncService {
         return;
       }
 
-      // Now we know the validation was successful, so we can access the data
+      // Now we have successfully validated data - extract it safely
       const data = validationResult.data;
 
       // Handle sync results - check the data properties directly
@@ -103,7 +104,7 @@ export class AmazonSyncService {
     }
   }
 
-  private async handleSyncSuccess(data: any, connectionId: string): Promise<void> {
+  private async handleSyncSuccess(data: SyncResponse, connectionId: string): Promise<void> {
     const campaignCount = data.campaignCount || data.campaigns_synced || 0;
     
     // Update connection status
@@ -119,7 +120,7 @@ export class AmazonSyncService {
     });
   }
 
-  private async handleSyncFailure(data: any, connectionId: string): Promise<void> {
+  private async handleSyncFailure(data: SyncResponse, connectionId: string): Promise<void> {
     if (data.requiresSetup) {
       await this.operations.updateConnectionStatus(
         connectionId, 
