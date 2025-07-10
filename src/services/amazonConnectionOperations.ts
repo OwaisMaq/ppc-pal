@@ -1,6 +1,8 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
+import { validateOAuthResponse, type OAuthResponse } from '@/lib/validation/amazonApiSchemas';
+import { errorTracker } from './errorTracker';
 
 export class AmazonConnectionOperations {
   private toast: typeof toast;
@@ -9,19 +11,19 @@ export class AmazonConnectionOperations {
     this.toast = toastFn;
   }
 
-  async getAuthHeaders() {
+  async getAuthHeaders(): Promise<{ [key: string]: string }> {
     console.log('=== Getting Auth Headers ===');
     
     const { data: { session }, error } = await supabase.auth.getSession();
     
     if (error) {
       console.error('Session error:', error);
-      throw new Error('Failed to get session');
+      throw new Error(`Authentication failed: ${error.message}`);
     }
     
     if (!session?.access_token) {
-      console.error('No session or access token found');
-      throw new Error('Please sign in to continue');
+      console.error('No valid session found');
+      throw new Error('No valid session found. Please log in again.');
     }
     
     console.log('Valid session found, token length:', session.access_token.length);
@@ -32,35 +34,27 @@ export class AmazonConnectionOperations {
     };
   }
 
-  async initiateConnection(redirectUri: string) {
+  async initiateConnection(redirectUri: string): Promise<string> {
     console.log('=== Initiating Amazon Connection ===');
     console.log('Redirect URI:', redirectUri);
-    
+
     try {
-      // Get auth headers
       const headers = await this.getAuthHeaders();
       console.log('Auth headers prepared successfully');
       
-      // Prepare request body
-      const requestBody = { redirectUri };
       console.log('=== Making Request to Amazon OAuth Init ===');
-      console.log('Request body:', requestBody);
+      console.log('Request body:', JSON.stringify({ redirectUri }, null, 2));
       console.log('Headers (auth redacted):', {
-        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIs...',
-        'Content-Type': 'application/json'
+        ...headers,
+        'Authorization': headers.Authorization ? `Bearer ${headers.Authorization.substring(7, 27)}...` : 'Missing'
       });
       
       console.log('Calling edge function...');
-      
-      // Make the request to the edge function
       const response = await supabase.functions.invoke('amazon-oauth-init', {
-        body: requestBody,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': headers.Authorization
-        }
+        body: { redirectUri },
+        headers
       });
-      
+
       console.log('=== Edge Function Response ===');
       console.log('Response object:', {
         hasData: !!response.data,
@@ -68,130 +62,178 @@ export class AmazonConnectionOperations {
         dataType: typeof response.data,
         errorType: typeof response.error
       });
-      
+
       if (response.error) {
         console.error('=== Supabase Client Error ===');
         console.error('Client error:', response.error);
-        throw new Error(typeof response.error === 'string' ? response.error : 'Edge Function returned a non-2xx status code');
+        
+        errorTracker.captureAmazonError(response.error, {
+          operation: 'initiate_connection',
+          redirectUri,
+          endpoint: 'amazon-oauth-init'
+        });
+        
+        // Handle specific error types
+        if (response.error.message?.includes('non-2xx status code')) {
+          throw new Error('Server configuration error. Please check that Amazon credentials are properly configured.');
+        }
+        
+        throw new Error(response.error.message || 'Failed to initiate Amazon connection');
       }
-      
-      if (!response.data) {
-        console.error('=== No Response Data ===');
-        throw new Error('No data received from OAuth initialization');
+
+      // Validate response format
+      const validationResult = validateOAuthResponse(response.data);
+      if (!validationResult.success) {
+        console.error('=== Invalid OAuth Response Format ===');
+        console.error('Validation errors:', validationResult.error.issues);
+        
+        errorTracker.captureAmazonError('Invalid OAuth response format', {
+          operation: 'initiate_connection',
+          redirectUri
+        });
+        
+        throw new Error('Received invalid response format from server');
       }
+
+      const data = validationResult.data;
       
-      if (!response.data.authUrl) {
+      if (!data.authUrl) {
         console.error('=== Missing Auth URL ===');
-        console.error('Response data:', response.data);
-        throw new Error('No authorization URL received');
+        console.error('Response data:', data);
+        
+        errorTracker.captureAmazonError('Missing auth URL in response', {
+          operation: 'initiate_connection',
+          redirectUri
+        });
+        
+        throw new Error('Server did not provide authorization URL');
       }
-      
-      console.log('=== Redirecting to Amazon OAuth ===');
-      console.log('Auth URL length:', response.data.authUrl.length);
+
+      console.log('=== Redirecting to Amazon ===');
+      console.log('Auth URL length:', data.authUrl.length);
       
       // Redirect to Amazon OAuth
-      window.location.href = response.data.authUrl;
+      window.location.href = data.authUrl;
       
-    } catch (err) {
+      return data.authUrl;
+      
+    } catch (error) {
       console.error('=== Connection Initiation Failed ===');
-      console.error('Error:', err);
+      console.error('Error:', error);
       
-      let userMessage = 'Failed to initiate Amazon connection';
-      
-      if (err instanceof Error) {
-        if (err.message.includes('sign in')) {
-          userMessage = 'Please sign in and try again';
-        } else if (err.message.includes('network') || err.message.includes('fetch')) {
-          userMessage = 'Network error. Please check your connection and try again.';
-        } else {
-          userMessage = err.message;
-        }
-      }
-      
-      this.toast({
-        title: "Connection Failed",
-        description: userMessage,
-        variant: "destructive",
+      errorTracker.captureAmazonError(error as Error, {
+        operation: 'initiate_connection',
+        redirectUri
       });
       
-      throw new Error(userMessage);
+      // Re-throw with user-friendly message
+      if (error instanceof Error) {
+        throw error;
+      }
+      
+      throw new Error('An unexpected error occurred while connecting to Amazon');
+    }
+  }
+
+  async handleOAuthCallback(code: string, state: string): Promise<{ profileCount: number }> {
+    console.log('=== Handling OAuth Callback ===');
+    
+    try {
+      const headers = await this.getAuthHeaders();
+      
+      const response = await supabase.functions.invoke('amazon-oauth-callback', {
+        body: { code, state },
+        headers
+      });
+
+      if (response.error) {
+        console.error('OAuth callback error:', response.error);
+        
+        errorTracker.captureAmazonError(response.error, {
+          operation: 'oauth_callback'
+        });
+        
+        throw new Error(response.error.message || 'OAuth callback failed');
+      }
+
+      const validationResult = validateOAuthResponse(response.data);
+      if (!validationResult.success) {
+        console.error('Invalid OAuth callback response:', validationResult.error.issues);
+        
+        errorTracker.captureAmazonError('Invalid OAuth callback response format', {
+          operation: 'oauth_callback'
+        });
+        
+        throw new Error('Received invalid response format');
+      }
+
+      const data = validationResult.data;
+      
+      if (!data.success) {
+        throw new Error(data.error || 'OAuth callback failed');
+      }
+
+      return {
+        profileCount: data.profile_count || 0
+      };
+      
+    } catch (error) {
+      console.error('OAuth callback processing error:', error);
+      
+      errorTracker.captureAmazonError(error as Error, {
+        operation: 'oauth_callback'
+      });
+      
+      throw error;
     }
   }
 
   async updateConnectionStatus(
     connectionId: string, 
-    status: 'active' | 'expired' | 'error' | 'pending' | 'warning' | 'setup_required', 
-    reason?: string | null
-  ) {
+    status: 'active' | 'setup_required' | 'error' | 'expired' | 'warning',
+    reason?: string
+  ): Promise<void> {
     console.log('=== Updating Connection Status ===');
     console.log('Connection ID:', connectionId);
-    console.log('New status:', status);
+    console.log('New Status:', status);
     console.log('Reason:', reason);
     
     try {
-      const updateData: any = {
-        status,
-        updated_at: new Date().toISOString()
-      };
-      
-      if (reason) {
-        updateData.setup_required_reason = reason;
-      } else if (status === 'active') {
-        updateData.setup_required_reason = null;
-      }
-      
       const { error } = await supabase
         .from('amazon_connections')
-        .update(updateData)
+        .update({
+          status,
+          setup_required_reason: reason,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', connectionId);
-      
+
       if (error) {
         console.error('Failed to update connection status:', error);
-        throw error;
+        
+        errorTracker.captureAmazonError(error, {
+          connectionId,
+          operation: 'update_connection_status',
+          status,
+          reason
+        });
+        
+        throw new Error(`Failed to update connection status: ${error.message}`);
       }
       
       console.log('Connection status updated successfully');
-    } catch (err) {
-      console.error('Error updating connection status:', err);
-    }
-  }
-
-  async deleteConnection(connectionId: string): Promise<boolean> {
-    console.log('=== Deleting Amazon Connection ===');
-    console.log('Connection ID:', connectionId);
-    
-    try {
-      const { error } = await supabase
-        .from('amazon_connections')
-        .delete()
-        .eq('id', connectionId);
       
-      if (error) {
-        console.error('Failed to delete connection:', error);
-        this.toast({
-          title: "Delete Failed",
-          description: "Failed to delete the Amazon connection",
-          variant: "destructive",
-        });
-        return false;
-      }
+    } catch (error) {
+      console.error('Error updating connection status:', error);
       
-      this.toast({
-        title: "Connection Deleted",
-        description: "Amazon connection has been removed successfully",
+      errorTracker.captureAmazonError(error as Error, {
+        connectionId,
+        operation: 'update_connection_status',
+        status,
+        reason
       });
       
-      console.log('Connection deleted successfully');
-      return true;
-      
-    } catch (err) {
-      console.error('Error deleting connection:', err);
-      this.toast({
-        title: "Delete Failed",
-        description: "An error occurred while deleting the connection",
-        variant: "destructive",
-      });
-      return false;
+      throw error;
     }
   }
 }

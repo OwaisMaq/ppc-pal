@@ -22,7 +22,7 @@ serve(async (req) => {
   }
 
   try {
-    // Environment variables check
+    // Environment variables check with detailed logging
     console.log('=== Checking Environment Variables ===');
     const amazonClientId = Deno.env.get('AMAZON_CLIENT_ID');
     const amazonClientSecret = Deno.env.get('AMAZON_CLIENT_SECRET');
@@ -35,13 +35,30 @@ serve(async (req) => {
       supabaseUrl: supabaseUrl ? 'present' : 'MISSING',
       supabaseServiceKey: supabaseServiceKey ? 'present' : 'MISSING'
     });
-    
-    if (!amazonClientId || !amazonClientSecret) {
-      console.error('=== MISSING AMAZON CREDENTIALS ===');
+
+    // Check for missing Amazon credentials with specific error
+    if (!amazonClientId) {
+      console.error('=== MISSING AMAZON_CLIENT_ID ===');
       return new Response(
         JSON.stringify({ 
           error: 'Server configuration error',
-          details: 'Amazon API credentials not configured'
+          details: 'Amazon Client ID not configured in Supabase secrets',
+          errorType: 'missing_amazon_client_id'
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    if (!amazonClientSecret) {
+      console.error('=== MISSING AMAZON_CLIENT_SECRET ===');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Server configuration error',
+          details: 'Amazon Client Secret not configured in Supabase secrets',
+          errorType: 'missing_amazon_client_secret'
         }),
         {
           status: 500,
@@ -55,7 +72,8 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           error: 'Server configuration error',
-          details: 'Database configuration missing'
+          details: 'Database configuration missing',
+          errorType: 'missing_supabase_config'
         }),
         {
           status: 500,
@@ -75,14 +93,14 @@ serve(async (req) => {
       // Read the body as text first
       const bodyText = await req.text();
       console.log('Raw body text length:', bodyText.length);
-      console.log('Raw body text preview:', bodyText.substring(0, 200));
       
       if (!bodyText || bodyText.trim().length === 0) {
         console.error('=== EMPTY REQUEST BODY ===');
         return new Response(
           JSON.stringify({ 
             error: 'Invalid request',
-            details: 'Request body is required and cannot be empty'
+            details: 'Request body is required and cannot be empty',
+            errorType: 'empty_body'
           }),
           {
             status: 400,
@@ -102,7 +120,8 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           error: 'Invalid JSON',
-          details: 'Request body must be valid JSON'
+          details: 'Request body must be valid JSON',
+          errorType: 'invalid_json'
         }),
         {
           status: 400,
@@ -121,7 +140,8 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           error: 'Missing redirect URI',
-          details: 'redirectUri field is required'
+          details: 'redirectUri field is required',
+          errorType: 'missing_redirect_uri'
         }),
         {
           status: 400,
@@ -135,7 +155,8 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           error: 'Invalid redirect URI',
-          details: 'redirectUri must be a string'
+          details: 'redirectUri must be a string',
+          errorType: 'invalid_redirect_uri_type'
         }),
         {
           status: 400,
@@ -159,7 +180,8 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           error: 'Invalid redirect URI format',
-          details: 'Redirect URI must be a valid URL'
+          details: 'Redirect URI must be a valid URL',
+          errorType: 'invalid_redirect_uri_format'
         }),
         {
           status: 400,
@@ -178,7 +200,8 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           error: 'Authentication required',
-          details: 'Authorization header is required'
+          details: 'Authorization header is required',
+          errorType: 'missing_auth_header'
         }),
         {
           status: 401,
@@ -192,7 +215,8 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           error: 'Authentication failed',
-          details: 'Authorization header must start with "Bearer "'
+          details: 'Authorization header must start with "Bearer "',
+          errorType: 'invalid_auth_format'
         }),
         {
           status: 401,
@@ -209,7 +233,8 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           error: 'Authentication failed',
-          details: 'Invalid token format'
+          details: 'Invalid token format',
+          errorType: 'invalid_token'
         }),
         {
           status: 401,
@@ -236,7 +261,8 @@ serve(async (req) => {
         return new Response(
           JSON.stringify({ 
             error: 'Authentication failed',
-            details: authResult.error.message || 'Invalid token'
+            details: authResult.error.message || 'Invalid token',
+            errorType: 'auth_failed'
           }),
           {
             status: 401,
@@ -252,7 +278,8 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           error: 'Authentication failed',
-          details: 'Token validation failed'
+          details: 'Token validation failed',
+          errorType: 'auth_exception'
         }),
         {
           status: 401,
@@ -268,7 +295,8 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           error: 'Authentication failed',
-          details: 'User not found or invalid token'
+          details: 'User not found or invalid token',
+          errorType: 'user_not_found'
         }),
         {
           status: 401,
@@ -328,11 +356,13 @@ serve(async (req) => {
   } catch (error) {
     console.error('=== UNEXPECTED ERROR ===');
     console.error('Error details:', error);
+    console.error('Error stack:', error.stack);
     
     return new Response(
       JSON.stringify({
         error: 'Internal server error',
-        details: 'An unexpected error occurred'
+        details: error.message || 'An unexpected error occurred',
+        errorType: 'internal_error'
       }),
       {
         status: 500,

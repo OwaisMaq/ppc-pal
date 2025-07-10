@@ -1,10 +1,11 @@
-
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ExternalLink, AlertTriangle, CheckCircle, RefreshCw, Bug } from 'lucide-react';
 import { useAmazonConnections } from '@/hooks/useAmazonConnections';
 import { useToast } from '@/hooks/use-toast';
+import { AmazonEnvironmentValidator } from '@/services/amazon/amazonEnvironmentValidator';
+import { toast as sonnerToast } from 'sonner';
 import ConnectionSummaryTable from '@/components/performance/ConnectionSummaryTable';
 import ConnectionRecovery from '@/components/ConnectionRecovery';
 import EnhancedAmazonSync from '@/components/EnhancedAmazonSync';
@@ -24,6 +25,16 @@ const AmazonAccountSetup = () => {
   const handleConnect = async () => {
     try {
       console.log('=== Amazon Connect Button Clicked ===');
+      
+      // Validate environment first
+      const environmentValidator = new AmazonEnvironmentValidator(sonnerToast);
+      const isEnvironmentValid = await environmentValidator.validateEnvironment();
+      
+      if (!isEnvironmentValid) {
+        console.log('Environment validation failed, aborting connection');
+        return;
+      }
+      
       console.log('Current environment:', window.location.origin);
       const redirectUri = 'https://ppcpal.online/amazon-callback';
       console.log('Using redirect URI:', redirectUri);
