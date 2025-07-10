@@ -82,23 +82,23 @@ export class EnhancedSyncService {
       }
 
       // Handle validated response - now we know validation was successful
-      const data = validationResult.data;
+      const responseData = validationResult.data;
       
-      // Check for errors in the validated data - access data properties directly
-      if (!data.success || data.error) {
+      // Check for errors in the actual response data
+      if (!responseData.success || responseData.error) {
         console.log('=== Sync Failed ===');
-        console.log('Error:', data.error);
-        console.log('Requires setup:', data.requiresSetup);
-        console.log('Requires reconnection:', data.requiresReconnection);
+        console.log('Error:', responseData.error);
+        console.log('Requires setup:', responseData.requiresSetup);
+        console.log('Requires reconnection:', responseData.requiresReconnection);
         
-        await this.handleSyncFailure(data, connectionId);
+        await this.handleSyncFailure(responseData, connectionId);
         await refreshConnections();
         return;
       }
 
       // Handle success
       console.log('=== Sync Successful ===');
-      await this.handleSyncSuccess(data, connectionId);
+      await this.handleSyncSuccess(responseData, connectionId);
       await refreshConnections();
 
     } catch (err) {

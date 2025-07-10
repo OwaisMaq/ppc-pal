@@ -77,15 +77,15 @@ export class AmazonSyncService {
       }
 
       // Now we have successfully validated data - extract it safely
-      const data = validationResult.data;
+      const responseData = validationResult.data;
 
-      // Handle sync results - check the validated data properties directly
-      if (!data.success || data.error) {
+      // Handle sync results - check the actual response data properties
+      if (!responseData.success || responseData.error) {
         console.log('=== Sync Failed ===');
-        await this.handleSyncFailure(data, connectionId);
+        await this.handleSyncFailure(responseData, connectionId);
       } else {
         console.log('=== Sync Successful ===');
-        await this.handleSyncSuccess(data, connectionId);
+        await this.handleSyncSuccess(responseData, connectionId);
       }
 
       await refreshConnections();
