@@ -1,13 +1,16 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 import { validateOAuthResponse, type OAuthResponse } from '@/lib/validation/amazonApiSchemas';
 import { errorTracker } from './errorTracker';
 
-export class AmazonConnectionOperations {
-  private toast: typeof toast;
+interface ToastFunction {
+  (props: { title: string; description: string; variant?: 'default' | 'destructive' }): void;
+}
 
-  constructor(toastFn: typeof toast) {
+export class AmazonConnectionOperations {
+  private toast: ToastFunction;
+
+  constructor(toastFn: ToastFunction) {
     this.toast = toastFn;
   }
 
@@ -69,7 +72,6 @@ export class AmazonConnectionOperations {
         
         errorTracker.captureAmazonError(response.error, {
           operation: 'initiate_connection',
-          redirectUri,
           endpoint: 'amazon-oauth-init'
         });
         
@@ -88,8 +90,7 @@ export class AmazonConnectionOperations {
         console.error('Validation errors:', validationResult.error.issues);
         
         errorTracker.captureAmazonError('Invalid OAuth response format', {
-          operation: 'initiate_connection',
-          redirectUri
+          operation: 'initiate_connection'
         });
         
         throw new Error('Received invalid response format from server');
@@ -102,8 +103,7 @@ export class AmazonConnectionOperations {
         console.error('Response data:', data);
         
         errorTracker.captureAmazonError('Missing auth URL in response', {
-          operation: 'initiate_connection',
-          redirectUri
+          operation: 'initiate_connection'
         });
         
         throw new Error('Server did not provide authorization URL');
@@ -122,8 +122,7 @@ export class AmazonConnectionOperations {
       console.error('Error:', error);
       
       errorTracker.captureAmazonError(error as Error, {
-        operation: 'initiate_connection',
-        redirectUri
+        operation: 'initiate_connection'
       });
       
       // Re-throw with user-friendly message
@@ -213,9 +212,7 @@ export class AmazonConnectionOperations {
         
         errorTracker.captureAmazonError(error, {
           connectionId,
-          operation: 'update_connection_status',
-          status,
-          reason
+          operation: 'update_connection_status'
         });
         
         throw new Error(`Failed to update connection status: ${error.message}`);
@@ -228,12 +225,64 @@ export class AmazonConnectionOperations {
       
       errorTracker.captureAmazonError(error as Error, {
         connectionId,
-        operation: 'update_connection_status',
-        status,
-        reason
+        operation: 'update_connection_status'
       });
       
       throw error;
+    }
+  }
+
+  async deleteConnection(connectionId: string): Promise<boolean> {
+    console.log('=== Deleting Amazon Connection ===');
+    console.log('Connection ID:', connectionId);
+
+    try {
+      const { error } = await supabase
+        .from('amazon_connections')
+        .delete()
+        .eq('id', connectionId);
+
+      if (error) {
+        console.error('Failed to delete connection:', error);
+        
+        errorTracker.captureAmazonError(error, {
+          connectionId,
+          operation: 'delete_connection'
+        });
+        
+        this.toast({
+          title: "Delete Failed",
+          description: `Failed to delete connection: ${error.message}`,
+          variant: "destructive",
+        });
+        
+        return false;
+      }
+      
+      console.log('Connection deleted successfully');
+      
+      this.toast({
+        title: "Connection Deleted",
+        description: "Amazon connection has been successfully removed.",
+      });
+      
+      return true;
+      
+    } catch (error) {
+      console.error('Error deleting connection:', error);
+      
+      errorTracker.captureAmazonError(error as Error, {
+        connectionId,
+        operation: 'delete_connection'
+      });
+      
+      this.toast({
+        title: "Delete Failed",
+        description: "An unexpected error occurred while deleting the connection.",
+        variant: "destructive",
+      });
+      
+      return false;
     }
   }
 }
