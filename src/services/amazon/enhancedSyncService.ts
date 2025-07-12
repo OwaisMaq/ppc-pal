@@ -84,8 +84,8 @@ export class EnhancedSyncService {
       // Handle validated response - now we know validation was successful
       const responseData = validationResult.data;
       
-      // Check for errors in the actual response data
-      if (!responseData.success || responseData.error) {
+      // Check for errors in the actual response data - safely access the error property
+      if (!responseData.success || (responseData.success && responseData.error)) {
         console.log('=== Sync Failed ===');
         console.log('Error:', responseData.error);
         console.log('Requires setup:', responseData.requiresSetup);

@@ -98,6 +98,18 @@ export class AmazonConnectionOperations {
 
       const data = validationResult.data;
       
+      // Safely check for error in validated data
+      if (!data.success || (data.success && data.error)) {
+        console.error('=== OAuth Init Failed ===');
+        console.error('Error:', data.error);
+        
+        errorTracker.captureAmazonError(data.error || 'OAuth initialization failed', {
+          operation: 'initiate_connection'
+        });
+        
+        throw new Error(data.error || 'Failed to initialize OAuth');
+      }
+      
       if (!data.authUrl) {
         console.error('=== Missing Auth URL ===');
         console.error('Response data:', data);
@@ -168,7 +180,8 @@ export class AmazonConnectionOperations {
 
       const data = validationResult.data;
       
-      if (!data.success) {
+      // Safely check for error in validated data
+      if (!data.success || (data.success && data.error)) {
         throw new Error(data.error || 'OAuth callback failed');
       }
 
