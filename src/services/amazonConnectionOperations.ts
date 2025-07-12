@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { validateOAuthResponse, type OAuthResponse } from '@/lib/validation/amazonApiSchemas';
 import { errorTracker } from './errorTracker';
