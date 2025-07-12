@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { errorTracker } from '@/services/errorTracker';
@@ -79,7 +80,7 @@ export class AmazonSyncService {
       const responseData = validationResult.data;
 
       // Handle sync results - safely check the actual response data properties
-      if (!responseData.success || (responseData.success && responseData.error)) {
+      if (!responseData.success || responseData.error) {
         console.log('=== Sync Failed ===');
         await this.handleSyncFailure(responseData, connectionId);
       } else {

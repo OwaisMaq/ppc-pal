@@ -98,7 +98,7 @@ export class AmazonConnectionOperations {
       const data = validationResult.data;
       
       // Safely check for error in validated data
-      if (!data.success || (data.success && data.error)) {
+      if (!data.success || data.error) {
         console.error('=== OAuth Init Failed ===');
         console.error('Error:', data.error);
         
@@ -180,7 +180,7 @@ export class AmazonConnectionOperations {
       const data = validationResult.data;
       
       // Safely check for error in validated data
-      if (!data.success || (data.success && data.error)) {
+      if (!data.success || data.error) {
         throw new Error(data.error || 'OAuth callback failed');
       }
 
