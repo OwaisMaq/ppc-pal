@@ -52,7 +52,7 @@ export class AmazonConnectionOperations {
       });
       
       console.log('Calling edge function...');
-      const response = await supabase.functions.invoke('amazon-oauth-start', {
+      const response = await supabase.functions.invoke('simple-test', {
         body: { redirectUri },
         headers
       });
