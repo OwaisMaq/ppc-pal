@@ -73,3 +73,6 @@ verify_jwt = true
 
 [functions.scheduled-optimization]
 verify_jwt = true
+
+[functions.test-oauth-init]
+verify_jwt = true
