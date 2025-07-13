@@ -3,6 +3,7 @@ import Header from "@/components/Header";
 import AmazonAccountSetup from "@/components/AmazonAccountSetup";
 import OptimizationDashboard from "@/components/OptimizationDashboard";
 import SubscriptionStatus from "@/components/SubscriptionStatus";
+import AmazonDataDashboard from "@/components/AmazonDataDashboard";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 
 const Dashboard = () => {
@@ -32,6 +33,14 @@ const Dashboard = () => {
           <div>
             <SubscriptionStatus />
           </div>
+
+          
+          {/* Amazon Data Dashboard - Full Width */}
+          {hasActiveConnections && (
+            <div className="lg:col-span-3">
+              <AmazonDataDashboard />
+            </div>
+          )}
 
           {/* Optimization Dashboard - Full Width */}
           {hasActiveConnections && (
