@@ -76,3 +76,6 @@ verify_jwt = true
 
 [functions.test-oauth-init]
 verify_jwt = true
+
+[functions.simple-test]
+verify_jwt = false
