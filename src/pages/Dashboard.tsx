@@ -14,7 +14,7 @@ import { RefreshCw, BarChart3, Calendar } from "lucide-react";
 import { toast } from "sonner";
 
 const Dashboard = () => {
-  const { connections, syncConnection } = useAmazonConnections();
+  const { connections, syncConnection, refreshConnections, loading: connectionsLoading } = useAmazonConnections();
   const { metrics, campaigns, loading, error, refetch } = useCampaignMetrics();
   
   const hasActiveConnections = connections.some(c => c.status === 'active');
@@ -75,6 +75,33 @@ const Dashboard = () => {
         </div>
 
         <div className="space-y-6">
+          {/* Debug Section - Temporary */}
+          <Card className="border-blue-200 bg-blue-50">
+            <CardContent className="pt-6">
+              <div className="text-sm">
+                <strong>Debug Info:</strong>
+                <br />
+                Connections count: {connections.length}
+                <br />
+                Active connections: {connections.filter(c => c.status === 'active').length}
+                <br />
+                Connection statuses: {connections.map(c => `${c.profile_name || 'Unknown'}: ${c.status}`).join(', ')}
+                <br />
+                Has active connections: {hasActiveConnections ? 'Yes' : 'No'}
+                <br />
+                <Button 
+                  onClick={refreshConnections} 
+                  size="sm" 
+                  variant="outline"
+                  disabled={connectionsLoading}
+                  className="mt-2"
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${connectionsLoading ? 'animate-spin' : ''}`} />
+                  Refresh Connections
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
           {/* Account Setup Section */}
           {!hasActiveConnections && (
             <div className="grid lg:grid-cols-3 gap-6">

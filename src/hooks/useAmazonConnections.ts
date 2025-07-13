@@ -12,6 +12,7 @@ export const useAmazonConnections = () => {
 
   useEffect(() => {
     if (user) {
+      console.log('useAmazonConnections: Fetching connections for user:', user.id);
       fetchConnections();
     }
   }, [user]);
@@ -19,12 +20,17 @@ export const useAmazonConnections = () => {
   const fetchConnections = async () => {
     try {
       setLoading(true);
+      console.log('Fetching Amazon connections...');
       const { data, error } = await supabase
         .from('amazon_connections')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+      
+      console.log('Fetched connections:', data);
+      console.log('Active connections:', data?.filter(c => c.status === 'active'));
+      
       setConnections(data || []);
     } catch (error) {
       console.error('Error fetching connections:', error);
