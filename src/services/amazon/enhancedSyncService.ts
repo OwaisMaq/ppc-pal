@@ -65,14 +65,14 @@ export class EnhancedSyncService {
       const validationResult = validateSyncResponse(response.data);
       if (!validationResult.success) {
         console.error('=== Invalid Response Format ===');
-        console.error('Validation errors:', validationResult.error.issues);
+        console.error('Validation errors:', (validationResult as { success: false; error: any }).error.issues);
         
         errorTracker.captureAmazonError('Invalid sync response format', {
           connectionId,
           operation: 'sync'
         });
         
-        await this.validator.handleValidationError(connectionId, validationResult.error);
+        await this.validator.handleValidationError(connectionId, (validationResult as { success: false; error: any }).error);
         this.toast.error("Sync Warning", {
           description: "Received unexpected response format. Please try again."
         });

@@ -61,7 +61,7 @@ export class AmazonSyncService {
       const validationResult = validateSyncResponse(response.data);
       if (!validationResult.success) {
         console.error('=== Invalid Response Format ===');
-        console.error('Validation errors:', validationResult.error.issues);
+        console.error('Validation errors:', (validationResult as { success: false; error: any }).error.issues);
         
         errorTracker.captureAmazonError('Invalid sync response format', {
           connectionId,

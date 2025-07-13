@@ -46,8 +46,13 @@ export type SyncResponse = z.infer<typeof SyncResponseSchema>;
 export type OAuthResponse = z.infer<typeof OAuthResponseSchema>;
 export type ProfileResponse = z.infer<typeof ProfileResponseSchema>;
 
+// Validation result types
+type ValidationSuccess<T> = { success: true; data: T };
+type ValidationFailure = { success: false; error: z.ZodError };
+type ValidationResult<T> = ValidationSuccess<T> | ValidationFailure;
+
 // Validation functions
-export function validateSyncResponse(data: unknown): { success: true; data: SyncResponse } | { success: false; error: z.ZodError } {
+export function validateSyncResponse(data: unknown): ValidationResult<SyncResponse> {
   try {
     const validated = SyncResponseSchema.parse(data);
     return { success: true, data: validated };
@@ -59,7 +64,7 @@ export function validateSyncResponse(data: unknown): { success: true; data: Sync
   }
 }
 
-export function validateOAuthResponse(data: unknown): { success: true; data: OAuthResponse } | { success: false; error: z.ZodError } {
+export function validateOAuthResponse(data: unknown): ValidationResult<OAuthResponse> {
   try {
     const validated = OAuthResponseSchema.parse(data);
     return { success: true, data: validated };
@@ -71,7 +76,7 @@ export function validateOAuthResponse(data: unknown): { success: true; data: OAu
   }
 }
 
-export function validateProfileResponse(data: unknown): { success: true; data: ProfileResponse } | { success: false; error: z.ZodError } {
+export function validateProfileResponse(data: unknown): ValidationResult<ProfileResponse> {
   try {
     const validated = ProfileResponseSchema.parse(data);
     return { success: true, data: validated };

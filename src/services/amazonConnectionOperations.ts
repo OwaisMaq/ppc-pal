@@ -86,7 +86,7 @@ export class AmazonConnectionOperations {
       const validationResult = validateOAuthResponse(response.data);
       if (!validationResult.success) {
         console.error('=== Invalid OAuth Response Format ===');
-        console.error('Validation errors:', validationResult.error.issues);
+        console.error('Validation errors:', (validationResult as { success: false; error: any }).error.issues);
         
         errorTracker.captureAmazonError('Invalid OAuth response format', {
           operation: 'initiate_connection'
@@ -168,7 +168,7 @@ export class AmazonConnectionOperations {
 
       const validationResult = validateOAuthResponse(response.data);
       if (!validationResult.success) {
-        console.error('Invalid OAuth callback response:', validationResult.error.issues);
+        console.error('Invalid OAuth callback response:', (validationResult as { success: false; error: any }).error.issues);
         
         errorTracker.captureAmazonError('Invalid OAuth callback response format', {
           operation: 'oauth_callback'
