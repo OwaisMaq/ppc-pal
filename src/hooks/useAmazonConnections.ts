@@ -101,6 +101,16 @@ export const useAmazonConnections = () => {
       });
 
       console.log('Callback response:', { data, error });
+      
+      // Log the actual error details
+      if (error) {
+        console.error('Detailed callback error:', {
+          message: error.message,
+          context: error.context,
+          details: error.details,
+          status: error.status
+        });
+      }
 
       if (error) {
         console.error('Callback error:', error);
