@@ -34,7 +34,7 @@ serve(async (req) => {
     const requestBody = await req.json()
     const { code, state, error: oauthError } = requestBody
     
-    console.log('=== Amazon OAuth Callback ===')
+    console.log('=== Amazon OAuth Callback (v2) ===')
     console.log('Request body:', { code: !!code, state: !!state, error: oauthError })
     console.log('Authorization code hash:', code ? btoa(code).substring(0, 10) : 'none')
 

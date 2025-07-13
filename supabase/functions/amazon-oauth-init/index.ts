@@ -9,7 +9,7 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  console.log('=== Amazon OAuth Init Function Started ===');
+  console.log('=== Amazon OAuth Init Function Started (v2) ===');
   console.log('Request method:', req.method);
   console.log('Request URL:', req.url);
   
