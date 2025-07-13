@@ -130,8 +130,26 @@ serve(async (req) => {
       );
     }
 
-    // Validate redirectUri
-    const { redirectUri } = requestBody;
+    // Handle test mode for environment validation
+    const { redirectUri, test } = requestBody;
+    
+    if (test) {
+      console.log('=== Test Mode - Environment Validation ===');
+      
+      // For test mode, we just need to verify credentials are available
+      // All the checks above already verified the Amazon credentials exist
+      console.log('Environment validation passed - credentials available');
+      return new Response(
+        JSON.stringify({ 
+          success: true,
+          message: 'Amazon API credentials are properly configured',
+          credentialsConfigured: true
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate redirectUri for normal OAuth flow
     console.log('=== Validating Redirect URI ===');
     console.log('Received redirectUri:', redirectUri);
     
