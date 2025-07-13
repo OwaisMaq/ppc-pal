@@ -56,18 +56,19 @@ export class AmazonEnvironmentValidator {
       });
 
       // Test edge function accessibility with test mode only
-      const response = await supabase.functions.invoke('amazon-oauth-init', {
-        body: { 
-          test: true 
-        },
+      console.log('=== Testing Environment Function ===');
+      const response = await supabase.functions.invoke('test-environment', {
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json'
         }
       });
 
+      console.log('OAuth init test response:', response);
+
       if (response.error) {
         console.error('Environment validation failed:', response.error);
+        console.error('Response data:', response.data);
         
         let errorMessage = 'Server configuration issue detected';
         
