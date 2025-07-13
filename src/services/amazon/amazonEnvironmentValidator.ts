@@ -55,10 +55,9 @@ export class AmazonEnvironmentValidator {
         clientSecretLength: credentialsData.clientSecretLength
       });
 
-      // Test edge function accessibility with minimal body
+      // Test edge function accessibility with test mode only
       const response = await supabase.functions.invoke('amazon-oauth-init', {
         body: { 
-          redirectUri: 'https://example.com/callback',
           test: true 
         },
         headers: {
