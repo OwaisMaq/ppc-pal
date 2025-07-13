@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
@@ -9,9 +8,8 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  console.log('=== Amazon OAuth Init Function Started (v2) ===');
+  console.log('=== Amazon OAuth Init Function Started ===');
   console.log('Request method:', req.method);
-  console.log('Request URL:', req.url);
   
   if (req.method === 'OPTIONS') {
     console.log('Handling CORS preflight request');
@@ -22,7 +20,7 @@ serve(async (req) => {
   }
 
   try {
-    // Environment variables check with detailed logging
+    // Environment variables check
     console.log('=== Checking Environment Variables ===');
     const amazonClientId = Deno.env.get('AMAZON_CLIENT_ID');
     const amazonClientSecret = Deno.env.get('AMAZON_CLIENT_SECRET');
@@ -30,13 +28,13 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
     console.log('Environment check:', {
-      amazonClientId: amazonClientId ? `${amazonClientId.substring(0, 10)}...` : 'MISSING',
-      amazonClientSecret: amazonClientSecret ? `${amazonClientSecret.substring(0, 10)}...` : 'MISSING',
+      amazonClientId: amazonClientId ? `Found (${amazonClientId.length} chars)` : 'MISSING',
+      amazonClientSecret: amazonClientSecret ? `Found (${amazonClientSecret.length} chars)` : 'MISSING',
       supabaseUrl: supabaseUrl ? 'present' : 'MISSING',
       supabaseServiceKey: supabaseServiceKey ? 'present' : 'MISSING'
     });
 
-    // Check for missing Amazon credentials with specific error
+    // Check for missing Amazon credentials
     if (!amazonClientId) {
       console.error('=== MISSING AMAZON_CLIENT_ID ===');
       return new Response(
@@ -82,15 +80,11 @@ serve(async (req) => {
       );
     }
 
-    // Parse request body with better error handling
+    // Parse request body
     console.log('=== Parsing Request Body ===');
     let requestBody;
     
     try {
-      const contentType = req.headers.get('content-type') || '';
-      console.log('Content-Type:', contentType);
-      
-      // Read the body as text first
       const bodyText = await req.text();
       console.log('Raw body text length:', bodyText.length);
       
@@ -109,7 +103,6 @@ serve(async (req) => {
         );
       }
       
-      // Try to parse as JSON
       requestBody = JSON.parse(bodyText);
       console.log('Parsed request body:', requestBody);
       
@@ -135,9 +128,6 @@ serve(async (req) => {
     
     if (test) {
       console.log('=== Test Mode - Environment Validation ===');
-      
-      // For test mode, we just need to verify credentials are available
-      // All the checks above already verified the Amazon credentials exist
       console.log('Environment validation passed - credentials available');
       return new Response(
         JSON.stringify({ 
@@ -149,7 +139,7 @@ serve(async (req) => {
       );
     }
 
-    // For normal OAuth flow, validate authorization header first
+    // For normal OAuth flow, validate authorization header
     console.log('=== Validating Authorization ===');
     const authHeader = req.headers.get('authorization');
     console.log('Auth header present:', !!authHeader);
@@ -186,21 +176,6 @@ serve(async (req) => {
 
     const token = authHeader.replace('Bearer ', '');
     console.log('Token extracted, length:', token.length);
-    
-    if (token.length < 10) {
-      console.error('=== INVALID TOKEN LENGTH ===');
-      return new Response(
-        JSON.stringify({ 
-          error: 'Authentication failed',
-          details: 'Invalid token format',
-          errorType: 'invalid_token'
-        }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
 
     // Validate redirectUri for normal OAuth flow
     console.log('=== Validating Redirect URI ===');
@@ -213,21 +188,6 @@ serve(async (req) => {
           error: 'Missing redirect URI',
           details: 'redirectUri field is required',
           errorType: 'missing_redirect_uri'
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-
-    if (typeof redirectUri !== 'string') {
-      console.error('=== INVALID REDIRECT URI TYPE ===');
-      return new Response(
-        JSON.stringify({ 
-          error: 'Invalid redirect URI',
-          details: 'redirectUri must be a string',
-          errorType: 'invalid_redirect_uri_type'
         }),
         {
           status: 400,
@@ -266,11 +226,9 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
     console.log('=== Verifying User Authentication ===');
-    let userResponse;
     
     try {
       const authResult = await supabase.auth.getUser(token);
-      userResponse = authResult.data;
       
       if (authResult.error) {
         console.error('=== SUPABASE AUTH ERROR ===');
@@ -289,6 +247,68 @@ serve(async (req) => {
         );
       }
       
+      if (!authResult.data?.user?.id) {
+        console.error('=== NO USER FOUND ===');
+        
+        return new Response(
+          JSON.stringify({ 
+            error: 'Authentication failed',
+            details: 'User not found or invalid token',
+            errorType: 'user_not_found'
+          }),
+          {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      console.log('=== USER AUTHENTICATED SUCCESSFULLY ===');
+      console.log('User ID:', authResult.data.user.id);
+
+      // Generate OAuth state parameter
+      console.log('=== Generating OAuth State ===');
+      const stateData = {
+        user_id: authResult.data.user.id,
+        redirect_uri: redirectUri,
+        timestamp: Date.now(),
+        nonce: crypto.randomUUID()
+      };
+      
+      const state = btoa(JSON.stringify(stateData));
+      console.log('OAuth state generated successfully');
+
+      // Build Amazon OAuth URL
+      console.log('=== Building Amazon OAuth URL ===');
+      const amazonOAuthUrl = new URL('https://www.amazon.com/ap/oa');
+      
+      amazonOAuthUrl.searchParams.set('client_id', amazonClientId);
+      amazonOAuthUrl.searchParams.set('scope', 'advertising::campaign_management profile');
+      amazonOAuthUrl.searchParams.set('response_type', 'code');
+      amazonOAuthUrl.searchParams.set('redirect_uri', redirectUri);
+      amazonOAuthUrl.searchParams.set('state', state);
+      
+      const finalAuthUrl = amazonOAuthUrl.toString();
+      
+      console.log('=== OAuth URL Generated Successfully ===');
+
+      // Return successful response
+      const responseData = { 
+        authUrl: finalAuthUrl,
+        success: true,
+        timestamp: new Date().toISOString()
+      };
+      
+      console.log('=== SUCCESS - Returning Auth URL ===');
+
+      return new Response(
+        JSON.stringify(responseData),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+      
     } catch (authError) {
       console.error('=== SUPABASE AUTH EXCEPTION ===');
       console.error('Auth exception:', authError);
@@ -305,71 +325,6 @@ serve(async (req) => {
         }
       );
     }
-    
-    if (!userResponse?.user?.id) {
-      console.error('=== NO USER FOUND ===');
-      console.error('User response:', userResponse);
-      
-      return new Response(
-        JSON.stringify({ 
-          error: 'Authentication failed',
-          details: 'User not found or invalid token',
-          errorType: 'user_not_found'
-        }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-
-    console.log('=== USER AUTHENTICATED SUCCESSFULLY ===');
-    console.log('User ID:', userResponse.user.id);
-    console.log('User email:', userResponse.user.email);
-
-    // Generate OAuth state parameter
-    console.log('=== Generating OAuth State ===');
-    const stateData = {
-      user_id: userResponse.user.id,
-      redirect_uri: redirectUri,
-      timestamp: Date.now(),
-      nonce: crypto.randomUUID()
-    };
-    
-    const state = btoa(JSON.stringify(stateData));
-    console.log('OAuth state generated successfully, length:', state.length);
-
-    // Build Amazon OAuth URL
-    console.log('=== Building Amazon OAuth URL ===');
-    const amazonOAuthUrl = new URL('https://www.amazon.com/ap/oa');
-    
-    amazonOAuthUrl.searchParams.set('client_id', amazonClientId);
-    amazonOAuthUrl.searchParams.set('scope', 'advertising::campaign_management profile');
-    amazonOAuthUrl.searchParams.set('response_type', 'code');
-    amazonOAuthUrl.searchParams.set('redirect_uri', redirectUri);
-    amazonOAuthUrl.searchParams.set('state', state);
-    
-    const finalAuthUrl = amazonOAuthUrl.toString();
-    
-    console.log('=== OAuth URL Generated Successfully ===');
-    console.log('Final URL length:', finalAuthUrl.length);
-
-    // Return successful response
-    const responseData = { 
-      authUrl: finalAuthUrl,
-      success: true,
-      timestamp: new Date().toISOString()
-    };
-    
-    console.log('=== SUCCESS - Returning Auth URL ===');
-
-    return new Response(
-      JSON.stringify(responseData),
-      {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
-    );
     
   } catch (error) {
     console.error('=== UNEXPECTED ERROR ===');
