@@ -1,17 +1,15 @@
-
 import Header from "@/components/Header";
 import AmazonAccountSetup from "@/components/AmazonAccountSetup";
 import OptimizationDashboard from "@/components/OptimizationDashboard";
 import SubscriptionStatus from "@/components/SubscriptionStatus";
 import AmazonDataDashboard from "@/components/AmazonDataDashboard";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
-
 const Dashboard = () => {
-  const { connections } = useAmazonConnections();
+  const {
+    connections
+  } = useAmazonConnections();
   const hasActiveConnections = connections.some(c => c.status === 'active');
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50">
+  return <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50">
       <Header />
       <div className="container mx-auto py-6 px-4">
         <div className="mb-8">
@@ -30,28 +28,20 @@ const Dashboard = () => {
           </div>
 
           {/* Subscription Status */}
-          <div>
-            <SubscriptionStatus />
-          </div>
+          
 
           
           {/* Amazon Data Dashboard - Full Width */}
-          {hasActiveConnections && (
-            <div className="lg:col-span-3">
+          {hasActiveConnections && <div className="lg:col-span-3">
               <AmazonDataDashboard />
-            </div>
-          )}
+            </div>}
 
           {/* Optimization Dashboard - Full Width */}
-          {hasActiveConnections && (
-            <div className="lg:col-span-3">
+          {hasActiveConnections && <div className="lg:col-span-3">
               <OptimizationDashboard />
-            </div>
-          )}
+            </div>}
         </div>
       </div>
-    </div>
-  );
+    </div>;
 };
-
 export default Dashboard;
