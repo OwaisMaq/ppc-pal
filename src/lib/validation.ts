@@ -1,46 +1,46 @@
-import { z } from 'zod';
-import { AdvertisingData } from '@/types/common';
 
-// Re-export all validation schemas and functions
-export * from './validation/amazonApiSchemas';
-export * from './validation/formSchemas';
+import { AdvertisingData } from '@/pages/Index';
 
-// Keep existing schemas for backward compatibility
-export const advertisingDataSchema = z.object({
-  campaigns: z.array(z.any()).default([]),
-  keywords: z.array(z.any()).default([]),
-  adGroups: z.array(z.any()).default([]),
-  connections: z.array(z.any()).default([])
-});
-
-export const validateAdvertisingData = (data: unknown): AdvertisingData => {
-  const result = advertisingDataSchema.safeParse(data);
-  
-  if (!result.success) {
-    throw new Error('Invalid advertising data format');
+// Input validation and sanitization
+export const validateAndSanitizeData = (data: AdvertisingData): AdvertisingData => {
+  if (!data || typeof data !== 'object') {
+    throw new Error('Invalid data format');
   }
-  
-  return {
-    campaigns: result.data.campaigns || [],
-    keywords: result.data.keywords || [],
-    adGroups: result.data.adGroups || [],
-    connections: result.data.connections || []
-  };
+
+  // Sanitize and validate keywords array
+  if (data.keywords && Array.isArray(data.keywords)) {
+    data.keywords = data.keywords.filter(keyword => {
+      if (!keyword || typeof keyword !== 'object') return false;
+      
+      // Sanitize string fields to prevent injection
+      Object.keys(keyword).forEach(key => {
+        if (typeof keyword[key] === 'string') {
+          keyword[key] = keyword[key].replace(/[<>]/g, ''); // Basic HTML tag removal
+        }
+      });
+      
+      return true;
+    });
+  }
+
+  // Similar validation for campaigns and adGroups
+  if (data.campaigns && Array.isArray(data.campaigns)) {
+    data.campaigns = data.campaigns.filter(campaign => campaign && typeof campaign === 'object');
+  }
+
+  if (data.adGroups && Array.isArray(data.adGroups)) {
+    data.adGroups = data.adGroups.filter(adGroup => adGroup && typeof adGroup === 'object');
+  }
+
+  return data;
 };
 
-// Enhanced validation with better error messages
-export const validateWithContext = <T>(
-  schema: z.ZodSchema<T>,
-  data: unknown,
-  context: string
-): T => {
-  try {
-    return schema.parse(data);
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      const firstError = error.issues[0];
-      throw new Error(`${context}: ${firstError.message} at ${firstError.path.join('.')}`);
-    }
-    throw error;
-  }
+// Generate a simple hash for the data to use as cache key
+export const generateDataHash = (data: AdvertisingData): string => {
+  const keyData = {
+    keywordCount: data.keywords?.length || 0,
+    campaignCount: data.campaigns?.length || 0,
+    firstKeywords: data.keywords?.slice(0, 5) || []
+  };
+  return btoa(JSON.stringify(keyData)).substring(0, 16);
 };

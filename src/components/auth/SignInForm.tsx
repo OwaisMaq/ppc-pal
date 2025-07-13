@@ -9,10 +9,6 @@ interface SignInFormProps {
     email: string;
     password: string;
   };
-  errors?: {
-    email?: string;
-    password?: string;
-  };
   showPassword: boolean;
   isLoading: boolean;
   onInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -22,7 +18,6 @@ interface SignInFormProps {
 
 const SignInForm = ({
   formData,
-  errors = {},
   showPassword,
   isLoading,
   onInputChange,
@@ -40,13 +35,12 @@ const SignInForm = ({
             name="email"
             type="email"
             placeholder="Enter your email"
-            className={`pl-10 ${errors.email ? 'border-red-500' : ''}`}
+            className="pl-10"
             value={formData.email}
             onChange={onInputChange}
             disabled={isLoading}
           />
         </div>
-        {errors.email && <p className="text-sm text-red-500">{errors.email}</p>}
       </div>
       
       <div className="space-y-2">
@@ -58,7 +52,7 @@ const SignInForm = ({
             name="password"
             type={showPassword ? "text" : "password"}
             placeholder="Enter your password"
-            className={`pl-10 pr-10 ${errors.password ? 'border-red-500' : ''}`}
+            className="pl-10 pr-10"
             value={formData.password}
             onChange={onInputChange}
             disabled={isLoading}
@@ -67,12 +61,10 @@ const SignInForm = ({
             type="button"
             onClick={onTogglePassword}
             className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
-            disabled={isLoading}
           >
             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
         </div>
-        {errors.password && <p className="text-sm text-red-500">{errors.password}</p>}
       </div>
       
       <Button type="submit" className="w-full" disabled={isLoading}>

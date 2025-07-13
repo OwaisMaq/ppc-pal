@@ -1,104 +1,96 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
+
+import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider } from "@/hooks/useAuth";
 import ProtectedRoute from "@/components/ProtectedRoute";
-import PublicRoute from "@/components/PublicRoute";
-import Index from "./pages/Index";
-import Auth from "./pages/Auth";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import Dashboard from "./pages/Dashboard";
-import Settings from "./pages/Settings";
-import Feedback from "./pages/Feedback";
-import AmazonCallbackPage from "./pages/AmazonCallbackPage";
+import Auth from "@/pages/Auth";
+import Index from "@/pages/Index";
+import Dashboard from "@/pages/Dashboard";
+import Feedback from "@/pages/Feedback";
+import DataManagement from "@/pages/DataManagement";
+import Privacy from "@/pages/Privacy";
+import PublicLanding from "@/pages/PublicLanding";
+import About from "@/pages/About";
+import Contact from "@/pages/Contact";
+import Company from "@/pages/Company";
+import NotFound from "@/pages/NotFound";
+import CookieConsent from "@/components/CookieConsent";
+import { useEffect } from "react";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route 
-              path="/auth" 
-              element={
-                <PublicRoute>
-                  <Auth />
-                </PublicRoute>
-              } 
-            />
-            <Route 
-              path="/login" 
-              element={
-                <PublicRoute>
-                  <Login />
-                </PublicRoute>
-              } 
-            />
-            <Route 
-              path="/register" 
-              element={
-                <PublicRoute>
-                  <Register />
-                </PublicRoute>
-              } 
-            />
-            <Route 
-              path="/dashboard" 
-              element={
+const App = () => {
+  useEffect(() => {
+    // Handle Amazon OAuth callback
+    const handleAmazonCallback = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+      const state = urlParams.get('state');
+      
+      if (code && state && window.location.pathname === '/auth/amazon/callback') {
+        // This would be handled by the useAmazonConnections hook
+        console.log('Amazon OAuth callback received', { code, state });
+        // Redirect to dashboard after handling
+        window.location.href = '/dashboard';
+      }
+    };
+
+    handleAmazonCallback();
+  }, []);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <BrowserRouter>
+            <Routes>
+              {/* Public routes */}
+              <Route path="/" element={<PublicLanding />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/contact" element={<Contact />} />
+              <Route path="/company" element={<Company />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/auth/amazon/callback" element={<Navigate to="/dashboard" replace />} />
+              
+              {/* Protected routes */}
+              <Route path="/app" element={
+                <ProtectedRoute>
+                  <Index />
+                </ProtectedRoute>
+              } />
+              <Route path="/dashboard" element={
                 <ProtectedRoute>
                   <Dashboard />
                 </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/settings" 
-              element={
-                <ProtectedRoute>
-                  <Settings />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/feedback" 
-              element={
+              } />
+              <Route path="/feedback" element={
                 <ProtectedRoute>
                   <Feedback />
                 </ProtectedRoute>
-              } 
-            />
-            {/* Amazon OAuth callback route - this is the main callback route */}
-            <Route 
-              path="/amazon-callback" 
-              element={
+              } />
+              <Route path="/data-management" element={
                 <ProtectedRoute>
-                  <AmazonCallbackPage />
+                  <DataManagement />
                 </ProtectedRoute>
-              } 
-            />
-            {/* Keep the old route for backwards compatibility */}
-            <Route 
-              path="/auth/amazon/callback" 
-              element={
+              } />
+              <Route path="/privacy" element={
                 <ProtectedRoute>
-                  <AmazonCallbackPage />
+                  <Privacy />
                 </ProtectedRoute>
-              } 
-            />
-            {/* Redirect unknown routes to auth for unauthenticated users, dashboard for authenticated */}
-            <Route path="*" element={<Navigate to="/auth" replace />} />
-          </Routes>
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+              } />
+              
+              {/* 404 */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+          <CookieConsent />
+        </TooltipProvider>
+      </AuthProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;

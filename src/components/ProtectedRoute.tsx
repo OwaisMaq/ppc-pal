@@ -1,13 +1,13 @@
 
 import { useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
-const PROTECTED_ROUTES = ['/app', '/feedback', '/data-management', '/dashboard', '/settings'];
+const PROTECTED_ROUTES = ['/app', '/feedback', '/data-management'];
 
 const isProtectedRoute = (pathname: string) => {
   return PROTECTED_ROUTES.some(route => pathname.startsWith(route));
@@ -22,7 +22,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     console.log('ProtectedRoute: Auth check for path:', location.pathname);
     console.log('ProtectedRoute: User:', user?.email || 'No user', 'Loading:', loading);
     
-    // Only redirect if we're actually on a protected route and there's no user
+    // CRITICAL: Only redirect if we're actually on a protected route and there's no user
     if (!loading && !user && isProtectedRoute(location.pathname)) {
       console.log('ProtectedRoute: No user found, redirecting to auth from protected route:', location.pathname);
       navigate("/auth", { replace: true });
@@ -40,7 +40,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     );
   }
 
-  if (!user && isProtectedRoute(location.pathname)) {
+  if (!user) {
     console.log('ProtectedRoute: No user, showing loading while redirect happens from protected route');
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50 flex items-center justify-center">

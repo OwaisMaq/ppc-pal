@@ -1,22 +1,13 @@
 
 import * as XLSX from 'xlsx';
-import { AdvertisingData } from '@/types/common';
+import { AdvertisingData } from '@/pages/Index';
 
-export interface ExcelParseResult {
-  data: AdvertisingData;
-  errors: string[];
-  warnings: string[];
+export interface OriginalWorkbookStructure {
+  sheetNames: string[];
+  sheetStructures: { [sheetName: string]: any };
+  originalWorkbook: XLSX.WorkBook;
 }
 
-export interface ExcelExportOptions {
-  includeMetrics: boolean;
-  dateRange?: {
-    start: Date;
-    end: Date;
-  };
-}
-
-// Add missing type definitions
 export type EntityType = 'keyword' | 'campaign' | 'adgroup' | 'portfolio' | 'product_targeting' | 'asset_group' | 'negative_keyword';
 
 export type ProductType = 'Sponsored Products' | 'Sponsored Brands' | 'Sponsored Display';
@@ -25,9 +16,16 @@ export type CampaignType = 'Automatic' | 'Manual' | 'Video' | 'Audio' | 'Custom'
 
 export type MatchType = 'broad' | 'phrase' | 'exact' | 'negative_broad' | 'negative_phrase' | 'negative_exact';
 
-export interface OriginalWorkbookStructure {
-  sheets: string[];
-  entityTypes: EntityType[];
+export interface GroupedDataByProductType {
+  [productType: string]: {
+    keywords: any[];
+    campaigns: any[];
+    adGroups: any[];
+    portfolios: any[];
+    productTargeting: any[];
+    assetGroups: any[];
+    negativeKeywords: any[];
+  };
 }
 
 export interface OptimizationMetrics {
@@ -44,8 +42,9 @@ export interface OptimizationMetrics {
 }
 
 export interface ReportData {
-  campaigns: any[];
-  keywords: any[];
-  adGroups: any[];
+  entityType: EntityType;
+  productType: ProductType;
+  campaignType?: CampaignType;
   metrics: OptimizationMetrics;
+  [key: string]: any;
 }

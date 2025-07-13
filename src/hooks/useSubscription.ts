@@ -1,70 +1,158 @@
-
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+
+interface SubscriptionData {
+  id: string;
+  plan_type: 'free' | 'pro';
+  status: 'active' | 'cancelled' | 'past_due' | 'incomplete';
+  current_period_end?: string;
+  stripe_customer_id?: string;
+  stripe_subscription_id?: string;
+}
+
+interface UsageData {
+  optimizations_used: number;
+  period_start: string;
+  period_end: string;
+}
 
 export const useSubscription = () => {
   const { user } = useAuth();
-  const [subscription, setSubscription] = useState(null);
-  const [usage, setUsage] = useState(null);
+  const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
+  const [usage, setUsage] = useState<UsageData | null>(null);
+  const [usageLimit, setUsageLimit] = useState<number>(0);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [canOptimize, setCanOptimize] = useState(false);
 
-  const fetchSubscription = async () => {
-    if (!user) {
+  useEffect(() => {
+    if (user) {
+      fetchSubscriptionData();
+    } else {
       setLoading(false);
-      return;
     }
+  }, [user]);
 
-    setLoading(true);
+  const fetchSubscriptionData = async () => {
+    if (!user) return;
+
     try {
+      setLoading(true);
+
+      // Check subscription status with Stripe
+      await checkStripeSubscription();
+
       // Fetch subscription
-      const { data: subData, error: subError } = await supabase
+      const { data: subscriptionData, error: subError } = await supabase
         .from('subscriptions')
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
-      if (subError && subError.code !== 'PGRST116') {
-        throw subError;
-      }
+      if (subError) throw subError;
 
-      setSubscription(subData);
-
-      // Fetch usage
+      // Fetch current usage
       const { data: usageData, error: usageError } = await supabase
         .from('usage_tracking')
         .select('*')
         .eq('user_id', user.id)
+        .eq('period_start', new Date().toISOString().slice(0, 7) + '-01')
+        .maybeSingle();
+
+      if (usageError) throw usageError;
+
+      // Fetch usage limits
+      const planType = subscriptionData?.plan_type || 'free';
+      const { data: limitData, error: limitError } = await supabase
+        .from('usage_limits')
+        .select('optimization_limit')
+        .eq('plan_type', planType)
         .single();
 
-      if (usageError && usageError.code !== 'PGRST116') {
-        throw usageError;
-      }
+      if (limitError) throw limitError;
 
+      setSubscription(subscriptionData);
       setUsage(usageData);
-    } catch (err) {
-      setError(err);
+      setUsageLimit(limitData.optimization_limit);
+
+      // Check if user can optimize - now free tier gets 1 optimization
+      const currentUsage = usageData?.optimizations_used || 0;
+      setCanOptimize(currentUsage < limitData.optimization_limit);
+
+    } catch (error) {
+      console.error('Error fetching subscription data:', error);
+      toast.error('Failed to load subscription information');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchSubscription();
-  }, [user]);
+  const checkStripeSubscription = async () => {
+    if (!user) return;
 
-  const isFreeTier = !subscription || subscription.plan_type === 'free';
-  const isProTier = subscription && subscription.plan_type === 'pro';
-  const usageLimit = isFreeTier ? 0 : 100; // Pro tier gets 100 optimizations per month
+    try {
+      const { data, error } = await supabase.functions.invoke('check-subscription', {
+        headers: {
+          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+      });
 
-  const checkCanOptimize = async () => {
+      if (error) throw error;
+      console.log('Stripe subscription check result:', data);
+    } catch (error) {
+      console.error('Error checking Stripe subscription:', error);
+    }
+  };
+
+  const createCheckoutSession = async () => {
+    if (!user) return null;
+
+    try {
+      const { data, error } = await supabase.functions.invoke('create-checkout', {
+        headers: {
+          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+      return data.url;
+    } catch (error) {
+      console.error('Error creating checkout session:', error);
+      toast.error('Failed to create checkout session');
+      return null;
+    }
+  };
+
+  const openCustomerPortal = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase.functions.invoke('customer-portal', {
+        headers: {
+          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+      window.open(data.url, '_blank');
+    } catch (error) {
+      console.error('Error opening customer portal:', error);
+      toast.error('Failed to open customer portal');
+    }
+  };
+
+  const checkCanOptimize = async (): Promise<boolean> => {
+    if (!user) return false;
+
     try {
       const { data, error } = await supabase.rpc('can_user_optimize', {
-        user_uuid: user?.id
+        user_uuid: user.id
       });
-      
+
       if (error) throw error;
+      
+      setCanOptimize(data);
       return data;
     } catch (error) {
       console.error('Error checking optimization permission:', error);
@@ -72,13 +160,18 @@ export const useSubscription = () => {
     }
   };
 
-  const incrementUsage = async () => {
+  const incrementUsage = async (): Promise<boolean> => {
+    if (!user) return false;
+
     try {
       const { error } = await supabase.rpc('increment_optimization_usage', {
-        user_uuid: user?.id
+        user_uuid: user.id
       });
-      
+
       if (error) throw error;
+
+      // Refresh subscription data after incrementing
+      await fetchSubscriptionData();
       return true;
     } catch (error) {
       console.error('Error incrementing usage:', error);
@@ -86,51 +179,18 @@ export const useSubscription = () => {
     }
   };
 
-  const createCheckoutSession = async () => {
-    try {
-      const { data, error } = await supabase.functions.invoke('create-checkout');
-      
-      if (error) throw error;
-      return data.checkoutUrl;
-    } catch (error) {
-      console.error('Error creating checkout session:', error);
-      return null;
-    }
-  };
-
-  const openCustomerPortal = async () => {
-    try {
-      const { data, error } = await supabase.functions.invoke('customer-portal');
-      
-      if (error) throw error;
-      if (data.portalUrl) {
-        window.open(data.portalUrl, '_blank');
-      }
-    } catch (error) {
-      console.error('Error opening customer portal:', error);
-    }
-  };
-
-  const refreshSubscription = async () => {
-    await fetchSubscription();
-  };
-
-  // Add canOptimize as an alias for checkCanOptimize for backward compatibility
-  const canOptimize = !loading && !isFreeTier;
-
-  return { 
-    subscription, 
+  return {
+    subscription,
     usage,
     usageLimit,
-    loading, 
-    error,
-    isFreeTier,
-    isProTier,
+    loading,
     canOptimize,
     checkCanOptimize,
     incrementUsage,
+    refreshSubscription: fetchSubscriptionData,
     createCheckoutSession,
     openCustomerPortal,
-    refreshSubscription
+    isFreeTier: subscription?.plan_type === 'free' || !subscription,
+    isProTier: subscription?.plan_type === 'pro'
   };
 };
