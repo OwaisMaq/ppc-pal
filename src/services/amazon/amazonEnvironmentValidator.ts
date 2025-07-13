@@ -22,6 +22,39 @@ export class AmazonEnvironmentValidator {
         return false;
       }
 
+      // First test if credentials are accessible
+      console.log('=== Testing Amazon Credentials Access ===');
+      const testResponse = await supabase.functions.invoke('test-amazon-credentials', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('Credentials test response:', testResponse);
+
+      if (testResponse.error) {
+        console.error('Credentials test failed:', testResponse.error);
+        this.toast.error("Configuration Error", {
+          description: "Unable to test Amazon credentials. Edge functions may need redeployment."
+        });
+        return false;
+      }
+
+      const credentialsData = testResponse.data;
+      if (!credentialsData?.amazonClientId || !credentialsData?.amazonClientSecret) {
+        console.error('Amazon credentials not accessible:', credentialsData);
+        this.toast.error("Amazon Credentials Missing", {
+          description: "Amazon API credentials are not accessible to edge functions. Please verify they are set in Supabase secrets and redeploy if needed."
+        });
+        return false;
+      }
+
+      console.log('Credentials test passed:', {
+        clientIdLength: credentialsData.clientIdLength,
+        clientSecretLength: credentialsData.clientSecretLength
+      });
+
       // Test edge function accessibility with minimal body
       const response = await supabase.functions.invoke('amazon-oauth-init', {
         body: { 
