@@ -1,13 +1,8 @@
 
-import { AuthProvider } from "@/contexts/AuthContext";
 import AuthContainer from "@/components/auth/AuthContainer";
 
 const Auth = () => {
-  return (
-    <AuthProvider>
-      <AuthContainer />
-    </AuthProvider>
-  );
+  return <AuthContainer />;
 };
 
 export default Auth;

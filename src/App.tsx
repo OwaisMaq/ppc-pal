@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import PublicRoute from "@/components/PublicRoute";
 import Index from "./pages/Index";
+import Auth from "./pages/Auth";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
@@ -25,6 +26,14 @@ const App = () => (
         <AuthProvider>
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route 
+              path="/auth" 
+              element={
+                <PublicRoute>
+                  <Auth />
+                </PublicRoute>
+              } 
+            />
             <Route 
               path="/login" 
               element={
@@ -83,8 +92,8 @@ const App = () => (
                 </ProtectedRoute>
               } 
             />
-            {/* Redirect any unknown routes to dashboard for authenticated users */}
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            {/* Redirect unknown routes to auth for unauthenticated users, dashboard for authenticated */}
+            <Route path="*" element={<Navigate to="/auth" replace />} />
           </Routes>
         </AuthProvider>
       </BrowserRouter>
