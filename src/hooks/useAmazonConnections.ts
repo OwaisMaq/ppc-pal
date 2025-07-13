@@ -36,41 +36,90 @@ export const useAmazonConnections = () => {
 
   const initiateConnection = async (redirectUri: string) => {
     try {
+      console.log('Initiating Amazon connection with redirect URI:', redirectUri);
+      
+      // Get current session
+      const session = await supabase.auth.getSession();
+      console.log('Current session:', session.data.session ? 'Valid' : 'None');
+      
+      if (!session.data.session?.access_token) {
+        throw new Error('No valid session found');
+      }
+
       // Call edge function to initiate Amazon OAuth
+      console.log('Calling amazon-oauth edge function...');
       const { data, error } = await supabase.functions.invoke('amazon-oauth', {
         body: { action: 'initiate', redirectUri },
         headers: {
-          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+          Authorization: `Bearer ${session.data.session.access_token}`,
         },
       });
 
-      if (error) throw error;
+      console.log('Edge function response:', { data, error });
+
+      if (error) {
+        console.error('Edge function error:', error);
+        throw error;
+      }
       
+      if (!data?.authUrl) {
+        throw new Error('No auth URL returned from edge function');
+      }
+
+      console.log('Redirecting to Amazon OAuth URL:', data.authUrl);
       // Redirect to Amazon OAuth URL
       window.location.href = data.authUrl;
     } catch (error) {
       console.error('Error initiating connection:', error);
-      toast.error('Failed to initiate Amazon connection');
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      toast.error(`Failed to initiate Amazon connection: ${error.message}`);
     }
   };
 
   const handleOAuthCallback = async (code: string, state: string) => {
     try {
+      console.log('Handling OAuth callback with code:', code?.substring(0, 10) + '...', 'state:', state);
+      
+      // Get current session
+      const session = await supabase.auth.getSession();
+      console.log('Session for callback:', session.data.session ? 'Valid' : 'None');
+      
+      if (!session.data.session?.access_token) {
+        throw new Error('No valid session found for callback');
+      }
+
+      console.log('Calling amazon-oauth callback...');
       const { data, error } = await supabase.functions.invoke('amazon-oauth', {
         body: { action: 'callback', code, state },
         headers: {
-          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+          Authorization: `Bearer ${session.data.session.access_token}`,
         },
       });
 
-      if (error) throw error;
+      console.log('Callback response:', { data, error });
+
+      if (error) {
+        console.error('Callback error:', error);
+        throw error;
+      }
       
+      console.log('Connection successful, refreshing connections...');
       toast.success('Amazon account connected successfully!');
       await fetchConnections();
       return data;
     } catch (error) {
       console.error('Error handling OAuth callback:', error);
-      toast.error('Failed to complete Amazon connection');
+      console.error('Callback error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      toast.error(`Failed to complete Amazon connection: ${error.message}`);
+      throw error; // Re-throw so the callback page can handle it
     }
   };
 
