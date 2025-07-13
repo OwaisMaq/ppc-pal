@@ -14,6 +14,8 @@ serve(async (req) => {
   }
 
   try {
+    console.log('Amazon OAuth function called with method:', req.method);
+    
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -21,7 +23,10 @@ serve(async (req) => {
 
     // Get the authorization header
     const authHeader = req.headers.get('Authorization')
+    console.log('Auth header present:', !!authHeader);
+    
     if (!authHeader) {
+      console.error('No authorization header provided');
       throw new Error('No authorization header')
     }
 
@@ -29,17 +34,39 @@ serve(async (req) => {
     const token = authHeader.replace('Bearer ', '')
     const { data: { user }, error: authError } = await supabase.auth.getUser(token)
     
+    console.log('User verification result:', { 
+      hasUser: !!user, 
+      userId: user?.id, 
+      authError: authError?.message 
+    });
+    
     if (authError || !user) {
+      console.error('Invalid authorization:', authError?.message);
       throw new Error('Invalid authorization')
     }
 
-    const { action, redirectUri, code, state } = await req.json()
+    let requestBody;
+    try {
+      requestBody = await req.json();
+      console.log('Request body received:', { 
+        action: requestBody.action,
+        hasCode: !!requestBody.code,
+        hasState: !!requestBody.state,
+        hasRedirectUri: !!requestBody.redirectUri
+      });
+    } catch (jsonError) {
+      console.error('Failed to parse JSON body:', jsonError.message);
+      throw new Error('Invalid JSON body');
+    }
+
+    const { action, redirectUri, code, state } = requestBody;
     console.log('Amazon OAuth action:', action)
 
     if (action === 'initiate') {
       // Generate OAuth URL for Amazon Advertising API
       const clientId = Deno.env.get('AMAZON_CLIENT_ID')
       if (!clientId) {
+        console.error('Amazon Client ID not configured');
         throw new Error('Amazon Client ID not configured')
       }
 
@@ -69,9 +96,12 @@ serve(async (req) => {
       const clientSecret = Deno.env.get('AMAZON_CLIENT_SECRET')
       
       if (!clientId || !clientSecret) {
+        console.error('Amazon credentials not configured');
         throw new Error('Amazon credentials not configured')
       }
 
+      console.log('Exchanging code for tokens...');
+      
       // Exchange code for tokens
       const tokenResponse = await fetch('https://api.amazon.com/auth/o2/token', {
         method: 'POST',
@@ -86,16 +116,19 @@ serve(async (req) => {
         }),
       })
 
+      console.log('Token response status:', tokenResponse.status);
+
       if (!tokenResponse.ok) {
         const errorData = await tokenResponse.text()
-        console.error('Token exchange failed:', errorData)
-        throw new Error('Failed to exchange code for tokens')
+        console.error('Token exchange failed:', tokenResponse.status, errorData)
+        throw new Error(`Failed to exchange code for tokens: ${tokenResponse.status} - ${errorData}`)
       }
 
       const tokenData = await tokenResponse.json()
-      console.log('Token exchange successful')
+      console.log('Token exchange successful, access token length:', tokenData.access_token?.length || 0)
 
       // Get profile information
+      console.log('Fetching Amazon profiles...');
       const profileResponse = await fetch('https://advertising-api.amazon.com/v2/profiles', {
         headers: {
           'Authorization': `Bearer ${tokenData.access_token}`,
@@ -103,12 +136,22 @@ serve(async (req) => {
         },
       })
 
+      console.log('Profile response status:', profileResponse.status);
+
+      if (!profileResponse.ok) {
+        const profileError = await profileResponse.text();
+        console.error('Profile fetch failed:', profileResponse.status, profileError);
+        throw new Error(`Failed to fetch profiles: ${profileResponse.status} - ${profileError}`);
+      }
+
       const profiles = await profileResponse.json()
-      console.log('Retrieved profiles:', profiles.length)
+      console.log('Retrieved profiles count:', profiles.length)
 
       // Store connection for each profile
       for (const profile of profiles) {
         const expiresAt = new Date(Date.now() + (tokenData.expires_in * 1000))
+        
+        console.log('Storing connection for profile:', profile.profileId);
         
         const { error: insertError } = await supabase
           .from('amazon_connections')
@@ -139,12 +182,17 @@ serve(async (req) => {
       )
     }
 
+    console.error('Invalid action provided:', action);
     throw new Error('Invalid action')
 
   } catch (error) {
-    console.error('Amazon OAuth error:', error)
+    console.error('Amazon OAuth error:', error.message);
+    console.error('Full error:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        details: error.stack?.split('\n')[0] || 'No additional details'
+      }),
       { 
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }

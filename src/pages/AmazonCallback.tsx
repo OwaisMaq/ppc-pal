@@ -12,7 +12,12 @@ const AmazonCallback = () => {
   const [message, setMessage] = useState('Processing Amazon connection...');
 
   useEffect(() => {
+    let processed = false;
+    
     const processCallback = async () => {
+      if (processed) return;
+      processed = true;
+      
       const urlParams = new URLSearchParams(window.location.search);
       const code = urlParams.get('code');
       const state = urlParams.get('state');
@@ -31,7 +36,7 @@ const AmazonCallback = () => {
       }
 
       try {
-        console.log('Processing Amazon OAuth callback:', { code, state });
+        console.log('Processing Amazon OAuth callback:', { code: code.substring(0, 10) + '...', state });
         const result = await handleOAuthCallback(code, state);
         console.log('OAuth callback result:', result);
         
@@ -56,7 +61,7 @@ const AmazonCallback = () => {
     };
 
     processCallback();
-  }, [handleOAuthCallback, navigate]);
+  }, []); // Empty dependency array to run only once
 
   const getIcon = () => {
     switch (status) {
