@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -23,9 +22,12 @@ export class AmazonEnvironmentValidator {
         return false;
       }
 
-      // Test edge function accessibility
+      // Test edge function accessibility with minimal body
       const response = await supabase.functions.invoke('amazon-oauth-init', {
-        body: { test: true },
+        body: { 
+          redirectUri: 'https://example.com/callback',
+          test: true 
+        },
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json'
@@ -38,7 +40,7 @@ export class AmazonEnvironmentValidator {
         let errorMessage = 'Server configuration issue detected';
         
         if (response.error.message?.includes('non-2xx status code')) {
-          errorMessage = 'Amazon API credentials not configured. Please contact support.';
+          errorMessage = 'Amazon API credentials not configured. Please set up AMAZON_CLIENT_ID and AMAZON_CLIENT_SECRET in Supabase secrets.';
         } else if (response.error.message?.includes('missing')) {
           errorMessage = 'Required server configuration missing. Please contact support.';
         }
@@ -47,6 +49,15 @@ export class AmazonEnvironmentValidator {
           description: errorMessage
         });
         
+        return false;
+      }
+
+      // Check if the response indicates missing credentials
+      if (response.data?.errorType === 'missing_amazon_client_id' || 
+          response.data?.errorType === 'missing_amazon_client_secret') {
+        this.toast.error("Amazon Credentials Missing", {
+          description: "Amazon API credentials need to be configured in Supabase secrets"
+        });
         return false;
       }
 
