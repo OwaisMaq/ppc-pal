@@ -71,7 +71,39 @@ serve(async (req) => {
       );
     }
 
-    const { connectionId } = requestBody;
+    const { connectionId, test } = requestBody;
+
+    // Handle test mode for environment validation
+    if (test) {
+      console.log('=== Test Mode - Environment Validation ===');
+      
+      // Check if Amazon credentials are available
+      const amazonClientId = Deno.env.get('AMAZON_CLIENT_ID');
+      const amazonClientSecret = Deno.env.get('AMAZON_CLIENT_SECRET');
+      
+      if (!amazonClientId || !amazonClientSecret) {
+        console.error('Amazon credentials missing');
+        return new Response(
+          JSON.stringify({ 
+            success: false,
+            error: 'Amazon API credentials not configured',
+            details: 'Please set up AMAZON_CLIENT_ID and AMAZON_CLIENT_SECRET in Supabase secrets',
+            errorType: !amazonClientId ? 'missing_amazon_client_id' : 'missing_amazon_client_secret'
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      console.log('Environment validation passed - credentials available');
+      return new Response(
+        JSON.stringify({ 
+          success: true,
+          message: 'Amazon API credentials are properly configured',
+          credentialsConfigured: true
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     if (!connectionId) {
       return new Response(
