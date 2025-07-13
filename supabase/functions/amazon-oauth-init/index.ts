@@ -87,6 +87,7 @@ serve(async (req) => {
     try {
       const bodyText = await req.text();
       console.log('Raw body text length:', bodyText.length);
+      console.log('Raw body text content:', bodyText); // Add this for debugging
       
       if (!bodyText || bodyText.trim().length === 0) {
         console.error('=== EMPTY REQUEST BODY ===');
@@ -104,7 +105,7 @@ serve(async (req) => {
       }
       
       requestBody = JSON.parse(bodyText);
-      console.log('Parsed request body:', requestBody);
+      console.log('Parsed request body:', JSON.stringify(requestBody, null, 2));
       
     } catch (parseError) {
       console.error('=== REQUEST BODY PARSE ERROR ===');
