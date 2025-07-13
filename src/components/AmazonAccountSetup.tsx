@@ -24,6 +24,10 @@ const AmazonAccountSetup = () => {
         return <AlertCircle className="h-4 w-4 text-red-500" />;
       case 'pending':
         return <Clock className="h-4 w-4 text-blue-500" />;
+      case 'warning':
+        return <AlertCircle className="h-4 w-4 text-yellow-500" />;
+      case 'setup_required':
+        return <AlertCircle className="h-4 w-4 text-amber-500" />;
       default:
         return <AlertCircle className="h-4 w-4 text-gray-500" />;
     }
@@ -39,6 +43,10 @@ const AmazonAccountSetup = () => {
         return 'bg-red-100 text-red-800';
       case 'pending':
         return 'bg-blue-100 text-blue-800';
+      case 'warning':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'setup_required':
+        return 'bg-amber-100 text-amber-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }

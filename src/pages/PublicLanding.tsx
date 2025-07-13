@@ -1,7 +1,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Bot, TrendingUp, Shield, Zap, Users, Mail, Building2, Sparkles, Star } from "lucide-react";
+import { Bot, TrendingUp, Shield, Zap, Users, Mail, Building2, Sparkles, Star, LinkIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
@@ -99,6 +99,34 @@ const PublicLanding = () => {
             PPC Pal uses advanced artificial intelligence to analyze and optimize your Amazon advertising campaigns, 
             helping you increase sales while reducing wasted ad spend in the vast digital cosmos.
           </p>
+          
+          {/* Amazon Integration Highlight */}
+          <div className="bg-gradient-to-r from-orange-500/10 to-amber-500/10 border border-orange-400/30 rounded-lg p-6 mb-8 backdrop-blur-sm">
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <div className="bg-gradient-to-r from-orange-600 to-amber-600 rounded-full p-2 shadow-lg shadow-orange-500/30">
+                <LinkIcon className="h-6 w-6 text-white" />
+              </div>
+              <h3 className="text-2xl font-semibold text-white">Direct Amazon Ads API Integration</h3>
+            </div>
+            <p className="text-orange-100 text-lg mb-4">
+              Seamlessly connect your Amazon Advertising accounts for real-time campaign optimization and automated bid management.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div className="bg-white/5 rounded-lg p-3 border border-orange-400/20">
+                <div className="text-orange-300 font-medium mb-1">Secure Connection</div>
+                <div className="text-orange-100">OAuth 2.0 authentication with Amazon</div>
+              </div>
+              <div className="bg-white/5 rounded-lg p-3 border border-orange-400/20">
+                <div className="text-orange-300 font-medium mb-1">Real-time Sync</div>
+                <div className="text-orange-100">Live campaign data and performance metrics</div>
+              </div>
+              <div className="bg-white/5 rounded-lg p-3 border border-orange-400/20">
+                <div className="text-orange-300 font-medium mb-1">Auto Optimization</div>
+                <div className="text-orange-100">AI-powered bid adjustments and keyword optimization</div>
+              </div>
+            </div>
+          </div>
+          
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             {user ? (
               <Link to="/app">

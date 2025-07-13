@@ -8,7 +8,7 @@ export interface AmazonConnection {
   access_token: string;
   refresh_token: string;
   token_expires_at: string;
-  status: 'active' | 'expired' | 'error' | 'pending';
+  status: 'active' | 'expired' | 'error' | 'pending' | 'warning' | 'setup_required';
   last_sync_at?: string;
   created_at: string;
   updated_at: string;
