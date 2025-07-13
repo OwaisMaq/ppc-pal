@@ -33,6 +33,7 @@ const AmazonCallback = () => {
       try {
         console.log('Processing Amazon OAuth callback:', { code, state });
         const result = await handleOAuthCallback(code, state);
+        console.log('OAuth callback result:', result);
         
         if (result) {
           setStatus('success');
@@ -42,13 +43,15 @@ const AmazonCallback = () => {
             navigate('/dashboard');
           }, 2000);
         } else {
+          console.log('OAuth callback returned falsy result:', result);
           setStatus('error');
           setMessage('Failed to connect Amazon account');
         }
       } catch (error) {
         console.error('Callback processing error:', error);
+        console.error('Error details:', error);
         setStatus('error');
-        setMessage('Failed to process Amazon connection');
+        setMessage(`Connection error: ${error.message || 'Unknown error'}`);
       }
     };
 
