@@ -3,45 +3,170 @@ import AmazonAccountSetup from "@/components/AmazonAccountSetup";
 import OptimizationDashboard from "@/components/OptimizationDashboard";
 import SubscriptionStatus from "@/components/SubscriptionStatus";
 import AmazonDataDashboard from "@/components/AmazonDataDashboard";
+import { PerformanceMetricCards } from "@/components/PerformanceMetricCards";
+import { CampaignDataTable } from "@/components/CampaignDataTable";
+import { WeeklyPerformanceChart } from "@/components/WeeklyPerformanceChart";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
+import { useCampaignMetrics } from "@/hooks/useCampaignMetrics";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { RefreshCw, BarChart3, Calendar } from "lucide-react";
+import { toast } from "sonner";
+
 const Dashboard = () => {
-  const {
-    connections
-  } = useAmazonConnections();
+  const { connections, syncConnection } = useAmazonConnections();
+  const { metrics, campaigns, loading, error, refetch } = useCampaignMetrics();
+  
   const hasActiveConnections = connections.some(c => c.status === 'active');
-  return <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50">
+
+  const handleSyncData = async () => {
+    if (!hasActiveConnections) {
+      toast.error("Please connect your Amazon account first");
+      return;
+    }
+
+    const activeConnection = connections.find(c => c.status === 'active');
+    if (activeConnection) {
+      try {
+        await syncConnection(activeConnection.id);
+        setTimeout(() => {
+          refetch();
+        }, 2000); // Give time for sync to complete
+      } catch (error) {
+        toast.error("Failed to sync campaign data");
+      }
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50">
       <Header />
       <div className="container mx-auto py-6 px-4">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            PPC Automation Dashboard
-          </h1>
-          <p className="text-gray-600">
-            Connect your Amazon Advertising accounts and let AI optimize your campaigns automatically
-          </p>
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              PPC Automation Dashboard
+            </h1>
+            <p className="text-gray-600">
+              Connect your Amazon Advertising accounts and let AI optimize your campaigns automatically
+            </p>
+          </div>
+          
+          {hasActiveConnections && (
+            <div className="flex gap-3">
+              <Button 
+                onClick={refetch} 
+                variant="outline" 
+                className="flex items-center gap-2"
+                disabled={loading}
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                Refresh Data
+              </Button>
+              <Button 
+                onClick={handleSyncData} 
+                className="flex items-center gap-2"
+              >
+                <Calendar className="h-4 w-4" />
+                Sync Amazon Data
+              </Button>
+            </div>
+          )}
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Account Setup */}
-          <div className="lg:col-span-2">
-            <AmazonAccountSetup />
-          </div>
+        <div className="space-y-6">
+          {/* Account Setup Section */}
+          {!hasActiveConnections && (
+            <div className="grid lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2">
+                <AmazonAccountSetup />
+              </div>
+            </div>
+          )}
 
-          {/* Subscription Status */}
-          
+          {/* Performance Overview Section */}
+          {hasActiveConnections && (
+            <>
+              {error && (
+                <Card className="border-red-200 bg-red-50">
+                  <CardContent className="pt-6">
+                    <p className="text-red-800">Error loading campaign data: {error}</p>
+                  </CardContent>
+                </Card>
+              )}
 
-          
-          {/* Amazon Data Dashboard - Full Width */}
-          {hasActiveConnections && <div className="lg:col-span-3">
-              <AmazonDataDashboard />
-            </div>}
+              {/* KPI Cards */}
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <BarChart3 className="h-5 w-5 text-blue-600" />
+                  <h2 className="text-xl font-semibold">Performance Overview</h2>
+                </div>
+                <PerformanceMetricCards metrics={metrics} loading={loading} />
+              </div>
 
-          {/* Optimization Dashboard - Full Width */}
-          {hasActiveConnections && <div className="lg:col-span-3">
-              <OptimizationDashboard />
-            </div>}
+              {/* Charts and Tables */}
+              <div className="grid lg:grid-cols-2 gap-6">
+                <WeeklyPerformanceChart campaigns={campaigns} loading={loading} />
+                
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Quick Stats</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Active Campaigns</span>
+                        <span className="font-semibold">
+                          {campaigns.filter(c => c.status === 'enabled').length}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Paused Campaigns</span>
+                        <span className="font-semibold">
+                          {campaigns.filter(c => c.status === 'paused').length}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Best ACOS</span>
+                        <span className="font-semibold text-green-600">
+                          {campaigns.length > 0 
+                            ? `${Math.min(...campaigns.map(c => c.acos || 100)).toFixed(2)}%`
+                            : 'N/A'
+                          }
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Best ROAS</span>
+                        <span className="font-semibold text-blue-600">
+                          {campaigns.length > 0 
+                            ? `${Math.max(...campaigns.map(c => c.roas || 0)).toFixed(2)}x`
+                            : 'N/A'
+                          }
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Campaign Data Table */}
+              <CampaignDataTable campaigns={campaigns} loading={loading} />
+
+              {/* Amazon Data Dashboard - Full Width */}
+              <div className="lg:col-span-3">
+                <AmazonDataDashboard />
+              </div>
+
+              {/* Optimization Dashboard - Full Width */}
+              <div className="lg:col-span-3">
+                <OptimizationDashboard />
+              </div>
+            </>
+          )}
         </div>
       </div>
-    </div>;
+    </div>
+  );
 };
+
 export default Dashboard;
