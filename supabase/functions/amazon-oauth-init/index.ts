@@ -130,7 +130,7 @@ serve(async (req) => {
       );
     }
 
-    // Handle test mode for environment validation
+    // Handle test mode for environment validation FIRST
     const { redirectUri, test } = requestBody;
     
     if (test) {
@@ -146,6 +146,59 @@ serve(async (req) => {
           credentialsConfigured: true
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // For normal OAuth flow, validate authorization header first
+    console.log('=== Validating Authorization ===');
+    const authHeader = req.headers.get('authorization');
+    console.log('Auth header present:', !!authHeader);
+    
+    if (!authHeader) {
+      console.error('=== MISSING AUTHORIZATION HEADER ===');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Authentication required',
+          details: 'Authorization header is required',
+          errorType: 'missing_auth_header'
+        }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    if (!authHeader.startsWith('Bearer ')) {
+      console.error('=== INVALID AUTHORIZATION HEADER FORMAT ===');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Authentication failed',
+          details: 'Authorization header must start with "Bearer "',
+          errorType: 'invalid_auth_format'
+        }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    console.log('Token extracted, length:', token.length);
+    
+    if (token.length < 10) {
+      console.error('=== INVALID TOKEN LENGTH ===');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Authentication failed',
+          details: 'Invalid token format',
+          errorType: 'invalid_token'
+        }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
       );
     }
 
@@ -203,59 +256,6 @@ serve(async (req) => {
         }),
         {
           status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-
-    // Validate authorization header
-    console.log('=== Validating Authorization ===');
-    const authHeader = req.headers.get('authorization');
-    console.log('Auth header present:', !!authHeader);
-    
-    if (!authHeader) {
-      console.error('=== MISSING AUTHORIZATION HEADER ===');
-      return new Response(
-        JSON.stringify({ 
-          error: 'Authentication required',
-          details: 'Authorization header is required',
-          errorType: 'missing_auth_header'
-        }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-
-    if (!authHeader.startsWith('Bearer ')) {
-      console.error('=== INVALID AUTHORIZATION HEADER FORMAT ===');
-      return new Response(
-        JSON.stringify({ 
-          error: 'Authentication failed',
-          details: 'Authorization header must start with "Bearer "',
-          errorType: 'invalid_auth_format'
-        }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    console.log('Token extracted, length:', token.length);
-    
-    if (token.length < 10) {
-      console.error('=== INVALID TOKEN LENGTH ===');
-      return new Response(
-        JSON.stringify({ 
-          error: 'Authentication failed',
-          details: 'Invalid token format',
-          errorType: 'invalid_token'
-        }),
-        {
-          status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );
