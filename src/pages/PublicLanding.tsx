@@ -69,9 +69,9 @@ const PublicLanding = () => {
               Contact
             </Link>
             {user ? (
-              <Link to="/app">
+              <Link to="/dashboard">
                 <Button className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg shadow-purple-500/30 transition-all duration-300 hover:scale-105">
-                  Go to App
+                  Go to Dashboard
                 </Button>
               </Link>
             ) : (
@@ -129,7 +129,7 @@ const PublicLanding = () => {
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             {user ? (
-              <Link to="/app">
+              <Link to="/dashboard">
                 <Button size="lg" className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg shadow-purple-500/40 transition-all duration-300 hover:scale-105 border border-purple-400/30">
                   <Zap className="mr-2 h-5 w-5" />
                   Go to Dashboard

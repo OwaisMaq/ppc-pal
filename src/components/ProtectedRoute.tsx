@@ -7,7 +7,7 @@ interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
-const PROTECTED_ROUTES = ['/app', '/feedback', '/data-management'];
+const PROTECTED_ROUTES = ['/dashboard', '/feedback', '/data-management'];
 
 const isProtectedRoute = (pathname: string) => {
   return PROTECTED_ROUTES.some(route => pathname.startsWith(route));

@@ -18,7 +18,7 @@ const Header = () => {
     <header className="bg-white border-b border-gray-200 px-4 py-3">
       <div className="container mx-auto flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link to="/app" className="flex items-center">
+          <Link to="/dashboard" className="flex items-center">
             <div className="bg-blue-600 rounded-full p-2">
               <Bot className="h-6 w-6 text-white" />
             </div>

@@ -51,9 +51,9 @@ const Auth = () => {
     // 3. User is specifically on the /auth page (not other pages)
     // 4. We're not currently loading auth state
     if (!loading && user && location.pathname === '/auth') {
-      console.log('Auth: Authenticated user on /auth page, redirecting to /app');
+      console.log('Auth: Authenticated user on /auth page, redirecting to /dashboard');
       // Use replace to prevent back button issues
-      navigate("/app", { replace: true });
+      navigate("/dashboard", { replace: true });
     }
   }, [user, loading, navigate, location.pathname]);
 
@@ -94,10 +94,10 @@ const Auth = () => {
       if (error) throw error;
 
       if (data.user) {
-        console.log('Auth: Sign in successful, redirecting to /app');
+        console.log('Auth: Sign in successful, redirecting to /dashboard');
         toast.success("Welcome back!");
-        // Navigate to app after successful sign in
-        navigate("/app", { replace: true });
+        // Navigate to dashboard after successful sign in
+        navigate("/dashboard", { replace: true });
       }
     } catch (error: any) {
       console.error("Sign in error:", error);
@@ -138,7 +138,7 @@ const Auth = () => {
         console.log('Auth: Sign out during sign up cleanup failed (continuing)');
       }
 
-      const redirectUrl = `${window.location.origin}/app`;
+      const redirectUrl = `${window.location.origin}/dashboard`;
       
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,

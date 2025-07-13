@@ -6,7 +6,6 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Auth from "@/pages/Auth";
-import Index from "@/pages/Index";
 import Dashboard from "@/pages/Dashboard";
 import Feedback from "@/pages/Feedback";
 import DataManagement from "@/pages/DataManagement";
@@ -38,11 +37,6 @@ const App = () => {
               <Route path="/auth/amazon/callback" element={<AmazonCallback />} />
               
               {/* Protected routes */}
-              <Route path="/app" element={
-                <ProtectedRoute>
-                  <Index />
-                </ProtectedRoute>
-              } />
               <Route path="/dashboard" element={
                 <ProtectedRoute>
                   <Dashboard />

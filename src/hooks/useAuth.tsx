@@ -46,7 +46,7 @@ const cleanupAuthState = () => {
 };
 
 // Define protected routes that require authentication
-const PROTECTED_ROUTES = ['/app', '/feedback', '/data-management'];
+const PROTECTED_ROUTES = ['/dashboard', '/feedback', '/data-management'];
 
 const isProtectedRoute = (pathname: string) => {
   return PROTECTED_ROUTES.some(route => pathname.startsWith(route));
