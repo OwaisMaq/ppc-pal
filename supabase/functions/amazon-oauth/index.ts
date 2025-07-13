@@ -171,26 +171,37 @@ serve(async (req) => {
         const expiresAt = new Date(Date.now() + (tokenData.expires_in * 1000))
         
         console.log('Storing connection for profile:', profile.profileId);
+        console.log('User ID:', user.id);
+        console.log('Profile data:', JSON.stringify(profile, null, 2));
         
-        const { error: insertError } = await supabase
+        const connectionData = {
+          user_id: user.id,
+          profile_id: profile.profileId.toString(),
+          profile_name: profile.accountInfo?.name || `Profile ${profile.profileId}`,
+          marketplace_id: profile.countryCode,
+          access_token: tokenData.access_token,
+          refresh_token: tokenData.refresh_token,
+          token_expires_at: expiresAt.toISOString(),
+          status: 'active' as const,
+        };
+        
+        console.log('Connection data to insert:', JSON.stringify(connectionData, null, 2));
+        
+        const { data: insertData, error: insertError } = await supabase
           .from('amazon_connections')
-          .upsert({
-            user_id: user.id,
-            profile_id: profile.profileId.toString(),
-            profile_name: profile.accountInfo?.name || `Profile ${profile.profileId}`,
-            marketplace_id: profile.countryCode,
-            access_token: tokenData.access_token,
-            refresh_token: tokenData.refresh_token,
-            token_expires_at: expiresAt.toISOString(),
-            status: 'active',
-          }, {
+          .upsert(connectionData, {
             onConflict: 'user_id, profile_id'
           })
+          .select();
+
+        console.log('Insert result:', { insertData, insertError });
 
         if (insertError) {
           console.error('Error storing connection:', insertError)
           throw insertError
         }
+        
+        console.log('Successfully inserted connection:', insertData);
       }
 
       console.log('Successfully stored connections for user:', user.id)
