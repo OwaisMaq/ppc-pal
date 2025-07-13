@@ -113,6 +113,7 @@ serve(async (req) => {
           code,
           client_id: clientId,
           client_secret: clientSecret,
+          redirect_uri: 'https://ppcpal.online/auth/amazon/callback', // Must match the one used in authorization
         }),
       })
 
@@ -121,7 +122,16 @@ serve(async (req) => {
       if (!tokenResponse.ok) {
         const errorData = await tokenResponse.text()
         console.error('Token exchange failed:', tokenResponse.status, errorData)
-        throw new Error(`Failed to exchange code for tokens: ${tokenResponse.status} - ${errorData}`)
+        return new Response(
+          JSON.stringify({ 
+            error: `Token exchange failed: ${tokenResponse.status}`,
+            details: errorData 
+          }),
+          { 
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        )
       }
 
       const tokenData = await tokenResponse.json()
@@ -141,7 +151,16 @@ serve(async (req) => {
       if (!profileResponse.ok) {
         const profileError = await profileResponse.text();
         console.error('Profile fetch failed:', profileResponse.status, profileError);
-        throw new Error(`Failed to fetch profiles: ${profileResponse.status} - ${profileError}`);
+        return new Response(
+          JSON.stringify({ 
+            error: `Profile fetch failed: ${profileResponse.status}`,
+            details: profileError 
+          }),
+          { 
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        )
       }
 
       const profiles = await profileResponse.json()
