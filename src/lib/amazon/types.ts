@@ -12,6 +12,7 @@ export interface AmazonConnection {
   last_sync_at?: string;
   created_at: string;
   updated_at: string;
+  setup_required_reason?: string;
 }
 
 export interface Campaign {
