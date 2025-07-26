@@ -2,13 +2,13 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { LinkIcon, RefreshCw, Trash2, CheckCircle, AlertCircle, Clock, ExternalLink } from "lucide-react";
+import { LinkIcon, RefreshCw, Trash2, CheckCircle, AlertCircle, Clock, ExternalLink, RotateCcw } from "lucide-react";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import AmazonOAuthSetup from "@/components/AmazonOAuthSetup";
 import { formatDistanceToNow } from "date-fns";
 
 const AmazonAccountSetup = () => {
-  const { connections, loading, initiateConnection, syncConnection, deleteConnection } = useAmazonConnections();
+  const { connections, loading, initiateConnection, syncConnection, deleteConnection, refreshConnection } = useAmazonConnections();
 
   const handleConnect = () => {
     const redirectUri = `${window.location.origin}/auth/amazon/callback`;
@@ -107,11 +107,22 @@ const AmazonAccountSetup = () => {
                         <Badge className={getStatusColor(connection.status)}>
                           {connection.status}
                         </Badge>
+                        {connection.status === 'expired' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => refreshConnection(connection.id)}
+                            disabled={loading}
+                            className="text-orange-600 border-orange-200 hover:bg-orange-50"
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => syncConnection(connection.id)}
-                          disabled={connection.status !== 'active'}
+                          disabled={loading || connection.status !== 'active'}
                         >
                           <RefreshCw className="h-4 w-4" />
                         </Button>
@@ -119,6 +130,7 @@ const AmazonAccountSetup = () => {
                           variant="outline"
                           size="sm"
                           onClick={() => deleteConnection(connection.id)}
+                          disabled={loading}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>

@@ -170,7 +170,49 @@ export const useAmazonConnections = () => {
       await fetchConnections();
     } catch (error) {
       console.error('Error syncing connection:', error);
-      toast.error('Failed to sync Amazon data');
+      
+      // Check if it's a token-related error
+      if (error.message && (
+        error.message.includes('Token expired') || 
+        error.message.includes('refresh failed') ||
+        error.message.includes('reconnect')
+      )) {
+        toast.error('Your Amazon connection has expired. Please refresh or reconnect your account.');
+        
+        // Refresh connections to show updated status
+        await fetchConnections();
+      } else {
+        toast.error('Failed to sync Amazon data');
+      }
+    }
+  };
+
+  const refreshConnection = async (connectionId: string) => {
+    try {
+      setLoading(true);
+      
+      const { error } = await supabase.functions.invoke('refresh-amazon-token', {
+        body: { connectionId },
+        headers: {
+          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+
+      toast.success('Connection refreshed successfully!');
+
+      // Refresh connections to get updated status
+      await fetchConnections();
+      
+      return true;
+    } catch (error) {
+      console.error('Refresh error:', error);
+      toast.error('Failed to refresh connection. Please try reconnecting.');
+      
+      return false;
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -198,6 +240,7 @@ export const useAmazonConnections = () => {
     handleOAuthCallback,
     syncConnection,
     deleteConnection,
+    refreshConnection,
     refreshConnections: fetchConnections
   };
 };

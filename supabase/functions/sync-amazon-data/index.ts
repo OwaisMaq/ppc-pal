@@ -60,16 +60,77 @@ serve(async (req) => {
     
     let accessToken = connection.access_token
     
-    if (now >= expiresAt) {
-      console.log('Token expired, refreshing...')
-      // Refresh token logic would go here
-      // For now, mark as expired
-      await supabase
-        .from('amazon_connections')
-        .update({ status: 'expired' })
-        .eq('id', connectionId)
+    // If token expires within 5 minutes, try to refresh it
+    const bufferTime = 5 * 60 * 1000 // 5 minutes in milliseconds
+    if (now.getTime() >= (expiresAt.getTime() - bufferTime)) {
+      console.log('Token expired or expiring soon, attempting refresh...')
       
-      throw new Error('Token expired, please reconnect your account')
+      const clientId = Deno.env.get('AMAZON_CLIENT_ID')
+      const clientSecret = Deno.env.get('AMAZON_CLIENT_SECRET')
+      
+      if (!clientSecret) {
+        await supabase
+          .from('amazon_connections')
+          .update({ 
+            status: 'error',
+            setup_required_reason: 'Missing Amazon client secret'
+          })
+          .eq('id', connectionId)
+        
+        throw new Error('Amazon client secret not configured')
+      }
+
+      try {
+        console.log('Attempting token refresh...')
+        
+        const refreshResponse = await fetch('https://api.amazon.com/auth/o2/token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            grant_type: 'refresh_token',
+            refresh_token: connection.refresh_token,
+            client_id: clientId!,
+            client_secret: clientSecret,
+          }),
+        })
+
+        if (refreshResponse.ok) {
+          const tokenData = await refreshResponse.json()
+          const newExpiresAt = new Date(Date.now() + (tokenData.expires_in * 1000))
+          
+          // Update connection with new tokens
+          await supabase
+            .from('amazon_connections')
+            .update({
+              access_token: tokenData.access_token,
+              refresh_token: tokenData.refresh_token || connection.refresh_token,
+              token_expires_at: newExpiresAt.toISOString(),
+              status: 'active',
+              setup_required_reason: null
+            })
+            .eq('id', connectionId)
+          
+          accessToken = tokenData.access_token
+          console.log('Token refreshed successfully')
+        } else {
+          throw new Error('Token refresh failed')
+        }
+      } catch (refreshError) {
+        console.error('Token refresh failed:', refreshError)
+        
+        // Mark as expired if refresh fails
+        await supabase
+          .from('amazon_connections')
+          .update({ 
+            status: 'expired',
+            setup_required_reason: 'Token refresh failed - please reconnect'
+          })
+          .eq('id', connectionId)
+        
+        throw new Error('Token expired and refresh failed, please reconnect your account')
+      }
     }
 
     // Sync campaigns
