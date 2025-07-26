@@ -40,9 +40,16 @@ const AmazonCallback = () => {
         const result = await handleOAuthCallback(code, state);
         console.log('OAuth callback result:', result);
         
-        if (result) {
+        if (result?.requiresSetup) {
+          setStatus('error');
+          setMessage(result.details || 'Amazon Advertising account setup required. Please ensure you have an active Amazon Advertising account with API access.');
+          return;
+        }
+        
+        if (result?.success) {
           setStatus('success');
-          setMessage('Amazon account connected successfully!');
+          const profileCount = result?.profileCount || 0;
+          setMessage(`Amazon account connected successfully! Found ${profileCount} advertising profile(s). Redirecting to dashboard...`);
           // Redirect to dashboard after 2 seconds
           setTimeout(() => {
             navigate('/dashboard');

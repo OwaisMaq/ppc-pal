@@ -126,10 +126,23 @@ export const useAmazonConnections = () => {
         throw error;
       }
       
+      // Handle case where no profiles were found (setup required)
+      if (data?.requiresSetup) {
+        console.warn('Amazon setup required:', data);
+        toast.error(data.details || 'Amazon Advertising account setup required');
+        return { 
+          success: false, 
+          requiresSetup: true,
+          error: data.error,
+          details: data.details
+        };
+      }
+      
       console.log('Connection successful, refreshing connections...');
-      toast.success('Amazon account connected successfully!');
+      const profileCount = data?.profileCount || 0;
+      toast.success(`Amazon account connected successfully! Found ${profileCount} advertising profile(s).`);
       await fetchConnections();
-      return data;
+      return { success: true, profileCount };
     } catch (error) {
       console.error('Error handling OAuth callback:', error);
       console.error('Callback error details:', {

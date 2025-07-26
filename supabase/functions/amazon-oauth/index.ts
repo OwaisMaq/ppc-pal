@@ -71,14 +71,21 @@ serve(async (req) => {
       }
 
       const stateParam = `${user.id}_${Date.now()}`
-      const scope = 'advertising::campaign_management'
+      // Request comprehensive scopes for full Amazon Advertising API access
+      const scopes = [
+        'advertising::campaign_management',
+        'advertising::reporting', 
+        'profile:read'
+      ];
+      const scope = scopes.join(' ');
       
       const authUrl = `https://www.amazon.com/ap/oa?` +
         `client_id=${clientId}&` +
-        `scope=${scope}&` +
+        `scope=${encodeURIComponent(scope)}&` +
         `response_type=code&` +
         `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-        `state=${stateParam}`
+        `state=${stateParam}&` +
+        `prompt=consent`; // Ensure user sees all permissions being requested
 
       console.log('Generated auth URL for user:', user.id)
       
@@ -165,6 +172,29 @@ serve(async (req) => {
 
       const profiles = await profileResponse.json()
       console.log('Retrieved profiles count:', profiles.length)
+      console.log('Profiles data:', JSON.stringify(profiles, null, 2));
+
+      // Handle case where no profiles are returned
+      if (!profiles || profiles.length === 0) {
+        console.warn('No Amazon Advertising profiles found for user:', user.id);
+        console.warn('This usually means:');
+        console.warn('1. User does not have an active Amazon Advertising account');
+        console.warn('2. User has not granted sufficient permissions');
+        console.warn('3. User account is not eligible for Advertising API access');
+        
+        return new Response(
+          JSON.stringify({ 
+            error: 'No Amazon Advertising profiles found',
+            details: 'This account may not have access to Amazon Advertising, or insufficient permissions were granted. Please ensure you have an active Amazon Advertising account and grant all requested permissions.',
+            profileCount: 0,
+            requiresSetup: true
+          }),
+          { 
+            status: 200, // Not a server error, but a setup issue
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        )
+      }
 
       // Store connection for each profile
       for (const profile of profiles) {
