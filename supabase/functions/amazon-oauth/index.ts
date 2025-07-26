@@ -75,7 +75,7 @@ serve(async (req) => {
       const scopes = [
         'advertising::campaign_management',
         'advertising::reporting', 
-        'profile:read'
+        'profile'  // Correct scope for Amazon Advertising API profile access
       ];
       const scope = scopes.join(' ');
       
