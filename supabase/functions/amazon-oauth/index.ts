@@ -113,7 +113,7 @@ serve(async (req) => {
           code,
           client_id: clientId,
           client_secret: clientSecret,
-          redirect_uri: 'https://ppcpal.online/auth/amazon/callback', // Must match the one used in authorization
+          redirect_uri: redirectUri, // Use the dynamic redirect URI from the request
         }),
       })
 
