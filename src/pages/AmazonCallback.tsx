@@ -2,15 +2,14 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAmazonConnections } from '@/hooks/useAmazonConnections';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle, AlertCircle, Loader2, ExternalLink } from 'lucide-react';
+import { CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const AmazonCallback = () => {
   const navigate = useNavigate();
   const { handleOAuthCallback } = useAmazonConnections();
-  const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'setup_required'>('loading');
+  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('Processing Amazon connection...');
-  const [setupRequired, setSetupRequired] = useState(false);
 
   useEffect(() => {
     let processed = false;
@@ -56,15 +55,8 @@ const AmazonCallback = () => {
       } catch (error) {
         console.error('Callback processing error:', error);
         console.error('Error details:', error);
-        
-        if (error.setupRequired) {
-          setStatus('setup_required');
-          setSetupRequired(true);
-          setMessage('Amazon Advertising setup required');
-        } else {
-          setStatus('error');
-          setMessage(`Connection error: ${error.message || 'Unknown error'}`);
-        }
+        setStatus('error');
+        setMessage(`Connection error: ${error.message || 'Unknown error'}`);
       }
     };
 
@@ -77,8 +69,6 @@ const AmazonCallback = () => {
         return <Loader2 className="h-8 w-8 animate-spin text-blue-600" />;
       case 'success':
         return <CheckCircle className="h-8 w-8 text-green-600" />;
-      case 'setup_required':
-        return <AlertCircle className="h-8 w-8 text-orange-600" />;
       case 'error':
         return <AlertCircle className="h-8 w-8 text-red-600" />;
     }
@@ -90,8 +80,6 @@ const AmazonCallback = () => {
         return 'text-blue-600';
       case 'success':
         return 'text-green-600';
-      case 'setup_required':
-        return 'text-orange-600';
       case 'error':
         return 'text-red-600';
     }
@@ -106,7 +94,6 @@ const AmazonCallback = () => {
             <span className={getColor()}>
               {status === 'loading' && 'Connecting...'}
               {status === 'success' && 'Success!'}
-              {status === 'setup_required' && 'Setup Required'}
               {status === 'error' && 'Connection Failed'}
             </span>
           </CardTitle>
@@ -114,30 +101,6 @@ const AmazonCallback = () => {
         <CardContent className="text-center space-y-4">
           <p className="text-gray-600">{message}</p>
           
-          {status === 'setup_required' && (
-            <div className="space-y-3">
-              <p className="text-sm text-gray-500">
-                Your Amazon account needs an active Amazon Advertising profile to connect. Please set up Amazon Advertising first.
-              </p>
-              <div className="space-y-2">
-                <Button 
-                  onClick={() => window.open('https://advertising.amazon.com/', '_blank')} 
-                  className="w-full"
-                >
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  Set up Amazon Advertising
-                </Button>
-                <Button 
-                  onClick={() => navigate('/dashboard')} 
-                  variant="outline"
-                  className="w-full"
-                >
-                  Return to Dashboard
-                </Button>
-              </div>
-            </div>
-          )}
-
           {status === 'error' && (
             <Button 
               onClick={() => navigate('/dashboard')} 
