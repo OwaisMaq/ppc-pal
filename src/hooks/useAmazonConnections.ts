@@ -120,6 +120,19 @@ export const useAmazonConnections = () => {
 
       if (error) {
         console.error('Callback error:', error);
+        
+        // Handle specific error cases
+        if (error.setupRequired) {
+          toast.error('Amazon Advertising setup required', {
+            description: 'Your Amazon account needs an active Amazon Advertising profile. Please set up advertising first.',
+            action: {
+              label: 'Setup Guide',
+              onClick: () => window.open('https://advertising.amazon.com/', '_blank')
+            }
+          });
+        } else {
+          toast.error(`Connection failed: ${error.message}`);
+        }
         throw error;
       }
       

@@ -165,6 +165,24 @@ serve(async (req) => {
 
       const profiles = await profileResponse.json()
       console.log('Retrieved profiles count:', profiles.length)
+      console.log('Full profiles response:', JSON.stringify(profiles, null, 2));
+
+      // Check if user has any advertising profiles
+      if (!profiles || profiles.length === 0) {
+        console.log('No advertising profiles found for user');
+        return new Response(
+          JSON.stringify({ 
+            error: 'No Amazon Advertising profiles found',
+            message: 'Your Amazon account needs to have an active Amazon Advertising account with at least one advertising profile. Please set up Amazon Advertising first, then try connecting again.',
+            helpUrl: 'https://advertising.amazon.com/',
+            setupRequired: true
+          }),
+          { 
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        )
+      }
 
       // Store connection for each profile
       for (const profile of profiles) {
