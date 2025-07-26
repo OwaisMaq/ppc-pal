@@ -98,9 +98,12 @@ export const useAmazonConnections = () => {
         throw new Error('No valid session found for callback');
       }
 
+      // Generate the same redirect URI that was used for initiation
+      const redirectUri = `${window.location.origin}/auth/amazon/callback`;
+
       console.log('Calling amazon-oauth callback...');
       const { data, error } = await supabase.functions.invoke('amazon-oauth', {
-        body: { action: 'callback', code, state },
+        body: { action: 'callback', code, state, redirectUri },
         headers: {
           Authorization: `Bearer ${session.data.session.access_token}`,
         },
