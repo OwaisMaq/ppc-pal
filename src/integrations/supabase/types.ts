@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instanciate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "12.2.3 (519615d)"
+    PostgrestVersion: "12.2.12 (cd3cf9e)"
   }
   public: {
     Tables: {
@@ -79,6 +79,7 @@ export type Database = {
       amazon_connections: {
         Row: {
           access_token: string
+          advertising_api_endpoint: string | null
           campaign_count: number | null
           created_at: string
           id: string
@@ -95,6 +96,7 @@ export type Database = {
         }
         Insert: {
           access_token: string
+          advertising_api_endpoint?: string | null
           campaign_count?: number | null
           created_at?: string
           id?: string
@@ -111,6 +113,7 @@ export type Database = {
         }
         Update: {
           access_token?: string
+          advertising_api_endpoint?: string | null
           campaign_count?: number | null
           created_at?: string
           id?: string
