@@ -138,34 +138,53 @@ serve(async (req) => {
       const tokenData = await tokenResponse.json()
       console.log('Token exchange successful, access token length:', tokenData.access_token?.length || 0)
 
-      // Get profile information
+      // Get profile information - try multiple regional endpoints
       console.log('Fetching Amazon profiles...');
-      const profileResponse = await fetch('https://advertising-api.amazon.com/v2/profiles', {
-        headers: {
-          'Authorization': `Bearer ${tokenData.access_token}`,
-          'Amazon-Advertising-API-ClientId': clientId,
-        },
-      })
-
-      console.log('Profile response status:', profileResponse.status);
-
-      if (!profileResponse.ok) {
-        const profileError = await profileResponse.text();
-        console.error('Profile fetch failed:', profileResponse.status, profileError);
-        return new Response(
-          JSON.stringify({ 
-            error: `Profile fetch failed: ${profileResponse.status}`,
-            details: profileError 
-          }),
-          { 
-            status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      
+      const regionalEndpoints = [
+        'https://advertising-api.amazon.com',     // North America
+        'https://advertising-api-eu.amazon.com', // Europe
+        'https://advertising-api-fe.amazon.com'  // Far East
+      ];
+      
+      let profileResponse;
+      let profiles = [];
+      
+      // Try each regional endpoint until we find profiles
+      for (const endpoint of regionalEndpoints) {
+        console.log(`Trying endpoint: ${endpoint}`);
+        
+        try {
+          profileResponse = await fetch(`${endpoint}/v2/profiles`, {
+            headers: {
+              'Authorization': `Bearer ${tokenData.access_token}`,
+              'Amazon-Advertising-API-ClientId': clientId,
+            },
+          });
+          
+          console.log(`${endpoint} response status:`, profileResponse.status);
+          
+          if (profileResponse.ok) {
+            const endpointProfiles = await profileResponse.json();
+            console.log(`${endpoint} profiles found:`, endpointProfiles.length);
+            
+            if (endpointProfiles && endpointProfiles.length > 0) {
+              // Add endpoint info to each profile for future API calls
+              profiles.push(...endpointProfiles.map(profile => ({
+                ...profile,
+                advertisingApiEndpoint: endpoint
+              })));
+            }
+          } else {
+            const errorText = await profileResponse.text();
+            console.log(`${endpoint} error:`, profileResponse.status, errorText);
           }
-        )
+        } catch (error) {
+          console.log(`${endpoint} request failed:`, error.message);
+        }
       }
 
-      const profiles = await profileResponse.json()
-      console.log('Retrieved profiles count:', profiles.length)
+      console.log('Total profiles found across all regions:', profiles.length);
       console.log('Profiles data:', JSON.stringify(profiles, null, 2));
 
       // Handle case where no profiles are returned
