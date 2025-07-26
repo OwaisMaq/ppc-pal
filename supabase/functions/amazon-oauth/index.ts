@@ -71,13 +71,7 @@ serve(async (req) => {
       }
 
       const stateParam = `${user.id}_${Date.now()}`
-      // Request comprehensive scopes for full Amazon Advertising API access
-      const scopes = [
-        'advertising::campaign_management',
-        'advertising::reporting', 
-        'profile'  // Correct scope for Amazon Advertising API profile access
-      ];
-      const scope = scopes.join(' ');
+      const scope = 'advertising::campaign_management'
       
       const authUrl = `https://www.amazon.com/ap/oa?` +
         `client_id=${clientId}&` +
