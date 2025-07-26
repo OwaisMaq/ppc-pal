@@ -226,7 +226,7 @@ serve(async (req) => {
           refresh_token: tokenData.refresh_token,
           token_expires_at: expiresAt.toISOString(),
           status: 'active' as const,
-          advertising_api_endpoint: profile.advertisingApiEndpoint, // Store the correct endpoint
+          advertising_api_endpoint: profile.advertisingApiEndpoint || 'https://advertising-api.amazon.com', // Fallback to default
         };
         
         console.log('Connection data to insert:', JSON.stringify(connectionData, null, 2));
