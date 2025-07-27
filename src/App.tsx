@@ -9,6 +9,7 @@ import Auth from "@/pages/Auth";
 import Dashboard from "@/pages/Dashboard";
 import Feedback from "@/pages/Feedback";
 import DataManagement from "@/pages/DataManagement";
+import Breakdown from "@/pages/Breakdown";
 import Privacy from "@/pages/Privacy";
 import PublicLanding from "@/pages/PublicLanding";
 import About from "@/pages/About";
@@ -50,6 +51,11 @@ const App = () => {
               <Route path="/data-management" element={
                 <ProtectedRoute>
                   <DataManagement />
+                </ProtectedRoute>
+              } />
+              <Route path="/breakdown" element={
+                <ProtectedRoute>
+                  <Breakdown />
                 </ProtectedRoute>
               } />
               <Route path="/privacy" element={
