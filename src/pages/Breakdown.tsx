@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useAmazonData } from "@/hooks/useAmazonData";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import Header from "@/components/Header";
+import ParetoChart from "@/components/ParetoChart";
 import { 
   RefreshCw, 
   DollarSign, 
@@ -481,6 +482,11 @@ const Breakdown = () => {
                     </div>
                   </CardContent>
                 </Card>
+              )}
+
+              {/* Pareto Chart */}
+              {keywords.length > 0 && (
+                <ParetoChart keywords={keywords} adGroups={adGroups} />
               )}
             </>
           )}
