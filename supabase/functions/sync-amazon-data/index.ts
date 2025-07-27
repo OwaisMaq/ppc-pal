@@ -133,9 +133,13 @@ serve(async (req) => {
       }
     }
 
-    // Sync campaigns
+    // Use region-specific API endpoint
+    const apiEndpoint = connection.advertising_api_endpoint || 'https://advertising-api.amazon.com'
+    console.log('Using API endpoint:', apiEndpoint)
+
+    // Sync campaigns with performance data
     console.log('Fetching campaigns...')
-    const campaignsResponse = await fetch(`https://advertising-api.amazon.com/v2/campaigns`, {
+    const campaignsResponse = await fetch(`${apiEndpoint}/v2/campaigns`, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Amazon-Advertising-API-ClientId': clientId,
@@ -144,14 +148,32 @@ serve(async (req) => {
     })
 
     if (!campaignsResponse.ok) {
-      throw new Error('Failed to fetch campaigns')
+      const errorText = await campaignsResponse.text()
+      console.error('Campaigns API error:', campaignsResponse.status, errorText)
+      throw new Error(`Failed to fetch campaigns: ${campaignsResponse.status} ${errorText}`)
     }
 
     const campaignsData = await campaignsResponse.json()
     console.log('Retrieved campaigns:', campaignsData.length)
 
-    // Store campaigns
+    // Prepare date range for performance data (last 30 days)
+    const endDate = new Date()
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - 30)
+    
+    const reportStartDate = startDate.toISOString().split('T')[0]
+    const reportEndDate = endDate.toISOString().split('T')[0]
+
+    // Store campaigns with basic data first
+    const campaignIds: string[] = []
     for (const campaign of campaignsData) {
+      if (!campaign.campaignId || !campaign.name) {
+        console.warn('Skipping invalid campaign:', campaign)
+        continue
+      }
+
+      campaignIds.push(campaign.campaignId.toString())
+      
       const { error: campaignError } = await supabase
         .from('campaigns')
         .upsert({
@@ -160,10 +182,10 @@ serve(async (req) => {
           name: campaign.name,
           campaign_type: campaign.campaignType,
           targeting_type: campaign.targetingType,
-          status: campaign.state.toLowerCase(),
-          daily_budget: campaign.dailyBudget,
-          start_date: campaign.startDate,
-          end_date: campaign.endDate,
+          status: campaign.state ? campaign.state.toLowerCase() : 'unknown',
+          daily_budget: campaign.dailyBudget || null,
+          start_date: campaign.startDate || null,
+          end_date: campaign.endDate || null,
           impressions: 0,
           clicks: 0,
           spend: 0,
@@ -174,7 +196,84 @@ serve(async (req) => {
         })
 
       if (campaignError) {
-        console.error('Error storing campaign:', campaignError)
+        console.error('Error storing campaign:', campaign.campaignId, campaignError)
+      }
+    }
+
+    // Fetch performance data for campaigns
+    if (campaignIds.length > 0) {
+      console.log('Fetching campaign performance data...')
+      
+      // Process campaigns in batches of 100
+      const batchSize = 100
+      for (let i = 0; i < campaignIds.length; i += batchSize) {
+        const batch = campaignIds.slice(i, i + batchSize)
+        
+        try {
+          const reportPayload = {
+            reportDate: reportEndDate,
+            metrics: [
+              'campaignId',
+              'impressions',
+              'clicks',
+              'cost',
+              'attributedSales30d',
+              'attributedUnitsOrdered30d'
+            ],
+            campaignType: 'sponsoredProducts',
+            timeUnit: 'SUMMARY',
+            format: 'JSON',
+            campaignIdFilter: batch
+          }
+
+          const reportResponse = await fetch(`${apiEndpoint}/reporting/reports`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Amazon-Advertising-API-ClientId': clientId,
+              'Amazon-Advertising-API-Scope': connection.profile_id,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(reportPayload)
+          })
+
+          if (reportResponse.ok) {
+            const reportData = await reportResponse.json()
+            console.log(`Retrieved performance data for ${reportData.length} campaigns in batch ${i/batchSize + 1}`)
+            
+            // Update campaigns with performance data
+            for (const perfData of reportData) {
+              if (!perfData.campaignId) continue
+              
+              const { error: updateError } = await supabase
+                .from('campaigns')
+                .update({
+                  impressions: parseInt(perfData.impressions || '0'),
+                  clicks: parseInt(perfData.clicks || '0'),
+                  spend: parseFloat(perfData.cost || '0'),
+                  sales: parseFloat(perfData.attributedSales30d || '0'),
+                  orders: parseInt(perfData.attributedUnitsOrdered30d || '0'),
+                  last_updated: new Date().toISOString()
+                })
+                .eq('connection_id', connectionId)
+                .eq('amazon_campaign_id', perfData.campaignId.toString())
+
+              if (updateError) {
+                console.error('Error updating campaign performance:', perfData.campaignId, updateError)
+              }
+            }
+          } else {
+            const errorText = await reportResponse.text()
+            console.error(`Performance data API error for batch ${i/batchSize + 1}:`, reportResponse.status, errorText)
+          }
+        } catch (batchError) {
+          console.error(`Error processing batch ${i/batchSize + 1}:`, batchError)
+        }
+        
+        // Small delay between batches to avoid rate limiting
+        if (i + batchSize < campaignIds.length) {
+          await new Promise(resolve => setTimeout(resolve, 100))
+        }
       }
     }
 
@@ -187,7 +286,7 @@ serve(async (req) => {
     for (const campaign of storedCampaigns || []) {
       console.log('Fetching ad groups for campaign:', campaign.amazon_campaign_id)
       
-      const adGroupsResponse = await fetch(`https://advertising-api.amazon.com/v2/adGroups?campaignIdFilter=${campaign.amazon_campaign_id}`, {
+      const adGroupsResponse = await fetch(`${apiEndpoint}/v2/adGroups?campaignIdFilter=${campaign.amazon_campaign_id}`, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Amazon-Advertising-API-ClientId': clientId,
