@@ -302,7 +302,7 @@ serve(async (req) => {
         const adGroupsData = await adGroupsResponse.json()
         
         for (const adGroup of adGroupsData) {
-          await supabase
+          const { data: storedAdGroup } = await supabase
             .from('ad_groups')
             .upsert({
               campaign_id: campaign.id,
@@ -318,6 +318,54 @@ serve(async (req) => {
             }, {
               onConflict: 'campaign_id, amazon_adgroup_id'
             })
+            .select('id')
+            .single()
+
+          if (storedAdGroup) {
+            // Fetch keywords for this ad group
+            console.log('Fetching keywords for ad group:', adGroup.adGroupId)
+            
+            const keywordsResponse = await fetch(`${apiEndpoint}/v2/keywords?adGroupIdFilter=${adGroup.adGroupId}`, {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Amazon-Advertising-API-ClientId': clientId,
+                'Amazon-Advertising-API-Scope': connection.profile_id,
+              },
+            })
+
+            if (keywordsResponse.ok) {
+              const keywordsData = await keywordsResponse.json()
+              console.log(`Retrieved ${keywordsData.length} keywords for ad group ${adGroup.adGroupId}`)
+              
+              for (const keyword of keywordsData) {
+                if (!keyword.keywordId || !keyword.keywordText) {
+                  console.warn('Skipping invalid keyword:', keyword)
+                  continue
+                }
+
+                await supabase
+                  .from('keywords')
+                  .upsert({
+                    adgroup_id: storedAdGroup.id,
+                    amazon_keyword_id: keyword.keywordId.toString(),
+                    keyword_text: keyword.keywordText,
+                    match_type: keyword.matchType || 'exact',
+                    bid: keyword.bid || null,
+                    status: keyword.state ? keyword.state.toLowerCase() : 'enabled',
+                    impressions: 0,
+                    clicks: 0,
+                    spend: 0,
+                    sales: 0,
+                    orders: 0,
+                  }, {
+                    onConflict: 'adgroup_id, amazon_keyword_id'
+                  })
+              }
+            } else {
+              const errorText = await keywordsResponse.text()
+              console.error(`Keywords API error for ad group ${adGroup.adGroupId}:`, keywordsResponse.status, errorText)
+            }
+          }
         }
       }
     }
