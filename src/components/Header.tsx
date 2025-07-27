@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
-import { LogOut, User, Crown, LinkIcon, MessageSquare, Bot, Shield, Database } from "lucide-react";
+import { LogOut, User, Crown, LinkIcon, MessageSquare, Bot, Shield, Database, BarChart3 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import ComingSoon from "@/components/ComingSoon";
 
@@ -65,6 +65,18 @@ const Header = () => {
             >
               <Database className="h-4 w-4" />
               My Data
+            </Link>
+            
+            <Link 
+              to="/breakdown"
+              className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
+                location.pathname === '/breakdown' 
+                  ? 'bg-blue-100 text-blue-700' 
+                  : 'text-gray-600 hover:text-blue-600 hover:bg-gray-100'
+              }`}
+            >
+              <BarChart3 className="h-4 w-4" />
+              Breakdown
             </Link>
             
             <Link 
