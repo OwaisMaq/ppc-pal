@@ -3,6 +3,7 @@ import AmazonAccountSetup from "@/components/AmazonAccountSetup";
 import OptimizationDashboard from "@/components/OptimizationDashboard";
 import SubscriptionStatus from "@/components/SubscriptionStatus";
 import AmazonDataDashboard from "@/components/AmazonDataDashboard";
+import ConsolidatedDataView from "@/components/ConsolidatedDataView";
 import { PerformanceMetricCards } from "@/components/PerformanceMetricCards";
 import { CampaignDataTable } from "@/components/CampaignDataTable";
 import { WeeklyPerformanceChart } from "@/components/WeeklyPerformanceChart";
@@ -178,6 +179,11 @@ const Dashboard = () => {
 
               {/* Campaign Data Table */}
               <CampaignDataTable campaigns={campaigns} loading={loading} />
+
+              {/* Consolidated Data View - Full Width */}
+              <div className="lg:col-span-3">
+                <ConsolidatedDataView />
+              </div>
 
               {/* Amazon Data Dashboard - Full Width */}
               <div className="lg:col-span-3">
