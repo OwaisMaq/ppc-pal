@@ -211,18 +211,22 @@ serve(async (req) => {
         
         try {
           const reportPayload = {
-            reportDate: reportEndDate,
-            metrics: [
-              'campaignId',
-              'impressions',
-              'clicks',
-              'cost',
-              'attributedSales30d',
-              'attributedUnitsOrdered30d'
-            ],
-            campaignType: 'sponsoredProducts',
-            timeUnit: 'SUMMARY',
-            format: 'JSON',
+            startDate: reportStartDate,
+            endDate: reportEndDate,
+            configuration: {
+              adProduct: 'SPONSORED_PRODUCTS',
+              columns: [
+                'campaignId',
+                'impressions',
+                'clicks',
+                'cost',
+                'attributedSales30d',
+                'attributedUnitsOrdered30d'
+              ],
+              reportTypeId: 'spCampaigns',
+              timeUnit: 'SUMMARY',
+              format: 'GZIP_JSON'
+            },
             campaignIdFilter: batch
           }
 
