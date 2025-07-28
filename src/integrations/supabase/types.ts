@@ -204,7 +204,10 @@ export type Database = {
           advertising_api_endpoint: string | null
           campaign_count: number | null
           created_at: string
+          health_issues: string[] | null
+          health_status: string | null
           id: string
+          last_health_check: string | null
           last_sync_at: string | null
           marketplace_id: string | null
           profile_id: string
@@ -223,7 +226,10 @@ export type Database = {
           advertising_api_endpoint?: string | null
           campaign_count?: number | null
           created_at?: string
+          health_issues?: string[] | null
+          health_status?: string | null
           id?: string
+          last_health_check?: string | null
           last_sync_at?: string | null
           marketplace_id?: string | null
           profile_id: string
@@ -242,7 +248,10 @@ export type Database = {
           advertising_api_endpoint?: string | null
           campaign_count?: number | null
           created_at?: string
+          health_issues?: string[] | null
+          health_status?: string | null
           id?: string
+          last_health_check?: string | null
           last_sync_at?: string | null
           marketplace_id?: string | null
           profile_id?: string
@@ -875,6 +884,59 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      sync_performance_logs: {
+        Row: {
+          campaigns_processed: number | null
+          connection_id: string
+          created_at: string
+          end_time: string | null
+          error_message: string | null
+          id: string
+          operation_type: string
+          performance_metrics: Json | null
+          phases: Json | null
+          start_time: string
+          success: boolean | null
+          total_duration_ms: number | null
+        }
+        Insert: {
+          campaigns_processed?: number | null
+          connection_id: string
+          created_at?: string
+          end_time?: string | null
+          error_message?: string | null
+          id?: string
+          operation_type?: string
+          performance_metrics?: Json | null
+          phases?: Json | null
+          start_time: string
+          success?: boolean | null
+          total_duration_ms?: number | null
+        }
+        Update: {
+          campaigns_processed?: number | null
+          connection_id?: string
+          created_at?: string
+          end_time?: string | null
+          error_message?: string | null
+          id?: string
+          operation_type?: string
+          performance_metrics?: Json | null
+          phases?: Json | null
+          start_time?: string
+          success?: boolean | null
+          total_duration_ms?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sync_performance_logs_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "amazon_connections"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       usage_limits: {
         Row: {
