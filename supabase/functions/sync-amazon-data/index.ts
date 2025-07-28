@@ -200,75 +200,163 @@ serve(async (req) => {
       }
     }
 
-    // Fetch performance data for campaigns
+    // Fetch performance data for campaigns using v3 reporting API
     if (campaignIds.length > 0) {
-      console.log('Fetching campaign performance data...')
+      console.log('Fetching campaign performance data using v3 API...')
+      console.log(`Date range: ${reportStartDate} to ${reportEndDate}`)
+      console.log('Campaign IDs to fetch:', campaignIds)
+      
+      // Try v3 reporting API first, fallback to v2 if needed
+      let performanceDataFetched = false
       
       // Process campaigns in batches of 100
       const batchSize = 100
       for (let i = 0; i < campaignIds.length; i += batchSize) {
         const batch = campaignIds.slice(i, i + batchSize)
+        console.log(`Processing batch ${i/batchSize + 1} with ${batch.length} campaigns`)
         
         try {
-          const reportPayload = {
-            startDate: reportStartDate,
-            endDate: reportEndDate,
-            configuration: {
-              adProduct: 'SPONSORED_PRODUCTS',
-              columns: [
-                'campaignId',
-                'impressions',
-                'clicks',
-                'cost',
-                'attributedSales30d',
-                'attributedUnitsOrdered30d'
-              ],
-              reportTypeId: 'spCampaigns',
-              timeUnit: 'SUMMARY',
-              format: 'GZIP_JSON'
-            },
-            campaignIdFilter: batch
+          // Try v3 reporting API
+          const v3ReportPayload = {
+            reportDate: reportEndDate, // Use single date for v3
+            metrics: 'impressions,clicks,cost,sales,orders',
+            campaignType: 'sponsoredProducts'
           }
 
-          const reportResponse = await fetch(`${apiEndpoint}/reporting/reports`, {
-            method: 'POST',
+          const v3ReportResponse = await fetch(`${apiEndpoint}/reporting/reports/campaigns?${new URLSearchParams(v3ReportPayload)}`, {
+            method: 'GET',
             headers: {
               'Authorization': `Bearer ${accessToken}`,
               'Amazon-Advertising-API-ClientId': clientId,
               'Amazon-Advertising-API-Scope': connection.profile_id,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(reportPayload)
+            }
           })
 
-          if (reportResponse.ok) {
-            const reportData = await reportResponse.json()
-            console.log(`Retrieved performance data for ${reportData.length} campaigns in batch ${i/batchSize + 1}`)
-            
-            // Update campaigns with performance data
-            for (const perfData of reportData) {
-              if (!perfData.campaignId) continue
-              
-              const { error: updateError } = await supabase
-                .from('campaigns')
-                .update({
-                  impressions: parseInt(perfData.impressions || '0'),
-                  clicks: parseInt(perfData.clicks || '0'),
-                  spend: parseFloat(perfData.cost || '0'),
-                  sales: parseFloat(perfData.attributedSales30d || '0'),
-                  orders: parseInt(perfData.attributedUnitsOrdered30d || '0'),
-                  last_updated: new Date().toISOString()
-                })
-                .eq('connection_id', connectionId)
-                .eq('amazon_campaign_id', perfData.campaignId.toString())
+          console.log(`V3 API response status: ${v3ReportResponse.status}`)
 
-              if (updateError) {
-                console.error('Error updating campaign performance:', perfData.campaignId, updateError)
+          if (v3ReportResponse.ok) {
+            const v3ReportData = await v3ReportResponse.json()
+            console.log(`V3 API returned ${v3ReportData.length || 0} records`)
+            
+            if (v3ReportData && v3ReportData.length > 0) {
+              performanceDataFetched = true
+              
+              // Update campaigns with v3 performance data
+              for (const perfData of v3ReportData) {
+                if (!perfData.campaignId) continue
+                
+                console.log(`Updating campaign ${perfData.campaignId} with v3 data:`, {
+                  impressions: perfData.impressions,
+                  clicks: perfData.clicks,
+                  spend: perfData.cost,
+                  sales: perfData.sales,
+                  orders: perfData.orders
+                })
+                
+                const { error: updateError } = await supabase
+                  .from('campaigns')
+                  .update({
+                    impressions: parseInt(perfData.impressions || '0'),
+                    clicks: parseInt(perfData.clicks || '0'),
+                    spend: parseFloat(perfData.cost || '0'),
+                    sales: parseFloat(perfData.sales || '0'),
+                    orders: parseInt(perfData.orders || '0'),
+                    acos: perfData.cost && perfData.sales ? (parseFloat(perfData.cost) / parseFloat(perfData.sales)) * 100 : null,
+                    roas: perfData.cost && perfData.sales ? parseFloat(perfData.sales) / parseFloat(perfData.cost) : null,
+                    last_updated: new Date().toISOString()
+                  })
+                  .eq('connection_id', connectionId)
+                  .eq('amazon_campaign_id', perfData.campaignId.toString())
+
+                if (updateError) {
+                  console.error('Error updating campaign performance:', perfData.campaignId, updateError)
+                }
               }
             }
           } else {
-            const errorText = await reportResponse.text()
-            console.error(`Performance data API error for batch ${i/batchSize + 1}:`, reportResponse.status, errorText)
+            console.log('V3 API failed, trying v2 reporting API...')
+            const v3ErrorText = await v3ReportResponse.text()
+            console.error(`V3 Performance data API error:`, v3ReportResponse.status, v3ErrorText)
+            
+            // Fallback to v2 reporting API
+            const reportPayload = {
+              startDate: reportStartDate,
+              endDate: reportEndDate,
+              configuration: {
+                adProduct: 'SPONSORED_PRODUCTS',
+                columns: [
+                  'campaignId',
+                  'impressions', 
+                  'clicks',
+                  'cost',
+                  'attributedSales30d',
+                  'attributedUnitsOrdered30d'
+                ],
+                reportTypeId: 'spCampaigns',
+                timeUnit: 'SUMMARY',
+                format: 'GZIP_JSON'
+              },
+              campaignIdFilter: batch
+            }
+
+            console.log('V2 API payload:', JSON.stringify(reportPayload, null, 2))
+
+            const reportResponse = await fetch(`${apiEndpoint}/reporting/reports`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Amazon-Advertising-API-ClientId': clientId,
+                'Amazon-Advertising-API-Scope': connection.profile_id,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(reportPayload)
+            })
+
+            console.log(`V2 API response status: ${reportResponse.status}`)
+
+            if (reportResponse.ok) {
+              const reportData = await reportResponse.json()
+              console.log(`V2 API returned ${reportData.length || 0} records`)
+              
+              if (reportData && reportData.length > 0) {
+                performanceDataFetched = true
+                
+                // Update campaigns with v2 performance data  
+                for (const perfData of reportData) {
+                  if (!perfData.campaignId) continue
+                  
+                  console.log(`Updating campaign ${perfData.campaignId} with v2 data:`, {
+                    impressions: perfData.impressions,
+                    clicks: perfData.clicks,
+                    spend: perfData.cost,
+                    sales: perfData.attributedSales30d,
+                    orders: perfData.attributedUnitsOrdered30d
+                  })
+                  
+                  const { error: updateError } = await supabase
+                    .from('campaigns')
+                    .update({
+                      impressions: parseInt(perfData.impressions || '0'),
+                      clicks: parseInt(perfData.clicks || '0'),
+                      spend: parseFloat(perfData.cost || '0'),
+                      sales: parseFloat(perfData.attributedSales30d || '0'),
+                      orders: parseInt(perfData.attributedUnitsOrdered30d || '0'),
+                      acos: perfData.cost && perfData.attributedSales30d ? (parseFloat(perfData.cost) / parseFloat(perfData.attributedSales30d)) * 100 : null,
+                      roas: perfData.cost && perfData.attributedSales30d ? parseFloat(perfData.attributedSales30d) / parseFloat(perfData.cost) : null,
+                      last_updated: new Date().toISOString()
+                    })
+                    .eq('connection_id', connectionId)
+                    .eq('amazon_campaign_id', perfData.campaignId.toString())
+
+                  if (updateError) {
+                    console.error('Error updating campaign performance:', perfData.campaignId, updateError)
+                  }
+                }
+              }
+            } else {
+              const errorText = await reportResponse.text()
+              console.error(`V2 Performance data API error for batch ${i/batchSize + 1}:`, reportResponse.status, errorText)
+            }
           }
         } catch (batchError) {
           console.error(`Error processing batch ${i/batchSize + 1}:`, batchError)
@@ -276,8 +364,17 @@ serve(async (req) => {
         
         // Small delay between batches to avoid rate limiting
         if (i + batchSize < campaignIds.length) {
-          await new Promise(resolve => setTimeout(resolve, 100))
+          await new Promise(resolve => setTimeout(resolve, 500))
         }
+      }
+      
+      if (!performanceDataFetched) {
+        console.warn('No performance data was successfully fetched from Amazon API')
+        console.log('This could be due to:')
+        console.log('1. Campaigns being paused/archived')
+        console.log('2. No data available for the date range')
+        console.log('3. API endpoint or configuration issues')
+        console.log('4. Insufficient permissions')
       }
     }
 
