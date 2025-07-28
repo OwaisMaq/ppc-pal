@@ -1,4 +1,3 @@
-
 export interface AmazonConnection {
   id: string;
   user_id: string;
@@ -13,6 +12,8 @@ export interface AmazonConnection {
   created_at: string;
   updated_at: string;
   setup_required_reason?: string;
+  reporting_api_version?: string;
+  supported_attribution_models?: string[];
 }
 
 export interface Campaign {
@@ -34,6 +35,16 @@ export interface Campaign {
   orders: number;
   acos?: number;
   roas?: number;
+  // Attribution window specific metrics
+  acos_7d?: number;
+  acos_14d?: number;
+  roas_7d?: number;
+  roas_14d?: number;
+  sales_7d?: number;
+  sales_14d?: number;
+  orders_7d?: number;
+  orders_14d?: number;
+  attribution_model?: string;
   last_updated?: string;
   created_at: string;
 }
@@ -52,6 +63,15 @@ export interface AdGroup {
   orders: number;
   acos?: number;
   roas?: number;
+  // Attribution window specific metrics
+  acos_7d?: number;
+  acos_14d?: number;
+  roas_7d?: number;
+  roas_14d?: number;
+  sales_7d?: number;
+  sales_14d?: number;
+  orders_7d?: number;
+  orders_14d?: number;
   last_updated?: string;
   created_at: string;
 }
@@ -71,6 +91,15 @@ export interface Keyword {
   orders: number;
   acos?: number;
   roas?: number;
+  // Attribution window specific metrics
+  acos_7d?: number;
+  acos_14d?: number;
+  roas_7d?: number;
+  roas_14d?: number;
+  sales_7d?: number;
+  sales_14d?: number;
+  orders_7d?: number;
+  orders_14d?: number;
   ctr?: number;
   cpc?: number;
   conversion_rate?: number;
@@ -109,4 +138,17 @@ export interface OptimizationRecommendation {
   applied: boolean;
   applied_at?: string;
   created_at: string;
+}
+
+export type AttributionWindow = '7d' | '14d';
+
+export interface AttributionMetrics {
+  acos_7d?: number;
+  acos_14d?: number;
+  roas_7d?: number;
+  roas_14d?: number;
+  sales_7d?: number;
+  sales_14d?: number;
+  orders_7d?: number;
+  orders_14d?: number;
 }

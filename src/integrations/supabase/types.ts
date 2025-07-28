@@ -17,6 +17,8 @@ export type Database = {
       ad_groups: {
         Row: {
           acos: number | null
+          acos_14d: number | null
+          acos_7d: number | null
           amazon_adgroup_id: string
           campaign_id: string
           clicks: number | null
@@ -27,13 +29,21 @@ export type Database = {
           last_updated: string | null
           name: string
           orders: number | null
+          orders_14d: number | null
+          orders_7d: number | null
           roas: number | null
+          roas_14d: number | null
+          roas_7d: number | null
           sales: number | null
+          sales_14d: number | null
+          sales_7d: number | null
           spend: number | null
           status: Database["public"]["Enums"]["campaign_status"]
         }
         Insert: {
           acos?: number | null
+          acos_14d?: number | null
+          acos_7d?: number | null
           amazon_adgroup_id: string
           campaign_id: string
           clicks?: number | null
@@ -44,13 +54,21 @@ export type Database = {
           last_updated?: string | null
           name: string
           orders?: number | null
+          orders_14d?: number | null
+          orders_7d?: number | null
           roas?: number | null
+          roas_14d?: number | null
+          roas_7d?: number | null
           sales?: number | null
+          sales_14d?: number | null
+          sales_7d?: number | null
           spend?: number | null
           status?: Database["public"]["Enums"]["campaign_status"]
         }
         Update: {
           acos?: number | null
+          acos_14d?: number | null
+          acos_7d?: number | null
           amazon_adgroup_id?: string
           campaign_id?: string
           clicks?: number | null
@@ -61,8 +79,14 @@ export type Database = {
           last_updated?: string | null
           name?: string
           orders?: number | null
+          orders_14d?: number | null
+          orders_7d?: number | null
           roas?: number | null
+          roas_14d?: number | null
+          roas_7d?: number | null
           sales?: number | null
+          sales_14d?: number | null
+          sales_7d?: number | null
           spend?: number | null
           status?: Database["public"]["Enums"]["campaign_status"]
         }
@@ -88,8 +112,10 @@ export type Database = {
           profile_id: string
           profile_name: string | null
           refresh_token: string
+          reporting_api_version: string | null
           setup_required_reason: string | null
           status: Database["public"]["Enums"]["api_connection_status"]
+          supported_attribution_models: string[] | null
           token_expires_at: string
           updated_at: string
           user_id: string
@@ -105,8 +131,10 @@ export type Database = {
           profile_id: string
           profile_name?: string | null
           refresh_token: string
+          reporting_api_version?: string | null
           setup_required_reason?: string | null
           status?: Database["public"]["Enums"]["api_connection_status"]
+          supported_attribution_models?: string[] | null
           token_expires_at: string
           updated_at?: string
           user_id: string
@@ -122,8 +150,10 @@ export type Database = {
           profile_id?: string
           profile_name?: string | null
           refresh_token?: string
+          reporting_api_version?: string | null
           setup_required_reason?: string | null
           status?: Database["public"]["Enums"]["api_connection_status"]
+          supported_attribution_models?: string[] | null
           token_expires_at?: string
           updated_at?: string
           user_id?: string
@@ -133,7 +163,10 @@ export type Database = {
       campaigns: {
         Row: {
           acos: number | null
+          acos_14d: number | null
+          acos_7d: number | null
           amazon_campaign_id: string
+          attribution_model: string | null
           budget: number | null
           campaign_type: string | null
           clicks: number | null
@@ -147,8 +180,14 @@ export type Database = {
           last_updated: string | null
           name: string
           orders: number | null
+          orders_14d: number | null
+          orders_7d: number | null
           roas: number | null
+          roas_14d: number | null
+          roas_7d: number | null
           sales: number | null
+          sales_14d: number | null
+          sales_7d: number | null
           spend: number | null
           start_date: string | null
           status: Database["public"]["Enums"]["campaign_status"]
@@ -156,7 +195,10 @@ export type Database = {
         }
         Insert: {
           acos?: number | null
+          acos_14d?: number | null
+          acos_7d?: number | null
           amazon_campaign_id: string
+          attribution_model?: string | null
           budget?: number | null
           campaign_type?: string | null
           clicks?: number | null
@@ -170,8 +212,14 @@ export type Database = {
           last_updated?: string | null
           name: string
           orders?: number | null
+          orders_14d?: number | null
+          orders_7d?: number | null
           roas?: number | null
+          roas_14d?: number | null
+          roas_7d?: number | null
           sales?: number | null
+          sales_14d?: number | null
+          sales_7d?: number | null
           spend?: number | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["campaign_status"]
@@ -179,7 +227,10 @@ export type Database = {
         }
         Update: {
           acos?: number | null
+          acos_14d?: number | null
+          acos_7d?: number | null
           amazon_campaign_id?: string
+          attribution_model?: string | null
           budget?: number | null
           campaign_type?: string | null
           clicks?: number | null
@@ -193,8 +244,14 @@ export type Database = {
           last_updated?: string | null
           name?: string
           orders?: number | null
+          orders_14d?: number | null
+          orders_7d?: number | null
           roas?: number | null
+          roas_14d?: number | null
+          roas_7d?: number | null
           sales?: number | null
+          sales_14d?: number | null
+          sales_7d?: number | null
           spend?: number | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["campaign_status"]
@@ -252,6 +309,8 @@ export type Database = {
       keywords: {
         Row: {
           acos: number | null
+          acos_14d: number | null
+          acos_7d: number | null
           adgroup_id: string
           amazon_keyword_id: string
           bid: number | null
@@ -266,13 +325,21 @@ export type Database = {
           last_updated: string | null
           match_type: string
           orders: number | null
+          orders_14d: number | null
+          orders_7d: number | null
           roas: number | null
+          roas_14d: number | null
+          roas_7d: number | null
           sales: number | null
+          sales_14d: number | null
+          sales_7d: number | null
           spend: number | null
           status: Database["public"]["Enums"]["campaign_status"]
         }
         Insert: {
           acos?: number | null
+          acos_14d?: number | null
+          acos_7d?: number | null
           adgroup_id: string
           amazon_keyword_id: string
           bid?: number | null
@@ -287,13 +354,21 @@ export type Database = {
           last_updated?: string | null
           match_type: string
           orders?: number | null
+          orders_14d?: number | null
+          orders_7d?: number | null
           roas?: number | null
+          roas_14d?: number | null
+          roas_7d?: number | null
           sales?: number | null
+          sales_14d?: number | null
+          sales_7d?: number | null
           spend?: number | null
           status?: Database["public"]["Enums"]["campaign_status"]
         }
         Update: {
           acos?: number | null
+          acos_14d?: number | null
+          acos_7d?: number | null
           adgroup_id?: string
           amazon_keyword_id?: string
           bid?: number | null
@@ -308,8 +383,14 @@ export type Database = {
           last_updated?: string | null
           match_type?: string
           orders?: number | null
+          orders_14d?: number | null
+          orders_7d?: number | null
           roas?: number | null
+          roas_14d?: number | null
+          roas_7d?: number | null
           sales?: number | null
+          sales_14d?: number | null
+          sales_7d?: number | null
           spend?: number | null
           status?: Database["public"]["Enums"]["campaign_status"]
         }
@@ -606,6 +687,10 @@ export type Database = {
         Returns: undefined
       }
       sync_amazon_data: {
+        Args: { connection_uuid: string }
+        Returns: undefined
+      }
+      sync_amazon_data_v3: {
         Args: { connection_uuid: string }
         Returns: undefined
       }
