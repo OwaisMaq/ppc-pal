@@ -267,6 +267,60 @@ export type Database = {
         }
         Relationships: []
       }
+      amazon_report_requests: {
+        Row: {
+          completed_at: string | null
+          configuration: Json | null
+          connection_id: string
+          created_at: string
+          download_url: string | null
+          end_date: string
+          file_size: number | null
+          id: string
+          records_processed: number | null
+          report_id: string
+          report_type: string
+          start_date: string
+          status: string
+          status_details: string | null
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          configuration?: Json | null
+          connection_id: string
+          created_at?: string
+          download_url?: string | null
+          end_date: string
+          file_size?: number | null
+          id?: string
+          records_processed?: number | null
+          report_id: string
+          report_type: string
+          start_date: string
+          status?: string
+          status_details?: string | null
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          configuration?: Json | null
+          connection_id?: string
+          created_at?: string
+          download_url?: string | null
+          end_date?: string
+          file_size?: number | null
+          id?: string
+          records_processed?: number | null
+          report_id?: string
+          report_type?: string
+          start_date?: string
+          status?: string
+          status_details?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       campaign_performance_history: {
         Row: {
           acos: number | null

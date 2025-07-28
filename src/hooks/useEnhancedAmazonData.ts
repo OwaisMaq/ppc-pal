@@ -162,17 +162,19 @@ export const useEnhancedAmazonData = () => {
     options?: {
       dateRange?: DateRange;
       attributionWindows?: string[];
+      reportTypes?: string[];
       campaignTypes?: string[];
     }
   ) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('sync-amazon-data', {
+      const { data, error } = await supabase.functions.invoke('enhanced-report-generation', {
         body: { 
           connectionId,
           dateRange: options?.dateRange || dateRange,
           attributionWindows: options?.attributionWindows || ['7d', '14d'],
-          campaignTypes: options?.campaignTypes || ['sponsoredProducts']
+          reportTypes: options?.reportTypes || ['spCampaigns'],
+          campaignIdFilter: options?.campaignTypes || []
         },
         headers: {
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
@@ -180,16 +182,16 @@ export const useEnhancedAmazonData = () => {
       });
 
       if (error) {
-        console.error('Enhanced sync error:', error);
-        toast.error(`Failed to sync Amazon data: ${error.message || 'Unknown error'}`);
+        console.error('Enhanced report generation error:', error);
+        toast.error(`Failed to generate Amazon reports: ${error.message || 'Unknown error'}`);
         
-        // Log failed sync attempt
+        // Log failed report generation attempt
         try {
           await supabase
             .from('sync_performance_logs')
             .insert({
               connection_id: connectionId,
-              operation_type: 'enhanced_sync',
+              operation_type: 'enhanced_report_generation',
               start_time: new Date().toISOString(),
               success: false,
               error_message: error.message || 'Unknown error'
@@ -201,11 +203,11 @@ export const useEnhancedAmazonData = () => {
         return false;
       }
       
-      console.log('Enhanced sync response:', data);
+      console.log('Enhanced report generation response:', data);
       
       // Log performance metrics for monitoring
       if (data?.performance) {
-        console.log('Sync performance metrics:', data.performance);
+        console.log('Report generation performance metrics:', data.performance);
         
         // Store performance data for analytics
         try {
@@ -213,12 +215,12 @@ export const useEnhancedAmazonData = () => {
             .from('sync_performance_logs')
             .insert({
               connection_id: connectionId,
-              operation_type: 'enhanced_sync',
-              start_time: new Date(data.performance.startTime).toISOString(),
+              operation_type: 'enhanced_report_generation',
+              start_time: new Date().toISOString(),
               end_time: new Date().toISOString(),
               total_duration_ms: data.performance.totalTime,
-              phases: data.performance.phases,
-              campaigns_processed: data.stats?.campaignsProcessed || 0,
+              phases: { report_generation: data.performance.totalTime },
+              campaigns_processed: data.performance?.reportsGenerated || 0,
               success: true,
               performance_metrics: data.performance
             });
@@ -227,24 +229,30 @@ export const useEnhancedAmazonData = () => {
         }
       }
 
-      // Show detailed success message with stats
-      const stats = data?.stats;
-      let message = 'Enhanced data sync completed successfully!';
+      // Show detailed success message with report generation stats
+      const reportsGenerated = data?.performance?.reportsGenerated || 0;
+      const reportsFailed = data?.performance?.reportsFailed || 0;
       
-      if (stats) {
-        message = `Successfully synced ${stats.campaignsProcessed} campaigns with ${stats.attributionWindows.join(', ')} attribution windows`;
-        
-        if (stats.healthStatus === 'degraded') {
-          toast.warning('Sync completed but connection health issues detected');
-        }
+      let message = 'Enhanced report generation completed successfully!';
+      
+      if (reportsGenerated > 0) {
+        message = `Successfully generated ${reportsGenerated} reports${reportsFailed > 0 ? ` (${reportsFailed} failed)` : ''}`;
       }
       
       toast.success(message);
       
+      // Show detailed results
+      if (data?.results?.length > 0) {
+        const completedReports = data.results.filter((r: any) => r.status === 'completed');
+        if (completedReports.length > 0) {
+          toast.info(`Report generation completed for ${completedReports.map((r: any) => r.reportType).join(', ')}`);
+        }
+      }
+      
       // Refresh data after processing with optimized timing
       setTimeout(() => {
         fetchAllData();
-        toast.info('Data refreshed with enhanced metrics and attribution windows');
+        toast.info('Data refreshed with enhanced report generation results');
       }, 2000);
       
       return true;
