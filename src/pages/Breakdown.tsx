@@ -5,11 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAmazonData } from "@/hooks/useAmazonData";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
-import { useAttributionMetrics } from "@/hooks/useAttributionMetrics";
 import Header from "@/components/Header";
 import ParetoChart from "@/components/ParetoChart";
-import { AttributionWindowSelector } from "@/components/AttributionWindowSelector";
-import { AttributionComparisonCard } from "@/components/AttributionComparisonCard";
 import { 
   RefreshCw, 
   DollarSign, 
@@ -32,7 +29,6 @@ const formatNumber = (value: number) => {
 const Breakdown = () => {
   const { campaigns, adGroups, keywords, loading, syncAllData } = useAmazonData();
   const { connections } = useAmazonConnections();
-  const { selectedAttribution, setSelectedAttribution, formatMetricWithAttribution } = useAttributionMetrics();
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>("");
   const [selectedAdGroupId, setSelectedAdGroupId] = useState<string>("");
   const [selectedKeywordId, setSelectedKeywordId] = useState<string>("");
@@ -107,20 +103,14 @@ const Breakdown = () => {
                 Explore your Amazon advertising data with detailed breakdowns
               </p>
             </div>
-            <div className="flex items-center gap-4">
-              <AttributionWindowSelector
-                value={selectedAttribution}
-                onChange={setSelectedAttribution}
-              />
-              <Button
-                onClick={handleSyncAll}
-                disabled={loading || activeConnections.length === 0}
-                variant="outline"
-              >
-                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                Sync Data
-              </Button>
-            </div>
+            <Button
+              onClick={handleSyncAll}
+              disabled={loading || activeConnections.length === 0}
+              variant="outline"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Sync Data
+            </Button>
           </div>
 
           {activeConnections.length === 0 ? (
@@ -492,18 +482,6 @@ const Breakdown = () => {
                     </div>
                   </CardContent>
                 </Card>
-              )}
-
-              {/* Attribution Comparison for selected entity */}
-              {(selectedCampaign || selectedAdGroup || selectedKeyword) && (
-                <AttributionComparisonCard
-                  metrics={selectedKeyword || selectedAdGroup || selectedCampaign}
-                  title={
-                    selectedKeyword ? `Keyword: ${selectedKeyword.keyword_text}` :
-                    selectedAdGroup ? `Ad Group: ${selectedAdGroup.name}` :
-                    `Campaign: ${selectedCampaign?.name}`
-                  }
-                />
               )}
 
               {/* Pareto Chart */}

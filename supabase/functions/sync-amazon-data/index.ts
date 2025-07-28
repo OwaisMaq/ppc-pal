@@ -137,8 +137,8 @@ serve(async (req) => {
     const apiEndpoint = connection.advertising_api_endpoint || 'https://advertising-api.amazon.com'
     console.log('Using API endpoint:', apiEndpoint)
 
-    // Sync campaigns with performance data using v3 API
-    console.log('Fetching campaigns with v3 API...')
+    // Sync campaigns with performance data
+    console.log('Fetching campaigns...')
     const campaignsResponse = await fetch(`${apiEndpoint}/v2/campaigns`, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -210,146 +210,65 @@ serve(async (req) => {
         const batch = campaignIds.slice(i, i + batchSize)
         
         try {
-          // Fetch reports for both 7-day and 14-day attribution using v3 API
-          const reportRequests = [
-            {
-              reportDate: reportEndDate,
-              configuration: {
-                adProduct: 'SPONSORED_PRODUCTS',
-                columns: [
-                  'campaignId',
-                  'impressions',
-                  'clicks',
-                  'cost',
-                  'attributedSales7d',
-                  'attributedUnitsOrdered7d',
-                  'acos',
-                  'roas'
-                ],
-                reportTypeId: 'spCampaigns',
-                timeUnit: 'SUMMARY',
-                format: 'GZIP_JSON',
-                filters: [{ field: 'campaignId', values: batch }],
-                attributionReportingType: 'CLICK_7_DAY'
-              }
+          const reportPayload = {
+            startDate: reportStartDate,
+            endDate: reportEndDate,
+            configuration: {
+              adProduct: 'SPONSORED_PRODUCTS',
+              columns: [
+                'campaignId',
+                'impressions',
+                'clicks',
+                'cost',
+                'attributedSales30d',
+                'attributedUnitsOrdered30d'
+              ],
+              reportTypeId: 'spCampaigns',
+              timeUnit: 'SUMMARY',
+              format: 'GZIP_JSON'
             },
-            {
-              reportDate: reportEndDate,
-              configuration: {
-                adProduct: 'SPONSORED_PRODUCTS',
-                columns: [
-                  'campaignId',
-                  'impressions',
-                  'clicks',
-                  'cost',
-                  'attributedSales14d',
-                  'attributedUnitsOrdered14d',
-                  'acos',
-                  'roas'
-                ],
-                reportTypeId: 'spCampaigns',
-                timeUnit: 'SUMMARY',
-                format: 'GZIP_JSON',
-                filters: [{ field: 'campaignId', values: batch }],
-                attributionReportingType: 'CLICK_14_DAY'
-              }
-            }
-          ]
+            campaignIdFilter: batch
+          }
 
-          // Submit both attribution reports
-          const reportResponses = await Promise.all(
-            reportRequests.map(request =>
-              fetch(`${apiEndpoint}/reporting/reports`, {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Amazon-Advertising-API-ClientId': clientId,
-                  'Amazon-Advertising-API-Scope': connection.profile_id,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(request),
-              })
-            )
-          )
+          const reportResponse = await fetch(`${apiEndpoint}/reporting/reports`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Amazon-Advertising-API-ClientId': clientId,
+              'Amazon-Advertising-API-Scope': connection.profile_id,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(reportPayload)
+          })
 
-          // Process report responses
-          const [response7d, response14d] = reportResponses;
-          
-          if (response7d.ok && response14d.ok) {
-            const [reportData7d, reportData14d] = await Promise.all([
-              response7d.json(),
-              response14d.json()
-            ]);
+          if (reportResponse.ok) {
+            const reportData = await reportResponse.json()
+            console.log(`Retrieved performance data for ${reportData.length} campaigns in batch ${i/batchSize + 1}`)
             
-            console.log(`Retrieved performance data for batch ${i/batchSize + 1} with attribution windows`)
-            
-            // Create maps for attribution data
-            const attribution7dMap = new Map();
-            const attribution14dMap = new Map();
-            
-            // Process 7-day attribution data
-            if (Array.isArray(reportData7d)) {
-              reportData7d.forEach(data => {
-                if (data.campaignId) {
-                  attribution7dMap.set(data.campaignId.toString(), data);
-                }
-              });
-            }
-            
-            // Process 14-day attribution data  
-            if (Array.isArray(reportData14d)) {
-              reportData14d.forEach(data => {
-                if (data.campaignId) {
-                  attribution14dMap.set(data.campaignId.toString(), data);
-                }
-              });
-            }
-            
-            // Update campaigns with attribution data
-            for (const campaignId of batch) {
-              const data7d = attribution7dMap.get(campaignId);
-              const data14d = attribution14dMap.get(campaignId);
+            // Update campaigns with performance data
+            for (const perfData of reportData) {
+              if (!perfData.campaignId) continue
               
-              if (!data7d && !data14d) continue;
-              
-              // Use 14-day data as primary, fall back to 7-day
-              const primaryData = data14d || data7d;
-              
-              const updateData = {
-                impressions: parseInt(primaryData.impressions || '0'),
-                clicks: parseInt(primaryData.clicks || '0'),
-                spend: parseFloat(primaryData.cost || '0'),
-                sales: parseFloat(primaryData.attributedSales14d || primaryData.attributedSales7d || '0'),
-                orders: parseInt(primaryData.attributedUnitsOrdered14d || primaryData.attributedUnitsOrdered7d || '0'),
-                acos: parseFloat(primaryData.acos || '0') || null,
-                roas: parseFloat(primaryData.roas || '0') || null,
-                // Attribution-specific metrics
-                sales_7d: data7d ? parseFloat(data7d.attributedSales7d || '0') : null,
-                sales_14d: data14d ? parseFloat(data14d.attributedSales14d || '0') : null,
-                orders_7d: data7d ? parseInt(data7d.attributedUnitsOrdered7d || '0') : null,
-                orders_14d: data14d ? parseInt(data14d.attributedUnitsOrdered14d || '0') : null,
-                acos_7d: data7d ? parseFloat(data7d.acos || '0') || null : null,
-                acos_14d: data14d ? parseFloat(data14d.acos || '0') || null : null,
-                roas_7d: data7d ? parseFloat(data7d.roas || '0') || null : null,
-                roas_14d: data14d ? parseFloat(data14d.roas || '0') || null : null,
-                attribution_model: '14d',
-                last_updated: new Date().toISOString()
-              };
-
               const { error: updateError } = await supabase
                 .from('campaigns')
-                .update(updateData)
+                .update({
+                  impressions: parseInt(perfData.impressions || '0'),
+                  clicks: parseInt(perfData.clicks || '0'),
+                  spend: parseFloat(perfData.cost || '0'),
+                  sales: parseFloat(perfData.attributedSales30d || '0'),
+                  orders: parseInt(perfData.attributedUnitsOrdered30d || '0'),
+                  last_updated: new Date().toISOString()
+                })
                 .eq('connection_id', connectionId)
-                .eq('amazon_campaign_id', campaignId);
+                .eq('amazon_campaign_id', perfData.campaignId.toString())
 
               if (updateError) {
-                console.error('Error updating campaign performance:', campaignId, updateError)
+                console.error('Error updating campaign performance:', perfData.campaignId, updateError)
               }
             }
           } else {
-            const error7d = response7d.ok ? null : await response7d.text();
-            const error14d = response14d.ok ? null : await response14d.text();
-            console.error(`Performance data API error for batch ${i/batchSize + 1}:`, { error7d, error14d });
+            const errorText = await reportResponse.text()
+            console.error(`Performance data API error for batch ${i/batchSize + 1}:`, reportResponse.status, errorText)
           }
         } catch (batchError) {
           console.error(`Error processing batch ${i/batchSize + 1}:`, batchError)
@@ -451,14 +370,10 @@ serve(async (req) => {
       }
     }
 
-    // Update last sync time and API version
+    // Update last sync time
     await supabase
       .from('amazon_connections')
-      .update({ 
-        last_sync_at: new Date().toISOString(),
-        reporting_api_version: 'v3',
-        supported_attribution_models: ['7d', '14d']
-      })
+      .update({ last_sync_at: new Date().toISOString() })
       .eq('id', connectionId)
 
     console.log('Data sync completed successfully')
