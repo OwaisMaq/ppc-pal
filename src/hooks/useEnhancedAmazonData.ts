@@ -180,23 +180,96 @@ export const useEnhancedAmazonData = () => {
       });
 
       if (error) {
-        console.error('Sync function error:', error);
-        throw error;
+        console.error('Enhanced sync error:', error);
+        toast.error(`Failed to sync Amazon data: ${error.message || 'Unknown error'}`);
+        
+        // Log failed sync attempt
+        try {
+          await supabase
+            .from('sync_performance_logs')
+            .insert({
+              connection_id: connectionId,
+              operation_type: 'enhanced_sync',
+              start_time: new Date().toISOString(),
+              success: false,
+              error_message: error.message || 'Unknown error'
+            });
+        } catch (logError) {
+          console.warn('Failed to log error:', logError);
+        }
+        
+        return false;
       }
       
-      console.log('Enhanced sync function response:', data);
-      toast.success('Enhanced data sync initiated successfully!');
+      console.log('Enhanced sync response:', data);
       
-      // Refresh data after sync with longer delay to allow API processing
+      // Log performance metrics for monitoring
+      if (data?.performance) {
+        console.log('Sync performance metrics:', data.performance);
+        
+        // Store performance data for analytics
+        try {
+          await supabase
+            .from('sync_performance_logs')
+            .insert({
+              connection_id: connectionId,
+              operation_type: 'enhanced_sync',
+              start_time: new Date(data.performance.startTime).toISOString(),
+              end_time: new Date().toISOString(),
+              total_duration_ms: data.performance.totalTime,
+              phases: data.performance.phases,
+              campaigns_processed: data.stats?.campaignsProcessed || 0,
+              success: true,
+              performance_metrics: data.performance
+            });
+        } catch (logError) {
+          console.warn('Failed to log performance data:', logError);
+        }
+      }
+
+      // Show detailed success message with stats
+      const stats = data?.stats;
+      let message = 'Enhanced data sync completed successfully!';
+      
+      if (stats) {
+        message = `Successfully synced ${stats.campaignsProcessed} campaigns with ${stats.attributionWindows.join(', ')} attribution windows`;
+        
+        if (stats.healthStatus === 'degraded') {
+          toast.warning('Sync completed but connection health issues detected');
+        }
+      }
+      
+      toast.success(message);
+      
+      // Refresh data after processing with optimized timing
       setTimeout(() => {
         fetchAllData();
-        toast.info('Data refreshed with enhanced metrics');
-      }, 5000);
+        toast.info('Data refreshed with enhanced metrics and attribution windows');
+      }, 2000);
+      
+      return true;
       
     } catch (error) {
       console.error('Error syncing data:', error);
-      const errorMessage = error?.message || 'Failed to sync Amazon data';
+      const errorMessage = error?.message || 'Network or server error';
       toast.error(`Sync failed: ${errorMessage}`);
+      
+      // Log failed sync attempt
+      try {
+        await supabase
+          .from('sync_performance_logs')
+          .insert({
+            connection_id: connectionId,
+            operation_type: 'enhanced_sync',
+            start_time: new Date().toISOString(),
+            success: false,
+            error_message: errorMessage
+          });
+      } catch (logError) {
+        console.warn('Failed to log error:', logError);
+      }
+      
+      return false;
     } finally {
       setLoading(false);
     }
