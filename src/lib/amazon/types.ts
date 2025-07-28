@@ -22,6 +22,7 @@ export interface Campaign {
   name: string;
   campaign_type?: string;
   targeting_type?: string;
+  product_type?: string;
   status: 'enabled' | 'paused' | 'archived';
   budget?: number;
   daily_budget?: number;
@@ -34,6 +35,28 @@ export interface Campaign {
   orders: number;
   acos?: number;
   roas?: number;
+  // Enhanced 7-day attribution metrics
+  impressions_7d?: number;
+  clicks_7d?: number;
+  spend_7d?: number;
+  sales_7d?: number;
+  orders_7d?: number;
+  acos_7d?: number;
+  roas_7d?: number;
+  ctr_7d?: number;
+  cpc_7d?: number;
+  conversion_rate_7d?: number;
+  // Enhanced 14-day attribution metrics
+  impressions_14d?: number;
+  clicks_14d?: number;
+  spend_14d?: number;
+  sales_14d?: number;
+  orders_14d?: number;
+  acos_14d?: number;
+  roas_14d?: number;
+  ctr_14d?: number;
+  cpc_14d?: number;
+  conversion_rate_14d?: number;
   last_updated?: string;
   created_at: string;
 }
@@ -52,6 +75,28 @@ export interface AdGroup {
   orders: number;
   acos?: number;
   roas?: number;
+  // Enhanced 7-day attribution metrics
+  impressions_7d?: number;
+  clicks_7d?: number;
+  spend_7d?: number;
+  sales_7d?: number;
+  orders_7d?: number;
+  acos_7d?: number;
+  roas_7d?: number;
+  ctr_7d?: number;
+  cpc_7d?: number;
+  conversion_rate_7d?: number;
+  // Enhanced 14-day attribution metrics
+  impressions_14d?: number;
+  clicks_14d?: number;
+  spend_14d?: number;
+  sales_14d?: number;
+  orders_14d?: number;
+  acos_14d?: number;
+  roas_14d?: number;
+  ctr_14d?: number;
+  cpc_14d?: number;
+  conversion_rate_14d?: number;
   last_updated?: string;
   created_at: string;
 }
@@ -74,6 +119,28 @@ export interface Keyword {
   ctr?: number;
   cpc?: number;
   conversion_rate?: number;
+  // Enhanced 7-day attribution metrics
+  impressions_7d?: number;
+  clicks_7d?: number;
+  spend_7d?: number;
+  sales_7d?: number;
+  orders_7d?: number;
+  acos_7d?: number;
+  roas_7d?: number;
+  ctr_7d?: number;
+  cpc_7d?: number;
+  conversion_rate_7d?: number;
+  // Enhanced 14-day attribution metrics
+  impressions_14d?: number;
+  clicks_14d?: number;
+  spend_14d?: number;
+  sales_14d?: number;
+  orders_14d?: number;
+  acos_14d?: number;
+  roas_14d?: number;
+  ctr_14d?: number;
+  cpc_14d?: number;
+  conversion_rate_14d?: number;
   last_updated?: string;
   created_at: string;
 }

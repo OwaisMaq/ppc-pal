@@ -17,53 +17,113 @@ export type Database = {
       ad_groups: {
         Row: {
           acos: number | null
+          acos_14d: number | null
+          acos_7d: number | null
           amazon_adgroup_id: string
           campaign_id: string
           clicks: number | null
+          clicks_14d: number | null
+          clicks_7d: number | null
+          conversion_rate_14d: number | null
+          conversion_rate_7d: number | null
+          cpc_14d: number | null
+          cpc_7d: number | null
           created_at: string
+          ctr_14d: number | null
+          ctr_7d: number | null
           default_bid: number | null
           id: string
           impressions: number | null
+          impressions_14d: number | null
+          impressions_7d: number | null
           last_updated: string | null
           name: string
           orders: number | null
+          orders_14d: number | null
+          orders_7d: number | null
           roas: number | null
+          roas_14d: number | null
+          roas_7d: number | null
           sales: number | null
+          sales_14d: number | null
+          sales_7d: number | null
           spend: number | null
+          spend_14d: number | null
+          spend_7d: number | null
           status: Database["public"]["Enums"]["campaign_status"]
         }
         Insert: {
           acos?: number | null
+          acos_14d?: number | null
+          acos_7d?: number | null
           amazon_adgroup_id: string
           campaign_id: string
           clicks?: number | null
+          clicks_14d?: number | null
+          clicks_7d?: number | null
+          conversion_rate_14d?: number | null
+          conversion_rate_7d?: number | null
+          cpc_14d?: number | null
+          cpc_7d?: number | null
           created_at?: string
+          ctr_14d?: number | null
+          ctr_7d?: number | null
           default_bid?: number | null
           id?: string
           impressions?: number | null
+          impressions_14d?: number | null
+          impressions_7d?: number | null
           last_updated?: string | null
           name: string
           orders?: number | null
+          orders_14d?: number | null
+          orders_7d?: number | null
           roas?: number | null
+          roas_14d?: number | null
+          roas_7d?: number | null
           sales?: number | null
+          sales_14d?: number | null
+          sales_7d?: number | null
           spend?: number | null
+          spend_14d?: number | null
+          spend_7d?: number | null
           status?: Database["public"]["Enums"]["campaign_status"]
         }
         Update: {
           acos?: number | null
+          acos_14d?: number | null
+          acos_7d?: number | null
           amazon_adgroup_id?: string
           campaign_id?: string
           clicks?: number | null
+          clicks_14d?: number | null
+          clicks_7d?: number | null
+          conversion_rate_14d?: number | null
+          conversion_rate_7d?: number | null
+          cpc_14d?: number | null
+          cpc_7d?: number | null
           created_at?: string
+          ctr_14d?: number | null
+          ctr_7d?: number | null
           default_bid?: number | null
           id?: string
           impressions?: number | null
+          impressions_14d?: number | null
+          impressions_7d?: number | null
           last_updated?: string | null
           name?: string
           orders?: number | null
+          orders_14d?: number | null
+          orders_7d?: number | null
           roas?: number | null
+          roas_14d?: number | null
+          roas_7d?: number | null
           sales?: number | null
+          sales_14d?: number | null
+          sales_7d?: number | null
           spend?: number | null
+          spend_14d?: number | null
+          spend_7d?: number | null
           status?: Database["public"]["Enums"]["campaign_status"]
         }
         Relationships: [
@@ -72,6 +132,68 @@ export type Database = {
             columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      adgroup_performance_history: {
+        Row: {
+          acos: number | null
+          adgroup_id: string | null
+          attribution_window: string
+          clicks: number | null
+          conversion_rate: number | null
+          cpc: number | null
+          created_at: string
+          ctr: number | null
+          date: string
+          id: string
+          impressions: number | null
+          orders: number | null
+          roas: number | null
+          sales: number | null
+          spend: number | null
+        }
+        Insert: {
+          acos?: number | null
+          adgroup_id?: string | null
+          attribution_window?: string
+          clicks?: number | null
+          conversion_rate?: number | null
+          cpc?: number | null
+          created_at?: string
+          ctr?: number | null
+          date: string
+          id?: string
+          impressions?: number | null
+          orders?: number | null
+          roas?: number | null
+          sales?: number | null
+          spend?: number | null
+        }
+        Update: {
+          acos?: number | null
+          adgroup_id?: string | null
+          attribution_window?: string
+          clicks?: number | null
+          conversion_rate?: number | null
+          cpc?: number | null
+          created_at?: string
+          ctr?: number | null
+          date?: string
+          id?: string
+          impressions?: number | null
+          orders?: number | null
+          roas?: number | null
+          sales?: number | null
+          spend?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "adgroup_performance_history_adgroup_id_fkey"
+            columns: ["adgroup_id"]
+            isOneToOne: false
+            referencedRelation: "ad_groups"
             referencedColumns: ["id"]
           },
         ]
@@ -88,8 +210,10 @@ export type Database = {
           profile_id: string
           profile_name: string | null
           refresh_token: string
+          reporting_api_version: string | null
           setup_required_reason: string | null
           status: Database["public"]["Enums"]["api_connection_status"]
+          supported_attribution_models: string[] | null
           token_expires_at: string
           updated_at: string
           user_id: string
@@ -105,8 +229,10 @@ export type Database = {
           profile_id: string
           profile_name?: string | null
           refresh_token: string
+          reporting_api_version?: string | null
           setup_required_reason?: string | null
           status?: Database["public"]["Enums"]["api_connection_status"]
+          supported_attribution_models?: string[] | null
           token_expires_at: string
           updated_at?: string
           user_id: string
@@ -122,80 +248,210 @@ export type Database = {
           profile_id?: string
           profile_name?: string | null
           refresh_token?: string
+          reporting_api_version?: string | null
           setup_required_reason?: string | null
           status?: Database["public"]["Enums"]["api_connection_status"]
+          supported_attribution_models?: string[] | null
           token_expires_at?: string
           updated_at?: string
           user_id?: string
         }
         Relationships: []
       }
+      campaign_performance_history: {
+        Row: {
+          acos: number | null
+          attribution_window: string
+          campaign_id: string | null
+          clicks: number | null
+          conversion_rate: number | null
+          cpc: number | null
+          created_at: string
+          ctr: number | null
+          date: string
+          id: string
+          impressions: number | null
+          orders: number | null
+          roas: number | null
+          sales: number | null
+          spend: number | null
+        }
+        Insert: {
+          acos?: number | null
+          attribution_window?: string
+          campaign_id?: string | null
+          clicks?: number | null
+          conversion_rate?: number | null
+          cpc?: number | null
+          created_at?: string
+          ctr?: number | null
+          date: string
+          id?: string
+          impressions?: number | null
+          orders?: number | null
+          roas?: number | null
+          sales?: number | null
+          spend?: number | null
+        }
+        Update: {
+          acos?: number | null
+          attribution_window?: string
+          campaign_id?: string | null
+          clicks?: number | null
+          conversion_rate?: number | null
+          cpc?: number | null
+          created_at?: string
+          ctr?: number | null
+          date?: string
+          id?: string
+          impressions?: number | null
+          orders?: number | null
+          roas?: number | null
+          sales?: number | null
+          spend?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_performance_history_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaigns: {
         Row: {
           acos: number | null
+          acos_14d: number | null
+          acos_7d: number | null
           amazon_campaign_id: string
+          attribution_model: string | null
           budget: number | null
           campaign_type: string | null
           clicks: number | null
+          clicks_14d: number | null
+          clicks_7d: number | null
           connection_id: string
+          conversion_rate_14d: number | null
+          conversion_rate_7d: number | null
+          cpc_14d: number | null
+          cpc_7d: number | null
           created_at: string
+          ctr_14d: number | null
+          ctr_7d: number | null
           daily_budget: number | null
           data_source: string | null
           end_date: string | null
           id: string
           impressions: number | null
+          impressions_14d: number | null
+          impressions_7d: number | null
           last_updated: string | null
           name: string
           orders: number | null
+          orders_14d: number | null
+          orders_7d: number | null
+          product_type: string | null
           roas: number | null
+          roas_14d: number | null
+          roas_7d: number | null
           sales: number | null
+          sales_14d: number | null
+          sales_7d: number | null
           spend: number | null
+          spend_14d: number | null
+          spend_7d: number | null
           start_date: string | null
           status: Database["public"]["Enums"]["campaign_status"]
           targeting_type: string | null
         }
         Insert: {
           acos?: number | null
+          acos_14d?: number | null
+          acos_7d?: number | null
           amazon_campaign_id: string
+          attribution_model?: string | null
           budget?: number | null
           campaign_type?: string | null
           clicks?: number | null
+          clicks_14d?: number | null
+          clicks_7d?: number | null
           connection_id: string
+          conversion_rate_14d?: number | null
+          conversion_rate_7d?: number | null
+          cpc_14d?: number | null
+          cpc_7d?: number | null
           created_at?: string
+          ctr_14d?: number | null
+          ctr_7d?: number | null
           daily_budget?: number | null
           data_source?: string | null
           end_date?: string | null
           id?: string
           impressions?: number | null
+          impressions_14d?: number | null
+          impressions_7d?: number | null
           last_updated?: string | null
           name: string
           orders?: number | null
+          orders_14d?: number | null
+          orders_7d?: number | null
+          product_type?: string | null
           roas?: number | null
+          roas_14d?: number | null
+          roas_7d?: number | null
           sales?: number | null
+          sales_14d?: number | null
+          sales_7d?: number | null
           spend?: number | null
+          spend_14d?: number | null
+          spend_7d?: number | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["campaign_status"]
           targeting_type?: string | null
         }
         Update: {
           acos?: number | null
+          acos_14d?: number | null
+          acos_7d?: number | null
           amazon_campaign_id?: string
+          attribution_model?: string | null
           budget?: number | null
           campaign_type?: string | null
           clicks?: number | null
+          clicks_14d?: number | null
+          clicks_7d?: number | null
           connection_id?: string
+          conversion_rate_14d?: number | null
+          conversion_rate_7d?: number | null
+          cpc_14d?: number | null
+          cpc_7d?: number | null
           created_at?: string
+          ctr_14d?: number | null
+          ctr_7d?: number | null
           daily_budget?: number | null
           data_source?: string | null
           end_date?: string | null
           id?: string
           impressions?: number | null
+          impressions_14d?: number | null
+          impressions_7d?: number | null
           last_updated?: string | null
           name?: string
           orders?: number | null
+          orders_14d?: number | null
+          orders_7d?: number | null
+          product_type?: string | null
           roas?: number | null
+          roas_14d?: number | null
+          roas_7d?: number | null
           sales?: number | null
+          sales_14d?: number | null
+          sales_7d?: number | null
           spend?: number | null
+          spend_14d?: number | null
+          spend_7d?: number | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["campaign_status"]
           targeting_type?: string | null
@@ -249,68 +505,190 @@ export type Database = {
         }
         Relationships: []
       }
-      keywords: {
+      keyword_performance_history: {
         Row: {
           acos: number | null
-          adgroup_id: string
-          amazon_keyword_id: string
-          bid: number | null
+          attribution_window: string
           clicks: number | null
           conversion_rate: number | null
           cpc: number | null
           created_at: string
           ctr: number | null
+          date: string
           id: string
           impressions: number | null
-          keyword_text: string
-          last_updated: string | null
-          match_type: string
+          keyword_id: string | null
           orders: number | null
           roas: number | null
           sales: number | null
           spend: number | null
+        }
+        Insert: {
+          acos?: number | null
+          attribution_window?: string
+          clicks?: number | null
+          conversion_rate?: number | null
+          cpc?: number | null
+          created_at?: string
+          ctr?: number | null
+          date: string
+          id?: string
+          impressions?: number | null
+          keyword_id?: string | null
+          orders?: number | null
+          roas?: number | null
+          sales?: number | null
+          spend?: number | null
+        }
+        Update: {
+          acos?: number | null
+          attribution_window?: string
+          clicks?: number | null
+          conversion_rate?: number | null
+          cpc?: number | null
+          created_at?: string
+          ctr?: number | null
+          date?: string
+          id?: string
+          impressions?: number | null
+          keyword_id?: string | null
+          orders?: number | null
+          roas?: number | null
+          sales?: number | null
+          spend?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "keyword_performance_history_keyword_id_fkey"
+            columns: ["keyword_id"]
+            isOneToOne: false
+            referencedRelation: "keywords"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      keywords: {
+        Row: {
+          acos: number | null
+          acos_14d: number | null
+          acos_7d: number | null
+          adgroup_id: string
+          amazon_keyword_id: string
+          bid: number | null
+          clicks: number | null
+          clicks_14d: number | null
+          clicks_7d: number | null
+          conversion_rate: number | null
+          conversion_rate_14d: number | null
+          conversion_rate_7d: number | null
+          cpc: number | null
+          cpc_14d: number | null
+          cpc_7d: number | null
+          created_at: string
+          ctr: number | null
+          ctr_14d: number | null
+          ctr_7d: number | null
+          id: string
+          impressions: number | null
+          impressions_14d: number | null
+          impressions_7d: number | null
+          keyword_text: string
+          last_updated: string | null
+          match_type: string
+          orders: number | null
+          orders_14d: number | null
+          orders_7d: number | null
+          roas: number | null
+          roas_14d: number | null
+          roas_7d: number | null
+          sales: number | null
+          sales_14d: number | null
+          sales_7d: number | null
+          spend: number | null
+          spend_14d: number | null
+          spend_7d: number | null
           status: Database["public"]["Enums"]["campaign_status"]
         }
         Insert: {
           acos?: number | null
+          acos_14d?: number | null
+          acos_7d?: number | null
           adgroup_id: string
           amazon_keyword_id: string
           bid?: number | null
           clicks?: number | null
+          clicks_14d?: number | null
+          clicks_7d?: number | null
           conversion_rate?: number | null
+          conversion_rate_14d?: number | null
+          conversion_rate_7d?: number | null
           cpc?: number | null
+          cpc_14d?: number | null
+          cpc_7d?: number | null
           created_at?: string
           ctr?: number | null
+          ctr_14d?: number | null
+          ctr_7d?: number | null
           id?: string
           impressions?: number | null
+          impressions_14d?: number | null
+          impressions_7d?: number | null
           keyword_text: string
           last_updated?: string | null
           match_type: string
           orders?: number | null
+          orders_14d?: number | null
+          orders_7d?: number | null
           roas?: number | null
+          roas_14d?: number | null
+          roas_7d?: number | null
           sales?: number | null
+          sales_14d?: number | null
+          sales_7d?: number | null
           spend?: number | null
+          spend_14d?: number | null
+          spend_7d?: number | null
           status?: Database["public"]["Enums"]["campaign_status"]
         }
         Update: {
           acos?: number | null
+          acos_14d?: number | null
+          acos_7d?: number | null
           adgroup_id?: string
           amazon_keyword_id?: string
           bid?: number | null
           clicks?: number | null
+          clicks_14d?: number | null
+          clicks_7d?: number | null
           conversion_rate?: number | null
+          conversion_rate_14d?: number | null
+          conversion_rate_7d?: number | null
           cpc?: number | null
+          cpc_14d?: number | null
+          cpc_7d?: number | null
           created_at?: string
           ctr?: number | null
+          ctr_14d?: number | null
+          ctr_7d?: number | null
           id?: string
           impressions?: number | null
+          impressions_14d?: number | null
+          impressions_7d?: number | null
           keyword_text?: string
           last_updated?: string | null
           match_type?: string
           orders?: number | null
+          orders_14d?: number | null
+          orders_7d?: number | null
           roas?: number | null
+          roas_14d?: number | null
+          roas_7d?: number | null
           sales?: number | null
+          sales_14d?: number | null
+          sales_7d?: number | null
           spend?: number | null
+          spend_14d?: number | null
+          spend_7d?: number | null
           status?: Database["public"]["Enums"]["campaign_status"]
         }
         Relationships: [
@@ -606,6 +984,10 @@ export type Database = {
         Returns: undefined
       }
       sync_amazon_data: {
+        Args: { connection_uuid: string }
+        Returns: undefined
+      }
+      sync_amazon_data_v3: {
         Args: { connection_uuid: string }
         Returns: undefined
       }

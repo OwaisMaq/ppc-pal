@@ -30,7 +30,7 @@ serve(async (req) => {
       throw new Error('Invalid authorization')
     }
 
-    const { connectionId } = await req.json()
+    const { connectionId, dateRange, attributionWindows, campaignTypes } = await req.json()
     console.log('Syncing data for connection:', connectionId)
 
     // Get the connection details
@@ -156,13 +156,19 @@ serve(async (req) => {
     const campaignsData = await campaignsResponse.json()
     console.log('Retrieved campaigns:', campaignsData.length)
 
-    // Prepare date range for performance data (last 30 days)
-    const endDate = new Date()
-    const startDate = new Date()
-    startDate.setDate(startDate.getDate() - 30)
+    // Use provided date range or default to last 30 days
+    const endDate = dateRange?.endDate ? new Date(dateRange.endDate) : new Date()
+    const startDate = dateRange?.startDate ? new Date(dateRange.startDate) : new Date()
+    if (!dateRange?.startDate) {
+      startDate.setDate(startDate.getDate() - 30)
+    }
     
     const reportStartDate = startDate.toISOString().split('T')[0]
     const reportEndDate = endDate.toISOString().split('T')[0]
+    
+    // Default attribution windows if not provided
+    const windows = attributionWindows || ['7d', '14d']
+    const supportedCampaignTypes = campaignTypes || ['sponsoredProducts']
 
     // Store campaigns with basic data first
     const campaignIds: string[] = []
@@ -182,6 +188,7 @@ serve(async (req) => {
           name: campaign.name,
           campaign_type: campaign.campaignType,
           targeting_type: campaign.targetingType,
+          product_type: 'Sponsored Products', // Will be enhanced for other types
           status: campaign.state ? campaign.state.toLowerCase() : 'unknown',
           daily_budget: campaign.dailyBudget || null,
           start_date: campaign.startDate || null,
@@ -200,85 +207,28 @@ serve(async (req) => {
       }
     }
 
-    // Fetch performance data for campaigns using v3 reporting API
+    // Fetch performance data for campaigns with multiple attribution windows
     if (campaignIds.length > 0) {
-      console.log('Fetching campaign performance data using v3 API...')
+      console.log('Fetching campaign performance data with enhanced metrics...')
       console.log(`Date range: ${reportStartDate} to ${reportEndDate}`)
+      console.log('Attribution windows:', windows)
       console.log('Campaign IDs to fetch:', campaignIds)
       
-      // Try v3 reporting API first, fallback to v2 if needed
-      let performanceDataFetched = false
-      
-      // Process campaigns in batches of 100
-      const batchSize = 100
-      for (let i = 0; i < campaignIds.length; i += batchSize) {
-        const batch = campaignIds.slice(i, i + batchSize)
-        console.log(`Processing batch ${i/batchSize + 1} with ${batch.length} campaigns`)
+      // Process each attribution window
+      for (const window of windows) {
+        console.log(`Processing attribution window: ${window}`)
         
-        try {
-          // Try v3 reporting API
-          const v3ReportPayload = {
-            reportDate: reportEndDate, // Use single date for v3
-            metrics: 'impressions,clicks,cost,sales,orders',
-            campaignType: 'sponsoredProducts'
-          }
-
-          const v3ReportResponse = await fetch(`${apiEndpoint}/reporting/reports/campaigns?${new URLSearchParams(v3ReportPayload)}`, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'Amazon-Advertising-API-ClientId': clientId,
-              'Amazon-Advertising-API-Scope': connection.profile_id,
-            }
-          })
-
-          console.log(`V3 API response status: ${v3ReportResponse.status}`)
-
-          if (v3ReportResponse.ok) {
-            const v3ReportData = await v3ReportResponse.json()
-            console.log(`V3 API returned ${v3ReportData.length || 0} records`)
-            
-            if (v3ReportData && v3ReportData.length > 0) {
-              performanceDataFetched = true
-              
-              // Update campaigns with v3 performance data
-              for (const perfData of v3ReportData) {
-                if (!perfData.campaignId) continue
-                
-                console.log(`Updating campaign ${perfData.campaignId} with v3 data:`, {
-                  impressions: perfData.impressions,
-                  clicks: perfData.clicks,
-                  spend: perfData.cost,
-                  sales: perfData.sales,
-                  orders: perfData.orders
-                })
-                
-                const { error: updateError } = await supabase
-                  .from('campaigns')
-                  .update({
-                    impressions: parseInt(perfData.impressions || '0'),
-                    clicks: parseInt(perfData.clicks || '0'),
-                    spend: parseFloat(perfData.cost || '0'),
-                    sales: parseFloat(perfData.sales || '0'),
-                    orders: parseInt(perfData.orders || '0'),
-                    acos: perfData.cost && perfData.sales ? (parseFloat(perfData.cost) / parseFloat(perfData.sales)) * 100 : null,
-                    roas: perfData.cost && perfData.sales ? parseFloat(perfData.sales) / parseFloat(perfData.cost) : null,
-                    last_updated: new Date().toISOString()
-                  })
-                  .eq('connection_id', connectionId)
-                  .eq('amazon_campaign_id', perfData.campaignId.toString())
-
-                if (updateError) {
-                  console.error('Error updating campaign performance:', perfData.campaignId, updateError)
-                }
-              }
-            }
-          } else {
-            console.log('V3 API failed, trying v2 reporting API...')
-            const v3ErrorText = await v3ReportResponse.text()
-            console.error(`V3 Performance data API error:`, v3ReportResponse.status, v3ErrorText)
-            
-            // Fallback to v2 reporting API
+        // Try v3 reporting API first, fallback to v2 if needed
+        let performanceDataFetched = false
+        
+        // Process campaigns in batches of 100
+        const batchSize = 100
+        for (let i = 0; i < campaignIds.length; i += batchSize) {
+          const batch = campaignIds.slice(i, i + batchSize)
+          console.log(`Processing batch ${i/batchSize + 1} with ${batch.length} campaigns for ${window} attribution`)
+          
+          try {
+            // Enhanced v2 reporting API payload with more metrics and attribution windows
             const reportPayload = {
               startDate: reportStartDate,
               endDate: reportEndDate,
@@ -289,8 +239,10 @@ serve(async (req) => {
                   'impressions', 
                   'clicks',
                   'cost',
-                  'attributedSales30d',
-                  'attributedUnitsOrdered30d'
+                  `attributedSales${window}`,
+                  `attributedUnitsOrdered${window}`,
+                  'clickThroughRate',
+                  'costPerClick'
                 ],
                 reportTypeId: 'spCampaigns',
                 timeUnit: 'SUMMARY',
@@ -299,7 +251,7 @@ serve(async (req) => {
               campaignIdFilter: batch
             }
 
-            console.log('V2 API payload:', JSON.stringify(reportPayload, null, 2))
+            console.log('Enhanced V2 API payload:', JSON.stringify(reportPayload, null, 2))
 
             const reportResponse = await fetch(`${apiEndpoint}/reporting/reports`, {
               method: 'POST',
@@ -313,59 +265,134 @@ serve(async (req) => {
             })
 
             console.log(`V2 API response status: ${reportResponse.status}`)
-
             if (reportResponse.ok) {
               const reportData = await reportResponse.json()
-              console.log(`V2 API returned ${reportData.length || 0} records`)
+              console.log(`V2 API returned ${reportData.length || 0} records for ${window} attribution`)
               
               if (reportData && reportData.length > 0) {
                 performanceDataFetched = true
                 
-                // Update campaigns with v2 performance data  
+                // Update campaigns with enhanced v2 performance data  
                 for (const perfData of reportData) {
                   if (!perfData.campaignId) continue
                   
-                  console.log(`Updating campaign ${perfData.campaignId} with v2 data:`, {
+                  const salesKey = `attributedSales${window}`
+                  const ordersKey = `attributedUnitsOrdered${window}`
+                  
+                  console.log(`Updating campaign ${perfData.campaignId} with ${window} attribution data:`, {
                     impressions: perfData.impressions,
                     clicks: perfData.clicks,
                     spend: perfData.cost,
-                    sales: perfData.attributedSales30d,
-                    orders: perfData.attributedUnitsOrdered30d
+                    sales: perfData[salesKey],
+                    orders: perfData[ordersKey],
+                    ctr: perfData.clickThroughRate,
+                    cpc: perfData.costPerClick
                   })
+                  
+                  // Calculate derived metrics
+                  const impressions = parseInt(perfData.impressions || '0')
+                  const clicks = parseInt(perfData.clicks || '0')
+                  const spend = parseFloat(perfData.cost || '0')
+                  const sales = parseFloat(perfData[salesKey] || '0')
+                  const orders = parseInt(perfData[ordersKey] || '0')
+                  const ctr = parseFloat(perfData.clickThroughRate || '0') / 100 // Convert percentage
+                  const cpc = parseFloat(perfData.costPerClick || '0')
+                  const conversionRate = clicks > 0 ? (orders / clicks) * 100 : 0
+                  const acos = sales > 0 ? (spend / sales) * 100 : null
+                  const roas = spend > 0 ? sales / spend : null
+
+                  // Prepare update object based on attribution window
+                  const updateData: any = {
+                    last_updated: new Date().toISOString()
+                  }
+
+                  if (window === '7d') {
+                    updateData.impressions_7d = impressions
+                    updateData.clicks_7d = clicks
+                    updateData.spend_7d = spend
+                    updateData.sales_7d = sales
+                    updateData.orders_7d = orders
+                    updateData.acos_7d = acos
+                    updateData.roas_7d = roas
+                    updateData.ctr_7d = ctr
+                    updateData.cpc_7d = cpc
+                    updateData.conversion_rate_7d = conversionRate
+                  } else if (window === '14d') {
+                    updateData.impressions_14d = impressions
+                    updateData.clicks_14d = clicks
+                    updateData.spend_14d = spend
+                    updateData.sales_14d = sales
+                    updateData.orders_14d = orders
+                    updateData.acos_14d = acos
+                    updateData.roas_14d = roas
+                    updateData.ctr_14d = ctr
+                    updateData.cpc_14d = cpc
+                    updateData.conversion_rate_14d = conversionRate
+                    
+                    // Also update default columns for 14d as main metrics
+                    updateData.impressions = impressions
+                    updateData.clicks = clicks
+                    updateData.spend = spend
+                    updateData.sales = sales
+                    updateData.orders = orders
+                    updateData.acos = acos
+                    updateData.roas = roas
+                  }
                   
                   const { error: updateError } = await supabase
                     .from('campaigns')
-                    .update({
-                      impressions: parseInt(perfData.impressions || '0'),
-                      clicks: parseInt(perfData.clicks || '0'),
-                      spend: parseFloat(perfData.cost || '0'),
-                      sales: parseFloat(perfData.attributedSales30d || '0'),
-                      orders: parseInt(perfData.attributedUnitsOrdered30d || '0'),
-                      acos: perfData.cost && perfData.attributedSales30d ? (parseFloat(perfData.cost) / parseFloat(perfData.attributedSales30d)) * 100 : null,
-                      roas: perfData.cost && perfData.attributedSales30d ? parseFloat(perfData.attributedSales30d) / parseFloat(perfData.cost) : null,
-                      last_updated: new Date().toISOString()
-                    })
+                    .update(updateData)
                     .eq('connection_id', connectionId)
                     .eq('amazon_campaign_id', perfData.campaignId.toString())
 
                   if (updateError) {
                     console.error('Error updating campaign performance:', perfData.campaignId, updateError)
                   }
+
+                  // Store historical data - get internal campaign ID
+                  const { data: campaignRecord } = await supabase
+                    .from('campaigns')
+                    .select('id')
+                    .eq('connection_id', connectionId)
+                    .eq('amazon_campaign_id', perfData.campaignId.toString())
+                    .single()
+
+                  if (campaignRecord) {
+                    await supabase
+                      .from('campaign_performance_history')
+                      .upsert({
+                        campaign_id: campaignRecord.id,
+                        date: reportEndDate,
+                        attribution_window: window,
+                        impressions,
+                        clicks,
+                        spend,
+                        sales,
+                        orders,
+                        acos,
+                        roas,
+                        ctr,
+                        cpc,
+                        conversion_rate: conversionRate
+                      }, {
+                        onConflict: 'campaign_id, date, attribution_window'
+                      })
+                  }
                 }
               }
             } else {
               const errorText = await reportResponse.text()
-              console.error(`V2 Performance data API error for batch ${i/batchSize + 1}:`, reportResponse.status, errorText)
+              console.error(`V2 Performance data API error for batch ${i/batchSize + 1}, window ${window}:`, reportResponse.status, errorText)
             }
+          } catch (batchError) {
+            console.error(`Error processing batch ${i/batchSize + 1}:`, batchError)
           }
-        } catch (batchError) {
-          console.error(`Error processing batch ${i/batchSize + 1}:`, batchError)
-        }
         
         // Small delay between batches to avoid rate limiting
         if (i + batchSize < campaignIds.length) {
           await new Promise(resolve => setTimeout(resolve, 500))
         }
+      }
       }
       
       if (!performanceDataFetched) {

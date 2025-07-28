@@ -7,6 +7,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Auth from "@/pages/Auth";
 import Dashboard from "@/pages/Dashboard";
+import EnhancedDashboard from "@/pages/EnhancedDashboard";
 import Feedback from "@/pages/Feedback";
 import DataManagement from "@/pages/DataManagement";
 import Breakdown from "@/pages/Breakdown";
@@ -41,6 +42,11 @@ const App = () => {
               <Route path="/dashboard" element={
                 <ProtectedRoute>
                   <Dashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/enhanced-dashboard" element={
+                <ProtectedRoute>
+                  <EnhancedDashboard />
                 </ProtectedRoute>
               } />
               <Route path="/feedback" element={
