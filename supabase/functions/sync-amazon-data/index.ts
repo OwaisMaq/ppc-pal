@@ -495,8 +495,15 @@ serve(async (req) => {
 
     performanceLog.phases.healthCheck = Date.now() - startTime
 
-    // Enhanced campaigns fetch with error handling
+    // Enhanced campaigns fetch with comprehensive debugging
     console.log('Fetching campaigns with enhanced error handling...')
+    console.log('API request details:', {
+      endpoint: `${apiEndpoint}/v2/campaigns`,
+      profileId: connection.profile_id,
+      clientId: clientId ? 'present' : 'missing',
+      accessToken: accessToken ? `present (${accessToken.substring(0, 10)}...)` : 'missing'
+    })
+    
     const campaignsResponse = await requestQueue.add(() => 
       makeAmazonApiRequest(`${apiEndpoint}/v2/campaigns`, {
         headers: {
@@ -507,8 +514,39 @@ serve(async (req) => {
       })
     )
 
-    const campaignsData = await campaignsResponse.json()
-    console.log('Retrieved campaigns:', campaignsData.length)
+    console.log('Campaigns response status:', campaignsResponse.status)
+    console.log('Campaigns response headers:', Object.fromEntries(campaignsResponse.headers.entries()))
+    
+    let campaignsData
+    const responseText = await campaignsResponse.text()
+    console.log('Raw campaigns response:', responseText.substring(0, 500) + (responseText.length > 500 ? '...' : ''))
+    
+    try {
+      campaignsData = JSON.parse(responseText)
+    } catch (parseError) {
+      console.error('Failed to parse campaigns response as JSON:', parseError)
+      throw new Error(`Invalid JSON response: ${responseText}`)
+    }
+    
+    console.log('Parsed campaigns data type:', typeof campaignsData)
+    console.log('Is campaigns data array?', Array.isArray(campaignsData))
+    console.log('Retrieved campaigns count:', Array.isArray(campaignsData) ? campaignsData.length : 'N/A')
+    
+    if (!Array.isArray(campaignsData)) {
+      console.log('Full campaigns response object:', JSON.stringify(campaignsData, null, 2))
+      if (campaignsData?.error) {
+        console.error('API returned error:', campaignsData.error)
+        throw new Error(`Amazon API error: ${JSON.stringify(campaignsData.error)}`)
+      }
+      // If response is not an array, maybe it's wrapped in an object
+      if (campaignsData?.campaigns && Array.isArray(campaignsData.campaigns)) {
+        campaignsData = campaignsData.campaigns
+        console.log('Found campaigns in nested object, count:', campaignsData.length)
+      } else {
+        console.warn('Unexpected response structure, treating as empty array')
+        campaignsData = []
+      }
+    }
 
     performanceLog.phases.campaignsFetch = Date.now() - startTime
 
