@@ -1,13 +1,25 @@
+
 import { Badge } from "@/components/ui/badge";
 import { Clock } from "lucide-react";
+
 interface ComingSoonProps {
   feature?: string;
   className?: string;
 }
+
 const ComingSoon = ({
   feature,
   className
 }: ComingSoonProps) => {
-  return;
+  return (
+    <Badge 
+      variant="outline" 
+      className={`flex items-center gap-1 text-xs text-gray-500 ${className || ''}`}
+    >
+      <Clock className="h-3 w-3" />
+      {feature ? `${feature} - Coming Soon` : 'Coming Soon'}
+    </Badge>
+  );
 };
+
 export default ComingSoon;
