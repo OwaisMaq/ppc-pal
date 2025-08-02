@@ -204,14 +204,16 @@ async function fetchPerformanceData(
                 console.log(`v3 API successful, returned ${reportData.length || 0} records`)
                 // Mark data with API version for tracking
                 return (reportData || []).map((item: any) => ({ ...item, __apiVersion: 'v3' }))
+              }
             } else if (statusData.status === 'FAILED') {
               console.error('v3 report generation failed:', statusData)
               break
             }
+          } else {
+            console.error('Failed to poll report status:', statusResponse.status)
           }
           
-        } while (attempts < maxAttempts && (!statusResponse.ok || 
-                 !['COMPLETED', 'FAILED'].includes((await statusResponse.json()).status)))
+        } while (attempts < maxAttempts)
         
         if (attempts >= maxAttempts) {
           console.warn('v3 report polling timeout, falling back to v2')
