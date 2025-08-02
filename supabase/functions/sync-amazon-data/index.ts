@@ -119,34 +119,34 @@ async function fetchPerformanceData(
   
   console.log(`Fetching performance data for ${attributionWindow} attribution, campaigns: ${campaignIds.length}`)
   
-  // Try v3 API first with corrected column names
-  try {
-    console.log('Attempting v3 reporting API with corrected column mapping')
-    
-    // Step 1: Submit report request (v3 API with correct column names)
-    const reportPayload = {
-      startDate: reportStartDate,
-      endDate: reportEndDate,
-      configuration: {
-        adProduct: 'SPONSORED_PRODUCTS',
-        groupBy: ['campaign'],
-        columns: [
-          'campaignId',
-          'campaignName', 
-          'impressions',
-          'clicks',
-          'cost',
-          `sales${attributionWindow}`,  // Corrected: sales7d instead of attributedSales7d
-          `orders${attributionWindow}`, // Corrected: orders7d instead of attributedUnitsOrdered7d
-          'ctr',  // Corrected: ctr instead of clickThroughRate
-          'cpc'   // Corrected: cpc instead of costPerClick
-        ],
-        reportTypeId: 'spCampaigns',
-        timeUnit: 'SUMMARY',
-        format: 'GZIP_JSON'
-      },
-      campaignIdFilter: campaignIds
-    }
+    // Try v3 API first with corrected column names based on Amazon's actual API spec
+    try {
+      console.log('Attempting v3 reporting API with validated column names')
+      
+      // Step 1: Submit report request (v3 API with correct column names)
+      const reportPayload = {
+        startDate: reportStartDate,
+        endDate: reportEndDate,
+        configuration: {
+          adProduct: 'SPONSORED_PRODUCTS',
+          groupBy: ['campaign'],
+          columns: [
+            'campaignId',
+            'campaignName', 
+            'impressions',
+            'clicks',
+            'cost',
+            `sales${attributionWindow}`,     // Use sales7d, sales14d - these are correct
+            `purchases${attributionWindow}`, // Use purchases7d, purchases14d instead of orders
+            'clickThroughRate',              // Use full name instead of ctr
+            'costPerClick'                   // Use full name instead of cpc
+          ],
+          reportTypeId: 'spCampaigns',
+          timeUnit: 'SUMMARY',
+          format: 'GZIP_JSON'
+        },
+        campaignIdFilter: campaignIds
+      }
     
     console.log('Submitting v3 report request:', JSON.stringify(reportPayload, null, 2))
     
@@ -225,49 +225,20 @@ async function fetchPerformanceData(
     console.error('v3 API failed:', v3Error.message)
   }
   
-  // Fallback to v2 API with corrected endpoint
+  // Fallback to v2 API with corrected endpoint and metrics
   try {
-    console.log('Falling back to v2 reporting API with corrected endpoint')
+    console.log('Falling back to v2 reporting API with corrected metrics and endpoint')
     
-    // Try direct metrics endpoint first for immediate data
-    const metricsResponse = await requestQueue.add(() =>
-      makeAmazonApiRequest(`${apiEndpoint}/v2/campaigns?stateFilter=enabled,paused,archived`, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Amazon-Advertising-API-ClientId': clientId,
-          'Amazon-Advertising-API-Scope': profileId,
-        },
-      })
-    )
-    
-    if (metricsResponse.ok) {
-      const metricsData = await metricsResponse.json()
-      console.log(`v2 metrics API successful, returned ${metricsData.length || 0} campaign records`)
-      
-      // Process the campaign data to extract available metrics
-      const processedData = metricsData.map((campaign: any) => ({
-        campaignId: campaign.campaignId,
-        campaignName: campaign.name,
-        impressions: campaign.impressions || 0,
-        clicks: campaign.clicks || 0,
-        cost: campaign.cost || campaign.spend || 0,
-        [`sales${attributionWindow}`]: campaign[`attributedSales${attributionWindow}`] || campaign.sales || 0,
-        [`orders${attributionWindow}`]: campaign[`attributedUnitsOrdered${attributionWindow}`] || campaign.orders || 0,
-        ctr: campaign.ctr || 0,
-        cpc: campaign.cpc || 0
-      }))
-      
-      return processedData
-    }
-    
-    // Fallback to report generation if direct metrics fail
+    // Use the correct v2 report endpoint with validated metrics
     const v2Payload = {
       reportDate: reportEndDate,
-      metrics: `impressions,clicks,cost,attributedSales${attributionWindow},attributedUnitsOrdered${attributionWindow}`,
-      campaignType: 'sponsoredProducts'
+      metrics: `impressions,clicks,cost,attributedSales${attributionWindow},attributedUnitsOrdered${attributionWindow},ctr,cpc`,
+      campaignType: 'sponsoredProducts',
+      timeUnit: 'DAILY',
+      format: 'JSON'
     }
     
-    console.log('Trying v2 report generation:', JSON.stringify(v2Payload, null, 2))
+    console.log('Submitting v2 report request:', JSON.stringify(v2Payload, null, 2))
     
     const v2Response = await requestQueue.add(() =>
       makeAmazonApiRequest(`${apiEndpoint}/v2/sp/campaigns/report`, {
@@ -700,7 +671,7 @@ serve(async (req) => {
                   
                   // Updated to use correct column names for both v3 and v2 APIs
                   const salesKeyV3 = `sales${window}`  // v3 API format: sales7d, sales14d
-                  const ordersKeyV3 = `orders${window}` // v3 API format: orders7d, orders14d
+                  const purchasesKeyV3 = `purchases${window}` // v3 API format: purchases7d, purchases14d
                   const salesKeyV2 = `attributedSales${window}` // v2 API format: attributedSales7d, attributedSales14d
                   const ordersKeyV2 = `attributedUnitsOrdered${window}` // v2 API format: attributedUnitsOrdered7d, attributedUnitsOrdered14d
                   
@@ -709,7 +680,7 @@ serve(async (req) => {
                   const clicks = Math.max(0, parseInt(perfData.clicks || '0') || 0)
                   const spend = Math.max(0, parseFloat(perfData.cost || perfData.spend || '0') || 0)
                   
-                  // Try multiple column name formats for sales and orders
+                  // Try multiple column name formats for sales and orders with proper v3/v2 handling
                   const sales = Math.max(0, parseFloat(
                     perfData[salesKeyV3] || 
                     perfData[salesKeyV2] || 
@@ -719,25 +690,41 @@ serve(async (req) => {
                   ) || 0)
                   
                   const orders = Math.max(0, parseInt(
-                    perfData[ordersKeyV3] || 
+                    perfData[purchasesKeyV3] ||  // v3 uses "purchases" instead of "orders"
                     perfData[ordersKeyV2] || 
                     perfData.orders || 
+                    perfData.purchases ||
                     perfData.attributedUnitsOrdered || 
                     '0'
                   ) || 0)
                   
-                  // Handle CTR - v3 returns decimal, v2 returns percentage
+                  // Handle CTR - v3 and v2 have different formats
                   let ctr = 0
-                  if (perfData.ctr !== undefined) {
+                  if (perfData.clickThroughRate !== undefined) {
+                    // v3 API uses full name and returns as decimal (0.05 = 5%)
+                    ctr = Math.max(0, parseFloat(perfData.clickThroughRate) || 0)
+                  } else if (perfData.ctr !== undefined) {
+                    // v2 API may use abbreviated name
                     ctr = Math.max(0, parseFloat(perfData.ctr) || 0)
-                    // If it's already a decimal (v3), leave as is; if percentage (v2), convert
+                    // Convert to decimal if it's a percentage
                     if (ctr > 1) ctr = ctr / 100
-                  } else if (perfData.clickThroughRate !== undefined) {
-                    ctr = Math.max(0, parseFloat(perfData.clickThroughRate) / 100 || 0)
+                  } else if (impressions > 0 && clicks > 0) {
+                    // Calculate CTR if not provided
+                    ctr = clicks / impressions
                   }
                   
-                  // Handle CPC
-                  const cpc = Math.max(0, parseFloat(perfData.cpc || perfData.costPerClick || '0') || 0)
+                  // Handle CPC - v3 and v2 have different formats
+                  let cpc = 0
+                  if (perfData.costPerClick !== undefined) {
+                    // v3 API uses full name
+                    cpc = Math.max(0, parseFloat(perfData.costPerClick) || 0)
+                  } else if (perfData.cpc !== undefined) {
+                    // v2 API may use abbreviated name
+                    cpc = Math.max(0, parseFloat(perfData.cpc) || 0)
+                  } else if (clicks > 0 && spend > 0) {
+                    // Calculate CPC if not provided
+                    cpc = spend / clicks
+                  }
                   const conversionRate = clicks > 0 ? (orders / clicks) * 100 : 0
                   const acos = sales > 0 ? (spend / sales) * 100 : null
                   const roas = spend > 0 ? sales / spend : null
