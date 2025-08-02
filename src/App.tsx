@@ -12,6 +12,7 @@ import Feedback from "@/pages/Feedback";
 import DataManagement from "@/pages/DataManagement";
 import Breakdown from "@/pages/Breakdown";
 import Privacy from "@/pages/Privacy";
+import Settings from "@/pages/Settings";
 import PublicLanding from "@/pages/PublicLanding";
 import About from "@/pages/About";
 import Contact from "@/pages/Contact";
@@ -67,6 +68,11 @@ const App = () => {
               <Route path="/privacy" element={
                 <ProtectedRoute>
                   <Privacy />
+                </ProtectedRoute>
+              } />
+              <Route path="/settings" element={
+                <ProtectedRoute>
+                  <Settings />
                 </ProtectedRoute>
               } />
               
