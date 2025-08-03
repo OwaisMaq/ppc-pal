@@ -89,18 +89,26 @@ serve(async (req) => {
     // Calculate new expiry time (Amazon tokens typically last 1 hour)
     const expiresAt = new Date(Date.now() + (tokenData.expires_in * 1000))
 
-    // Ensure access token doesn't have Bearer prefix when storing
+    // Store access token without Bearer prefix for better compatibility
     const cleanAccessToken = tokenData.access_token.replace(/^Bearer\s+/i, '')
+    
+    console.log('Token validation check:', {
+      originalLength: tokenData.access_token.length,
+      cleanedLength: cleanAccessToken.length,
+      startsWithAtza: cleanAccessToken.startsWith('Atza|')
+    })
     
     // Update the connection with new tokens
     const { error: updateError } = await supabase
       .from('amazon_connections')
       .update({
         access_token: cleanAccessToken,
-        refresh_token: tokenData.refresh_token || connection.refresh_token, // Keep old refresh token if new one not provided
+        refresh_token: tokenData.refresh_token || connection.refresh_token,
         token_expires_at: expiresAt.toISOString(),
         status: 'active',
         setup_required_reason: null,
+        health_status: 'unknown', // Reset health status to trigger new check
+        last_health_check: null,
         updated_at: new Date().toISOString()
       })
       .eq('id', connectionId)

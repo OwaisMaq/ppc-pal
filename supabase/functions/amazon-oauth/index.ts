@@ -217,8 +217,15 @@ serve(async (req) => {
         console.log('User ID:', user.id);
         console.log('Profile data:', JSON.stringify(profile, null, 2));
         
-        // Ensure access token doesn't have Bearer prefix when storing
+        // Store access token without Bearer prefix for consistency
         const cleanAccessToken = tokenData.access_token.replace(/^Bearer\s+/i, '')
+        
+        console.log('Token validation for storage:', {
+          originalLength: tokenData.access_token.length,
+          cleanedLength: cleanAccessToken.length,
+          startsWithAtza: cleanAccessToken.startsWith('Atza|'),
+          profileId: profile.profileId
+        })
         
         const connectionData = {
           user_id: user.id,

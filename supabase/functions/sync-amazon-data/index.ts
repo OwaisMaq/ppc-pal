@@ -470,37 +470,91 @@ async function checkConnectionHealth(
   clientId: string,
   profileId: string
 ): Promise<{ healthy: boolean, issues: string[] }> {
-  const issues: string[] = []
+  console.log('⚡ Starting enhanced connection health check...');
   
+  let healthStatus = 'healthy';
+  let healthIssues: string[] = [];
+
   try {
-    // Test basic profile access with proper authentication
+    // Validate token format before making requests
+    const cleanToken = accessToken.replace(/^Bearer\s+/i, '');
+    if (!cleanToken.startsWith('Atza|')) {
+      healthIssues.push('Invalid access token format - not an Amazon token');
+      healthStatus = 'unhealthy';
+    }
+
+    // Test basic profile access with enhanced error handling
+    console.log('🔍 Testing profile access...');
     const profileResponse = await makeAmazonApiRequest(
       `${apiEndpoint}/v2/profiles`,
       { method: 'GET' },
       accessToken,
       clientId,
       profileId
-    )
-    
+    );
+
     if (!profileResponse.ok) {
-      issues.push(`Profile API access failed: ${profileResponse.status}`)
+      const errorText = await profileResponse.text();
+      console.log('❌ Profile access failed:', profileResponse.status, errorText);
+      
+      if (profileResponse.status === 403) {
+        healthIssues.push('Authentication failed - token may be expired or invalid');
+        healthStatus = 'auth_failed';
+      } else if (profileResponse.status === 429) {
+        healthIssues.push('Rate limit exceeded');
+        healthStatus = 'rate_limited';
+      } else {
+        healthIssues.push(`API error ${profileResponse.status}: ${errorText}`);
+        healthStatus = 'unhealthy';
+      }
+    } else {
+      console.log('✅ Profile access successful');
     }
-    
+
+    // Test campaigns endpoint access
+    console.log('🔍 Testing campaigns endpoint access...');
+    const campaignsResponse = await makeAmazonApiRequest(
+      `${apiEndpoint}/v3/sp/campaigns`,
+      { method: 'GET' },
+      accessToken,
+      clientId,
+      profileId
+    );
+
+    if (!campaignsResponse.ok) {
+      const errorText = await campaignsResponse.text();
+      console.log('❌ Campaigns access failed:', campaignsResponse.status, errorText);
+      
+      if (campaignsResponse.status === 403) {
+        healthIssues.push('Campaign access denied - insufficient permissions');
+        if (healthStatus === 'healthy') healthStatus = 'auth_failed';
+      }
+    } else {
+      console.log('✅ Campaigns endpoint accessible');
+    }
+
   } catch (error) {
-    issues.push(`Connection test failed: ${error.message}`)
+    console.error('❌ Health check error:', error);
+    healthIssues.push(`Health check failed: ${error.message}`);
+    healthStatus = 'error';
   }
+
+  // Update connection with enhanced health information
+  console.log(`📊 Health check result: ${healthStatus}`, healthIssues);
   
-  // Update connection health status
   await supabase
     .from('amazon_connections')
     .update({
+      health_status: healthStatus,
+      health_issues: healthIssues.length > 0 ? healthIssues : null,
       last_health_check: new Date().toISOString(),
-      health_status: issues.length === 0 ? 'healthy' : 'degraded',
-      health_issues: issues.length > 0 ? issues : null
+      // If auth failed, update status to require attention
+      status: healthStatus === 'auth_failed' ? 'expired' : 'active',
+      setup_required_reason: healthStatus === 'auth_failed' ? 'Authentication failed - please reconnect your account' : null
     })
-    .eq('id', connectionId)
+    .eq('id', connectionId);
   
-  return { healthy: issues.length === 0, issues }
+  return { healthy: healthIssues.length === 0, issues: healthIssues };
 }
 
 serve(async (req) => {
@@ -589,19 +643,24 @@ serve(async (req) => {
           const tokenData = await refreshResponse.json()
           const newExpiresAt = new Date(Date.now() + (tokenData.expires_in * 1000))
           
+          // Store access token without Bearer prefix for consistency
+          const cleanAccessToken = tokenData.access_token.replace(/^Bearer\s+/i, '')
+          
           await supabase
             .from('amazon_connections')
             .update({
-              access_token: tokenData.access_token,
+              access_token: cleanAccessToken,
               refresh_token: tokenData.refresh_token || connection.refresh_token,
               token_expires_at: newExpiresAt.toISOString(),
               status: 'active',
-              setup_required_reason: null
+              setup_required_reason: null,
+              health_status: 'unknown', // Reset to trigger health check
+              last_health_check: null
             })
             .eq('id', connectionId)
           
-          accessToken = tokenData.access_token
-          console.log('Token refreshed successfully')
+          accessToken = cleanAccessToken
+          console.log('Token refreshed and stored successfully')
         } else {
           throw new Error('Token refresh failed')
         }
