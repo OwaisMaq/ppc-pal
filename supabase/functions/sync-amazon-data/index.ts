@@ -8,9 +8,9 @@ const corsHeaders = {
 
 // Rate limiting configuration
 const RATE_LIMIT = {
-  requestsPerSecond: 10,
-  burstSize: 20,
-  retryDelay: 1000
+  requestsPerSecond: 8, // Reduced for better reliability
+  burstSize: 15,
+  retryDelay: 2000
 }
 
 // Request queue for rate limiting
@@ -58,10 +58,8 @@ class RequestQueue {
   }
 }
 
-// Enhanced error handling with retry logic
+// Enhanced API request with proper Amazon Ads API error handling
 async function makeAmazonApiRequest(url: string, options: RequestInit, retries = 3): Promise<Response> {
-  let lastError: Error
-  
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const response = await fetch(url, options)
@@ -70,7 +68,10 @@ async function makeAmazonApiRequest(url: string, options: RequestInit, retries =
         return response
       }
       
-      // Handle specific error codes
+      const errorText = await response.text()
+      console.log(`API request failed (${response.status}): ${errorText}`)
+      
+      // Handle rate limiting
       if (response.status === 429) {
         const retryAfter = response.headers.get('Retry-After')
         const delay = retryAfter ? parseInt(retryAfter) * 1000 : RATE_LIMIT.retryDelay * attempt
@@ -79,245 +80,119 @@ async function makeAmazonApiRequest(url: string, options: RequestInit, retries =
         continue
       }
       
+      // Retry on server errors
       if (response.status >= 500) {
         console.log(`Server error ${response.status}, retrying attempt ${attempt}/${retries}`)
         await new Promise(resolve => setTimeout(resolve, RATE_LIMIT.retryDelay * attempt))
         continue
       }
       
-      // For client errors (4xx), don't retry
-      const errorText = await response.text()
+      // Don't retry on client errors
       throw new Error(`API request failed: ${response.status} ${errorText}`)
       
     } catch (error) {
-      lastError = error as Error
+      console.log(`Request failed (attempt ${attempt}/${retries}): ${error.message}`)
       
       if (attempt === retries) {
-        throw lastError
+        throw error
       }
       
-      console.log(`Request failed (attempt ${attempt}/${retries}):`, error.message)
       await new Promise(resolve => setTimeout(resolve, RATE_LIMIT.retryDelay * attempt))
     }
   }
   
-  throw lastError!
+  throw new Error('Maximum retries exceeded')
 }
 
-// Request deduplication to avoid 425 errors
-const requestCache = new Map<string, Promise<any>>()
-
-function generateRequestKey(endpoint: string, body: string, attribution: string): string {
-  return `${endpoint}-${attribution}-${btoa(body).slice(0, 50)}`
-}
-
-// Enhanced reporting API with complete rewrite for Amazon API compatibility
-async function fetchPerformanceData(
+// Fetch campaign performance using the correct Amazon Ads API v2 endpoint
+async function fetchCampaignPerformance(
   apiEndpoint: string,
   accessToken: string,
   clientId: string,
   profileId: string,
   campaignIds: string[],
-  reportStartDate: string,
-  reportEndDate: string,
+  startDate: string,
+  endDate: string,
   attributionWindow: string,
   requestQueue: RequestQueue
 ): Promise<any[]> {
   
-  console.log(`Fetching performance data for ${attributionWindow} attribution, campaigns: ${campaignIds.length}`)
-  
-  // Generate unique request key for deduplication
-  const requestKey = generateRequestKey('performance', JSON.stringify(campaignIds), attributionWindow)
-  
-  // Check if this exact request is already in progress
-  if (requestCache.has(requestKey)) {
-    console.log('Request already in progress, waiting for existing request...')
-    try {
-      return await requestCache.get(requestKey)!
-    } catch (error) {
-      console.log('Cached request failed, proceeding with new request')
-      requestCache.delete(requestKey)
-    }
-  }
-
-  // Create promise for this request
-  const requestPromise = (async (): Promise<any[]> => {
-    try {
-      // Try direct campaign metrics API first (more reliable than reports)
-      return await fetchDirectCampaignMetrics(
-        apiEndpoint, accessToken, clientId, profileId, 
-        campaignIds, reportStartDate, reportEndDate, attributionWindow, requestQueue
-      )
-    } catch (directError) {
-      console.log('Direct API failed, trying report-based approach:', directError.message)
-      
-      // Fallback to report-based approach with correct endpoints
-      return await fetchReportBasedMetrics(
-        apiEndpoint, accessToken, clientId, profileId,
-        campaignIds, reportStartDate, reportEndDate, attributionWindow, requestQueue
-      )
-    }
-  })()
-  
-  // Cache the request
-  requestCache.set(requestKey, requestPromise)
+  console.log(`Fetching performance for ${campaignIds.length} campaigns, ${attributionWindow} attribution`)
   
   try {
-    const result = await requestPromise
-    // Clean up cache after successful completion
-    setTimeout(() => requestCache.delete(requestKey), 60000) // Clean after 1 minute
-    return result
+    // Use Amazon Ads API v2 campaigns endpoint with performance metrics
+    // This is the most reliable endpoint for getting campaign performance data
+    const campaignFilter = campaignIds.length > 0 ? `campaignIdFilter=${campaignIds.join(',')}` : ''
+    const metricsUrl = `${apiEndpoint}/v2/sp/campaigns/extended?${campaignFilter}`
+    
+    console.log(`Making request to: ${metricsUrl}`)
+    
+    const response = await requestQueue.add(() =>
+      makeAmazonApiRequest(metricsUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Amazon-Advertising-API-ClientId': clientId,
+          'Amazon-Advertising-API-Scope': profileId,
+          'Content-Type': 'application/json',
+        },
+      })
+    )
+    
+    if (!response.ok) {
+      console.error(`Performance API failed: ${response.status}`)
+      return []
+    }
+    
+    const performanceData = await response.json()
+    console.log(`Retrieved ${Array.isArray(performanceData) ? performanceData.length : 0} performance records`)
+    
+    if (!Array.isArray(performanceData)) {
+      console.warn('Performance API returned non-array data')
+      return []
+    }
+    
+    // Transform the extended campaign data to include performance metrics
+    const results = performanceData.map(campaign => ({
+      campaignId: campaign.campaignId,
+      campaignName: campaign.name,
+      impressions: campaign.impressions || 0,
+      clicks: campaign.clicks || 0,
+      cost: campaign.cost || 0,
+      sales: campaign[`attributedSales${attributionWindow}`] || campaign.sales || 0,
+      orders: campaign[`attributedUnitsOrdered${attributionWindow}`] || campaign.orders || 0,
+      ctr: campaign.ctr || 0,
+      cpc: campaign.cpc || 0,
+      attributionWindow: attributionWindow,
+      __source: 'extended_campaigns_api'
+    }))
+    
+    console.log(`Processed ${results.length} campaign performance records`)
+    return results
+    
   } catch (error) {
-    // Clean up cache on error
-    requestCache.delete(requestKey)
-    throw error
+    console.error('Error fetching campaign performance:', error)
+    return []
   }
 }
 
-// Direct campaign metrics API - more reliable than reports
-async function fetchDirectCampaignMetrics(
+// Fetch ad groups for campaigns
+async function fetchAdGroups(
   apiEndpoint: string,
   accessToken: string,
   clientId: string,
   profileId: string,
   campaignIds: string[],
-  reportStartDate: string,
-  reportEndDate: string,
-  attributionWindow: string,
   requestQueue: RequestQueue
 ): Promise<any[]> {
   
-  console.log('Attempting direct campaign metrics API')
+  console.log(`Fetching ad groups for ${campaignIds.length} campaigns`)
   
-  const results: any[] = []
-  
-  // Process campaigns in smaller batches
-  const batchSize = 10
-  for (let i = 0; i < campaignIds.length; i += batchSize) {
-    const batch = campaignIds.slice(i, i + batchSize)
-    
-    try {
-      // Use correct Amazon Ads API endpoints for campaign metrics
-      const metricsResponse = await requestQueue.add(() =>
-        makeAmazonApiRequest(`${apiEndpoint}/v2/sp/campaigns`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Amazon-Advertising-API-ClientId': clientId,
-            'Amazon-Advertising-API-Scope': profileId,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            campaignIdFilter: batch,
-            includeExtendedDataFields: true
-          })
-        })
-      )
-      
-      if (metricsResponse.ok) {
-        const metricsData = await metricsResponse.json()
-        
-        if (Array.isArray(metricsData)) {
-          // Transform the data to include performance metrics
-          for (const campaign of metricsData) {
-            // Basic campaign data
-            const baseData = {
-              campaignId: campaign.campaignId,
-              campaignName: campaign.name,
-              impressions: 0,
-              clicks: 0,
-              cost: 0,
-              __apiVersion: 'direct'
-            }
-            
-            // Add attribution-specific metrics if available
-            if (campaign.extendedData) {
-              const extData = campaign.extendedData
-              baseData[`sales${attributionWindow}`] = extData[`sales${attributionWindow}`] || 0
-              baseData[`purchases${attributionWindow}`] = extData[`orders${attributionWindow}`] || 0
-              baseData.impressions = extData.impressions || 0
-              baseData.clicks = extData.clicks || 0
-              baseData.cost = extData.spend || 0
-            }
-            
-            results.push(baseData)
-          }
-        }
-      } else {
-        console.log(`Direct metrics API failed for batch: ${metricsResponse.status}`)
-        throw new Error(`Direct API failed: ${metricsResponse.status}`)
-      }
-    } catch (batchError) {
-      console.error(`Error fetching direct metrics for batch:`, batchError)
-      throw batchError
-    }
-  }
-  
-  console.log(`Direct API returned ${results.length} campaign metrics`)
-  return results
-}
-
-// Report-based metrics with fixed endpoints and column names
-async function fetchReportBasedMetrics(
-  apiEndpoint: string,
-  accessToken: string,
-  clientId: string,
-  profileId: string,
-  campaignIds: string[],
-  reportStartDate: string,
-  reportEndDate: string,
-  attributionWindow: string,
-  requestQueue: RequestQueue
-): Promise<any[]> {
-  
-  console.log('Attempting report-based metrics with corrected Amazon API spec')
-  
-  // Use correct Amazon Advertising API endpoints and format
-  // Amazon uses different endpoints based on product type and API version
-  
-  // Try Sponsored Products v3 API first
   try {
-    console.log('Trying SP v3 reporting API with correct configuration')
+    const adGroupsUrl = `${apiEndpoint}/v2/sp/adGroups/extended`
     
-    const reportConfig = {
-      name: `Campaign Performance ${Date.now()}`,
-      startDate: reportStartDate,
-      endDate: reportEndDate,
-      configuration: {
-        adProduct: 'SPONSORED_PRODUCTS',
-        recordType: 'campaign',
-        reportTypeId: 'spCampaigns',
-        timeUnit: 'SUMMARY',
-        format: 'JSON',
-        columns: [
-          'campaignId',
-          'campaignName',
-          'impressions',
-          'clicks', 
-          'cost',
-          `attributedSales${attributionWindow === '7d' ? '7d' : '14d'}`,
-          `attributedUnitsOrdered${attributionWindow === '7d' ? '7d' : '14d'}`,
-          'ctr',
-          'cpc'
-        ]
-      }
-    }
-    
-    // Add campaign filter if we have campaign IDs
-    if (campaignIds.length > 0) {
-      reportConfig.configuration['filters'] = [
-        {
-          field: 'campaignId',
-          values: campaignIds
-        }
-      ]
-    }
-    
-    console.log('SP v3 report config:', JSON.stringify(reportConfig, null, 2))
-    
-    // Submit report request to correct v3 endpoint
-    const submitResponse = await requestQueue.add(() =>
-      makeAmazonApiRequest(`${apiEndpoint}/reporting/reports`, {
+    const response = await requestQueue.add(() =>
+      makeAmazonApiRequest(adGroupsUrl, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -325,55 +200,46 @@ async function fetchReportBasedMetrics(
           'Amazon-Advertising-API-Scope': profileId,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(reportConfig)
+        body: JSON.stringify({
+          campaignIdFilter: campaignIds,
+          includeExtendedDataFields: true
+        })
       })
     )
     
-    if (submitResponse.ok) {
-      const submitData = await submitResponse.json()
-      console.log('v3 report submitted:', submitData)
-      
-      if (submitData.reportId) {
-        // Poll for completion with exponential backoff
-        const reportData = await pollReportCompletion(
-          apiEndpoint, accessToken, clientId, profileId, 
-          submitData.reportId, requestQueue, 'v3'
-        )
-        
-        if (reportData && reportData.length > 0) {
-          console.log(`SP v3 API successful: ${reportData.length} records`)
-          return reportData.map(item => ({ ...item, __apiVersion: 'v3' }))
-        }
-      }
+    if (!response.ok) {
+      console.error(`Ad groups API failed: ${response.status}`)
+      return []
     }
-  } catch (v3Error) {
-    console.log('SP v3 API failed:', v3Error.message)
+    
+    const adGroupsData = await response.json()
+    console.log(`Retrieved ${Array.isArray(adGroupsData) ? adGroupsData.length : 0} ad groups`)
+    
+    return Array.isArray(adGroupsData) ? adGroupsData : []
+    
+  } catch (error) {
+    console.error('Error fetching ad groups:', error)
+    return []
   }
+}
+
+// Fetch keywords for ad groups
+async function fetchKeywords(
+  apiEndpoint: string,
+  accessToken: string,
+  clientId: string,
+  profileId: string,
+  adGroupIds: string[],
+  requestQueue: RequestQueue
+): Promise<any[]> {
   
-  // Fallback to v2 API with correct endpoint structure
+  console.log(`Fetching keywords for ${adGroupIds.length} ad groups`)
+  
   try {
-    console.log('Falling back to SP v2 API with correct endpoint')
+    const keywordsUrl = `${apiEndpoint}/v2/sp/keywords/extended`
     
-    // Amazon v2 API uses different endpoint structure
-    const v2Config = {
-      reportDate: reportEndDate,
-      metrics: [
-        'impressions',
-        'clicks',
-        'cost',
-        `attributedSales${attributionWindow}`,
-        `attributedUnitsOrdered${attributionWindow}`,
-        'ctr', 
-        'cpc'
-      ].join(','),
-      campaignType: 'sponsoredProducts'
-    }
-    
-    console.log('SP v2 report config:', JSON.stringify(v2Config, null, 2))
-    
-    // Use correct v2 endpoint
-    const v2Response = await requestQueue.add(() =>
-      makeAmazonApiRequest(`${apiEndpoint}/v2/sp/campaignReport`, {
+    const response = await requestQueue.add(() =>
+      makeAmazonApiRequest(keywordsUrl, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -381,135 +247,30 @@ async function fetchReportBasedMetrics(
           'Amazon-Advertising-API-Scope': profileId,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(v2Config)
+        body: JSON.stringify({
+          adGroupIdFilter: adGroupIds,
+          includeExtendedDataFields: true
+        })
       })
     )
     
-    if (v2Response.ok) {
-      const v2Data = await v2Response.json()
-      console.log('v2 response:', v2Data)
-      
-      if (v2Data.reportId) {
-        const reportData = await pollReportCompletion(
-          apiEndpoint, accessToken, clientId, profileId,
-          v2Data.reportId, requestQueue, 'v2'
-        )
-        
-        if (reportData && reportData.length > 0) {
-          console.log(`SP v2 API successful: ${reportData.length} records`)
-          return reportData.map(item => ({ ...item, __apiVersion: 'v2' }))
-        }
-      }
+    if (!response.ok) {
+      console.error(`Keywords API failed: ${response.status}`)
+      return []
     }
-  } catch (v2Error) {
-    console.log('SP v2 API failed:', v2Error.message)
+    
+    const keywordsData = await response.json()
+    console.log(`Retrieved ${Array.isArray(keywordsData) ? keywordsData.length : 0} keywords`)
+    
+    return Array.isArray(keywordsData) ? keywordsData : []
+    
+  } catch (error) {
+    console.error('Error fetching keywords:', error)
+    return []
   }
-  
-  console.warn('All report-based methods failed, returning empty array')
-  return []
 }
 
-// Enhanced report polling with exponential backoff
-async function pollReportCompletion(
-  apiEndpoint: string,
-  accessToken: string,
-  clientId: string,
-  profileId: string,
-  reportId: string,
-  requestQueue: RequestQueue,
-  apiVersion: 'v2' | 'v3'
-): Promise<any[]> {
-  
-  console.log(`Polling ${apiVersion} report ${reportId} for completion`)
-  
-  let attempts = 0
-  const maxAttempts = 30
-  let backoffDelay = 5000 // Start with 5 seconds
-  
-  while (attempts < maxAttempts) {
-    attempts++
-    
-    // Exponential backoff: 5s, 7.5s, 11.25s, etc., max 60s
-    const delay = Math.min(backoffDelay * Math.pow(1.5, attempts - 1), 60000)
-    await new Promise(resolve => setTimeout(resolve, delay))
-    
-    console.log(`Polling attempt ${attempts}/${maxAttempts} (delay: ${delay}ms)`)
-    
-    try {
-      // Use correct polling endpoint based on API version
-      const statusEndpoint = apiVersion === 'v3' 
-        ? `${apiEndpoint}/reporting/reports/${reportId}`
-        : `${apiEndpoint}/v2/reports/${reportId}`
-      
-      const statusResponse = await requestQueue.add(() =>
-        makeAmazonApiRequest(statusEndpoint, {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Amazon-Advertising-API-ClientId': clientId,
-            'Amazon-Advertising-API-Scope': profileId,
-          },
-        })
-      )
-      
-      if (statusResponse.ok) {
-        const statusData = await statusResponse.json()
-        console.log(`Report status: ${statusData.status}`)
-        
-        // Handle different status field names between v2/v3
-        const status = statusData.status || statusData.state
-        const downloadUrl = statusData.url || statusData.location
-        
-        if ((status === 'COMPLETED' || status === 'SUCCESS') && downloadUrl) {
-          console.log('Report completed, downloading...')
-          
-          try {
-            const downloadResponse = await fetch(downloadUrl)
-            if (downloadResponse.ok) {
-              // Handle different response formats (JSON vs GZIP)
-              const contentType = downloadResponse.headers.get('content-type')
-              let reportData
-              
-              if (contentType?.includes('application/json')) {
-                reportData = await downloadResponse.json()
-              } else {
-                // Handle compressed or text formats
-                const text = await downloadResponse.text()
-                try {
-                  reportData = JSON.parse(text)
-                } catch {
-                  console.error('Could not parse report data as JSON')
-                  return []
-                }
-              }
-              
-              console.log(`Downloaded ${Array.isArray(reportData) ? reportData.length : 'unknown'} records`)
-              return Array.isArray(reportData) ? reportData : []
-            }
-          } catch (downloadError) {
-            console.error('Error downloading report:', downloadError)
-            return []
-          }
-        } else if (status === 'FAILED' || status === 'FAILURE') {
-          console.error('Report generation failed:', statusData)
-          return []
-        }
-        // Status is still IN_PROGRESS/PENDING, continue polling
-      } else {
-        console.warn(`Status polling failed: ${statusResponse.status}`)
-      }
-    } catch (pollError) {
-      console.error(`Polling error attempt ${attempts}:`, pollError)
-      if (attempts >= maxAttempts - 3) {
-        throw pollError // Re-throw on final attempts
-      }
-    }
-  }
-  
-  console.warn('Report polling timed out')
-  return []
-}
-
-// Enhanced connection health monitoring
+// Enhanced connection health check
 async function checkConnectionHealth(
   supabase: any,
   connectionId: string,
@@ -521,7 +282,7 @@ async function checkConnectionHealth(
   const issues: string[] = []
   
   try {
-    // Test basic API connectivity
+    // Test basic profile access
     const profileResponse = await fetch(`${apiEndpoint}/v2/profiles`, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -532,19 +293,6 @@ async function checkConnectionHealth(
     
     if (!profileResponse.ok) {
       issues.push(`Profile API access failed: ${profileResponse.status}`)
-    }
-    
-    // Test campaigns API
-    const campaignsResponse = await fetch(`${apiEndpoint}/v2/campaigns?count=1`, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Amazon-Advertising-API-ClientId': clientId,
-        'Amazon-Advertising-API-Scope': profileId,
-      },
-    })
-    
-    if (!campaignsResponse.ok) {
-      issues.push(`Campaigns API access failed: ${campaignsResponse.status}`)
     }
     
   } catch (error) {
@@ -594,13 +342,13 @@ serve(async (req) => {
       throw new Error('Invalid authorization')
     }
 
-    const { connectionId, dateRange, attributionWindows, campaignTypes } = await req.json()
+    const { connectionId, dateRange, attributionWindows } = await req.json()
     console.log('Starting enhanced data sync for connection:', connectionId)
     
     performanceLog.connectionId = connectionId
     performanceLog.phases.auth = Date.now() - startTime
 
-    // Get the connection details
+    // Get connection details
     const { data: connection, error: connectionError } = await supabase
       .from('amazon_connections')
       .select('*')
@@ -623,7 +371,7 @@ serve(async (req) => {
       throw new Error('Amazon API credentials not configured')
     }
 
-    // Enhanced token refresh logic
+    // Token refresh logic
     const now = new Date()
     const expiresAt = new Date(connection.token_expires_at)
     let accessToken = connection.access_token
@@ -683,14 +431,14 @@ serve(async (req) => {
 
     performanceLog.phases.tokenRefresh = Date.now() - startTime
 
-    // Initialize request queue for rate limiting
+    // Initialize request queue
     const requestQueue = new RequestQueue()
 
-    // Use region-specific API endpoint
-    const apiEndpoint = connection.advertising_api_endpoint || 'https://advertising-api.amazon.com'
+    // Use correct API endpoint
+    const apiEndpoint = connection.advertising_api_endpoint || 'https://advertising-api-eu.amazon.com'
     console.log('Using API endpoint:', apiEndpoint)
 
-    // Perform connection health check
+    // Connection health check
     const healthCheck = await checkConnectionHealth(
       supabase, connectionId, apiEndpoint, accessToken, clientId, connection.profile_id
     )
@@ -701,7 +449,7 @@ serve(async (req) => {
 
     performanceLog.phases.healthCheck = Date.now() - startTime
 
-    // Enhanced campaigns fetch with comprehensive debugging
+    // Fetch campaigns with detailed logging
     console.log('Fetching campaigns with enhanced error handling...')
     console.log('API request details:', {
       endpoint: `${apiEndpoint}/v2/campaigns`,
@@ -744,7 +492,7 @@ serve(async (req) => {
         console.error('API returned error:', campaignsData.error)
         throw new Error(`Amazon API error: ${JSON.stringify(campaignsData.error)}`)
       }
-      // If response is not an array, maybe it's wrapped in an object
+      // Handle wrapped response
       if (campaignsData?.campaigns && Array.isArray(campaignsData.campaigns)) {
         campaignsData = campaignsData.campaigns
         console.log('Found campaigns in nested object, count:', campaignsData.length)
@@ -766,7 +514,7 @@ serve(async (req) => {
     const reportStartDate = startDate.toISOString().split('T')[0]
     const reportEndDate = endDate.toISOString().split('T')[0]
     
-    // Enhanced attribution windows with validation
+    // Enhanced attribution windows
     const supportedWindows = connection.supported_attribution_models || ['7d', '14d']
     const requestedWindows = attributionWindows || ['7d', '14d']
     const windows = requestedWindows.filter(w => supportedWindows.includes(w))
@@ -781,7 +529,6 @@ serve(async (req) => {
 
     // Store campaigns with enhanced error handling
     const campaignIds: string[] = []
-    const campaignBatches: string[][] = []
     
     for (const campaign of campaignsData) {
       if (!campaign.campaignId || !campaign.name) {
@@ -817,364 +564,222 @@ serve(async (req) => {
       }
     }
 
-    // Create optimized batches for performance requests
-    const batchSize = 50 // Reduced batch size for better reliability
-    for (let i = 0; i < campaignIds.length; i += batchSize) {
-      campaignBatches.push(campaignIds.slice(i, i + batchSize))
-    }
-
     performanceLog.phases.campaignsStore = Date.now() - startTime
 
-    // Enhanced performance data fetching with validation and monitoring
+    // Enhanced performance data fetching with correct API calls
     let totalMetricsUpdated = 0
-    let campaignsWithZeroData = 0
-    let apiVersionsUsed = new Set<string>()
     
     if (campaignIds.length > 0) {
       console.log('Fetching enhanced performance data with validation...')
       
-      const performancePromises: Promise<void>[] = []
-      
       for (const window of windows) {
-        for (let batchIndex = 0; batchIndex < campaignBatches.length; batchIndex++) {
-          const batch = campaignBatches[batchIndex]
-          
-          performancePromises.push(
-            (async () => {
-              try {
-                console.log(`Processing batch ${batchIndex + 1}/${campaignBatches.length} for ${window} attribution`)
-                
-                const performanceData = await fetchPerformanceData(
-                  apiEndpoint,
-                  accessToken,
-                  clientId,
-                  connection.profile_id,
-                  batch,
-                  reportStartDate,
-                  reportEndDate,
-                  window,
-                  requestQueue
-                )
-                
-                // Track API version used for this batch
-                if (performanceData.length > 0) {
-                  apiVersionsUsed.add(performanceData[0].__apiVersion || 'unknown')
-                }
-                
-                // Update campaigns with performance data
-                for (const perfData of performanceData) {
-                  if (!perfData.campaignId) {
-                    console.warn('Skipping performance data without campaignId:', perfData)
-                    continue
-                  }
-                  
-                  console.log(`Processing performance data for campaign ${perfData.campaignId}:`, perfData)
-                  
-                  // Updated to use correct column names for both v3 and v2 APIs
-                  const salesKeyV3 = `sales${window}`  // v3 API format: sales7d, sales14d
-                  const purchasesKeyV3 = `purchases${window}` // v3 API format: purchases7d, purchases14d
-                  const salesKeyV2 = `attributedSales${window}` // v2 API format: attributedSales7d, attributedSales14d
-                  const ordersKeyV2 = `attributedUnitsOrdered${window}` // v2 API format: attributedUnitsOrdered7d, attributedUnitsOrdered14d
-                  
-                  // Enhanced metrics calculation with validation and multiple fallbacks
-                  const impressions = Math.max(0, parseInt(perfData.impressions || '0') || 0)
-                  const clicks = Math.max(0, parseInt(perfData.clicks || '0') || 0)
-                  const spend = Math.max(0, parseFloat(perfData.cost || perfData.spend || '0') || 0)
-                  
-                  // Try multiple column name formats for sales and orders with proper v3/v2 handling
-                  const sales = Math.max(0, parseFloat(
-                    perfData[salesKeyV3] || 
-                    perfData[salesKeyV2] || 
-                    perfData.sales || 
-                    perfData.attributedSales || 
-                    '0'
-                  ) || 0)
-                  
-                  const orders = Math.max(0, parseInt(
-                    perfData[purchasesKeyV3] ||  // v3 uses "purchases" instead of "orders"
-                    perfData[ordersKeyV2] || 
-                    perfData.orders || 
-                    perfData.purchases ||
-                    perfData.attributedUnitsOrdered || 
-                    '0'
-                  ) || 0)
-                  
-                  // Handle CTR - v3 and v2 have different formats
-                  let ctr = 0
-                  if (perfData.clickThroughRate !== undefined) {
-                    // v3 API uses full name and returns as decimal (0.05 = 5%)
-                    ctr = Math.max(0, parseFloat(perfData.clickThroughRate) || 0)
-                  } else if (perfData.ctr !== undefined) {
-                    // v2 API may use abbreviated name
-                    ctr = Math.max(0, parseFloat(perfData.ctr) || 0)
-                    // Convert to decimal if it's a percentage
-                    if (ctr > 1) ctr = ctr / 100
-                  } else if (impressions > 0 && clicks > 0) {
-                    // Calculate CTR if not provided
-                    ctr = clicks / impressions
-                  }
-                  
-                  // Handle CPC - v3 and v2 have different formats
-                  let cpc = 0
-                  if (perfData.costPerClick !== undefined) {
-                    // v3 API uses full name
-                    cpc = Math.max(0, parseFloat(perfData.costPerClick) || 0)
-                  } else if (perfData.cpc !== undefined) {
-                    // v2 API may use abbreviated name
-                    cpc = Math.max(0, parseFloat(perfData.cpc) || 0)
-                  } else if (clicks > 0 && spend > 0) {
-                    // Calculate CPC if not provided
-                    cpc = spend / clicks
-                  }
-                  const conversionRate = clicks > 0 ? (orders / clicks) * 100 : 0
-                  const acos = sales > 0 ? (spend / sales) * 100 : null
-                  const roas = spend > 0 ? sales / spend : null
-                  
-                  console.log(`Calculated metrics for campaign ${perfData.campaignId}: spend=${spend}, sales=${sales}, impressions=${impressions}, clicks=${clicks}`)
-
-                  // Track zero data campaigns for monitoring
-                  if (spend === 0 && sales === 0 && impressions === 0 && clicks === 0) {
-                    campaignsWithZeroData++
-                  } else {
-                    totalMetricsUpdated++
-                  }
-
-                  // Dynamic update object based on attribution window
-                  const updateData: any = {
-                    last_updated: new Date().toISOString(),
-                    [`impressions_${window}`]: impressions,
-                    [`clicks_${window}`]: clicks,
-                    [`spend_${window}`]: spend,
-                    [`sales_${window}`]: sales,
-                    [`orders_${window}`]: orders,
-                    [`acos_${window}`]: acos,
-                    [`roas_${window}`]: roas,
-                    [`ctr_${window}`]: ctr,
-                    [`cpc_${window}`]: cpc,
-                    [`conversion_rate_${window}`]: conversionRate
-                  }
-
-                  // Set primary metrics to 14d by default
-                  if (window === '14d') {
-                    updateData.impressions = impressions
-                    updateData.clicks = clicks
-                    updateData.spend = spend
-                    updateData.sales = sales
-                    updateData.orders = orders
-                    updateData.acos = acos
-                    updateData.roas = roas
-                  }
-                  
-                  const { error: updateError } = await supabase
-                    .from('campaigns')
-                    .update(updateData)
-                    .eq('connection_id', connectionId)
-                    .eq('amazon_campaign_id', perfData.campaignId.toString())
-
-                  if (updateError) {
-                    console.error('Error updating campaign performance:', perfData.campaignId, updateError)
-                  }
-
-                  // Store historical performance data
-                  const { data: campaignRecord } = await supabase
-                    .from('campaigns')
-                    .select('id')
-                    .eq('connection_id', connectionId)
-                    .eq('amazon_campaign_id', perfData.campaignId.toString())
-                    .single()
-
-                  if (campaignRecord) {
-                    await supabase
-                      .from('campaign_performance_history')
-                      .upsert({
-                        campaign_id: campaignRecord.id,
-                        date: reportEndDate,
-                        attribution_window: window,
-                        impressions,
-                        clicks,
-                        spend,
-                        sales,
-                        orders,
-                        acos,
-                        roas,
-                        ctr,
-                        cpc,
-                        conversion_rate: conversionRate
-                      }, {
-                        onConflict: 'campaign_id, date, attribution_window'
-                      })
-                  }
-                }
-                
-              } catch (batchError) {
-                console.error(`Error processing batch ${batchIndex + 1} for ${window}:`, batchError)
-              }
-            })()
+        console.log(`Processing ${window} attribution`)
+        
+        try {
+          const performanceData = await fetchCampaignPerformance(
+            apiEndpoint,
+            accessToken,
+            clientId,
+            connection.profile_id,
+            campaignIds,
+            reportStartDate,
+            reportEndDate,
+            window,
+            requestQueue
           )
+          
+          console.log(`Retrieved ${performanceData.length} performance records for ${window}`)
+          
+          // Update campaigns with performance data
+          for (const perfData of performanceData) {
+            if (!perfData.campaignId) {
+              console.warn('Skipping performance data without campaignId:', perfData)
+              continue
+            }
+            
+            // Enhanced metrics calculation with proper data types
+            const impressions = Math.max(0, parseInt(perfData.impressions || '0') || 0)
+            const clicks = Math.max(0, parseInt(perfData.clicks || '0') || 0)
+            const spend = Math.max(0, parseFloat(perfData.cost || '0') || 0)
+            const sales = Math.max(0, parseFloat(perfData.sales || '0') || 0)
+            const orders = Math.max(0, parseInt(perfData.orders || '0') || 0)
+            
+            // Calculate derived metrics
+            const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0
+            const cpc = clicks > 0 ? spend / clicks : 0
+            const conversionRate = clicks > 0 ? (orders / clicks) * 100 : 0
+            const acos = sales > 0 ? (spend / sales) * 100 : null
+            const roas = spend > 0 ? sales / spend : null
+            
+            console.log(`Updating campaign ${perfData.campaignId}: spend=${spend}, sales=${sales}, impressions=${impressions}, clicks=${clicks}`)
+
+            // Dynamic update object based on attribution window
+            const updateData: any = {
+              last_updated: new Date().toISOString(),
+              [`impressions_${window}`]: impressions,
+              [`clicks_${window}`]: clicks,
+              [`spend_${window}`]: spend,
+              [`sales_${window}`]: sales,
+              [`orders_${window}`]: orders,
+              [`ctr_${window}`]: ctr,
+              [`cpc_${window}`]: cpc,
+              [`conversion_rate_${window}`]: conversionRate,
+              [`acos_${window}`]: acos,
+              [`roas_${window}`]: roas,
+            }
+
+            // Also update the default columns for the primary attribution window
+            if (window === '14d') {
+              updateData.impressions = impressions
+              updateData.clicks = clicks
+              updateData.spend = spend
+              updateData.sales = sales
+              updateData.orders = orders
+              updateData.acos = acos
+              updateData.roas = roas
+            }
+
+            const { error: updateError } = await supabase
+              .from('campaigns')
+              .update(updateData)
+              .eq('connection_id', connectionId)
+              .eq('amazon_campaign_id', perfData.campaignId.toString())
+
+            if (updateError) {
+              console.error('Error updating campaign metrics:', perfData.campaignId, updateError)
+            } else {
+              totalMetricsUpdated++
+            }
+          }
+        } catch (error) {
+          console.error(`Error processing ${window} attribution:`, error)
         }
       }
-      
-      // Wait for all performance data fetching to complete
-      await Promise.allSettled(performancePromises)
     }
 
     performanceLog.phases.performanceData = Date.now() - startTime
 
-    // Enhanced ad groups and keywords sync with parallel processing
+    // Sync ad groups and keywords
     console.log('Syncing ad groups and keywords...')
     
-    const { data: storedCampaigns } = await supabase
-      .from('campaigns')
-      .select('id, amazon_campaign_id')
-      .eq('connection_id', connectionId)
-
-    const adGroupPromises: Promise<void>[] = []
-    
-    for (const campaign of storedCampaigns || []) {
-      adGroupPromises.push(
-        (async () => {
-          try {
-            const adGroupsResponse = await requestQueue.add(() =>
-              makeAmazonApiRequest(`${apiEndpoint}/v2/adGroups?campaignIdFilter=${campaign.amazon_campaign_id}`, {
-                headers: {
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Amazon-Advertising-API-ClientId': clientId,
-                  'Amazon-Advertising-API-Scope': connection.profile_id,
-                },
-              })
-            )
-
-            if (adGroupsResponse.ok) {
-              const adGroupsData = await adGroupsResponse.json()
-              
-              for (const adGroup of adGroupsData) {
-                const { data: storedAdGroup } = await supabase
-                  .from('ad_groups')
-                  .upsert({
-                    campaign_id: campaign.id,
-                    amazon_adgroup_id: adGroup.adGroupId.toString(),
-                    name: adGroup.name,
-                    status: adGroup.state?.toLowerCase() || 'enabled',
-                    default_bid: adGroup.defaultBid || null,
-                  }, {
-                    onConflict: 'campaign_id, amazon_adgroup_id'
-                  })
-                  .select('id')
-                  .single()
-
-                if (storedAdGroup) {
-                  // Fetch keywords for this ad group
-                  try {
-                    const keywordsResponse = await requestQueue.add(() =>
-                      makeAmazonApiRequest(`${apiEndpoint}/v2/keywords?adGroupIdFilter=${adGroup.adGroupId}`, {
-                        headers: {
-                          'Authorization': `Bearer ${accessToken}`,
-                          'Amazon-Advertising-API-ClientId': clientId,
-                          'Amazon-Advertising-API-Scope': connection.profile_id,
-                        },
-                      })
-                    )
-
-                    if (keywordsResponse.ok) {
-                      const keywordsData = await keywordsResponse.json()
-                      
-                      for (const keyword of keywordsData) {
-                        if (!keyword.keywordId || !keyword.keywordText) {
-                          continue
-                        }
-
-                        await supabase
-                          .from('keywords')
-                          .upsert({
-                            adgroup_id: storedAdGroup.id,
-                            amazon_keyword_id: keyword.keywordId.toString(),
-                            keyword_text: keyword.keywordText,
-                            match_type: keyword.matchType || 'exact',
-                            bid: keyword.bid || null,
-                            status: keyword.state?.toLowerCase() || 'enabled',
-                          }, {
-                            onConflict: 'adgroup_id, amazon_keyword_id'
-                          })
-                      }
-                    }
-                  } catch (keywordError) {
-                    console.error(`Keywords sync failed for ad group ${adGroup.adGroupId}:`, keywordError)
-                  }
-                }
-              }
-            }
-          } catch (adGroupError) {
-            console.error(`Ad groups sync failed for campaign ${campaign.amazon_campaign_id}:`, adGroupError)
-          }
-        })()
+    try {
+      const adGroupsData = await fetchAdGroups(
+        apiEndpoint, accessToken, clientId, connection.profile_id, campaignIds, requestQueue
       )
+      
+      const adGroupIds: string[] = []
+      
+      for (const adGroup of adGroupsData) {
+        if (!adGroup.adGroupId || !adGroup.name) continue
+        
+        adGroupIds.push(adGroup.adGroupId.toString())
+        
+        await supabase
+          .from('ad_groups')
+          .upsert({
+            campaign_id: (await supabase
+              .from('campaigns')
+              .select('id')
+              .eq('connection_id', connectionId)
+              .eq('amazon_campaign_id', adGroup.campaignId.toString())
+              .single()).data?.id,
+            amazon_adgroup_id: adGroup.adGroupId.toString(),
+            name: adGroup.name,
+            status: adGroup.state?.toLowerCase() || 'enabled',
+            default_bid: adGroup.defaultBid,
+          }, {
+            onConflict: 'campaign_id, amazon_adgroup_id'
+          })
+      }
+      
+      if (adGroupIds.length > 0) {
+        const keywordsData = await fetchKeywords(
+          apiEndpoint, accessToken, clientId, connection.profile_id, adGroupIds, requestQueue
+        )
+        
+        for (const keyword of keywordsData) {
+          if (!keyword.keywordId || !keyword.keywordText) continue
+          
+          await supabase
+            .from('keywords')
+            .upsert({
+              adgroup_id: (await supabase
+                .from('ad_groups')
+                .select('id')
+                .eq('amazon_adgroup_id', keyword.adGroupId.toString())
+                .single()).data?.id,
+              amazon_keyword_id: keyword.keywordId.toString(),
+              keyword_text: keyword.keywordText,
+              match_type: keyword.matchType?.toLowerCase() || 'broad',
+              bid: keyword.bid,
+              status: keyword.state?.toLowerCase() || 'enabled',
+            }, {
+              onConflict: 'adgroup_id, amazon_keyword_id'
+            })
+        }
+      }
+    } catch (error) {
+      console.error('Error syncing ad groups and keywords:', error)
     }
-    
-    // Wait for ad groups and keywords sync to complete
-    await Promise.allSettled(adGroupPromises)
 
     performanceLog.phases.adGroupsKeywords = Date.now() - startTime
 
-    // Update connection with enhanced metadata
+    // Update connection metadata
     await supabase
       .from('amazon_connections')
-      .update({ 
+      .update({
         last_sync_at: new Date().toISOString(),
-        campaign_count: campaignIds.length,
-        reporting_api_version: 'v3_with_v2_fallback'
+        campaign_count: campaignIds.length
       })
       .eq('id', connectionId)
 
+    // Log performance metrics
     performanceLog.totalTime = Date.now() - startTime
+    
+    await supabase
+      .from('sync_performance_logs')
+      .insert({
+        connection_id: connectionId,
+        operation_type: 'enhanced_sync',
+        start_time: new Date(startTime).toISOString(),
+        end_time: new Date().toISOString(),
+        total_duration_ms: performanceLog.totalTime,
+        campaigns_processed: campaignIds.length,
+        success: true,
+        phases: performanceLog.phases,
+        performance_metrics: {
+          campaignsProcessed: campaignIds.length,
+          metricsUpdated: totalMetricsUpdated,
+          attributionWindows: windows,
+          apiEndpoint: apiEndpoint
+        }
+      })
+
     console.log('Enhanced sync completed successfully:', performanceLog)
 
-    // Log performance metrics to database
-    try {
-      await supabase
-        .from('sync_performance_logs')
-        .insert({
-          connection_id: connectionId,
-          start_time: new Date(startTime).toISOString(),
-          end_time: new Date().toISOString(),
-          total_duration_ms: performanceLog.totalTime,
-          phases: performanceLog.phases,
-          campaigns_processed: campaignIds.length,
-          operation_type: 'enhanced_sync',
-          success: true,
-          performance_metrics: {
-            attributionWindows: windows,
-            healthStatus: healthCheck.healthy ? 'healthy' : 'degraded',
-            apiVersionUsed: Array.from(apiVersionsUsed).join(', ') || 'v3_with_v2_fallback',
-            totalMetricsUpdated,
-            campaignsWithZeroData,
-            dataQualityScore: totalMetricsUpdated > 0 ? (totalMetricsUpdated / (totalMetricsUpdated + campaignsWithZeroData)) * 100 : 0
-          }
-        })
-    } catch (logError) {
-      console.error('Failed to log performance metrics:', logError)
-    }
-
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: 'Enhanced data sync completed',
-        performance: performanceLog,
-        stats: {
-          campaignsProcessed: campaignIds.length,
-          attributionWindows: windows,
-          healthStatus: healthCheck.healthy ? 'healthy' : 'degraded'
-        }
+      JSON.stringify({
+        success: true,
+        campaignsProcessed: campaignIds.length,
+        metricsUpdated: totalMetricsUpdated,
+        attributionWindows: windows,
+        performanceData: performanceLog
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200 
+      }
     )
 
   } catch (error) {
-    console.error('Enhanced sync error:', error)
+    console.error('Sync failed:', error)
     
-    performanceLog.error = error.message
-    performanceLog.totalTime = Date.now() - startTime
-    
-    // Log failed sync to database
+    const errorLog = {
+      ...performanceLog,
+      error: error.message,
+      totalTime: Date.now() - startTime
+    }
+
     try {
       const supabase = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
@@ -1185,28 +790,26 @@ serve(async (req) => {
         .from('sync_performance_logs')
         .insert({
           connection_id: performanceLog.connectionId || null,
+          operation_type: 'enhanced_sync',
           start_time: new Date(startTime).toISOString(),
           end_time: new Date().toISOString(),
-          total_duration_ms: performanceLog.totalTime,
-          phases: performanceLog.phases,
-          campaigns_processed: 0,
-          operation_type: 'enhanced_sync',
+          total_duration_ms: errorLog.totalTime,
           success: false,
           error_message: error.message,
-          performance_metrics: { error: error.message }
+          phases: performanceLog.phases
         })
     } catch (logError) {
-      console.error('Failed to log error metrics:', logError)
+      console.error('Failed to log error:', logError)
     }
-    
+
     return new Response(
       JSON.stringify({ 
         error: error.message,
-        performance: performanceLog
+        details: errorLog
       }),
       { 
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500 
       }
     )
   }
