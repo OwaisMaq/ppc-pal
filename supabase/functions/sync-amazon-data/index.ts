@@ -104,7 +104,14 @@ async function makeAmazonApiRequest(url: string, options: RequestInit, retries =
   throw lastError!
 }
 
-// Enhanced reporting API with proper v3 workflow and v2 fallback
+// Request deduplication to avoid 425 errors
+const requestCache = new Map<string, Promise<any>>()
+
+function generateRequestKey(endpoint: string, body: string, attribution: string): string {
+  return `${endpoint}-${attribution}-${btoa(body).slice(0, 50)}`
+}
+
+// Enhanced reporting API with complete rewrite for Amazon API compatibility
 async function fetchPerformanceData(
   apiEndpoint: string,
   accessToken: string,
@@ -119,37 +126,196 @@ async function fetchPerformanceData(
   
   console.log(`Fetching performance data for ${attributionWindow} attribution, campaigns: ${campaignIds.length}`)
   
-    // Try v3 API first with corrected column names based on Amazon's actual API spec
+  // Generate unique request key for deduplication
+  const requestKey = generateRequestKey('performance', JSON.stringify(campaignIds), attributionWindow)
+  
+  // Check if this exact request is already in progress
+  if (requestCache.has(requestKey)) {
+    console.log('Request already in progress, waiting for existing request...')
     try {
-      console.log('Attempting v3 reporting API with validated column names')
+      return await requestCache.get(requestKey)!
+    } catch (error) {
+      console.log('Cached request failed, proceeding with new request')
+      requestCache.delete(requestKey)
+    }
+  }
+
+  // Create promise for this request
+  const requestPromise = (async (): Promise<any[]> => {
+    try {
+      // Try direct campaign metrics API first (more reliable than reports)
+      return await fetchDirectCampaignMetrics(
+        apiEndpoint, accessToken, clientId, profileId, 
+        campaignIds, reportStartDate, reportEndDate, attributionWindow, requestQueue
+      )
+    } catch (directError) {
+      console.log('Direct API failed, trying report-based approach:', directError.message)
       
-      // Step 1: Submit report request (v3 API with correct column names)
-      const reportPayload = {
-        startDate: reportStartDate,
-        endDate: reportEndDate,
-        configuration: {
-          adProduct: 'SPONSORED_PRODUCTS',
-          groupBy: ['campaign'],
-          columns: [
-            'campaignId',
-            'campaignName', 
-            'impressions',
-            'clicks',
-            'cost',
-            `sales${attributionWindow}`,     // Use sales7d, sales14d - these are correct
-            `purchases${attributionWindow}`, // Use purchases7d, purchases14d instead of orders
-            'clickThroughRate',              // Use full name instead of ctr
-            'costPerClick'                   // Use full name instead of cpc
-          ],
-          reportTypeId: 'spCampaigns',
-          timeUnit: 'SUMMARY',
-          format: 'GZIP_JSON'
-        },
-        campaignIdFilter: campaignIds
+      // Fallback to report-based approach with correct endpoints
+      return await fetchReportBasedMetrics(
+        apiEndpoint, accessToken, clientId, profileId,
+        campaignIds, reportStartDate, reportEndDate, attributionWindow, requestQueue
+      )
+    }
+  })()
+  
+  // Cache the request
+  requestCache.set(requestKey, requestPromise)
+  
+  try {
+    const result = await requestPromise
+    // Clean up cache after successful completion
+    setTimeout(() => requestCache.delete(requestKey), 60000) // Clean after 1 minute
+    return result
+  } catch (error) {
+    // Clean up cache on error
+    requestCache.delete(requestKey)
+    throw error
+  }
+}
+
+// Direct campaign metrics API - more reliable than reports
+async function fetchDirectCampaignMetrics(
+  apiEndpoint: string,
+  accessToken: string,
+  clientId: string,
+  profileId: string,
+  campaignIds: string[],
+  reportStartDate: string,
+  reportEndDate: string,
+  attributionWindow: string,
+  requestQueue: RequestQueue
+): Promise<any[]> {
+  
+  console.log('Attempting direct campaign metrics API')
+  
+  const results: any[] = []
+  
+  // Process campaigns in smaller batches
+  const batchSize = 10
+  for (let i = 0; i < campaignIds.length; i += batchSize) {
+    const batch = campaignIds.slice(i, i + batchSize)
+    
+    try {
+      // Use correct Amazon Ads API endpoints for campaign metrics
+      const metricsResponse = await requestQueue.add(() =>
+        makeAmazonApiRequest(`${apiEndpoint}/v2/sp/campaigns`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Amazon-Advertising-API-ClientId': clientId,
+            'Amazon-Advertising-API-Scope': profileId,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            campaignIdFilter: batch,
+            includeExtendedDataFields: true
+          })
+        })
+      )
+      
+      if (metricsResponse.ok) {
+        const metricsData = await metricsResponse.json()
+        
+        if (Array.isArray(metricsData)) {
+          // Transform the data to include performance metrics
+          for (const campaign of metricsData) {
+            // Basic campaign data
+            const baseData = {
+              campaignId: campaign.campaignId,
+              campaignName: campaign.name,
+              impressions: 0,
+              clicks: 0,
+              cost: 0,
+              __apiVersion: 'direct'
+            }
+            
+            // Add attribution-specific metrics if available
+            if (campaign.extendedData) {
+              const extData = campaign.extendedData
+              baseData[`sales${attributionWindow}`] = extData[`sales${attributionWindow}`] || 0
+              baseData[`purchases${attributionWindow}`] = extData[`orders${attributionWindow}`] || 0
+              baseData.impressions = extData.impressions || 0
+              baseData.clicks = extData.clicks || 0
+              baseData.cost = extData.spend || 0
+            }
+            
+            results.push(baseData)
+          }
+        }
+      } else {
+        console.log(`Direct metrics API failed for batch: ${metricsResponse.status}`)
+        throw new Error(`Direct API failed: ${metricsResponse.status}`)
       }
+    } catch (batchError) {
+      console.error(`Error fetching direct metrics for batch:`, batchError)
+      throw batchError
+    }
+  }
+  
+  console.log(`Direct API returned ${results.length} campaign metrics`)
+  return results
+}
+
+// Report-based metrics with fixed endpoints and column names
+async function fetchReportBasedMetrics(
+  apiEndpoint: string,
+  accessToken: string,
+  clientId: string,
+  profileId: string,
+  campaignIds: string[],
+  reportStartDate: string,
+  reportEndDate: string,
+  attributionWindow: string,
+  requestQueue: RequestQueue
+): Promise<any[]> {
+  
+  console.log('Attempting report-based metrics with corrected Amazon API spec')
+  
+  // Use correct Amazon Advertising API endpoints and format
+  // Amazon uses different endpoints based on product type and API version
+  
+  // Try Sponsored Products v3 API first
+  try {
+    console.log('Trying SP v3 reporting API with correct configuration')
     
-    console.log('Submitting v3 report request:', JSON.stringify(reportPayload, null, 2))
+    const reportConfig = {
+      name: `Campaign Performance ${Date.now()}`,
+      startDate: reportStartDate,
+      endDate: reportEndDate,
+      configuration: {
+        adProduct: 'SPONSORED_PRODUCTS',
+        recordType: 'campaign',
+        reportTypeId: 'spCampaigns',
+        timeUnit: 'SUMMARY',
+        format: 'JSON',
+        columns: [
+          'campaignId',
+          'campaignName',
+          'impressions',
+          'clicks', 
+          'cost',
+          `attributedSales${attributionWindow === '7d' ? '7d' : '14d'}`,
+          `attributedUnitsOrdered${attributionWindow === '7d' ? '7d' : '14d'}`,
+          'ctr',
+          'cpc'
+        ]
+      }
+    }
     
+    // Add campaign filter if we have campaign IDs
+    if (campaignIds.length > 0) {
+      reportConfig.configuration['filters'] = [
+        {
+          field: 'campaignId',
+          values: campaignIds
+        }
+      ]
+    }
+    
+    console.log('SP v3 report config:', JSON.stringify(reportConfig, null, 2))
+    
+    // Submit report request to correct v3 endpoint
     const submitResponse = await requestQueue.add(() =>
       makeAmazonApiRequest(`${apiEndpoint}/reporting/reports`, {
         method: 'POST',
@@ -159,89 +325,55 @@ async function fetchPerformanceData(
           'Amazon-Advertising-API-Scope': profileId,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(reportPayload)
+        body: JSON.stringify(reportConfig)
       })
     )
     
     if (submitResponse.ok) {
       const submitData = await submitResponse.json()
-      console.log('v3 report submitted successfully:', submitData)
+      console.log('v3 report submitted:', submitData)
       
       if (submitData.reportId) {
-        // Step 2: Poll for report status
-        const reportId = submitData.reportId
-        let statusResponse
-        let attempts = 0
-        const maxAttempts = 30 // 5 minutes with 10-second intervals
+        // Poll for completion with exponential backoff
+        const reportData = await pollReportCompletion(
+          apiEndpoint, accessToken, clientId, profileId, 
+          submitData.reportId, requestQueue, 'v3'
+        )
         
-        do {
-          await new Promise(resolve => setTimeout(resolve, 10000)) // Wait 10 seconds
-          attempts++
-          
-          console.log(`Polling report status (attempt ${attempts}/${maxAttempts})...`)
-          
-          statusResponse = await requestQueue.add(() =>
-            makeAmazonApiRequest(`${apiEndpoint}/reporting/reports/${reportId}`, {
-              headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Amazon-Advertising-API-ClientId': clientId,
-                'Amazon-Advertising-API-Scope': profileId,
-              },
-            })
-          )
-          
-          if (statusResponse.ok) {
-            const statusData = await statusResponse.json()
-            console.log('Report status:', statusData.status)
-            
-            if (statusData.status === 'COMPLETED' && statusData.url) {
-              // Step 3: Download report data
-              console.log('Report completed, downloading data...')
-              
-              const downloadResponse = await fetch(statusData.url)
-              if (downloadResponse.ok) {
-                const reportData = await downloadResponse.json()
-                console.log(`v3 API successful, returned ${reportData.length || 0} records`)
-                // Mark data with API version for tracking
-                return (reportData || []).map((item: any) => ({ ...item, __apiVersion: 'v3' }))
-              }
-            } else if (statusData.status === 'FAILED') {
-              console.error('v3 report generation failed:', statusData)
-              break
-            }
-          } else {
-            console.error('Failed to poll report status:', statusResponse.status)
-          }
-          
-        } while (attempts < maxAttempts)
-        
-        if (attempts >= maxAttempts) {
-          console.warn('v3 report polling timeout, falling back to v2')
+        if (reportData && reportData.length > 0) {
+          console.log(`SP v3 API successful: ${reportData.length} records`)
+          return reportData.map(item => ({ ...item, __apiVersion: 'v3' }))
         }
       }
     }
-    
   } catch (v3Error) {
-    console.error('v3 API failed:', v3Error.message)
+    console.log('SP v3 API failed:', v3Error.message)
   }
   
-  // Fallback to v2 API with corrected endpoint and metrics
+  // Fallback to v2 API with correct endpoint structure
   try {
-    console.log('Falling back to v2 reporting API with corrected metrics and endpoint')
+    console.log('Falling back to SP v2 API with correct endpoint')
     
-    // Use the correct v2 report endpoint with validated metrics
-    const v2Payload = {
+    // Amazon v2 API uses different endpoint structure
+    const v2Config = {
       reportDate: reportEndDate,
-      metrics: `impressions,clicks,cost,attributedSales${attributionWindow},attributedUnitsOrdered${attributionWindow},ctr,cpc`,
-      campaignType: 'sponsoredProducts',
-      timeUnit: 'DAILY',
-      format: 'JSON'
+      metrics: [
+        'impressions',
+        'clicks',
+        'cost',
+        `attributedSales${attributionWindow}`,
+        `attributedUnitsOrdered${attributionWindow}`,
+        'ctr', 
+        'cpc'
+      ].join(','),
+      campaignType: 'sponsoredProducts'
     }
     
-    console.log('Submitting v2 report request:', JSON.stringify(v2Payload, null, 2))
+    console.log('SP v2 report config:', JSON.stringify(v2Config, null, 2))
     
+    // Use correct v2 endpoint
     const v2Response = await requestQueue.add(() =>
-      makeAmazonApiRequest(`${apiEndpoint}/v2/sp/campaigns/report`, {
+      makeAmazonApiRequest(`${apiEndpoint}/v2/sp/campaignReport`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -249,62 +381,131 @@ async function fetchPerformanceData(
           'Amazon-Advertising-API-Scope': profileId,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(v2Payload)
+        body: JSON.stringify(v2Config)
       })
     )
     
     if (v2Response.ok) {
       const v2Data = await v2Response.json()
+      console.log('v2 response:', v2Data)
       
       if (v2Data.reportId) {
-        // Poll v2 report status
-        let statusAttempts = 0
-        const maxStatusAttempts = 20
+        const reportData = await pollReportCompletion(
+          apiEndpoint, accessToken, clientId, profileId,
+          v2Data.reportId, requestQueue, 'v2'
+        )
         
-        while (statusAttempts < maxStatusAttempts) {
-          await new Promise(resolve => setTimeout(resolve, 5000))
-          statusAttempts++
-          
-          const statusResponse = await requestQueue.add(() =>
-            makeAmazonApiRequest(`${apiEndpoint}/v2/reports/${v2Data.reportId}`, {
-              headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Amazon-Advertising-API-ClientId': clientId,
-                'Amazon-Advertising-API-Scope': profileId,
-              },
-            })
-          )
-          
-          if (statusResponse.ok) {
-            const statusData = await statusResponse.json()
-            console.log('v2 report status:', statusData.status)
-            
-            if (statusData.status === 'SUCCESS' && statusData.location) {
-              const downloadResponse = await fetch(statusData.location)
-              if (downloadResponse.ok) {
-                const reportData = await downloadResponse.json()
-                console.log(`v2 API successful, returned ${reportData.length || 0} records`)
-                return reportData || []
-              }
-            } else if (statusData.status === 'FAILURE') {
-              console.error('v2 report generation failed')
-              break
-            }
-          }
+        if (reportData && reportData.length > 0) {
+          console.log(`SP v2 API successful: ${reportData.length} records`)
+          return reportData.map(item => ({ ...item, __apiVersion: 'v2' }))
         }
-      } else if (Array.isArray(v2Data)) {
-        // Direct data return (some v2 endpoints return data immediately)
-        console.log(`v2 API returned immediate data: ${v2Data.length} records`)
-        return v2Data
       }
     }
-    
   } catch (v2Error) {
-    console.error('v2 API also failed:', v2Error.message)
-    throw new Error(`Both v3 and v2 APIs failed. v2: ${v2Error.message}`)
+    console.log('SP v2 API failed:', v2Error.message)
   }
   
-  console.warn('No performance data retrieved from either API version')
+  console.warn('All report-based methods failed, returning empty array')
+  return []
+}
+
+// Enhanced report polling with exponential backoff
+async function pollReportCompletion(
+  apiEndpoint: string,
+  accessToken: string,
+  clientId: string,
+  profileId: string,
+  reportId: string,
+  requestQueue: RequestQueue,
+  apiVersion: 'v2' | 'v3'
+): Promise<any[]> {
+  
+  console.log(`Polling ${apiVersion} report ${reportId} for completion`)
+  
+  let attempts = 0
+  const maxAttempts = 30
+  let backoffDelay = 5000 // Start with 5 seconds
+  
+  while (attempts < maxAttempts) {
+    attempts++
+    
+    // Exponential backoff: 5s, 7.5s, 11.25s, etc., max 60s
+    const delay = Math.min(backoffDelay * Math.pow(1.5, attempts - 1), 60000)
+    await new Promise(resolve => setTimeout(resolve, delay))
+    
+    console.log(`Polling attempt ${attempts}/${maxAttempts} (delay: ${delay}ms)`)
+    
+    try {
+      // Use correct polling endpoint based on API version
+      const statusEndpoint = apiVersion === 'v3' 
+        ? `${apiEndpoint}/reporting/reports/${reportId}`
+        : `${apiEndpoint}/v2/reports/${reportId}`
+      
+      const statusResponse = await requestQueue.add(() =>
+        makeAmazonApiRequest(statusEndpoint, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Amazon-Advertising-API-ClientId': clientId,
+            'Amazon-Advertising-API-Scope': profileId,
+          },
+        })
+      )
+      
+      if (statusResponse.ok) {
+        const statusData = await statusResponse.json()
+        console.log(`Report status: ${statusData.status}`)
+        
+        // Handle different status field names between v2/v3
+        const status = statusData.status || statusData.state
+        const downloadUrl = statusData.url || statusData.location
+        
+        if ((status === 'COMPLETED' || status === 'SUCCESS') && downloadUrl) {
+          console.log('Report completed, downloading...')
+          
+          try {
+            const downloadResponse = await fetch(downloadUrl)
+            if (downloadResponse.ok) {
+              // Handle different response formats (JSON vs GZIP)
+              const contentType = downloadResponse.headers.get('content-type')
+              let reportData
+              
+              if (contentType?.includes('application/json')) {
+                reportData = await downloadResponse.json()
+              } else {
+                // Handle compressed or text formats
+                const text = await downloadResponse.text()
+                try {
+                  reportData = JSON.parse(text)
+                } catch {
+                  console.error('Could not parse report data as JSON')
+                  return []
+                }
+              }
+              
+              console.log(`Downloaded ${Array.isArray(reportData) ? reportData.length : 'unknown'} records`)
+              return Array.isArray(reportData) ? reportData : []
+            }
+          } catch (downloadError) {
+            console.error('Error downloading report:', downloadError)
+            return []
+          }
+        } else if (status === 'FAILED' || status === 'FAILURE') {
+          console.error('Report generation failed:', statusData)
+          return []
+        }
+        // Status is still IN_PROGRESS/PENDING, continue polling
+      } else {
+        console.warn(`Status polling failed: ${statusResponse.status}`)
+      }
+    } catch (pollError) {
+      console.error(`Polling error attempt ${attempts}:`, pollError)
+      if (attempts >= maxAttempts - 3) {
+        throw pollError // Re-throw on final attempts
+      }
+    }
+  }
+  
+  console.warn('Report polling timed out')
   return []
 }
 
