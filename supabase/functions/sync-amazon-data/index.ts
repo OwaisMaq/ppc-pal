@@ -123,15 +123,16 @@ async function makeAmazonApiRequest(
       const method = options.method || 'GET';
       const body = options.body ? String(options.body) : '';
       
-      // Clean and validate token format
+      // Clean and validate token format - ensure no Bearer prefix for Amazon Ads API
       const cleanToken = accessToken.replace(/^Bearer\s+/i, '').trim();
       
-      // Amazon Advertising API requires specific headers in exact order
+      // Amazon Advertising API requires specific authentication format
+      // The token should be an LwA (Login with Amazon) access token
       const baseHeaders: Record<string, string> = {
         'Authorization': `Bearer ${cleanToken}`,
         'Amazon-Advertising-API-ClientId': clientId,
         'Content-Type': 'application/json',
-        'User-Agent': 'Lovable-Amazon-Integration/1.0'
+        'User-Agent': 'Amazon-Advertising-API-Sync/1.0'
       };
       
       // Add profile scope if provided

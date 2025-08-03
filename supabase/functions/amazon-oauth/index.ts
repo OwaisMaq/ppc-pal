@@ -72,16 +72,16 @@ serve(async (req) => {
 
       const stateParam = `${user.id}_${Date.now()}`
       
-      // Request comprehensive Amazon Advertising API permissions
-      const scope = 'advertising::campaign_management advertising::reports advertising::profiles'
+      // Use Login with Amazon (LwA) standard scope
+      // The advertising permissions are handled through the Amazon Advertising API separately
+      const scope = 'profile'
       
       const authUrl = `https://www.amazon.com/ap/oa?` +
         `client_id=${clientId}&` +
         `scope=${encodeURIComponent(scope)}&` +
         `response_type=code&` +
         `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-        `state=${stateParam}&` +
-        `prompt=consent`; // Ensure user sees all permissions being requested
+        `state=${stateParam}`;
 
       console.log('Generated auth URL for user:', user.id)
       

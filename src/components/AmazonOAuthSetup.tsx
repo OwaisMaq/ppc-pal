@@ -51,11 +51,12 @@ const AmazonOAuthSetup = () => {
               New accounts may need to wait 30+ days and have sufficient advertising spend.
             </li>
             <li>
-              <strong>Permissions:</strong> When connecting, you'll be asked to grant the following permissions:
+              <strong>Authentication:</strong> This integration uses Amazon's Login with Amazon (LwA) service
+              which then grants access to the Amazon Advertising API. You'll need to:
               <ul className="list-disc list-inside ml-4 mt-1 space-y-1">
-                <li>Campaign Management (to view and modify campaigns)</li>
-                <li>Reporting (to access performance data)</li>
-                <li>Profile Access (to identify your advertising profiles)</li>
+                <li>Sign in with your Amazon account (the same one linked to your advertising account)</li>
+                <li>Grant profile access permissions</li>
+                <li>Ensure your Amazon account has the necessary advertising API permissions</li>
               </ul>
             </li>
           </ul>
