@@ -62,6 +62,14 @@ class RequestQueue {
 async function makeAmazonApiRequest(url: string, options: RequestInit, retries = 3): Promise<Response> {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
+      // Ensure proper Authorization header format for Amazon Ads API
+      if (options.headers && typeof options.headers === 'object') {
+        const headers = options.headers as Record<string, string>
+        if (headers['Authorization'] && !headers['Authorization'].startsWith('Bearer ')) {
+          headers['Authorization'] = `Bearer ${headers['Authorization']}`
+        }
+      }
+      
       const response = await fetch(url, options)
       
       if (response.ok) {
@@ -70,6 +78,12 @@ async function makeAmazonApiRequest(url: string, options: RequestInit, retries =
       
       const errorText = await response.text()
       console.log(`API request failed (${response.status}): ${errorText}`)
+      
+      // Log request details for debugging auth issues
+      if (response.status === 403) {
+        console.log('Authorization failed. Request URL:', url)
+        console.log('Request headers:', JSON.stringify(options.headers))
+      }
       
       // Handle rate limiting
       if (response.status === 429) {
@@ -87,13 +101,23 @@ async function makeAmazonApiRequest(url: string, options: RequestInit, retries =
         continue
       }
       
-      // Don't retry on client errors
+      // Don't retry on authentication errors (they won't improve with retries)
+      if (response.status === 401 || response.status === 403) {
+        throw new Error(`Authentication failed: ${response.status} ${errorText}`)
+      }
+      
+      // Don't retry on other client errors
       throw new Error(`API request failed: ${response.status} ${errorText}`)
       
     } catch (error) {
       console.log(`Request failed (attempt ${attempt}/${retries}): ${error.message}`)
       
       if (attempt === retries) {
+        throw error
+      }
+      
+      // Don't retry authentication errors
+      if (error.message.includes('Authentication failed')) {
         throw error
       }
       
@@ -126,7 +150,7 @@ async function fetchCampaignPerformanceData(
       makeAmazonApiRequest(`${apiEndpoint}/v3/sp/campaigns/extended`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
+          'Authorization': accessToken.startsWith('Bearer ') ? accessToken : `Bearer ${accessToken}`,
           'Amazon-Advertising-API-ClientId': clientId,
           'Amazon-Advertising-API-Scope': profileId,
           'Content-Type': 'application/json',
@@ -200,7 +224,7 @@ async function fetchCampaignPerformanceReport(
       makeAmazonApiRequest(`${apiEndpoint}/reporting/reports`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
+          'Authorization': accessToken.startsWith('Bearer ') ? accessToken : `Bearer ${accessToken}`,
           'Amazon-Advertising-API-ClientId': clientId,
           'Amazon-Advertising-API-Scope': profileId,
           'Content-Type': 'application/json',
@@ -241,7 +265,7 @@ async function fetchCampaignPerformanceReport(
         makeAmazonApiRequest(`${apiEndpoint}/reporting/reports/${reportId}`, {
           method: 'GET',
           headers: {
-            'Authorization': `Bearer ${accessToken}`,
+            'Authorization': accessToken.startsWith('Bearer ') ? accessToken : `Bearer ${accessToken}`,
             'Amazon-Advertising-API-ClientId': clientId,
             'Amazon-Advertising-API-Scope': profileId,
           },
@@ -267,7 +291,7 @@ async function fetchCampaignPerformanceReport(
             makeAmazonApiRequest(statusResult.location, {
               method: 'GET',
               headers: {
-                'Authorization': `Bearer ${accessToken}`,
+                'Authorization': accessToken.startsWith('Bearer ') ? accessToken : `Bearer ${accessToken}`,
                 'Amazon-Advertising-API-ClientId': clientId,
                 'Amazon-Advertising-API-Scope': profileId,
               },
@@ -345,7 +369,7 @@ async function fetchCampaigns(
       makeAmazonApiRequest(`${apiEndpoint}/v3/sp/campaigns/extended`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
+          'Authorization': accessToken.startsWith('Bearer ') ? accessToken : `Bearer ${accessToken}`,
           'Amazon-Advertising-API-ClientId': clientId,
           'Amazon-Advertising-API-Scope': profileId,
           'Content-Type': 'application/json',
@@ -360,7 +384,7 @@ async function fetchCampaigns(
         makeAmazonApiRequest(`${apiEndpoint}/v3/sp/campaigns`, {
           method: 'GET',
           headers: {
-            'Authorization': `Bearer ${accessToken}`,
+            'Authorization': accessToken.startsWith('Bearer ') ? accessToken : `Bearer ${accessToken}`,
             'Amazon-Advertising-API-ClientId': clientId,
             'Amazon-Advertising-API-Scope': profileId,
             'Content-Type': 'application/json',
@@ -404,7 +428,7 @@ async function checkConnectionHealth(
     // Test basic profile access
     const profileResponse = await fetch(`${apiEndpoint}/v2/profiles`, {
       headers: {
-        'Authorization': `Bearer ${accessToken}`,
+        'Authorization': accessToken.startsWith('Bearer ') ? accessToken : `Bearer ${accessToken}`,
         'Amazon-Advertising-API-ClientId': clientId,
         'Amazon-Advertising-API-Scope': profileId,
       },

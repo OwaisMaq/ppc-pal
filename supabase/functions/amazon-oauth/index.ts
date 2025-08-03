@@ -217,12 +217,15 @@ serve(async (req) => {
         console.log('User ID:', user.id);
         console.log('Profile data:', JSON.stringify(profile, null, 2));
         
+        // Ensure access token doesn't have Bearer prefix when storing
+        const cleanAccessToken = tokenData.access_token.replace(/^Bearer\s+/i, '')
+        
         const connectionData = {
           user_id: user.id,
           profile_id: profile.profileId.toString(),
           profile_name: profile.accountInfo?.name || `Profile ${profile.profileId}`,
           marketplace_id: profile.countryCode,
-          access_token: tokenData.access_token,
+          access_token: cleanAccessToken,
           refresh_token: tokenData.refresh_token,
           token_expires_at: expiresAt.toISOString(),
           status: 'active' as const,

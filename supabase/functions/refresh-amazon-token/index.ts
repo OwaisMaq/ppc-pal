@@ -89,11 +89,14 @@ serve(async (req) => {
     // Calculate new expiry time (Amazon tokens typically last 1 hour)
     const expiresAt = new Date(Date.now() + (tokenData.expires_in * 1000))
 
+    // Ensure access token doesn't have Bearer prefix when storing
+    const cleanAccessToken = tokenData.access_token.replace(/^Bearer\s+/i, '')
+    
     // Update the connection with new tokens
     const { error: updateError } = await supabase
       .from('amazon_connections')
       .update({
-        access_token: tokenData.access_token,
+        access_token: cleanAccessToken,
         refresh_token: tokenData.refresh_token || connection.refresh_token, // Keep old refresh token if new one not provided
         token_expires_at: expiresAt.toISOString(),
         status: 'active',
