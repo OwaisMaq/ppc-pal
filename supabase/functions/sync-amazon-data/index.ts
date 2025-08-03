@@ -58,132 +58,18 @@ class RequestQueue {
   }
 }
 
-// AWS Signature V4 for Amazon Advertising API
-async function createAWSSignature(
-  method: string, 
-  url: string, 
-  headers: Record<string, string>, 
-  body: string,
-  accessToken: string,
-  clientId: string,
-  region: string = 'us-east-1'
-): Promise<Record<string, string>> {
-  
-  const urlObj = new URL(url);
-  const host = urlObj.hostname;
-  const path = urlObj.pathname + urlObj.search;
-  
-  // Create timestamp
-  const now = new Date();
-  const dateStamp = now.toISOString().split('T')[0].replace(/-/g, '');
-  const timeStamp = now.toISOString().replace(/[:\-]|\.\d{3}/g, '');
-  
-  // For Amazon Advertising API, we need to use the access token as AWS credentials
-  // Extract potential AWS access key from the token (first part before |)
-  const cleanToken = accessToken.replace(/^Bearer\s+/i, '');
-  
-  // Amazon Advertising API uses a hybrid approach - it needs both OAuth token and AWS-style headers
-  const canonicalHeaders = [
-    `amazon-advertising-api-clientid:${clientId}`,
-    `content-type:application/json`,
-    `host:${host}`,
-    `user-agent:Lovable-Amazon-Integration/1.0`,
-    `x-amz-date:${timeStamp}`,
-  ].sort().join('\n');
-  
-  const signedHeaders = 'amazon-advertising-api-clientid;content-type;host;user-agent;x-amz-date';
-  
-  // Hash the payload
-  const hashedPayload = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body))
-    .then(buffer => Array.from(new Uint8Array(buffer)).map(b => b.toString(16).padStart(2, '0')).join(''));
-  
-  return {
-    ...headers,
-    'Authorization': `Bearer ${cleanToken}`,
-    'Amazon-Advertising-API-ClientId': clientId,
-    'Content-Type': 'application/json',
-    'User-Agent': 'Lovable-Amazon-Integration/1.0',
-    'X-Amz-Date': timeStamp,
-    'X-Amz-Content-Sha256': hashedPayload
-  };
-}
-
-// Enhanced API request with proper Amazon Ads API authentication
-async function makeAmazonApiRequest(
-  url: string, 
-  options: RequestInit, 
-  accessToken: string,
-  clientId: string,
-  profileId?: string,
-  retries = 3
-): Promise<Response> {
+// Enhanced API request with proper Amazon Ads API error handling
+async function makeAmazonApiRequest(url: string, options: RequestInit, retries = 3): Promise<Response> {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      // Create proper headers for Amazon Advertising API
-      const method = options.method || 'GET';
-      const body = options.body ? String(options.body) : '';
-      
-      // Clean and validate token format - ensure no Bearer prefix for Amazon Ads API
-      const cleanToken = accessToken.replace(/^Bearer\s+/i, '').trim();
-      
-      // Amazon Advertising API requires specific authentication format
-      // The token should be an LwA (Login with Amazon) access token
-      const baseHeaders: Record<string, string> = {
-        'Authorization': `Bearer ${cleanToken}`,
-        'Amazon-Advertising-API-ClientId': clientId,
-        'Content-Type': 'application/json',
-        'User-Agent': 'Amazon-Advertising-API-Sync/1.0'
-      };
-      
-      // Add profile scope if provided
-      if (profileId) {
-        baseHeaders['Amazon-Advertising-API-Scope'] = profileId;
-      }
-      
-      // Add timestamp header for better tracking
-      baseHeaders['X-Request-Timestamp'] = new Date().toISOString();
-      
-      const requestOptions = {
-        ...options,
-        headers: {
-          ...baseHeaders,
-          ...(options.headers || {})
-        }
-      };
-      
-      console.log(`Making ${method} request to: ${url}`);
-      console.log('Request headers:', JSON.stringify(requestOptions.headers, null, 2));
-      
-      const response = await fetch(url, requestOptions);
+      const response = await fetch(url, options)
       
       if (response.ok) {
-        console.log(`✅ Request successful (${response.status})`);
-        return response;
+        return response
       }
       
-      const errorText = await response.text();
-      console.log(`❌ API request failed (${response.status}): ${errorText}`);
-      
-      // Detailed logging for authentication issues
-      if (response.status === 403) {
-        console.log('🔐 Authorization failed. Request URL:', url);
-        console.log('🔑 Token analysis:', {
-          tokenLength: cleanToken.length,
-          startsWithAtza: cleanToken.startsWith('Atza|'),
-          hasValidStructure: cleanToken.includes('|'),
-          originalHadBearer: accessToken.includes('Bearer'),
-          profileId: profileId || 'none'
-        });
-        
-        // Check if this is the specific "key=value pair" error
-        if (errorText.includes('Invalid key=value pair') && errorText.includes('Authorization header')) {
-          console.log('🚨 Detected authorization header format issue - token may lack advertising permissions');
-          throw new Error(`Amazon Advertising API authentication failed: Token lacks required advertising permissions. Please re-authenticate your Amazon account with expanded permissions.`);
-        }
-        
-        // General authorization error
-        throw new Error(`Authentication failed (${response.status}): ${errorText}. Please re-authenticate your Amazon account.`);
-      }
+      const errorText = await response.text()
+      console.log(`API request failed (${response.status}): ${errorText}`)
       
       // Handle rate limiting
       if (response.status === 429) {
@@ -201,27 +87,13 @@ async function makeAmazonApiRequest(
         continue
       }
       
-      // Don't retry on authentication errors (they won't improve with retries)
-      if (response.status === 401 || response.status === 403) {
-        // If this is a permissions error, update the connection status
-        if (errorText.includes('Invalid key=value pair') || errorText.includes('permissions')) {
-          console.log('🔄 Authentication error suggests permissions issue - will update connection status');
-        }
-        throw new Error(`Authentication failed: ${response.status} ${errorText}`)
-      }
-      
-      // Don't retry on other client errors
+      // Don't retry on client errors
       throw new Error(`API request failed: ${response.status} ${errorText}`)
       
     } catch (error) {
       console.log(`Request failed (attempt ${attempt}/${retries}): ${error.message}`)
       
       if (attempt === retries) {
-        throw error
-      }
-      
-      // Don't retry authentication errors
-      if (error.message.includes('Authentication failed')) {
         throw error
       }
       
@@ -232,58 +104,7 @@ async function makeAmazonApiRequest(
   throw new Error('Maximum retries exceeded')
 }
 
-// Simplified performance data fetch using campaigns extended endpoint
-async function fetchCampaignPerformanceData(
-  apiEndpoint: string,
-  accessToken: string,
-  clientId: string,
-  profileId: string,
-  campaignIds: string[],
-  requestQueue: RequestQueue
-): Promise<any[]> {
-  
-  console.log(`Fetching performance data for ${campaignIds.length} campaigns`)
-  
-  if (campaignIds.length === 0) {
-    return []
-  }
-  
-  try {
-    // Use campaigns extended endpoint for performance data
-    const response = await requestQueue.add(() =>
-      makeAmazonApiRequest(
-        `${apiEndpoint}/v3/sp/campaigns/extended`,
-        { method: 'GET' },
-        accessToken,
-        clientId,
-        profileId
-      )
-    )
-
-    if (!response.ok) {
-      console.error(`Performance data fetch failed: ${response.status}`)
-      return []
-    }
-
-    const performanceData = await response.json()
-    console.log(`Retrieved performance data for ${Array.isArray(performanceData) ? performanceData.length : 0} campaigns`)
-
-    // Filter to only campaigns we're interested in
-    if (Array.isArray(performanceData)) {
-      return performanceData.filter(campaign => 
-        campaignIds.includes(campaign.campaignId?.toString())
-      )
-    }
-
-    return []
-    
-  } catch (error) {
-    console.error('Error fetching performance data:', error)
-    return []
-  }
-}
-
-// Create and poll an Amazon Ads report for historical campaign performance
+// Create and poll an Amazon Ads report for campaign performance
 async function fetchCampaignPerformanceReport(
   apiEndpoint: string,
   accessToken: string,
@@ -297,48 +118,41 @@ async function fetchCampaignPerformanceReport(
   console.log(`Creating performance report for date range: ${startDate} to ${endDate}`)
   
   try {
-    // Step 1: Create the report using v3 reporting API
+    // Step 1: Create the report
     const reportRequest = {
       reportDate: endDate,
-      configuration: {
-        adProduct: "SPONSORED_PRODUCTS",
-        groupBy: ["CAMPAIGN"],
-        columns: [
-          "campaignName",
-          "campaignId", 
-          "impressions",
-          "clicks",
-          "cost",
-          "sales14d",
-          "orders14d",
-          "sales7d", 
-          "orders7d"
-        ],
-        reportTypeId: "spCampaigns",
-        timeUnit: "SUMMARY",
-        format: "GZIP_JSON"
-      }
+      campaignType: "sponsoredProducts",
+      segment: "campaign",
+      metrics: [
+        "campaignName",
+        "campaignId",
+        "impressions", 
+        "clicks",
+        "cost",
+        "attributedSales14d",
+        "attributedUnitsOrdered14d",
+        "attributedSales7d",
+        "attributedUnitsOrdered7d"
+      ]
     }
 
     console.log('Creating report with request:', JSON.stringify(reportRequest, null, 2))
 
     const createReportResponse = await requestQueue.add(() =>
-      makeAmazonApiRequest(
-        `${apiEndpoint}/reporting/reports`,
-        {
-          method: 'POST',
-          body: JSON.stringify(reportRequest)
+      makeAmazonApiRequest(`${apiEndpoint}/reporting/reports`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Amazon-Advertising-API-ClientId': clientId,
+          'Amazon-Advertising-API-Scope': profileId,
+          'Content-Type': 'application/json',
         },
-        accessToken,
-        clientId,
-        profileId
-      )
+        body: JSON.stringify(reportRequest)
+      })
     )
 
     if (!createReportResponse.ok) {
       console.error(`Report creation failed: ${createReportResponse.status}`)
-      const errorText = await createReportResponse.text()
-      console.error('Report creation error details:', errorText)
       return []
     }
 
@@ -355,7 +169,7 @@ async function fetchCampaignPerformanceReport(
     // Step 2: Poll for report completion
     let reportReady = false
     let pollAttempts = 0
-    const maxPollAttempts = 20 // 3-4 minutes at 10-second intervals
+    const maxPollAttempts = 30 // 5 minutes at 10-second intervals
     
     console.log(`Polling for report ${reportId} completion...`)
 
@@ -364,13 +178,14 @@ async function fetchCampaignPerformanceReport(
       pollAttempts++
 
       const statusResponse = await requestQueue.add(() =>
-        makeAmazonApiRequest(
-          `${apiEndpoint}/reporting/reports/${reportId}`,
-          { method: 'GET' },
-          accessToken,
-          clientId,
-          profileId
-        )
+        makeAmazonApiRequest(`${apiEndpoint}/reporting/reports/${reportId}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Amazon-Advertising-API-ClientId': clientId,
+            'Amazon-Advertising-API-Scope': profileId,
+          },
+        })
       )
 
       if (!statusResponse.ok) {
@@ -389,13 +204,14 @@ async function fetchCampaignPerformanceReport(
           console.log(`Downloading report data from: ${statusResult.location}`)
           
           const downloadResponse = await requestQueue.add(() =>
-            makeAmazonApiRequest(
-              statusResult.location,
-              { method: 'GET' },
-              accessToken,
-              clientId,
-              profileId
-            )
+            makeAmazonApiRequest(statusResult.location, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Amazon-Advertising-API-ClientId': clientId,
+                'Amazon-Advertising-API-Scope': profileId,
+              },
+            })
           )
 
           if (downloadResponse.ok) {
@@ -424,36 +240,7 @@ async function fetchCampaignPerformanceReport(
   }
 }
 
-// Regional API endpoint mapping
-function getRegionalApiEndpoint(marketplaceId: string): string {
-  const endpoints = {
-    // North America
-    'US': 'https://advertising-api.amazon.com',
-    'CA': 'https://advertising-api.amazon.com',
-    'MX': 'https://advertising-api.amazon.com',
-    
-    // Europe
-    'UK': 'https://advertising-api-eu.amazon.com',
-    'DE': 'https://advertising-api-eu.amazon.com',
-    'FR': 'https://advertising-api-eu.amazon.com',
-    'IT': 'https://advertising-api-eu.amazon.com',
-    'ES': 'https://advertising-api-eu.amazon.com',
-    'NL': 'https://advertising-api-eu.amazon.com',
-    'PL': 'https://advertising-api-eu.amazon.com',
-    'SE': 'https://advertising-api-eu.amazon.com',
-    
-    // Far East
-    'JP': 'https://advertising-api-fe.amazon.com',
-    'AU': 'https://advertising-api-fe.amazon.com',
-    'SG': 'https://advertising-api-fe.amazon.com',
-    'AE': 'https://advertising-api-fe.amazon.com',
-    'IN': 'https://advertising-api-fe.amazon.com',
-  }
-  
-  return endpoints[marketplaceId] || 'https://advertising-api-eu.amazon.com'
-}
-
-// Fetch campaigns using the correct v3 endpoint with extended data
+// Fetch campaigns using the basic campaigns endpoint
 async function fetchCampaigns(
   apiEndpoint: string,
   accessToken: string,
@@ -462,44 +249,28 @@ async function fetchCampaigns(
   requestQueue: RequestQueue
 ): Promise<any[]> {
   
-  console.log('Fetching campaigns from v3/sp/campaigns/extended endpoint')
+  console.log('Fetching campaigns from basic endpoint')
   
   try {
     const response = await requestQueue.add(() =>
-      makeAmazonApiRequest(
-        `${apiEndpoint}/v3/sp/campaigns/extended`,
-        { method: 'GET' },
-        accessToken,
-        clientId,
-        profileId
-      )
+      makeAmazonApiRequest(`${apiEndpoint}/v2/sp/campaigns`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Amazon-Advertising-API-ClientId': clientId,
+          'Amazon-Advertising-API-Scope': profileId,
+          'Content-Type': 'application/json',
+        },
+      })
     )
 
     if (!response.ok) {
-      // Fallback to basic v3 endpoint if extended fails
-      console.log('Extended endpoint failed, trying basic v3 endpoint')
-      const fallbackResponse = await requestQueue.add(() =>
-        makeAmazonApiRequest(
-          `${apiEndpoint}/v3/sp/campaigns`,
-          { method: 'GET' },
-          accessToken,
-          clientId,
-          profileId
-        )
-      )
-      
-      if (fallbackResponse.ok) {
-        const campaignsData = await fallbackResponse.json()
-        console.log(`Retrieved ${Array.isArray(campaignsData) ? campaignsData.length : 0} campaigns from basic v3 endpoint`)
-        return Array.isArray(campaignsData) ? campaignsData : []
-      } else {
-        console.error(`Both v3 endpoints failed: ${response.status}, ${fallbackResponse.status}`)
-        return []
-      }
+      console.error(`Campaigns API failed: ${response.status}`)
+      return []
     }
 
     const campaignsData = await response.json()
-    console.log(`Retrieved ${Array.isArray(campaignsData) ? campaignsData.length : 0} campaigns from extended endpoint`)
+    console.log(`Retrieved ${Array.isArray(campaignsData) ? campaignsData.length : 0} campaigns`)
 
     return Array.isArray(campaignsData) ? campaignsData : []
     
@@ -518,97 +289,37 @@ async function checkConnectionHealth(
   clientId: string,
   profileId: string
 ): Promise<{ healthy: boolean, issues: string[] }> {
-  console.log('⚡ Starting enhanced connection health check...');
+  const issues: string[] = []
   
-  let healthStatus = 'healthy';
-  let healthIssues: string[] = [];
-
   try {
-    // Validate token format before making requests
-    const cleanToken = accessToken.replace(/^Bearer\s+/i, '');
-    if (!cleanToken.startsWith('Atza|')) {
-      healthIssues.push('Invalid access token format - not an Amazon token');
-      healthStatus = 'unhealthy';
-    }
-
-    // Test basic profile access with enhanced error handling
-    console.log('🔍 Testing profile access...');
-    const profileResponse = await makeAmazonApiRequest(
-      `${apiEndpoint}/v2/profiles`,
-      { method: 'GET' },
-      accessToken,
-      clientId,
-      profileId
-    );
-
+    // Test basic profile access
+    const profileResponse = await fetch(`${apiEndpoint}/v2/profiles`, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Amazon-Advertising-API-ClientId': clientId,
+        'Amazon-Advertising-API-Scope': profileId,
+      },
+    })
+    
     if (!profileResponse.ok) {
-      const errorText = await profileResponse.text();
-      console.log('❌ Profile access failed:', profileResponse.status, errorText);
-      
-      if (profileResponse.status === 403) {
-        healthIssues.push('Authentication failed - token may be expired or invalid');
-        healthStatus = 'auth_failed';
-      } else if (profileResponse.status === 429) {
-        healthIssues.push('Rate limit exceeded');
-        healthStatus = 'rate_limited';
-      } else {
-        healthIssues.push(`API error ${profileResponse.status}: ${errorText}`);
-        healthStatus = 'unhealthy';
-      }
-    } else {
-      console.log('✅ Profile access successful');
+      issues.push(`Profile API access failed: ${profileResponse.status}`)
     }
-
-    // Test campaigns endpoint access
-    console.log('🔍 Testing campaigns endpoint access...');
-    const campaignsResponse = await makeAmazonApiRequest(
-      `${apiEndpoint}/v3/sp/campaigns`,
-      { method: 'GET' },
-      accessToken,
-      clientId,
-      profileId
-    );
-
-    if (!campaignsResponse.ok) {
-      const errorText = await campaignsResponse.text();
-      console.log('❌ Campaigns access failed:', campaignsResponse.status, errorText);
-      
-      if (campaignsResponse.status === 403) {
-        // Check for specific permissions error
-        if (errorText.includes('Invalid key=value pair') || errorText.includes('permissions')) {
-          healthIssues.push('Token lacks required advertising permissions - please re-authenticate');
-          healthStatus = 'auth_failed';
-        } else {
-          healthIssues.push('Campaign access denied - insufficient permissions');
-          if (healthStatus === 'healthy') healthStatus = 'auth_failed';
-        }
-      }
-    } else {
-      console.log('✅ Campaigns endpoint accessible');
-    }
-
+    
   } catch (error) {
-    console.error('❌ Health check error:', error);
-    healthIssues.push(`Health check failed: ${error.message}`);
-    healthStatus = 'error';
+    issues.push(`Connection test failed: ${error.message}`)
   }
-
-  // Update connection with enhanced health information
-  console.log(`📊 Health check result: ${healthStatus}`, healthIssues);
   
+  // Update connection health status
   await supabase
     .from('amazon_connections')
     .update({
-      health_status: healthStatus,
-      health_issues: healthIssues.length > 0 ? healthIssues : null,
       last_health_check: new Date().toISOString(),
-      // If auth failed, update status to require attention
-      status: healthStatus === 'auth_failed' ? 'expired' : 'active',
-      setup_required_reason: healthStatus === 'auth_failed' ? 'Authentication failed - please reconnect your account' : null
+      health_status: issues.length === 0 ? 'healthy' : 'degraded',
+      health_issues: issues.length > 0 ? issues : null
     })
-    .eq('id', connectionId);
+    .eq('id', connectionId)
   
-  return { healthy: healthIssues.length === 0, issues: healthIssues };
+  return { healthy: issues.length === 0, issues }
 }
 
 serve(async (req) => {
@@ -697,24 +408,19 @@ serve(async (req) => {
           const tokenData = await refreshResponse.json()
           const newExpiresAt = new Date(Date.now() + (tokenData.expires_in * 1000))
           
-          // Store access token without Bearer prefix for consistency
-          const cleanAccessToken = tokenData.access_token.replace(/^Bearer\s+/i, '')
-          
           await supabase
             .from('amazon_connections')
             .update({
-              access_token: cleanAccessToken,
+              access_token: tokenData.access_token,
               refresh_token: tokenData.refresh_token || connection.refresh_token,
               token_expires_at: newExpiresAt.toISOString(),
               status: 'active',
-              setup_required_reason: null,
-              health_status: 'unknown', // Reset to trigger health check
-              last_health_check: null
+              setup_required_reason: null
             })
             .eq('id', connectionId)
           
-          accessToken = cleanAccessToken
-          console.log('Token refreshed and stored successfully')
+          accessToken = tokenData.access_token
+          console.log('Token refreshed successfully')
         } else {
           throw new Error('Token refresh failed')
         }
@@ -738,17 +444,9 @@ serve(async (req) => {
     // Initialize request queue
     const requestQueue = new RequestQueue()
 
-    // Use correct regional API endpoint based on marketplace
-    const apiEndpoint = getRegionalApiEndpoint(connection.marketplace_id) 
-    console.log(`Using API endpoint for ${connection.marketplace_id}:`, apiEndpoint)
-    
-    // Update connection with correct endpoint if different
-    if (connection.advertising_api_endpoint !== apiEndpoint) {
-      await supabase
-        .from('amazon_connections')
-        .update({ advertising_api_endpoint: apiEndpoint })
-        .eq('id', connectionId)
-    }
+    // Use correct API endpoint
+    const apiEndpoint = connection.advertising_api_endpoint || 'https://advertising-api-eu.amazon.com'
+    console.log('Using API endpoint:', apiEndpoint)
 
     // Connection health check
     const healthCheck = await checkConnectionHealth(
@@ -822,188 +520,99 @@ serve(async (req) => {
 
     performanceLog.phases.campaignsStore = Date.now() - startTime
 
-    // Fetch performance data using multiple approaches
+    // Fetch performance data using proper reporting API
     let totalMetricsUpdated = 0
     
     if (campaignIds.length > 0) {
-      console.log('Fetching performance data using extended endpoint...')
+      console.log('Fetching performance data using reporting API...')
       
       try {
-        // First, try to get performance data from the extended endpoint
-        const extendedPerformanceData = await fetchCampaignPerformanceData(
+        const performanceData = await fetchCampaignPerformanceReport(
           apiEndpoint,
           accessToken,
           clientId,
           connection.profile_id,
-          campaignIds,
+          reportStartDate,
+          reportEndDate,
           requestQueue
         )
         
-        console.log(`Retrieved ${extendedPerformanceData.length} extended performance records`)
+        console.log(`Retrieved ${performanceData.length} performance records`)
         
-        // Process extended performance data if available
-        if (extendedPerformanceData.length > 0) {
-          for (const perfData of extendedPerformanceData) {
-            if (!perfData.campaignId) {
-              console.warn('Skipping performance data without campaignId:', perfData)
-              continue
-            }
-            
-            // Enhanced metrics calculation with proper data types - handle both old and new format
-            const impressions = Math.max(0, parseInt(perfData.impressions || perfData.serving?.impressions || '0') || 0)
-            const clicks = Math.max(0, parseInt(perfData.clicks || perfData.serving?.clicks || '0') || 0)
-            const spend = Math.max(0, parseFloat(perfData.cost || perfData.serving?.cost || '0') || 0)
-            const sales_14d = Math.max(0, parseFloat(perfData.sales14d || perfData.performance?.sales14d || '0') || 0)
-            const orders_14d = Math.max(0, parseInt(perfData.orders14d || perfData.performance?.orders14d || '0') || 0)
-            const sales_7d = Math.max(0, parseFloat(perfData.sales7d || perfData.performance?.sales7d || '0') || 0)
-            const orders_7d = Math.max(0, parseInt(perfData.orders7d || perfData.performance?.orders7d || '0') || 0)
-            
-            // Calculate derived metrics
-            const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0
-            const cpc = clicks > 0 ? spend / clicks : 0
-            const conversionRate_14d = clicks > 0 ? (orders_14d / clicks) * 100 : 0
-            const conversionRate_7d = clicks > 0 ? (orders_7d / clicks) * 100 : 0
-            const acos_14d = sales_14d > 0 ? (spend / sales_14d) * 100 : null
-            const roas_14d = spend > 0 ? sales_14d / spend : null
-            const acos_7d = sales_7d > 0 ? (spend / sales_7d) * 100 : null
-            const roas_7d = spend > 0 ? sales_7d / spend : null
-            
-            console.log(`Updating campaign ${perfData.campaignId}: spend=${spend}, sales_14d=${sales_14d}, impressions=${impressions}, clicks=${clicks}`)
-
-            // Update with both 7d and 14d attribution data
-            const updateData = {
-              last_updated: new Date().toISOString(),
-              // Basic metrics (use most recent data)
-              impressions: impressions,
-              clicks: clicks,
-              spend: spend,
-              // Default to 14d attribution for primary metrics
-              sales: sales_14d,
-              orders: orders_14d,
-              acos: acos_14d,
-              roas: roas_14d,
-              // 7d attribution specific
-              sales_7d: sales_7d,
-              orders_7d: orders_7d,
-              clicks_7d: clicks,
-              impressions_7d: impressions,
-              spend_7d: spend,
-              ctr_7d: ctr,
-              cpc_7d: cpc,
-              conversion_rate_7d: conversionRate_7d,
-              acos_7d: acos_7d,
-              roas_7d: roas_7d,
-              // 14d attribution specific
-              sales_14d: sales_14d,
-              orders_14d: orders_14d,
-              clicks_14d: clicks,
-              impressions_14d: impressions,
-              spend_14d: spend,
-              ctr_14d: ctr,
-              cpc_14d: cpc,
-              conversion_rate_14d: conversionRate_14d,
-              acos_14d: acos_14d,
-              roas_14d: roas_14d,
-            }
-
-            const { error: updateError } = await supabase
-              .from('campaigns')
-              .update(updateData)
-              .eq('connection_id', connectionId)
-              .eq('amazon_campaign_id', perfData.campaignId.toString())
-
-            if (updateError) {
-              console.error('Error updating campaign metrics:', perfData.campaignId, updateError)
-            } else {
-              totalMetricsUpdated++
-            }
+        // Update campaigns with performance data
+        for (const perfData of performanceData) {
+          if (!perfData.campaignId) {
+            console.warn('Skipping performance data without campaignId:', perfData)
+            continue
           }
-        } else {
-          // Fallback to reporting API for historical data
-          console.log('No extended data available, trying reporting API...')
           
-          const reportPerformanceData = await fetchCampaignPerformanceReport(
-            apiEndpoint,
-            accessToken,
-            clientId,
-            connection.profile_id,
-            reportStartDate,
-            reportEndDate,
-            requestQueue
-          )
+          // Enhanced metrics calculation with proper data types
+          const impressions = Math.max(0, parseInt(perfData.impressions || '0') || 0)
+          const clicks = Math.max(0, parseInt(perfData.clicks || '0') || 0)
+          const spend = Math.max(0, parseFloat(perfData.cost || '0') || 0)
+          const sales_14d = Math.max(0, parseFloat(perfData.attributedSales14d || '0') || 0)
+          const orders_14d = Math.max(0, parseInt(perfData.attributedUnitsOrdered14d || '0') || 0)
+          const sales_7d = Math.max(0, parseFloat(perfData.attributedSales7d || '0') || 0)
+          const orders_7d = Math.max(0, parseInt(perfData.attributedUnitsOrdered7d || '0') || 0)
           
-          console.log(`Retrieved ${reportPerformanceData.length} report performance records`)
+          // Calculate derived metrics
+          const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0
+          const cpc = clicks > 0 ? spend / clicks : 0
+          const conversionRate_14d = clicks > 0 ? (orders_14d / clicks) * 100 : 0
+          const conversionRate_7d = clicks > 0 ? (orders_7d / clicks) * 100 : 0
+          const acos_14d = sales_14d > 0 ? (spend / sales_14d) * 100 : null
+          const roas_14d = spend > 0 ? sales_14d / spend : null
+          const acos_7d = sales_7d > 0 ? (spend / sales_7d) * 100 : null
+          const roas_7d = spend > 0 ? sales_7d / spend : null
           
-          // Process reporting API data
-          for (const perfData of reportPerformanceData) {
-            if (!perfData.campaignId) {
-              console.warn('Skipping performance data without campaignId:', perfData)
-              continue
-            }
-            
-            // Handle reporting API format
-            const impressions = Math.max(0, parseInt(perfData.impressions || '0') || 0)
-            const clicks = Math.max(0, parseInt(perfData.clicks || '0') || 0)
-            const spend = Math.max(0, parseFloat(perfData.cost || '0') || 0)
-            const sales_14d = Math.max(0, parseFloat(perfData.sales14d || '0') || 0)
-            const orders_14d = Math.max(0, parseInt(perfData.orders14d || '0') || 0)
-            const sales_7d = Math.max(0, parseFloat(perfData.sales7d || '0') || 0)
-            const orders_7d = Math.max(0, parseInt(perfData.orders7d || '0') || 0)
-            
-            // Calculate derived metrics
-            const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0
-            const cpc = clicks > 0 ? spend / clicks : 0
-            const conversionRate_14d = clicks > 0 ? (orders_14d / clicks) * 100 : 0
-            const conversionRate_7d = clicks > 0 ? (orders_7d / clicks) * 100 : 0
-            const acos_14d = sales_14d > 0 ? (spend / sales_14d) * 100 : null
-            const roas_14d = spend > 0 ? sales_14d / spend : null
-            const acos_7d = sales_7d > 0 ? (spend / sales_7d) * 100 : null
-            const roas_7d = spend > 0 ? sales_7d / spend : null
-            
-            console.log(`Updating campaign ${perfData.campaignId} from report: spend=${spend}, sales_14d=${sales_14d}`)
+          console.log(`Updating campaign ${perfData.campaignId}: spend=${spend}, sales_14d=${sales_14d}, impressions=${impressions}, clicks=${clicks}`)
 
-            const updateData = {
-              last_updated: new Date().toISOString(),
-              impressions: impressions,
-              clicks: clicks,
-              spend: spend,
-              sales: sales_14d,
-              orders: orders_14d,
-              acos: acos_14d,
-              roas: roas_14d,
-              sales_7d: sales_7d,
-              orders_7d: orders_7d,
-              clicks_7d: clicks,
-              impressions_7d: impressions,
-              spend_7d: spend,
-              ctr_7d: ctr,
-              cpc_7d: cpc,
-              conversion_rate_7d: conversionRate_7d,
-              acos_7d: acos_7d,
-              roas_7d: roas_7d,
-              sales_14d: sales_14d,
-              orders_14d: orders_14d,
-              clicks_14d: clicks,
-              impressions_14d: impressions,
-              spend_14d: spend,
-              ctr_14d: ctr,
-              cpc_14d: cpc,
-              conversion_rate_14d: conversionRate_14d,
-              acos_14d: acos_14d,
-              roas_14d: roas_14d,
-            }
+          // Update with both 7d and 14d attribution data
+          const updateData = {
+            last_updated: new Date().toISOString(),
+            // Basic metrics (use most recent data)
+            impressions: impressions,
+            clicks: clicks,
+            spend: spend,
+            // Default to 14d attribution for primary metrics
+            sales: sales_14d,
+            orders: orders_14d,
+            acos: acos_14d,
+            roas: roas_14d,
+            // 7d attribution specific
+            sales_7d: sales_7d,
+            orders_7d: orders_7d,
+            clicks_7d: clicks,
+            impressions_7d: impressions,
+            spend_7d: spend,
+            ctr_7d: ctr,
+            cpc_7d: cpc,
+            conversion_rate_7d: conversionRate_7d,
+            acos_7d: acos_7d,
+            roas_7d: roas_7d,
+            // 14d attribution specific
+            sales_14d: sales_14d,
+            orders_14d: orders_14d,
+            clicks_14d: clicks,
+            impressions_14d: impressions,
+            spend_14d: spend,
+            ctr_14d: ctr,
+            cpc_14d: cpc,
+            conversion_rate_14d: conversionRate_14d,
+            acos_14d: acos_14d,
+            roas_14d: roas_14d,
+          }
 
-            const { error: updateError } = await supabase
-              .from('campaigns')
-              .update(updateData)
-              .eq('connection_id', connectionId)
-              .eq('amazon_campaign_id', perfData.campaignId.toString())
+          const { error: updateError } = await supabase
+            .from('campaigns')
+            .update(updateData)
+            .eq('connection_id', connectionId)
+            .eq('amazon_campaign_id', perfData.campaignId.toString())
 
-            if (updateError) {
-              console.error('Error updating campaign metrics:', perfData.campaignId, updateError)
-            } else {
-              totalMetricsUpdated++
-            }
+          if (updateError) {
+            console.error('Error updating campaign metrics:', perfData.campaignId, updateError)
+          } else {
+            totalMetricsUpdated++
           }
         }
       } catch (error) {

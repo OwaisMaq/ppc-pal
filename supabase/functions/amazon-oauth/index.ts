@@ -71,17 +71,15 @@ serve(async (req) => {
       }
 
       const stateParam = `${user.id}_${Date.now()}`
-      
-      // Use Login with Amazon (LwA) standard scope
-      // The advertising permissions are handled through the Amazon Advertising API separately
-      const scope = 'profile'
+      const scope = 'advertising::campaign_management'
       
       const authUrl = `https://www.amazon.com/ap/oa?` +
         `client_id=${clientId}&` +
         `scope=${encodeURIComponent(scope)}&` +
         `response_type=code&` +
         `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-        `state=${stateParam}`;
+        `state=${stateParam}&` +
+        `prompt=consent`; // Ensure user sees all permissions being requested
 
       console.log('Generated auth URL for user:', user.id)
       
@@ -219,22 +217,12 @@ serve(async (req) => {
         console.log('User ID:', user.id);
         console.log('Profile data:', JSON.stringify(profile, null, 2));
         
-        // Store access token without Bearer prefix for consistency
-        const cleanAccessToken = tokenData.access_token.replace(/^Bearer\s+/i, '')
-        
-        console.log('Token validation for storage:', {
-          originalLength: tokenData.access_token.length,
-          cleanedLength: cleanAccessToken.length,
-          startsWithAtza: cleanAccessToken.startsWith('Atza|'),
-          profileId: profile.profileId
-        })
-        
         const connectionData = {
           user_id: user.id,
           profile_id: profile.profileId.toString(),
           profile_name: profile.accountInfo?.name || `Profile ${profile.profileId}`,
           marketplace_id: profile.countryCode,
-          access_token: cleanAccessToken,
+          access_token: tokenData.access_token,
           refresh_token: tokenData.refresh_token,
           token_expires_at: expiresAt.toISOString(),
           status: 'active' as const,
