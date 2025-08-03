@@ -111,6 +111,18 @@ const AmazonAccountManager = () => {
                           Sync
                         </Button>
                       )}
+                      {(connection.status === 'expired' || connection.status === 'error') && 
+                       connection.setup_required_reason?.includes('permissions') && (
+                        <Button
+                          size="sm"
+                          variant="default"
+                          onClick={handleConnect}
+                          className="flex items-center gap-1"
+                        >
+                          <RefreshCw className="h-4 w-4" />
+                          Re-authenticate
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="outline"

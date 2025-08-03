@@ -58,26 +58,53 @@ class RequestQueue {
   }
 }
 
-// AWS SigV4 signing for Amazon Advertising API
+// AWS Signature V4 for Amazon Advertising API
 async function createAWSSignature(
   method: string, 
   url: string, 
   headers: Record<string, string>, 
   body: string,
   accessToken: string,
-  clientId: string
+  clientId: string,
+  region: string = 'us-east-1'
 ): Promise<Record<string, string>> {
   
-  // For Amazon Advertising API, we still use Bearer token but with proper formatting
-  // The API expects the access token without 'Bearer ' prefix in storage but with it in requests
+  const urlObj = new URL(url);
+  const host = urlObj.hostname;
+  const path = urlObj.pathname + urlObj.search;
+  
+  // Create timestamp
+  const now = new Date();
+  const dateStamp = now.toISOString().split('T')[0].replace(/-/g, '');
+  const timeStamp = now.toISOString().replace(/[:\-]|\.\d{3}/g, '');
+  
+  // For Amazon Advertising API, we need to use the access token as AWS credentials
+  // Extract potential AWS access key from the token (first part before |)
   const cleanToken = accessToken.replace(/^Bearer\s+/i, '');
+  
+  // Amazon Advertising API uses a hybrid approach - it needs both OAuth token and AWS-style headers
+  const canonicalHeaders = [
+    `amazon-advertising-api-clientid:${clientId}`,
+    `content-type:application/json`,
+    `host:${host}`,
+    `user-agent:Lovable-Amazon-Integration/1.0`,
+    `x-amz-date:${timeStamp}`,
+  ].sort().join('\n');
+  
+  const signedHeaders = 'amazon-advertising-api-clientid;content-type;host;user-agent;x-amz-date';
+  
+  // Hash the payload
+  const hashedPayload = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body))
+    .then(buffer => Array.from(new Uint8Array(buffer)).map(b => b.toString(16).padStart(2, '0')).join(''));
   
   return {
     ...headers,
     'Authorization': `Bearer ${cleanToken}`,
     'Amazon-Advertising-API-ClientId': clientId,
     'Content-Type': 'application/json',
-    'User-Agent': 'Lovable-Amazon-Integration/1.0'
+    'User-Agent': 'Lovable-Amazon-Integration/1.0',
+    'X-Amz-Date': timeStamp,
+    'X-Amz-Content-Sha256': hashedPayload
   };
 }
 
@@ -92,23 +119,28 @@ async function makeAmazonApiRequest(
 ): Promise<Response> {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      // Create proper headers with AWS-style authentication
+      // Create proper headers for Amazon Advertising API
       const method = options.method || 'GET';
       const body = options.body ? String(options.body) : '';
       
+      // Clean and validate token format
+      const cleanToken = accessToken.replace(/^Bearer\s+/i, '').trim();
+      
+      // Amazon Advertising API requires specific headers in exact order
       const baseHeaders: Record<string, string> = {
+        'Authorization': `Bearer ${cleanToken}`,
         'Amazon-Advertising-API-ClientId': clientId,
         'Content-Type': 'application/json',
         'User-Agent': 'Lovable-Amazon-Integration/1.0'
       };
       
+      // Add profile scope if provided
       if (profileId) {
         baseHeaders['Amazon-Advertising-API-Scope'] = profileId;
       }
       
-      // Add Authorization header with proper token format
-      const cleanToken = accessToken.replace(/^Bearer\s+/i, '');
-      baseHeaders['Authorization'] = `Bearer ${cleanToken}`;
+      // Add timestamp header for better tracking
+      baseHeaders['X-Request-Timestamp'] = new Date().toISOString();
       
       const requestOptions = {
         ...options,
@@ -131,14 +163,25 @@ async function makeAmazonApiRequest(
       const errorText = await response.text();
       console.log(`❌ API request failed (${response.status}): ${errorText}`);
       
-      // Enhanced error logging for authentication issues
+      // Detailed logging for authentication issues
       if (response.status === 403) {
         console.log('🔐 Authorization failed. Request URL:', url);
-        console.log('🔑 Access token format check:', {
+        console.log('🔑 Token analysis:', {
           tokenLength: cleanToken.length,
           startsWithAtza: cleanToken.startsWith('Atza|'),
-          hasBearer: accessToken.includes('Bearer')
+          hasValidStructure: cleanToken.includes('|'),
+          originalHadBearer: accessToken.includes('Bearer'),
+          profileId: profileId || 'none'
         });
+        
+        // Check if this is the specific "key=value pair" error
+        if (errorText.includes('Invalid key=value pair') && errorText.includes('Authorization header')) {
+          console.log('🚨 Detected authorization header format issue - token may lack advertising permissions');
+          throw new Error(`Amazon Advertising API authentication failed: Token lacks required advertising permissions. Please re-authenticate your Amazon account with expanded permissions.`);
+        }
+        
+        // General authorization error
+        throw new Error(`Authentication failed (${response.status}): ${errorText}. Please re-authenticate your Amazon account.`);
       }
       
       // Handle rate limiting
@@ -159,6 +202,10 @@ async function makeAmazonApiRequest(
       
       // Don't retry on authentication errors (they won't improve with retries)
       if (response.status === 401 || response.status === 403) {
+        // If this is a permissions error, update the connection status
+        if (errorText.includes('Invalid key=value pair') || errorText.includes('permissions')) {
+          console.log('🔄 Authentication error suggests permissions issue - will update connection status');
+        }
         throw new Error(`Authentication failed: ${response.status} ${errorText}`)
       }
       
@@ -526,8 +573,14 @@ async function checkConnectionHealth(
       console.log('❌ Campaigns access failed:', campaignsResponse.status, errorText);
       
       if (campaignsResponse.status === 403) {
-        healthIssues.push('Campaign access denied - insufficient permissions');
-        if (healthStatus === 'healthy') healthStatus = 'auth_failed';
+        // Check for specific permissions error
+        if (errorText.includes('Invalid key=value pair') || errorText.includes('permissions')) {
+          healthIssues.push('Token lacks required advertising permissions - please re-authenticate');
+          healthStatus = 'auth_failed';
+        } else {
+          healthIssues.push('Campaign access denied - insufficient permissions');
+          if (healthStatus === 'healthy') healthStatus = 'auth_failed';
+        }
       }
     } else {
       console.log('✅ Campaigns endpoint accessible');

@@ -71,7 +71,9 @@ serve(async (req) => {
       }
 
       const stateParam = `${user.id}_${Date.now()}`
-      const scope = 'advertising::campaign_management'
+      
+      // Request comprehensive Amazon Advertising API permissions
+      const scope = 'advertising::campaign_management advertising::reports advertising::profiles'
       
       const authUrl = `https://www.amazon.com/ap/oa?` +
         `client_id=${clientId}&` +
