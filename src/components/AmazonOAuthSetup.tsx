@@ -44,51 +44,48 @@ const AmazonOAuthSetup = () => {
         </Alert>
 
         <div className="space-y-3">
-          <h4 className="font-semibold text-gray-900">Prerequisites:</h4>
+          <h4 className="font-semibold text-gray-900">What you need:</h4>
           <ul className="list-disc list-inside space-y-2 text-sm text-gray-700">
             <li>
-              <strong>Amazon Advertising Account:</strong> You must have an active Amazon Advertising account
-              with campaigns, ad groups, and keywords set up.
+              <strong>Amazon Advertising Account:</strong> An active advertising account with campaigns and sufficient spend history (typically 30+ days).
             </li>
             <li>
-              <strong>API Access:</strong> Your account must be eligible for Amazon Advertising API access.
-              New accounts may need to wait 30+ days and have sufficient advertising spend.
+              <strong>Application Registration:</strong> Your application must be registered and approved by Amazon through their Developer Console. This is a separate process from regular Amazon authentication.
             </li>
             <li>
-              <strong>Authentication:</strong> This integration uses Amazon's Login with Amazon (LwA) service
-              which then grants access to the Amazon Advertising API. You'll need to:
+              <strong>API Approval:</strong> Amazon must explicitly grant your application access to the Advertising API. This typically requires:
               <ul className="list-disc list-inside ml-4 mt-1 space-y-1">
-                <li>Sign in with your Amazon account (the same one linked to your advertising account)</li>
-                <li>Grant profile access permissions</li>
-                <li>Ensure your Amazon account has the necessary advertising API permissions</li>
+                <li>Business justification for API access</li>
+                <li>Demonstration of legitimate advertising use case</li>
+                <li>Compliance with Amazon's API terms</li>
               </ul>
             </li>
           </ul>
         </div>
 
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h4 className="font-semibold text-blue-900 mb-2">Getting Amazon Advertising API Access</h4>
-          <p className="text-sm text-blue-800 mb-3">
-            To use this integration, you need to register your application with Amazon for Advertising API access. This is a separate process from regular Amazon authentication.
+        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+          <h4 className="font-semibold text-orange-900 mb-2">⚠️ API Registration Required</h4>
+          <p className="text-sm text-orange-800 mb-3">
+            To use this integration, the application developer must register with Amazon and get approval for Advertising API access. This cannot be done by end users - it's a developer/business registration process.
           </p>
           <div className="space-y-2">
             <Button 
               variant="outline" 
               size="sm" 
-              className="border-blue-300 text-blue-700 hover:bg-blue-100 mr-2"
-              onClick={() => window.open('https://advertising.amazon.com/API/docs/en-us/guides/onboarding/registration', '_blank')}
+              className="border-orange-300 text-orange-700 hover:bg-orange-100 mr-2"
+              onClick={() => window.open('https://developer.amazon.com/apps-and-games/console', '_blank')}
             >
               <ExternalLink className="h-4 w-4 mr-2" />
-              API Registration Guide
+              Amazon Developer Console
             </Button>
             <Button 
               variant="outline" 
               size="sm" 
-              className="border-blue-300 text-blue-700 hover:bg-blue-100"
-              onClick={() => window.open('https://advertising.amazon.com/', '_blank')}
+              className="border-orange-300 text-orange-700 hover:bg-orange-100"
+              onClick={() => window.open('https://advertising.amazon.com/API/docs/en-us/guides/onboarding', '_blank')}
             >
               <ExternalLink className="h-4 w-4 mr-2" />
-              Amazon Advertising Console
+              API Onboarding Guide
             </Button>
           </div>
         </div>
