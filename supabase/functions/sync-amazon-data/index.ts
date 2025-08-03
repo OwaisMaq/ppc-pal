@@ -104,7 +104,60 @@ async function makeAmazonApiRequest(url: string, options: RequestInit, retries =
   throw new Error('Maximum retries exceeded')
 }
 
-// Create and poll an Amazon Ads report for campaign performance
+// Simplified performance data fetch using campaigns extended endpoint
+async function fetchCampaignPerformanceData(
+  apiEndpoint: string,
+  accessToken: string,
+  clientId: string,
+  profileId: string,
+  campaignIds: string[],
+  requestQueue: RequestQueue
+): Promise<any[]> {
+  
+  console.log(`Fetching performance data for ${campaignIds.length} campaigns`)
+  
+  if (campaignIds.length === 0) {
+    return []
+  }
+  
+  try {
+    // Use campaigns extended endpoint for performance data
+    const response = await requestQueue.add(() =>
+      makeAmazonApiRequest(`${apiEndpoint}/v3/sp/campaigns/extended`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Amazon-Advertising-API-ClientId': clientId,
+          'Amazon-Advertising-API-Scope': profileId,
+          'Content-Type': 'application/json',
+        },
+      })
+    )
+
+    if (!response.ok) {
+      console.error(`Performance data fetch failed: ${response.status}`)
+      return []
+    }
+
+    const performanceData = await response.json()
+    console.log(`Retrieved performance data for ${Array.isArray(performanceData) ? performanceData.length : 0} campaigns`)
+
+    // Filter to only campaigns we're interested in
+    if (Array.isArray(performanceData)) {
+      return performanceData.filter(campaign => 
+        campaignIds.includes(campaign.campaignId?.toString())
+      )
+    }
+
+    return []
+    
+  } catch (error) {
+    console.error('Error fetching performance data:', error)
+    return []
+  }
+}
+
+// Create and poll an Amazon Ads report for historical campaign performance
 async function fetchCampaignPerformanceReport(
   apiEndpoint: string,
   accessToken: string,
@@ -118,22 +171,27 @@ async function fetchCampaignPerformanceReport(
   console.log(`Creating performance report for date range: ${startDate} to ${endDate}`)
   
   try {
-    // Step 1: Create the report
+    // Step 1: Create the report using v3 reporting API
     const reportRequest = {
       reportDate: endDate,
-      campaignType: "sponsoredProducts",
-      segment: "campaign",
-      metrics: [
-        "campaignName",
-        "campaignId",
-        "impressions", 
-        "clicks",
-        "cost",
-        "attributedSales14d",
-        "attributedUnitsOrdered14d",
-        "attributedSales7d",
-        "attributedUnitsOrdered7d"
-      ]
+      configuration: {
+        adProduct: "SPONSORED_PRODUCTS",
+        groupBy: ["CAMPAIGN"],
+        columns: [
+          "campaignName",
+          "campaignId", 
+          "impressions",
+          "clicks",
+          "cost",
+          "sales14d",
+          "orders14d",
+          "sales7d", 
+          "orders7d"
+        ],
+        reportTypeId: "spCampaigns",
+        timeUnit: "SUMMARY",
+        format: "GZIP_JSON"
+      }
     }
 
     console.log('Creating report with request:', JSON.stringify(reportRequest, null, 2))
@@ -153,6 +211,8 @@ async function fetchCampaignPerformanceReport(
 
     if (!createReportResponse.ok) {
       console.error(`Report creation failed: ${createReportResponse.status}`)
+      const errorText = await createReportResponse.text()
+      console.error('Report creation error details:', errorText)
       return []
     }
 
@@ -169,7 +229,7 @@ async function fetchCampaignPerformanceReport(
     // Step 2: Poll for report completion
     let reportReady = false
     let pollAttempts = 0
-    const maxPollAttempts = 30 // 5 minutes at 10-second intervals
+    const maxPollAttempts = 20 // 3-4 minutes at 10-second intervals
     
     console.log(`Polling for report ${reportId} completion...`)
 
@@ -240,7 +300,36 @@ async function fetchCampaignPerformanceReport(
   }
 }
 
-// Fetch campaigns using the basic campaigns endpoint
+// Regional API endpoint mapping
+function getRegionalApiEndpoint(marketplaceId: string): string {
+  const endpoints = {
+    // North America
+    'US': 'https://advertising-api.amazon.com',
+    'CA': 'https://advertising-api.amazon.com',
+    'MX': 'https://advertising-api.amazon.com',
+    
+    // Europe
+    'UK': 'https://advertising-api-eu.amazon.com',
+    'DE': 'https://advertising-api-eu.amazon.com',
+    'FR': 'https://advertising-api-eu.amazon.com',
+    'IT': 'https://advertising-api-eu.amazon.com',
+    'ES': 'https://advertising-api-eu.amazon.com',
+    'NL': 'https://advertising-api-eu.amazon.com',
+    'PL': 'https://advertising-api-eu.amazon.com',
+    'SE': 'https://advertising-api-eu.amazon.com',
+    
+    // Far East
+    'JP': 'https://advertising-api-fe.amazon.com',
+    'AU': 'https://advertising-api-fe.amazon.com',
+    'SG': 'https://advertising-api-fe.amazon.com',
+    'AE': 'https://advertising-api-fe.amazon.com',
+    'IN': 'https://advertising-api-fe.amazon.com',
+  }
+  
+  return endpoints[marketplaceId] || 'https://advertising-api-eu.amazon.com'
+}
+
+// Fetch campaigns using the correct v3 endpoint with extended data
 async function fetchCampaigns(
   apiEndpoint: string,
   accessToken: string,
@@ -249,11 +338,11 @@ async function fetchCampaigns(
   requestQueue: RequestQueue
 ): Promise<any[]> {
   
-  console.log('Fetching campaigns from basic endpoint')
+  console.log('Fetching campaigns from v3/sp/campaigns/extended endpoint')
   
   try {
     const response = await requestQueue.add(() =>
-      makeAmazonApiRequest(`${apiEndpoint}/v2/sp/campaigns`, {
+      makeAmazonApiRequest(`${apiEndpoint}/v3/sp/campaigns/extended`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -265,12 +354,32 @@ async function fetchCampaigns(
     )
 
     if (!response.ok) {
-      console.error(`Campaigns API failed: ${response.status}`)
-      return []
+      // Fallback to basic v3 endpoint if extended fails
+      console.log('Extended endpoint failed, trying basic v3 endpoint')
+      const fallbackResponse = await requestQueue.add(() =>
+        makeAmazonApiRequest(`${apiEndpoint}/v3/sp/campaigns`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Amazon-Advertising-API-ClientId': clientId,
+            'Amazon-Advertising-API-Scope': profileId,
+            'Content-Type': 'application/json',
+          },
+        })
+      )
+      
+      if (fallbackResponse.ok) {
+        const campaignsData = await fallbackResponse.json()
+        console.log(`Retrieved ${Array.isArray(campaignsData) ? campaignsData.length : 0} campaigns from basic v3 endpoint`)
+        return Array.isArray(campaignsData) ? campaignsData : []
+      } else {
+        console.error(`Both v3 endpoints failed: ${response.status}, ${fallbackResponse.status}`)
+        return []
+      }
     }
 
     const campaignsData = await response.json()
-    console.log(`Retrieved ${Array.isArray(campaignsData) ? campaignsData.length : 0} campaigns`)
+    console.log(`Retrieved ${Array.isArray(campaignsData) ? campaignsData.length : 0} campaigns from extended endpoint`)
 
     return Array.isArray(campaignsData) ? campaignsData : []
     
@@ -444,9 +553,17 @@ serve(async (req) => {
     // Initialize request queue
     const requestQueue = new RequestQueue()
 
-    // Use correct API endpoint
-    const apiEndpoint = connection.advertising_api_endpoint || 'https://advertising-api-eu.amazon.com'
-    console.log('Using API endpoint:', apiEndpoint)
+    // Use correct regional API endpoint based on marketplace
+    const apiEndpoint = getRegionalApiEndpoint(connection.marketplace_id) 
+    console.log(`Using API endpoint for ${connection.marketplace_id}:`, apiEndpoint)
+    
+    // Update connection with correct endpoint if different
+    if (connection.advertising_api_endpoint !== apiEndpoint) {
+      await supabase
+        .from('amazon_connections')
+        .update({ advertising_api_endpoint: apiEndpoint })
+        .eq('id', connectionId)
+    }
 
     // Connection health check
     const healthCheck = await checkConnectionHealth(
@@ -520,99 +637,188 @@ serve(async (req) => {
 
     performanceLog.phases.campaignsStore = Date.now() - startTime
 
-    // Fetch performance data using proper reporting API
+    // Fetch performance data using multiple approaches
     let totalMetricsUpdated = 0
     
     if (campaignIds.length > 0) {
-      console.log('Fetching performance data using reporting API...')
+      console.log('Fetching performance data using extended endpoint...')
       
       try {
-        const performanceData = await fetchCampaignPerformanceReport(
+        // First, try to get performance data from the extended endpoint
+        const extendedPerformanceData = await fetchCampaignPerformanceData(
           apiEndpoint,
           accessToken,
           clientId,
           connection.profile_id,
-          reportStartDate,
-          reportEndDate,
+          campaignIds,
           requestQueue
         )
         
-        console.log(`Retrieved ${performanceData.length} performance records`)
+        console.log(`Retrieved ${extendedPerformanceData.length} extended performance records`)
         
-        // Update campaigns with performance data
-        for (const perfData of performanceData) {
-          if (!perfData.campaignId) {
-            console.warn('Skipping performance data without campaignId:', perfData)
-            continue
+        // Process extended performance data if available
+        if (extendedPerformanceData.length > 0) {
+          for (const perfData of extendedPerformanceData) {
+            if (!perfData.campaignId) {
+              console.warn('Skipping performance data without campaignId:', perfData)
+              continue
+            }
+            
+            // Enhanced metrics calculation with proper data types - handle both old and new format
+            const impressions = Math.max(0, parseInt(perfData.impressions || perfData.serving?.impressions || '0') || 0)
+            const clicks = Math.max(0, parseInt(perfData.clicks || perfData.serving?.clicks || '0') || 0)
+            const spend = Math.max(0, parseFloat(perfData.cost || perfData.serving?.cost || '0') || 0)
+            const sales_14d = Math.max(0, parseFloat(perfData.sales14d || perfData.performance?.sales14d || '0') || 0)
+            const orders_14d = Math.max(0, parseInt(perfData.orders14d || perfData.performance?.orders14d || '0') || 0)
+            const sales_7d = Math.max(0, parseFloat(perfData.sales7d || perfData.performance?.sales7d || '0') || 0)
+            const orders_7d = Math.max(0, parseInt(perfData.orders7d || perfData.performance?.orders7d || '0') || 0)
+            
+            // Calculate derived metrics
+            const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0
+            const cpc = clicks > 0 ? spend / clicks : 0
+            const conversionRate_14d = clicks > 0 ? (orders_14d / clicks) * 100 : 0
+            const conversionRate_7d = clicks > 0 ? (orders_7d / clicks) * 100 : 0
+            const acos_14d = sales_14d > 0 ? (spend / sales_14d) * 100 : null
+            const roas_14d = spend > 0 ? sales_14d / spend : null
+            const acos_7d = sales_7d > 0 ? (spend / sales_7d) * 100 : null
+            const roas_7d = spend > 0 ? sales_7d / spend : null
+            
+            console.log(`Updating campaign ${perfData.campaignId}: spend=${spend}, sales_14d=${sales_14d}, impressions=${impressions}, clicks=${clicks}`)
+
+            // Update with both 7d and 14d attribution data
+            const updateData = {
+              last_updated: new Date().toISOString(),
+              // Basic metrics (use most recent data)
+              impressions: impressions,
+              clicks: clicks,
+              spend: spend,
+              // Default to 14d attribution for primary metrics
+              sales: sales_14d,
+              orders: orders_14d,
+              acos: acos_14d,
+              roas: roas_14d,
+              // 7d attribution specific
+              sales_7d: sales_7d,
+              orders_7d: orders_7d,
+              clicks_7d: clicks,
+              impressions_7d: impressions,
+              spend_7d: spend,
+              ctr_7d: ctr,
+              cpc_7d: cpc,
+              conversion_rate_7d: conversionRate_7d,
+              acos_7d: acos_7d,
+              roas_7d: roas_7d,
+              // 14d attribution specific
+              sales_14d: sales_14d,
+              orders_14d: orders_14d,
+              clicks_14d: clicks,
+              impressions_14d: impressions,
+              spend_14d: spend,
+              ctr_14d: ctr,
+              cpc_14d: cpc,
+              conversion_rate_14d: conversionRate_14d,
+              acos_14d: acos_14d,
+              roas_14d: roas_14d,
+            }
+
+            const { error: updateError } = await supabase
+              .from('campaigns')
+              .update(updateData)
+              .eq('connection_id', connectionId)
+              .eq('amazon_campaign_id', perfData.campaignId.toString())
+
+            if (updateError) {
+              console.error('Error updating campaign metrics:', perfData.campaignId, updateError)
+            } else {
+              totalMetricsUpdated++
+            }
           }
+        } else {
+          // Fallback to reporting API for historical data
+          console.log('No extended data available, trying reporting API...')
           
-          // Enhanced metrics calculation with proper data types
-          const impressions = Math.max(0, parseInt(perfData.impressions || '0') || 0)
-          const clicks = Math.max(0, parseInt(perfData.clicks || '0') || 0)
-          const spend = Math.max(0, parseFloat(perfData.cost || '0') || 0)
-          const sales_14d = Math.max(0, parseFloat(perfData.attributedSales14d || '0') || 0)
-          const orders_14d = Math.max(0, parseInt(perfData.attributedUnitsOrdered14d || '0') || 0)
-          const sales_7d = Math.max(0, parseFloat(perfData.attributedSales7d || '0') || 0)
-          const orders_7d = Math.max(0, parseInt(perfData.attributedUnitsOrdered7d || '0') || 0)
+          const reportPerformanceData = await fetchCampaignPerformanceReport(
+            apiEndpoint,
+            accessToken,
+            clientId,
+            connection.profile_id,
+            reportStartDate,
+            reportEndDate,
+            requestQueue
+          )
           
-          // Calculate derived metrics
-          const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0
-          const cpc = clicks > 0 ? spend / clicks : 0
-          const conversionRate_14d = clicks > 0 ? (orders_14d / clicks) * 100 : 0
-          const conversionRate_7d = clicks > 0 ? (orders_7d / clicks) * 100 : 0
-          const acos_14d = sales_14d > 0 ? (spend / sales_14d) * 100 : null
-          const roas_14d = spend > 0 ? sales_14d / spend : null
-          const acos_7d = sales_7d > 0 ? (spend / sales_7d) * 100 : null
-          const roas_7d = spend > 0 ? sales_7d / spend : null
+          console.log(`Retrieved ${reportPerformanceData.length} report performance records`)
           
-          console.log(`Updating campaign ${perfData.campaignId}: spend=${spend}, sales_14d=${sales_14d}, impressions=${impressions}, clicks=${clicks}`)
+          // Process reporting API data
+          for (const perfData of reportPerformanceData) {
+            if (!perfData.campaignId) {
+              console.warn('Skipping performance data without campaignId:', perfData)
+              continue
+            }
+            
+            // Handle reporting API format
+            const impressions = Math.max(0, parseInt(perfData.impressions || '0') || 0)
+            const clicks = Math.max(0, parseInt(perfData.clicks || '0') || 0)
+            const spend = Math.max(0, parseFloat(perfData.cost || '0') || 0)
+            const sales_14d = Math.max(0, parseFloat(perfData.sales14d || '0') || 0)
+            const orders_14d = Math.max(0, parseInt(perfData.orders14d || '0') || 0)
+            const sales_7d = Math.max(0, parseFloat(perfData.sales7d || '0') || 0)
+            const orders_7d = Math.max(0, parseInt(perfData.orders7d || '0') || 0)
+            
+            // Calculate derived metrics
+            const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0
+            const cpc = clicks > 0 ? spend / clicks : 0
+            const conversionRate_14d = clicks > 0 ? (orders_14d / clicks) * 100 : 0
+            const conversionRate_7d = clicks > 0 ? (orders_7d / clicks) * 100 : 0
+            const acos_14d = sales_14d > 0 ? (spend / sales_14d) * 100 : null
+            const roas_14d = spend > 0 ? sales_14d / spend : null
+            const acos_7d = sales_7d > 0 ? (spend / sales_7d) * 100 : null
+            const roas_7d = spend > 0 ? sales_7d / spend : null
+            
+            console.log(`Updating campaign ${perfData.campaignId} from report: spend=${spend}, sales_14d=${sales_14d}`)
 
-          // Update with both 7d and 14d attribution data
-          const updateData = {
-            last_updated: new Date().toISOString(),
-            // Basic metrics (use most recent data)
-            impressions: impressions,
-            clicks: clicks,
-            spend: spend,
-            // Default to 14d attribution for primary metrics
-            sales: sales_14d,
-            orders: orders_14d,
-            acos: acos_14d,
-            roas: roas_14d,
-            // 7d attribution specific
-            sales_7d: sales_7d,
-            orders_7d: orders_7d,
-            clicks_7d: clicks,
-            impressions_7d: impressions,
-            spend_7d: spend,
-            ctr_7d: ctr,
-            cpc_7d: cpc,
-            conversion_rate_7d: conversionRate_7d,
-            acos_7d: acos_7d,
-            roas_7d: roas_7d,
-            // 14d attribution specific
-            sales_14d: sales_14d,
-            orders_14d: orders_14d,
-            clicks_14d: clicks,
-            impressions_14d: impressions,
-            spend_14d: spend,
-            ctr_14d: ctr,
-            cpc_14d: cpc,
-            conversion_rate_14d: conversionRate_14d,
-            acos_14d: acos_14d,
-            roas_14d: roas_14d,
-          }
+            const updateData = {
+              last_updated: new Date().toISOString(),
+              impressions: impressions,
+              clicks: clicks,
+              spend: spend,
+              sales: sales_14d,
+              orders: orders_14d,
+              acos: acos_14d,
+              roas: roas_14d,
+              sales_7d: sales_7d,
+              orders_7d: orders_7d,
+              clicks_7d: clicks,
+              impressions_7d: impressions,
+              spend_7d: spend,
+              ctr_7d: ctr,
+              cpc_7d: cpc,
+              conversion_rate_7d: conversionRate_7d,
+              acos_7d: acos_7d,
+              roas_7d: roas_7d,
+              sales_14d: sales_14d,
+              orders_14d: orders_14d,
+              clicks_14d: clicks,
+              impressions_14d: impressions,
+              spend_14d: spend,
+              ctr_14d: ctr,
+              cpc_14d: cpc,
+              conversion_rate_14d: conversionRate_14d,
+              acos_14d: acos_14d,
+              roas_14d: roas_14d,
+            }
 
-          const { error: updateError } = await supabase
-            .from('campaigns')
-            .update(updateData)
-            .eq('connection_id', connectionId)
-            .eq('amazon_campaign_id', perfData.campaignId.toString())
+            const { error: updateError } = await supabase
+              .from('campaigns')
+              .update(updateData)
+              .eq('connection_id', connectionId)
+              .eq('amazon_campaign_id', perfData.campaignId.toString())
 
-          if (updateError) {
-            console.error('Error updating campaign metrics:', perfData.campaignId, updateError)
-          } else {
-            totalMetricsUpdated++
+            if (updateError) {
+              console.error('Error updating campaign metrics:', perfData.campaignId, updateError)
+            } else {
+              totalMetricsUpdated++
+            }
           }
         }
       } catch (error) {
