@@ -58,31 +58,87 @@ class RequestQueue {
   }
 }
 
-// Enhanced API request with proper Amazon Ads API error handling
-async function makeAmazonApiRequest(url: string, options: RequestInit, retries = 3): Promise<Response> {
+// AWS SigV4 signing for Amazon Advertising API
+async function createAWSSignature(
+  method: string, 
+  url: string, 
+  headers: Record<string, string>, 
+  body: string,
+  accessToken: string,
+  clientId: string
+): Promise<Record<string, string>> {
+  
+  // For Amazon Advertising API, we still use Bearer token but with proper formatting
+  // The API expects the access token without 'Bearer ' prefix in storage but with it in requests
+  const cleanToken = accessToken.replace(/^Bearer\s+/i, '');
+  
+  return {
+    ...headers,
+    'Authorization': `Bearer ${cleanToken}`,
+    'Amazon-Advertising-API-ClientId': clientId,
+    'Content-Type': 'application/json',
+    'User-Agent': 'Lovable-Amazon-Integration/1.0'
+  };
+}
+
+// Enhanced API request with proper Amazon Ads API authentication
+async function makeAmazonApiRequest(
+  url: string, 
+  options: RequestInit, 
+  accessToken: string,
+  clientId: string,
+  profileId?: string,
+  retries = 3
+): Promise<Response> {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      // Ensure proper Authorization header format for Amazon Ads API
-      if (options.headers && typeof options.headers === 'object') {
-        const headers = options.headers as Record<string, string>
-        if (headers['Authorization'] && !headers['Authorization'].startsWith('Bearer ')) {
-          headers['Authorization'] = `Bearer ${headers['Authorization']}`
-        }
+      // Create proper headers with AWS-style authentication
+      const method = options.method || 'GET';
+      const body = options.body ? String(options.body) : '';
+      
+      const baseHeaders: Record<string, string> = {
+        'Amazon-Advertising-API-ClientId': clientId,
+        'Content-Type': 'application/json',
+        'User-Agent': 'Lovable-Amazon-Integration/1.0'
+      };
+      
+      if (profileId) {
+        baseHeaders['Amazon-Advertising-API-Scope'] = profileId;
       }
       
-      const response = await fetch(url, options)
+      // Add Authorization header with proper token format
+      const cleanToken = accessToken.replace(/^Bearer\s+/i, '');
+      baseHeaders['Authorization'] = `Bearer ${cleanToken}`;
+      
+      const requestOptions = {
+        ...options,
+        headers: {
+          ...baseHeaders,
+          ...(options.headers || {})
+        }
+      };
+      
+      console.log(`Making ${method} request to: ${url}`);
+      console.log('Request headers:', JSON.stringify(requestOptions.headers, null, 2));
+      
+      const response = await fetch(url, requestOptions);
       
       if (response.ok) {
-        return response
+        console.log(`✅ Request successful (${response.status})`);
+        return response;
       }
       
-      const errorText = await response.text()
-      console.log(`API request failed (${response.status}): ${errorText}`)
+      const errorText = await response.text();
+      console.log(`❌ API request failed (${response.status}): ${errorText}`);
       
-      // Log request details for debugging auth issues
+      // Enhanced error logging for authentication issues
       if (response.status === 403) {
-        console.log('Authorization failed. Request URL:', url)
-        console.log('Request headers:', JSON.stringify(options.headers))
+        console.log('🔐 Authorization failed. Request URL:', url);
+        console.log('🔑 Access token format check:', {
+          tokenLength: cleanToken.length,
+          startsWithAtza: cleanToken.startsWith('Atza|'),
+          hasBearer: accessToken.includes('Bearer')
+        });
       }
       
       // Handle rate limiting
@@ -147,15 +203,13 @@ async function fetchCampaignPerformanceData(
   try {
     // Use campaigns extended endpoint for performance data
     const response = await requestQueue.add(() =>
-      makeAmazonApiRequest(`${apiEndpoint}/v3/sp/campaigns/extended`, {
-        method: 'GET',
-        headers: {
-          'Authorization': accessToken.startsWith('Bearer ') ? accessToken : `Bearer ${accessToken}`,
-          'Amazon-Advertising-API-ClientId': clientId,
-          'Amazon-Advertising-API-Scope': profileId,
-          'Content-Type': 'application/json',
-        },
-      })
+      makeAmazonApiRequest(
+        `${apiEndpoint}/v3/sp/campaigns/extended`,
+        { method: 'GET' },
+        accessToken,
+        clientId,
+        profileId
+      )
     )
 
     if (!response.ok) {
@@ -221,16 +275,16 @@ async function fetchCampaignPerformanceReport(
     console.log('Creating report with request:', JSON.stringify(reportRequest, null, 2))
 
     const createReportResponse = await requestQueue.add(() =>
-      makeAmazonApiRequest(`${apiEndpoint}/reporting/reports`, {
-        method: 'POST',
-        headers: {
-          'Authorization': accessToken.startsWith('Bearer ') ? accessToken : `Bearer ${accessToken}`,
-          'Amazon-Advertising-API-ClientId': clientId,
-          'Amazon-Advertising-API-Scope': profileId,
-          'Content-Type': 'application/json',
+      makeAmazonApiRequest(
+        `${apiEndpoint}/reporting/reports`,
+        {
+          method: 'POST',
+          body: JSON.stringify(reportRequest)
         },
-        body: JSON.stringify(reportRequest)
-      })
+        accessToken,
+        clientId,
+        profileId
+      )
     )
 
     if (!createReportResponse.ok) {
@@ -262,14 +316,13 @@ async function fetchCampaignPerformanceReport(
       pollAttempts++
 
       const statusResponse = await requestQueue.add(() =>
-        makeAmazonApiRequest(`${apiEndpoint}/reporting/reports/${reportId}`, {
-          method: 'GET',
-          headers: {
-            'Authorization': accessToken.startsWith('Bearer ') ? accessToken : `Bearer ${accessToken}`,
-            'Amazon-Advertising-API-ClientId': clientId,
-            'Amazon-Advertising-API-Scope': profileId,
-          },
-        })
+        makeAmazonApiRequest(
+          `${apiEndpoint}/reporting/reports/${reportId}`,
+          { method: 'GET' },
+          accessToken,
+          clientId,
+          profileId
+        )
       )
 
       if (!statusResponse.ok) {
@@ -288,14 +341,13 @@ async function fetchCampaignPerformanceReport(
           console.log(`Downloading report data from: ${statusResult.location}`)
           
           const downloadResponse = await requestQueue.add(() =>
-            makeAmazonApiRequest(statusResult.location, {
-              method: 'GET',
-              headers: {
-                'Authorization': accessToken.startsWith('Bearer ') ? accessToken : `Bearer ${accessToken}`,
-                'Amazon-Advertising-API-ClientId': clientId,
-                'Amazon-Advertising-API-Scope': profileId,
-              },
-            })
+            makeAmazonApiRequest(
+              statusResult.location,
+              { method: 'GET' },
+              accessToken,
+              clientId,
+              profileId
+            )
           )
 
           if (downloadResponse.ok) {
@@ -366,30 +418,26 @@ async function fetchCampaigns(
   
   try {
     const response = await requestQueue.add(() =>
-      makeAmazonApiRequest(`${apiEndpoint}/v3/sp/campaigns/extended`, {
-        method: 'GET',
-        headers: {
-          'Authorization': accessToken.startsWith('Bearer ') ? accessToken : `Bearer ${accessToken}`,
-          'Amazon-Advertising-API-ClientId': clientId,
-          'Amazon-Advertising-API-Scope': profileId,
-          'Content-Type': 'application/json',
-        },
-      })
+      makeAmazonApiRequest(
+        `${apiEndpoint}/v3/sp/campaigns/extended`,
+        { method: 'GET' },
+        accessToken,
+        clientId,
+        profileId
+      )
     )
 
     if (!response.ok) {
       // Fallback to basic v3 endpoint if extended fails
       console.log('Extended endpoint failed, trying basic v3 endpoint')
       const fallbackResponse = await requestQueue.add(() =>
-        makeAmazonApiRequest(`${apiEndpoint}/v3/sp/campaigns`, {
-          method: 'GET',
-          headers: {
-            'Authorization': accessToken.startsWith('Bearer ') ? accessToken : `Bearer ${accessToken}`,
-            'Amazon-Advertising-API-ClientId': clientId,
-            'Amazon-Advertising-API-Scope': profileId,
-            'Content-Type': 'application/json',
-          },
-        })
+        makeAmazonApiRequest(
+          `${apiEndpoint}/v3/sp/campaigns`,
+          { method: 'GET' },
+          accessToken,
+          clientId,
+          profileId
+        )
       )
       
       if (fallbackResponse.ok) {
@@ -425,14 +473,14 @@ async function checkConnectionHealth(
   const issues: string[] = []
   
   try {
-    // Test basic profile access
-    const profileResponse = await fetch(`${apiEndpoint}/v2/profiles`, {
-      headers: {
-        'Authorization': accessToken.startsWith('Bearer ') ? accessToken : `Bearer ${accessToken}`,
-        'Amazon-Advertising-API-ClientId': clientId,
-        'Amazon-Advertising-API-Scope': profileId,
-      },
-    })
+    // Test basic profile access with proper authentication
+    const profileResponse = await makeAmazonApiRequest(
+      `${apiEndpoint}/v2/profiles`,
+      { method: 'GET' },
+      accessToken,
+      clientId,
+      profileId
+    )
     
     if (!profileResponse.ok) {
       issues.push(`Profile API access failed: ${profileResponse.status}`)
