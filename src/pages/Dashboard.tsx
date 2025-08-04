@@ -9,7 +9,7 @@ import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { useCampaignMetrics } from "@/hooks/useCampaignMetrics";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart3, Settings as SettingsIcon } from "lucide-react";
+import { BarChart3, Settings as SettingsIcon, FileText } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const Dashboard = () => {
@@ -32,14 +32,23 @@ const Dashboard = () => {
             </p>
           </div>
           
-          {!hasActiveConnections && (
+          <div className="flex items-center gap-3">
             <Button asChild variant="outline" className="flex items-center gap-2">
-              <Link to="/settings">
-                <SettingsIcon className="h-4 w-4" />
-                Go to Settings
+              <Link to="/documentation">
+                <FileText className="h-4 w-4" />
+                API Documentation
               </Link>
             </Button>
-          )}
+            
+            {!hasActiveConnections && (
+              <Button asChild variant="outline" className="flex items-center gap-2">
+                <Link to="/settings">
+                  <SettingsIcon className="h-4 w-4" />
+                  Go to Settings
+                </Link>
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="space-y-6">

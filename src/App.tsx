@@ -8,6 +8,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import Auth from "@/pages/Auth";
 import Dashboard from "@/pages/Dashboard";
 import EnhancedDashboard from "@/pages/EnhancedDashboard";
+import Documentation from "@/pages/Documentation";
 import Feedback from "@/pages/Feedback";
 import DataManagement from "@/pages/DataManagement";
 import Breakdown from "@/pages/Breakdown";
@@ -48,6 +49,11 @@ const App = () => {
               <Route path="/enhanced-dashboard" element={
                 <ProtectedRoute>
                   <EnhancedDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/documentation" element={
+                <ProtectedRoute>
+                  <Documentation />
                 </ProtectedRoute>
               } />
               <Route path="/feedback" element={
