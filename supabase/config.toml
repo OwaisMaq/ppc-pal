@@ -55,3 +55,9 @@ verify_jwt = true
 
 [functions.customer-portal]
 verify_jwt = true
+
+[functions.health-check-amazon-connections]
+verify_jwt = true
+
+[functions.refresh-amazon-token]
+verify_jwt = true

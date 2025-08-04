@@ -164,36 +164,44 @@ export const useSyncMonitoring = () => {
     };
   };
 
-  const runHealthCheck = async (connectionId: string) => {
+  const runHealthCheck = async (connectionId?: string) => {
+    setLoading(true);
     try {
-      toast.info('Running connection health check...');
+      console.log('Running health check for connection:', connectionId);
       
-      // Trigger a lightweight sync to check connection health
-      const { data, error } = await supabase.functions.invoke('sync-amazon-data', {
-        body: { 
-          connectionId,
-          healthCheckOnly: true // Special flag for health check
-        },
+      const { data, error } = await supabase.functions.invoke('health-check-amazon-connections', {
+        body: connectionId ? { connectionId } : {},
         headers: {
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
         },
       });
 
       if (error) {
-        toast.error('Health check failed');
-        return false;
+        throw error;
       }
 
-      toast.success('Health check completed');
+      const results = data?.connections || [data?.connection].filter(Boolean);
+      const healthyCount = results.filter((r: any) => r.healthy).length;
+      const totalCount = results.length;
+
+      console.log('Health check results:', data);
+      
+      if (healthyCount === totalCount) {
+        toast.success(`Health check completed: All ${totalCount} connection(s) healthy`);
+      } else {
+        toast.error(`Health check completed: ${healthyCount}/${totalCount} connections healthy`);
+      }
       
       // Refresh connection health data
       await fetchConnectionHealths();
       
       return true;
     } catch (error) {
-      console.error('Health check error:', error);
-      toast.error('Health check failed');
+      console.error('Health check failed:', error);
+      toast.error(`Health check failed: ${error.message || 'Unknown error'}`);
       return false;
+    } finally {
+      setLoading(false);
     }
   };
 

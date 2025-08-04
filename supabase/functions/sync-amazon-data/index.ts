@@ -58,13 +58,42 @@ class RequestQueue {
   }
 }
 
-// Enhanced API request with proper Amazon Ads API error handling
+// Enhanced API request with proper Amazon Ads API error handling and auth
 async function makeAmazonApiRequest(url: string, options: RequestInit, retries = 3): Promise<Response> {
+  // Validate and sanitize authorization header
+  if (options.headers && typeof options.headers === 'object') {
+    const headers = options.headers as Record<string, string>
+    if (headers['Authorization']) {
+      // Ensure proper Bearer token format
+      const authValue = headers['Authorization']
+      if (!authValue.startsWith('Bearer ')) {
+        headers['Authorization'] = `Bearer ${authValue}`
+      }
+      
+      // Validate token format (should not contain spaces or special chars except the token itself)
+      const token = authValue.replace('Bearer ', '').trim()
+      if (!token || token.includes(' ') || token.length < 10) {
+        throw new Error(`Invalid access token format: ${token.substring(0, 20)}...`)
+      }
+      
+      headers['Authorization'] = `Bearer ${token}`
+      console.log(`Using authorization header: Bearer ${token.substring(0, 20)}...`)
+    }
+  }
+
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      const response = await fetch(url, options)
+      console.log(`Making API request (attempt ${attempt}/${retries}) to: ${url}`)
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          ...options.headers,
+          'User-Agent': 'Amazon-Advertising-API-SDK/1.0'
+        }
+      })
       
       if (response.ok) {
+        console.log(`API request successful: ${response.status}`)
         return response
       }
       
@@ -80,6 +109,18 @@ async function makeAmazonApiRequest(url: string, options: RequestInit, retries =
         continue
       }
       
+      // Handle token expiration
+      if (response.status === 401) {
+        console.log('Token expired or invalid')
+        throw new Error('AMAZON_TOKEN_EXPIRED')
+      }
+      
+      // Handle permission issues
+      if (response.status === 403) {
+        console.log('Insufficient permissions or invalid credentials')
+        throw new Error('AMAZON_INSUFFICIENT_PERMISSIONS')
+      }
+      
       // Retry on server errors
       if (response.status >= 500) {
         console.log(`Server error ${response.status}, retrying attempt ${attempt}/${retries}`)
@@ -92,6 +133,11 @@ async function makeAmazonApiRequest(url: string, options: RequestInit, retries =
       
     } catch (error) {
       console.log(`Request failed (attempt ${attempt}/${retries}): ${error.message}`)
+      
+      // Don't retry on token expiration or auth errors
+      if (error.message.includes('AMAZON_TOKEN_EXPIRED') || error.message.includes('AMAZON_INSUFFICIENT_PERMISSIONS')) {
+        throw error
+      }
       
       if (attempt === retries) {
         throw error
@@ -466,8 +512,9 @@ async function checkConnectionHealth(
   return { healthy: issues.length === 0, issues }
 }
 
-// Helper function for regional endpoint detection based on marketplace
-function getRegionalEndpointFromMarketplace(marketplaceId?: string): string {
+// Enhanced regional endpoint detection with country code support
+function getRegionalEndpointFromMarketplace(marketplaceId?: string, countryCode?: string): string {
+  // Map by marketplace ID (most accurate)
   const marketplaceEndpoints: Record<string, string> = {
     // North America
     'ATVPDKIKX0DER': 'https://advertising-api.amazon.com', // US
@@ -482,6 +529,7 @@ function getRegionalEndpointFromMarketplace(marketplaceId?: string): string {
     'A13V1IB3VIYZZH': 'https://advertising-api-eu.amazon.com', // France
     'A1805IZSGTT6HS': 'https://advertising-api-eu.amazon.com', // Netherlands
     'A2NODRKZP88ZB9': 'https://advertising-api-eu.amazon.com', // Sweden
+    'A1C3SOZRARQ6R3': 'https://advertising-api-eu.amazon.com', // Poland
     
     // Far East
     'A1VC38T7YXB528': 'https://advertising-api-fe.amazon.com', // Japan
@@ -493,7 +541,39 @@ function getRegionalEndpointFromMarketplace(marketplaceId?: string): string {
     'AMEN7PMS3EDWL': 'https://advertising-api-fe.amazon.com'   // India
   };
 
-  return marketplaceEndpoints[marketplaceId || ''] || 'https://advertising-api.amazon.com';
+  // First try marketplace ID
+  if (marketplaceId && marketplaceEndpoints[marketplaceId]) {
+    return marketplaceEndpoints[marketplaceId];
+  }
+
+  // Fallback to country code mapping
+  const countryEndpoints: Record<string, string> = {
+    'US': 'https://advertising-api.amazon.com',
+    'CA': 'https://advertising-api.amazon.ca', 
+    'MX': 'https://advertising-api.amazon.com.mx',
+    'DE': 'https://advertising-api-eu.amazon.com',
+    'ES': 'https://advertising-api-eu.amazon.com',
+    'IT': 'https://advertising-api-eu.amazon.com',
+    'UK': 'https://advertising-api-eu.amazon.com',
+    'GB': 'https://advertising-api-eu.amazon.com',
+    'FR': 'https://advertising-api-eu.amazon.com',
+    'NL': 'https://advertising-api-eu.amazon.com',
+    'SE': 'https://advertising-api-eu.amazon.com',
+    'PL': 'https://advertising-api-eu.amazon.com',
+    'JP': 'https://advertising-api-fe.amazon.com',
+    'AU': 'https://advertising-api-fe.amazon.com',
+    'BR': 'https://advertising-api-fe.amazon.com',
+    'TR': 'https://advertising-api-fe.amazon.com',
+    'IN': 'https://advertising-api-fe.amazon.com'
+  };
+
+  if (countryCode && countryEndpoints[countryCode.toUpperCase()]) {
+    return countryEndpoints[countryCode.toUpperCase()];
+  }
+
+  // Default to US endpoint
+  console.warn(`Unknown marketplace/country: ${marketplaceId}/${countryCode}, defaulting to US endpoint`);
+  return 'https://advertising-api.amazon.com';
 }
 
 serve(async (req) => {
@@ -555,20 +635,44 @@ serve(async (req) => {
       throw new Error('Amazon API credentials not configured')
     }
 
-    // Token refresh logic
+    // Enhanced token validation and refresh logic
     const now = new Date()
     const expiresAt = new Date(connection.token_expires_at)
     let accessToken = connection.access_token
+    
+    // Validate current token format
+    if (!accessToken || typeof accessToken !== 'string' || accessToken.trim().length < 10) {
+      console.error('Invalid access token format:', accessToken?.substring(0, 20))
+      throw new Error('Invalid access token stored - please reconnect your Amazon account')
+    }
+    
+    // Clean and validate token
+    accessToken = accessToken.trim()
+    console.log(`Using access token: ${accessToken.substring(0, 20)}... (expires: ${expiresAt.toISOString()})`)
     
     const bufferTime = 5 * 60 * 1000 // 5 minutes
     if (now.getTime() >= (expiresAt.getTime() - bufferTime)) {
       console.log('Token expired or expiring soon, attempting refresh...')
       
+      if (!connection.refresh_token) {
+        console.error('No refresh token available')
+        await supabase
+          .from('amazon_connections')
+          .update({ 
+            status: 'expired',
+            setup_required_reason: 'No refresh token available - please reconnect'
+          })
+          .eq('id', connectionId)
+        throw new Error('No refresh token available, please reconnect your account')
+      }
+      
       try {
+        console.log('Refreshing token with Amazon API...')
         const refreshResponse = await fetch('https://api.amazon.com/auth/o2/token', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent': 'Amazon-Advertising-API-SDK/1.0',
           },
           body: new URLSearchParams({
             grant_type: 'refresh_token',
@@ -580,23 +684,38 @@ serve(async (req) => {
 
         if (refreshResponse.ok) {
           const tokenData = await refreshResponse.json()
-          const newExpiresAt = new Date(Date.now() + (tokenData.expires_in * 1000))
+          
+          if (!tokenData.access_token) {
+            throw new Error('No access token in refresh response')
+          }
+          
+          const newExpiresAt = new Date(Date.now() + ((tokenData.expires_in || 3600) * 1000))
+          
+          // Validate new token
+          const newToken = tokenData.access_token.trim()
+          if (newToken.length < 10) {
+            throw new Error('Invalid new token format')
+          }
           
           await supabase
             .from('amazon_connections')
             .update({
-              access_token: tokenData.access_token,
+              access_token: newToken,
               refresh_token: tokenData.refresh_token || connection.refresh_token,
               token_expires_at: newExpiresAt.toISOString(),
               status: 'active',
-              setup_required_reason: null
+              setup_required_reason: null,
+              last_health_check: new Date().toISOString(),
+              health_status: 'healthy'
             })
             .eq('id', connectionId)
           
-          accessToken = tokenData.access_token
-          console.log('Token refreshed successfully')
+          accessToken = newToken
+          console.log(`Token refreshed successfully, new token: ${newToken.substring(0, 20)}... (expires: ${newExpiresAt.toISOString()})`)
         } else {
-          throw new Error('Token refresh failed')
+          const errorText = await refreshResponse.text()
+          console.error('Token refresh API failed:', refreshResponse.status, errorText)
+          throw new Error(`Token refresh failed: ${refreshResponse.status} ${errorText}`)
         }
       } catch (refreshError) {
         console.error('Token refresh failed:', refreshError)
@@ -605,7 +724,9 @@ serve(async (req) => {
           .from('amazon_connections')
           .update({ 
             status: 'expired',
-            setup_required_reason: 'Token refresh failed - please reconnect'
+            setup_required_reason: 'Token refresh failed - please reconnect',
+            health_status: 'error',
+            health_issues: [`Token refresh failed: ${refreshError.message}`]
           })
           .eq('id', connectionId)
         
@@ -618,11 +739,34 @@ serve(async (req) => {
     // Initialize request queue
     const requestQueue = new RequestQueue()
 
-    // Use correct API endpoint - prefer dynamic detection over hardcoded
-    const apiEndpoint = connection.advertising_api_endpoint || 
-                       getRegionalEndpointFromMarketplace(connection.marketplace_id) ||
-                       'https://advertising-api.amazon.com'
-    console.log('Using API endpoint:', apiEndpoint)
+    // Enhanced API endpoint resolution
+    let apiEndpoint = connection.advertising_api_endpoint
+    
+    // If no stored endpoint, determine from connection data
+    if (!apiEndpoint) {
+      // Try to get from stored marketplace data first
+      const marketplaceQuery = connection.marketplace_id
+      
+      // Get marketplace string ID if we have it
+      const { data: connectionDetails } = await supabase
+        .from('amazon_connections')
+        .select('marketplace_id')
+        .eq('id', connectionId)
+        .single()
+      
+      apiEndpoint = getRegionalEndpointFromMarketplace(
+        connectionDetails?.marketplace_id, 
+        connection.marketplace_id // This might be country code
+      )
+      
+      // Update the connection with the determined endpoint
+      await supabase
+        .from('amazon_connections')
+        .update({ advertising_api_endpoint: apiEndpoint })
+        .eq('id', connectionId)
+    }
+    
+    console.log(`Using API endpoint: ${apiEndpoint} (marketplace: ${connection.marketplace_id})`)
 
     // Connection health check
     const healthCheck = await checkConnectionHealth(

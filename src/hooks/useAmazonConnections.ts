@@ -156,34 +156,77 @@ export const useAmazonConnections = () => {
   };
 
   const syncConnection = async (connectionId: string) => {
+    setLoading(true);
     try {
-      const { error } = await supabase.functions.invoke('sync-amazon-data', {
+      console.log('Syncing connection:', connectionId);
+      
+      // First run a health check
+      const { data: healthData, error: healthError } = await supabase.functions.invoke('health-check-amazon-connections', {
         body: { connectionId },
         headers: {
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
         },
       });
 
-      if (error) throw error;
-      
-      toast.success('Data sync initiated successfully!');
-      await fetchConnections();
-    } catch (error) {
-      console.error('Error syncing connection:', error);
-      
-      // Check if it's a token-related error
-      if (error.message && (
-        error.message.includes('Token expired') || 
-        error.message.includes('refresh failed') ||
-        error.message.includes('reconnect')
-      )) {
-        toast.error('Your Amazon connection has expired. Please refresh or reconnect your account.');
+      if (healthError) {
+        console.warn('Health check failed, proceeding with sync anyway:', healthError);
+      } else if (healthData?.connection && !healthData.connection.healthy) {
+        const issues = healthData.connection.issues || [];
+        toast.error(`Connection health issues detected: ${issues.join(', ')}`);
         
-        // Refresh connections to show updated status
-        await fetchConnections();
-      } else {
-        toast.error('Failed to sync Amazon data');
+        // Still proceed with sync, but warn the user
+        console.warn('Connection has health issues:', issues);
       }
+      
+      const { data, error } = await supabase.functions.invoke('sync-amazon-data', {
+        body: { 
+          connectionId,
+          dateRange: {
+            startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(), // Last 30 days
+            endDate: new Date().toISOString()
+          },
+          attributionWindows: ['7d', '14d']
+        },
+        headers: {
+          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+      });
+
+      if (error) {
+        console.error('Sync error:', error);
+        
+        // Enhanced error messages based on common issues
+        if (error.message?.includes('AMAZON_TOKEN_EXPIRED')) {
+          toast.error('Amazon token expired - please reconnect your account');
+        } else if (error.message?.includes('AMAZON_INSUFFICIENT_PERMISSIONS')) {
+          toast.error('Insufficient Amazon API permissions - check your account setup');
+        } else if (error.message?.includes('Invalid access token')) {
+          toast.error('Invalid Amazon token - please reconnect your account');
+        } else {
+          toast.error(`Sync failed: ${error.message}`);
+        }
+        return;
+      }
+
+      console.log('Sync response:', data);
+      
+      if (data?.success) {
+        toast.success(`Sync completed: ${data.campaignsProcessed || 0} campaigns processed, ${data.metricsUpdated || 0} metrics updated`);
+        await fetchConnections(); // Refresh connections to get updated data
+      } else {
+        toast.error(`Sync completed but with issues: ${data?.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Sync failed:', error);
+      
+      // Enhanced error handling
+      if (error.message?.includes('fetch')) {
+        toast.error('Network error - please check your connection and try again');
+      } else {
+        toast.error(`Sync failed: ${error.message || 'Unknown error'}`);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
