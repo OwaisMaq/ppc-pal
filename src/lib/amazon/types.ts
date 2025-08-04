@@ -2,7 +2,7 @@
 export interface AmazonConnection {
   id: string;
   user_id: string;
-  profile_id: string;
+  profile_id: string; // Keep as string for now since DB stores it as string
   profile_name?: string;
   marketplace_id?: string;
   access_token: string;
@@ -13,12 +13,13 @@ export interface AmazonConnection {
   created_at: string;
   updated_at: string;
   setup_required_reason?: string;
+  advertising_api_endpoint?: string; // Add endpoint tracking
 }
 
 export interface Campaign {
   id: string;
   connection_id: string;
-  amazon_campaign_id: string;
+  amazon_campaign_id: string; // Keep as string for now since DB stores it as string
   name: string;
   campaign_type?: string;
   targeting_type?: string;
@@ -64,7 +65,7 @@ export interface Campaign {
 export interface AdGroup {
   id: string;
   campaign_id: string;
-  amazon_adgroup_id: string;
+  amazon_adgroup_id: string; // Keep as string for now since DB stores it as string
   name: string;
   status: 'enabled' | 'paused' | 'archived';
   default_bid?: number;
@@ -104,7 +105,7 @@ export interface AdGroup {
 export interface Keyword {
   id: string;
   adgroup_id: string;
-  amazon_keyword_id: string;
+  amazon_keyword_id: string; // Keep as string for now since DB stores it as string
   keyword_text: string;
   match_type: string;
   bid?: number;
@@ -177,3 +178,135 @@ export interface OptimizationRecommendation {
   applied_at?: string;
   created_at: string;
 }
+
+// Amazon API specific types (what Amazon actually expects/returns)
+export interface AmazonApiProfile {
+  profileId: number;
+  countryCode: string;
+  currencyCode: string;
+  dailyBudget?: number;
+  timezone: string;
+  accountInfo?: {
+    marketplaceStringId: string;
+    id: string;
+    type: string;
+    name?: string;
+    validPaymentMethod: boolean;
+  };
+}
+
+export interface AmazonApiCampaign {
+  campaignId: number;
+  name: string;
+  campaignType: string;
+  targetingType: string;
+  state: string;
+  dailyBudget?: number;
+  startDate?: string;
+  endDate?: string;
+  premiumBidAdjustment?: boolean;
+  portfolioId?: number;
+  bidding?: {
+    strategy: string;
+    adjustments?: Array<{
+      predicate: string;
+      percentage: number;
+    }>;
+  };
+}
+
+export interface AmazonApiAdGroup {
+  adGroupId: number;
+  name: string;
+  campaignId: number;
+  defaultBid: number;
+  state: string;
+}
+
+export interface AmazonApiKeyword {
+  keywordId: number;
+  adGroupId: number;
+  campaignId: number;
+  keywordText: string;
+  matchType: string;
+  state: string;
+  bid?: number;
+}
+
+// Utility functions for type conversion
+export const amazonApiUtils = {
+  // Convert profile_id for API calls
+  formatProfileId: (profileId: string): number => {
+    const numericId = parseInt(profileId, 10);
+    if (isNaN(numericId)) {
+      throw new Error(`Invalid profile ID: ${profileId}`);
+    }
+    return numericId;
+  },
+
+  // Convert campaign ID for API calls
+  formatCampaignId: (campaignId: string): number => {
+    const numericId = parseInt(campaignId, 10);
+    if (isNaN(numericId)) {
+      throw new Error(`Invalid campaign ID: ${campaignId}`);
+    }
+    return numericId;
+  },
+
+  // Convert ad group ID for API calls
+  formatAdGroupId: (adGroupId: string): number => {
+    const numericId = parseInt(adGroupId, 10);
+    if (isNaN(numericId)) {
+      throw new Error(`Invalid ad group ID: ${adGroupId}`);
+    }
+    return numericId;
+  },
+
+  // Convert keyword ID for API calls
+  formatKeywordId: (keywordId: string): number => {
+    const numericId = parseInt(keywordId, 10);
+    if (isNaN(numericId)) {
+      throw new Error(`Invalid keyword ID: ${keywordId}`);
+    }
+    return numericId;
+  },
+
+  // Generate proper API headers for v3
+  getApiHeaders: (accessToken: string, clientId: string, profileId: string) => ({
+    'Authorization': `Bearer ${accessToken}`,
+    'Amazon-Advertising-API-ClientId': clientId,
+    'Amazon-Advertising-API-Scope': profileId,
+    'Amazon-Advertising-API-Version': '3.0',
+    'Content-Type': 'application/json'
+  }),
+
+  // Get regional endpoint based on marketplace
+  getRegionalEndpoint: (marketplaceId?: string): string => {
+    const marketplaceEndpoints: Record<string, string> = {
+      // North America
+      'ATVPDKIKX0DER': 'https://advertising-api.amazon.com', // US
+      'A2EUQ1WTGCTBG2': 'https://advertising-api.amazon.ca', // Canada
+      'A1AM78C64UM0Y8': 'https://advertising-api.amazon.com.mx', // Mexico
+      
+      // Europe
+      'A1PA6795UKMFR9': 'https://advertising-api-eu.amazon.com', // Germany
+      'A1RKKUPIHCS9HS': 'https://advertising-api-eu.amazon.com', // Spain
+      'APJ6JRA9NG5V4': 'https://advertising-api-eu.amazon.com', // Italy
+      'A1F83G8C2ARO7P': 'https://advertising-api-eu.amazon.com', // UK
+      'A13V1IB3VIYZZH': 'https://advertising-api-eu.amazon.com', // France
+      'A1805IZSGTT6HS': 'https://advertising-api-eu.amazon.com', // Netherlands
+      'A2NODRKZP88ZB9': 'https://advertising-api-eu.amazon.com', // Sweden
+      
+      // Far East
+      'A1VC38T7YXB528': 'https://advertising-api-fe.amazon.com', // Japan
+      'AAHKV2X7AFYLW': 'https://advertising-api-fe.amazon.com',  // China
+      'A39IBJ37TRP1C6': 'https://advertising-api-fe.amazon.com', // Australia
+      'A2Q3Y263D00KWC': 'https://advertising-api-fe.amazon.com', // Brazil
+      'A1MQXOICRS2Z7M': 'https://advertising-api-fe.amazon.com', // Canada (French)
+      'A33AVAJ2PDY3EV': 'https://advertising-api-fe.amazon.com', // Turkey
+      'AMEN7PMS3EDWL': 'https://advertising-api-fe.amazon.com'   // India
+    };
+
+    return marketplaceEndpoints[marketplaceId || ''] || 'https://advertising-api.amazon.com';
+  }
+};

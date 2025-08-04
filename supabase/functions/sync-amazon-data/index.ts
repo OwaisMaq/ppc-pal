@@ -240,7 +240,7 @@ async function fetchCampaignPerformanceReport(
   }
 }
 
-// Fetch campaigns using the v3 campaigns endpoint with fallback to v2
+// Fetch campaigns using the v3 campaigns endpoint with proper compliance
 async function fetchCampaigns(
   apiEndpoint: string,
   accessToken: string,
@@ -249,34 +249,94 @@ async function fetchCampaigns(
   requestQueue: RequestQueue
 ): Promise<any[]> {
   
-  console.log('Fetching campaigns from v3 endpoint with v2 fallback')
+  console.log('Fetching campaigns from v3 endpoint with Amazon API compliance')
   
-  // Try v3 first
+  // Use proper v3 headers and pagination
   try {
-    const v3Response = await requestQueue.add(() =>
-      makeAmazonApiRequest(`${apiEndpoint}/sp/campaigns`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Amazon-Advertising-API-ClientId': clientId,
-          'Amazon-Advertising-API-Scope': profileId,
-          'Content-Type': 'application/json',
-        },
+    let allCampaigns: any[] = []
+    let nextToken: string | undefined
+    const maxResults = 100 // Amazon's limit for campaigns
+    
+    do {
+      const params = new URLSearchParams({
+        maxResults: maxResults.toString(),
+        ...(nextToken && { nextToken })
       })
-    )
 
-    if (v3Response.ok) {
-      const campaignsData = await v3Response.json()
-      console.log(`Retrieved ${Array.isArray(campaignsData) ? campaignsData.length : 0} campaigns from v3 API`)
-      return Array.isArray(campaignsData) ? campaignsData : []
+      const response = await requestQueue.add(() =>
+        makeAmazonApiRequest(`${apiEndpoint}/sp/campaigns?${params}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Amazon-Advertising-API-ClientId': clientId,
+            'Amazon-Advertising-API-Scope': profileId,
+            'Amazon-Advertising-API-Version': '3.0', // Required for v3 compliance
+            'Content-Type': 'application/json',
+          },
+        })
+      )
+
+      if (!response.ok) {
+        // Enhanced error handling for Amazon-specific errors
+        const errorText = await response.text()
+        console.error(`Campaigns API failed: ${response.status} - ${errorText}`)
+        
+        // Handle specific Amazon error codes
+        if (response.status === 401) {
+          throw new Error('AMAZON_TOKEN_EXPIRED')
+        } else if (response.status === 403) {
+          throw new Error('AMAZON_INSUFFICIENT_PERMISSIONS')
+        } else if (response.status === 422) {
+          throw new Error('AMAZON_INVALID_REQUEST')
+        }
+        
+        return allCampaigns // Return what we have so far
+      }
+
+      const campaignsData = await response.json()
+      
+      // Handle both v3 response format and legacy format
+      if (campaignsData.campaigns && Array.isArray(campaignsData.campaigns)) {
+        allCampaigns.push(...campaignsData.campaigns)
+        nextToken = campaignsData.nextToken
+      } else if (Array.isArray(campaignsData)) {
+        // Legacy v2 format fallback
+        allCampaigns.push(...campaignsData)
+        nextToken = undefined // v2 doesn't support pagination
+      }
+      
+      console.log(`Retrieved ${campaignsData.campaigns?.length || campaignsData.length || 0} campaigns in this batch`)
+      
+    } while (nextToken)
+
+    console.log(`Total campaigns retrieved: ${allCampaigns.length}`)
+    return allCampaigns
+    
+  } catch (error) {
+    console.error('Error fetching campaigns:', error)
+    
+    // If v3 fails with specific errors, try v2 fallback
+    if (error.message === 'AMAZON_INVALID_REQUEST') {
+      console.log('v3 API failed, attempting v2 fallback')
+      return fetchCampaignsV2Fallback(apiEndpoint, accessToken, clientId, profileId, requestQueue)
     }
-  } catch (v3Error) {
-    console.log('v3 API failed, falling back to v2:', v3Error.message)
+    
+    throw error
   }
+}
 
-  // Fallback to v2
+// Fallback function for v2 API
+async function fetchCampaignsV2Fallback(
+  apiEndpoint: string,
+  accessToken: string,
+  clientId: string,
+  profileId: string,
+  requestQueue: RequestQueue
+): Promise<any[]> {
+  
+  console.log('Using v2 fallback endpoint')
+  
   try {
-    console.log('Using v2 fallback endpoint')
     const response = await requestQueue.add(() =>
       makeAmazonApiRequest(`${apiEndpoint}/v2/sp/campaigns`, {
         method: 'GET',
@@ -290,22 +350,22 @@ async function fetchCampaigns(
     )
 
     if (!response.ok) {
-      console.error(`Campaigns API failed: ${response.status}`)
+      console.error(`v2 Campaigns API failed: ${response.status}`)
       return []
     }
 
     const campaignsData = await response.json()
-    console.log(`Retrieved ${Array.isArray(campaignsData) ? campaignsData.length : 0} campaigns`)
+    console.log(`Retrieved ${Array.isArray(campaignsData) ? campaignsData.length : 0} campaigns from v2 API`)
 
     return Array.isArray(campaignsData) ? campaignsData : []
     
   } catch (error) {
-    console.error('Error fetching campaigns:', error)
+    console.error('Error fetching campaigns from v2:', error)
     return []
   }
 }
 
-// Enhanced connection health check with v3 and v2 compatibility
+// Enhanced connection health check with v3 compliance
 async function checkConnectionHealth(
   supabase: any,
   connectionId: string,
@@ -317,7 +377,7 @@ async function checkConnectionHealth(
   const issues: string[] = []
   
   try {
-    // Test v3 profile access first
+    // Test v3 profile access with proper headers
     let profileResponse
     try {
       profileResponse = await fetch(`${apiEndpoint}/profiles`, {
@@ -325,6 +385,7 @@ async function checkConnectionHealth(
           'Authorization': `Bearer ${accessToken}`,
           'Amazon-Advertising-API-ClientId': clientId,
           'Amazon-Advertising-API-Scope': profileId,
+          'Amazon-Advertising-API-Version': '3.0', // Required for v3
         },
       })
       
@@ -341,32 +402,98 @@ async function checkConnectionHealth(
         })
         
         if (profileResponse.ok) {
-          console.log('v2 profiles API is working')
+          console.log('v2 profiles API is working (v3 not available)')
+          issues.push('v3 API not available, using v2 fallback')
         } else {
           issues.push(`Both v3 and v2 Profile API access failed: ${profileResponse.status}`)
         }
       } else {
-        issues.push(`Profile API access failed: ${profileResponse.status}`)
+        const errorText = await profileResponse.text()
+        console.error(`Profile API error: ${profileResponse.status} - ${errorText}`)
+        
+        // Enhanced error reporting based on Amazon error codes
+        if (profileResponse.status === 401) {
+          issues.push('Token expired or invalid - reconnection required')
+        } else if (profileResponse.status === 403) {
+          issues.push('Insufficient permissions - check API access approval')
+        } else if (profileResponse.status === 429) {
+          issues.push('Rate limited - consider reducing API call frequency')
+        } else {
+          issues.push(`Profile API access failed: ${profileResponse.status}`)
+        }
       }
     } catch (profileError) {
       issues.push(`Profile API test failed: ${profileError.message}`)
+    }
+    
+    // Additional health checks for v3 compliance
+    if (issues.length === 0) {
+      try {
+        // Test campaigns endpoint with v3 headers
+        const campaignTest = await fetch(`${apiEndpoint}/sp/campaigns?maxResults=1`, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Amazon-Advertising-API-ClientId': clientId,
+            'Amazon-Advertising-API-Scope': profileId,
+            'Amazon-Advertising-API-Version': '3.0',
+          },
+        })
+        
+        if (!campaignTest.ok && campaignTest.status !== 404) {
+          issues.push(`Campaign API health check failed: ${campaignTest.status}`)
+        }
+      } catch (campaignError) {
+        issues.push(`Campaign API test failed: ${campaignError.message}`)
+      }
     }
     
   } catch (error) {
     issues.push(`Connection test failed: ${error.message}`)
   }
   
-  // Update connection health status
+  // Update connection health status with enhanced details
   await supabase
     .from('amazon_connections')
     .update({
       last_health_check: new Date().toISOString(),
       health_status: issues.length === 0 ? 'healthy' : 'degraded',
-      health_issues: issues.length > 0 ? issues : null
+      health_issues: issues.length > 0 ? issues : null,
+      // Store API version compatibility info
+      reporting_api_version: issues.some(i => i.includes('v3 not available')) ? 'v2' : 'v3'
     })
     .eq('id', connectionId)
   
   return { healthy: issues.length === 0, issues }
+}
+
+// Helper function for regional endpoint detection based on marketplace
+function getRegionalEndpointFromMarketplace(marketplaceId?: string): string {
+  const marketplaceEndpoints: Record<string, string> = {
+    // North America
+    'ATVPDKIKX0DER': 'https://advertising-api.amazon.com', // US
+    'A2EUQ1WTGCTBG2': 'https://advertising-api.amazon.ca', // Canada
+    'A1AM78C64UM0Y8': 'https://advertising-api.amazon.com.mx', // Mexico
+    
+    // Europe
+    'A1PA6795UKMFR9': 'https://advertising-api-eu.amazon.com', // Germany
+    'A1RKKUPIHCS9HS': 'https://advertising-api-eu.amazon.com', // Spain
+    'APJ6JRA9NG5V4': 'https://advertising-api-eu.amazon.com', // Italy
+    'A1F83G8C2ARO7P': 'https://advertising-api-eu.amazon.com', // UK
+    'A13V1IB3VIYZZH': 'https://advertising-api-eu.amazon.com', // France
+    'A1805IZSGTT6HS': 'https://advertising-api-eu.amazon.com', // Netherlands
+    'A2NODRKZP88ZB9': 'https://advertising-api-eu.amazon.com', // Sweden
+    
+    // Far East
+    'A1VC38T7YXB528': 'https://advertising-api-fe.amazon.com', // Japan
+    'AAHKV2X7AFYLW': 'https://advertising-api-fe.amazon.com',  // China
+    'A39IBJ37TRP1C6': 'https://advertising-api-fe.amazon.com', // Australia
+    'A2Q3Y263D00KWC': 'https://advertising-api-fe.amazon.com', // Brazil
+    'A1MQXOICRS2Z7M': 'https://advertising-api-fe.amazon.com', // Canada (French)
+    'A33AVAJ2PDY3EV': 'https://advertising-api-fe.amazon.com', // Turkey
+    'AMEN7PMS3EDWL': 'https://advertising-api-fe.amazon.com'   // India
+  };
+
+  return marketplaceEndpoints[marketplaceId || ''] || 'https://advertising-api.amazon.com';
 }
 
 serve(async (req) => {
@@ -491,8 +618,10 @@ serve(async (req) => {
     // Initialize request queue
     const requestQueue = new RequestQueue()
 
-    // Use correct API endpoint
-    const apiEndpoint = connection.advertising_api_endpoint || 'https://advertising-api-eu.amazon.com'
+    // Use correct API endpoint - prefer dynamic detection over hardcoded
+    const apiEndpoint = connection.advertising_api_endpoint || 
+                       getRegionalEndpointFromMarketplace(connection.marketplace_id) ||
+                       'https://advertising-api.amazon.com'
     console.log('Using API endpoint:', apiEndpoint)
 
     // Connection health check
