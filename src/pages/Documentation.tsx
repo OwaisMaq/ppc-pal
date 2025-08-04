@@ -1,4 +1,6 @@
 import { DocumentationManager } from "@/components/DocumentationManager";
+import { DocumentationSyncTrigger } from "@/components/DocumentationSyncTrigger";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Documentation() {
   return (
@@ -11,7 +13,20 @@ export default function Documentation() {
           </p>
         </div>
         
-        <DocumentationManager />
+        <Tabs defaultValue="sync" className="w-full">
+          <TabsList>
+            <TabsTrigger value="sync">Sync & Analysis</TabsTrigger>
+            <TabsTrigger value="manage">Manage Sources</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="sync">
+            <DocumentationSyncTrigger />
+          </TabsContent>
+          
+          <TabsContent value="manage">
+            <DocumentationManager />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
