@@ -1,0 +1,13 @@
+-- Add missing Amazon Ads API documentation sources with default content
+INSERT INTO documentation_sources (url, title, content, is_active) VALUES 
+('https://advertising.amazon.com/API/docs/en-us/reference/api-overview#api-endpoints', 'Amazon Ads API Endpoints', 'Amazon Ads API endpoints documentation - content will be updated during sync.', true),
+('https://advertising.amazon.com/API/docs/en-us/reference/openapi-download', 'Amazon Ads OpenAPI Download', 'Amazon Ads OpenAPI specification download - content will be updated during sync.', true),
+('https://advertising.amazon.com/API/docs/en-us/reference/concepts/limits', 'Amazon Ads API Limits', 'Amazon Ads API limits and quotas documentation - content will be updated during sync.', true),
+('https://advertising.amazon.com/API/docs/en-us/reference/concepts/compatibility-versioning-policy', 'Amazon Ads API Compatibility & Versioning', 'Amazon Ads API compatibility and versioning policy - content will be updated during sync.', true),
+('https://advertising.amazon.com/API/docs/en-us/reference/concepts/computed-status', 'Amazon Ads API Computed Status', 'Amazon Ads API computed status documentation - content will be updated during sync.', true),
+('https://advertising.amazon.com/API/docs/en-us/reference/concepts/developer-notes', 'Amazon Ads API Developer Notes', 'Amazon Ads API developer notes and best practices - content will be updated during sync.', true),
+('https://advertising.amazon.com/API/docs/en-us/reference/common-models/overview', 'Amazon Ads Common Models Overview', 'Amazon Ads API common models overview - content will be updated during sync.', true),
+('https://advertising.amazon.com/API/docs/en-us/reference/common-models/enums', 'Amazon Ads Common Enums', 'Amazon Ads API common enumerations - content will be updated during sync.', true),
+('https://advertising.amazon.com/API/docs/en-us/sponsored-products/3-0/openapi/prod', 'Amazon Sponsored Products API 3.0', 'Amazon Sponsored Products API 3.0 OpenAPI specification - content will be updated during sync.', true),
+('https://advertising.amazon.com/API/docs/en-us/sponsored-products/2-0/openapi', 'Amazon Sponsored Products API 2.0', 'Amazon Sponsored Products API 2.0 OpenAPI specification - content will be updated during sync.', true)
+ON CONFLICT (url) DO NOTHING;
