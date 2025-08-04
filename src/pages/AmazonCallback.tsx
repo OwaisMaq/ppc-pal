@@ -42,7 +42,9 @@ const AmazonCallback = () => {
         
         if (result?.requiresSetup) {
           setStatus('error');
-          setMessage(result.details || 'Amazon Advertising account setup required. Please ensure you have an active Amazon Advertising account with API access.');
+          const detailedMessage = result.details || 'Amazon Advertising account setup required.';
+          const guidance = ' This usually means: (1) Your account lacks Amazon Advertising API access, (2) No advertising profiles were found, or (3) Insufficient account activity. Please check the requirements and try again.';
+          setMessage(detailedMessage + guidance);
           return;
         }
         
@@ -109,13 +111,21 @@ const AmazonCallback = () => {
           <p className="text-gray-600">{message}</p>
           
           {status === 'error' && (
-            <Button 
-              onClick={() => navigate('/dashboard')} 
-              variant="outline"
-              className="w-full"
-            >
-              Return to Dashboard
-            </Button>
+            <div className="space-y-3">
+              <Button 
+                onClick={() => navigate('/settings')} 
+                className="w-full"
+              >
+                View Account Settings
+              </Button>
+              <Button 
+                onClick={() => navigate('/dashboard')} 
+                variant="outline"
+                className="w-full"
+              >
+                Return to Dashboard
+              </Button>
+            </div>
           )}
           
           {status === 'success' && (

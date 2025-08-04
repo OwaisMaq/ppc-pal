@@ -24,6 +24,10 @@ const AmazonAccountManager = () => {
         return <CheckCircle className="h-4 w-4 text-green-500" />;
       case 'expired':
         return <XCircle className="h-4 w-4 text-red-500" />;
+      case 'pending_approval':
+        return <Clock className="h-4 w-4 text-blue-500 animate-pulse" />;
+      case 'rejected':
+        return <XCircle className="h-4 w-4 text-red-500" />;
       case 'setup_required':
       case 'error':
         return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
@@ -38,6 +42,10 @@ const AmazonAccountManager = () => {
         return 'text-green-700 bg-green-50 border-green-200';
       case 'expired':
         return 'text-red-700 bg-red-50 border-red-200';
+      case 'pending_approval':
+        return 'text-blue-700 bg-blue-50 border-blue-200';
+      case 'rejected':
+        return 'text-red-700 bg-red-50 border-red-200';
       case 'setup_required':
       case 'error':
         return 'text-yellow-700 bg-yellow-50 border-yellow-200';
@@ -47,7 +55,7 @@ const AmazonAccountManager = () => {
   };
 
   const needsSetupOrHasErrors = connections.some(
-    conn => conn.status === 'setup_required' || conn.status === 'error' || conn.status === 'expired'
+    conn => ['setup_required', 'error', 'expired', 'pending_approval', 'rejected'].includes(conn.status)
   );
 
   return (
@@ -132,9 +140,22 @@ const AmazonAccountManager = () => {
                     </div>
                   </div>
                   {connection.setup_required_reason && (
-                    <p className="mt-2 text-sm text-red-600">
-                      {connection.setup_required_reason}
-                    </p>
+                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm">
+                      <p className="text-red-800 font-medium">Action Required:</p>
+                      <p className="text-red-700">{connection.setup_required_reason}</p>
+                    </div>
+                  )}
+                  {connection.status === 'pending_approval' && (
+                    <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-sm">
+                      <p className="text-blue-800 font-medium">Under Review:</p>
+                      <p className="text-blue-700">Your API access request is being reviewed by Amazon. This typically takes 1-3 business days.</p>
+                    </div>
+                  )}
+                  {connection.status === 'rejected' && (
+                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm">
+                      <p className="text-red-800 font-medium">Access Denied:</p>
+                      <p className="text-red-700">Your API access was rejected. Your account may not meet minimum requirements. Contact Amazon Advertising support for details.</p>
+                    </div>
                   )}
                 </div>
               ))}
@@ -149,7 +170,13 @@ const AmazonAccountManager = () => {
         </CardContent>
       </Card>
 
-      {(connections.length === 0 || needsSetupOrHasErrors) && <AmazonOAuthSetup />}
+      {(connections.length === 0 || needsSetupOrHasErrors) && (
+        <AmazonOAuthSetup 
+          connectionStatus={connections.find(c => c.status === 'pending_approval')?.status}
+          showApprovalProgress={connections.some(c => c.status === 'pending_approval')}
+          errorType={connections.find(c => c.status === 'error')?.setup_required_reason}
+        />
+      )}
     </div>
   );
 };
