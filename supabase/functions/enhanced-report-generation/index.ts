@@ -62,8 +62,11 @@ class EnhancedReportGenerator {
   ): Promise<ReportRequest> {
     console.log(`Submitting ${reportType} report request for ${startDate} to ${endDate}`)
 
+    // Use v3 reporting API configuration
     const reportPayload = {
-      reportDate: endDate,
+      name: `${reportType}_${startDate}_${endDate}`,
+      startDate,
+      endDate,
       configuration: {
         adProduct: configuration.adProduct || 'SPONSORED_PRODUCTS',
         groupBy: configuration.groupBy || ['campaign'],
@@ -86,16 +89,54 @@ class EnhancedReportGenerator {
       reportPayload.configuration.campaignIdFilter = configuration.campaignIdFilter
     }
 
-    const response = await fetch(`${this.apiEndpoint}/reporting/reports`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.accessToken}`,
-        'Amazon-Advertising-API-ClientId': this.clientId,
-        'Amazon-Advertising-API-Scope': this.profileId,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(reportPayload)
-    })
+    // Try v3 API first, fallback to v2
+    let response
+    try {
+      response = await fetch(`${this.apiEndpoint}/reporting/reports`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.accessToken}`,
+          'Amazon-Advertising-API-ClientId': this.clientId,
+          'Amazon-Advertising-API-Scope': this.profileId,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(reportPayload)
+      })
+      
+      if (!response.ok && response.status === 404) {
+        console.log('v3 reporting API not available, trying v2 format')
+        throw new Error('v3 API not found, trying v2')
+      }
+    } catch (v3Error) {
+      console.log('Falling back to v2 reporting API format')
+      
+      // v2 API format
+      const v2Payload = {
+        reportDate: endDate,
+        campaignType: configuration.adProduct === 'SPONSORED_BRANDS' ? 'sponsoredBrands' : 'sponsoredProducts',
+        segment: configuration.groupBy?.[0] || 'campaign',
+        metrics: configuration.columns || [
+          'campaignName',
+          'campaignId',
+          'impressions',
+          'clicks',
+          'cost',
+          'attributedSales14d',
+          'attributedUnitsOrdered14d'
+        ]
+      }
+      
+      response = await fetch(`${this.apiEndpoint}/v2/reports`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.accessToken}`,
+          'Amazon-Advertising-API-ClientId': this.clientId,
+          'Amazon-Advertising-API-Scope': this.profileId,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(v2Payload)
+      })
+    }
 
     if (!response.ok) {
       const errorText = await response.text()
@@ -123,17 +164,34 @@ class EnhancedReportGenerator {
     }
   }
 
-  // Phase 2: Poll Report Status
+  // Phase 2: Poll Report Status with API version detection
   async pollReportStatus(reportId: string): Promise<ReportRequest> {
     console.log(`Polling status for report ${reportId}`)
 
-    const response = await fetch(`${this.apiEndpoint}/reporting/reports/${reportId}`, {
-      headers: {
-        'Authorization': `Bearer ${this.accessToken}`,
-        'Amazon-Advertising-API-ClientId': this.clientId,
-        'Amazon-Advertising-API-Scope': this.profileId,
-      },
-    })
+    // Try v3 first, fallback to v2
+    let response
+    try {
+      response = await fetch(`${this.apiEndpoint}/reporting/reports/${reportId}`, {
+        headers: {
+          'Authorization': `Bearer ${this.accessToken}`,
+          'Amazon-Advertising-API-ClientId': this.clientId,
+          'Amazon-Advertising-API-Scope': this.profileId,
+        },
+      })
+      
+      if (!response.ok && response.status === 404) {
+        throw new Error('v3 API not found, trying v2')
+      }
+    } catch (v3Error) {
+      console.log('Trying v2 reporting status endpoint')
+      response = await fetch(`${this.apiEndpoint}/v2/reports/${reportId}`, {
+        headers: {
+          'Authorization': `Bearer ${this.accessToken}`,
+          'Amazon-Advertising-API-ClientId': this.clientId,
+          'Amazon-Advertising-API-Scope': this.profileId,
+        },
+      })
+    }
 
     if (!response.ok) {
       const errorText = await response.text()
@@ -396,7 +454,7 @@ class EnhancedReportGenerator {
     }
   }
 
-  // Get appropriate columns for attribution window
+  // Get appropriate columns for attribution window with API version compatibility
   private getColumnsForAttributionWindow(reportType: string, attributionWindow: string): string[] {
     const baseColumns = [
       'impressions',
@@ -404,13 +462,16 @@ class EnhancedReportGenerator {
       'cost'
     ]
 
+    // Handle both v2 and v3 API column names
+    const attributionSuffix = attributionWindow.replace('d', '') + 'd' // Ensure format like '7d', '14d'
+
     if (reportType === 'spCampaigns') {
       return [
         'campaignId',
         'campaignName',
         ...baseColumns,
-        `attributedSales${attributionWindow}`,
-        `attributedUnitsOrdered${attributionWindow}`,
+        `attributedSales${attributionSuffix}`,
+        `attributedUnitsOrdered${attributionSuffix}`,
         'clickThroughRate',
         'costPerClick'
       ]
@@ -420,8 +481,8 @@ class EnhancedReportGenerator {
         'adGroupId', 
         'adGroupName',
         ...baseColumns,
-        `attributedSales${attributionWindow}`,
-        `attributedUnitsOrdered${attributionWindow}`
+        `attributedSales${attributionSuffix}`,
+        `attributedUnitsOrdered${attributionSuffix}`
       ]
     } else if (reportType === 'spKeywords') {
       return [
@@ -431,8 +492,8 @@ class EnhancedReportGenerator {
         'keywordText',
         'matchType',
         ...baseColumns,
-        `attributedSales${attributionWindow}`,
-        `attributedUnitsOrdered${attributionWindow}`
+        `attributedSales${attributionSuffix}`,
+        `attributedUnitsOrdered${attributionSuffix}`
       ]
     }
 

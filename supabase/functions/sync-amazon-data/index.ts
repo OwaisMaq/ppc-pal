@@ -240,7 +240,7 @@ async function fetchCampaignPerformanceReport(
   }
 }
 
-// Fetch campaigns using the basic campaigns endpoint
+// Fetch campaigns using the v3 campaigns endpoint with fallback to v2
 async function fetchCampaigns(
   apiEndpoint: string,
   accessToken: string,
@@ -249,9 +249,34 @@ async function fetchCampaigns(
   requestQueue: RequestQueue
 ): Promise<any[]> {
   
-  console.log('Fetching campaigns from basic endpoint')
+  console.log('Fetching campaigns from v3 endpoint with v2 fallback')
   
+  // Try v3 first
   try {
+    const v3Response = await requestQueue.add(() =>
+      makeAmazonApiRequest(`${apiEndpoint}/sp/campaigns`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Amazon-Advertising-API-ClientId': clientId,
+          'Amazon-Advertising-API-Scope': profileId,
+          'Content-Type': 'application/json',
+        },
+      })
+    )
+
+    if (v3Response.ok) {
+      const campaignsData = await v3Response.json()
+      console.log(`Retrieved ${Array.isArray(campaignsData) ? campaignsData.length : 0} campaigns from v3 API`)
+      return Array.isArray(campaignsData) ? campaignsData : []
+    }
+  } catch (v3Error) {
+    console.log('v3 API failed, falling back to v2:', v3Error.message)
+  }
+
+  // Fallback to v2
+  try {
+    console.log('Using v2 fallback endpoint')
     const response = await requestQueue.add(() =>
       makeAmazonApiRequest(`${apiEndpoint}/v2/sp/campaigns`, {
         method: 'GET',
@@ -280,7 +305,7 @@ async function fetchCampaigns(
   }
 }
 
-// Enhanced connection health check
+// Enhanced connection health check with v3 and v2 compatibility
 async function checkConnectionHealth(
   supabase: any,
   connectionId: string,
@@ -292,17 +317,39 @@ async function checkConnectionHealth(
   const issues: string[] = []
   
   try {
-    // Test basic profile access
-    const profileResponse = await fetch(`${apiEndpoint}/v2/profiles`, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Amazon-Advertising-API-ClientId': clientId,
-        'Amazon-Advertising-API-Scope': profileId,
-      },
-    })
-    
-    if (!profileResponse.ok) {
-      issues.push(`Profile API access failed: ${profileResponse.status}`)
+    // Test v3 profile access first
+    let profileResponse
+    try {
+      profileResponse = await fetch(`${apiEndpoint}/profiles`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Amazon-Advertising-API-ClientId': clientId,
+          'Amazon-Advertising-API-Scope': profileId,
+        },
+      })
+      
+      if (profileResponse.ok) {
+        console.log('v3 profiles API is working')
+      } else if (profileResponse.status === 404) {
+        // Try v2 fallback
+        profileResponse = await fetch(`${apiEndpoint}/v2/profiles`, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Amazon-Advertising-API-ClientId': clientId,
+            'Amazon-Advertising-API-Scope': profileId,
+          },
+        })
+        
+        if (profileResponse.ok) {
+          console.log('v2 profiles API is working')
+        } else {
+          issues.push(`Both v3 and v2 Profile API access failed: ${profileResponse.status}`)
+        }
+      } else {
+        issues.push(`Profile API access failed: ${profileResponse.status}`)
+      }
+    } catch (profileError) {
+      issues.push(`Profile API test failed: ${profileError.message}`)
     }
     
   } catch (error) {
