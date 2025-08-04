@@ -5,6 +5,7 @@ import { Bot, TrendingUp, Shield, Zap, Users, Mail, Building2, Sparkles, Star, L
 import { Link } from "react-router-dom";
 import { useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import InfoCards from "@/components/InfoCards";
 
 const PublicLanding = () => {
   const { user, loading } = useAuth();
@@ -149,6 +150,22 @@ const PublicLanding = () => {
               </Button>
             </Link>
           </div>
+        </div>
+      </section>
+
+      {/* How It Works Section */}
+      <section className="container mx-auto px-4 py-16 relative z-10">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl font-bold bg-gradient-to-r from-white to-purple-200 bg-clip-text text-transparent mb-4">
+            How It Works
+          </h2>
+          <p className="text-lg text-purple-100 opacity-90">
+            Get started with PPC Pal in three simple steps
+          </p>
+        </div>
+        
+        <div className="max-w-4xl mx-auto">
+          <InfoCards />
         </div>
       </section>
 
