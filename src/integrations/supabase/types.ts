@@ -529,6 +529,84 @@ export type Database = {
           },
         ]
       }
+      documentation_sources: {
+        Row: {
+          content: string
+          content_type: string
+          created_at: string
+          id: string
+          is_active: boolean
+          last_scraped_at: string
+          metadata: Json | null
+          title: string
+          updated_at: string
+          url: string
+          version_hash: string
+        }
+        Insert: {
+          content: string
+          content_type?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_scraped_at?: string
+          metadata?: Json | null
+          title: string
+          updated_at?: string
+          url: string
+          version_hash: string
+        }
+        Update: {
+          content?: string
+          content_type?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_scraped_at?: string
+          metadata?: Json | null
+          title?: string
+          updated_at?: string
+          url?: string
+          version_hash?: string
+        }
+        Relationships: []
+      }
+      documentation_sync_jobs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          error_details: Json | null
+          id: string
+          sources_failed: number | null
+          sources_processed: number | null
+          sources_updated: number | null
+          started_at: string
+          status: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          error_details?: Json | null
+          id?: string
+          sources_failed?: number | null
+          sources_processed?: number | null
+          sources_updated?: number | null
+          started_at?: string
+          status?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          error_details?: Json | null
+          id?: string
+          sources_failed?: number | null
+          sources_processed?: number | null
+          sources_updated?: number | null
+          started_at?: string
+          status?: string
+        }
+        Relationships: []
+      }
       feedback: {
         Row: {
           created_at: string

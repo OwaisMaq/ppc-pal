@@ -1,6 +1,7 @@
 
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -22,6 +23,12 @@ serve(async (req) => {
       throw new Error('OpenAI API key not configured');
     }
 
+    // Initialize Supabase client to fetch documentation
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    );
+
     const { dataSummary, seed } = await req.json();
 
     // Validate input parameters
@@ -34,8 +41,36 @@ serve(async (req) => {
       throw new Error('Dataset too large. Please limit to 1000 keywords or fewer.');
     }
 
+    // Fetch recent Amazon Ads documentation for context
+    console.log('Fetching Amazon Ads documentation...');
+    const { data: documentation, error: docError } = await supabase
+      .from('documentation_sources')
+      .select('title, content')
+      .eq('is_active', true)
+      .order('last_scraped_at', { ascending: false });
+
+    if (docError) {
+      console.warn('Could not fetch documentation:', docError);
+    }
+
+    // Build context from documentation
+    let documentationContext = '';
+    if (documentation && documentation.length > 0) {
+      documentationContext = `
+Amazon Ads API Documentation Context:
+${documentation.map(doc => `
+${doc.title}:
+${doc.content.substring(0, 2000)}...
+`).join('\n')}
+
+Use this official Amazon documentation context to provide more accurate and API-compliant optimization suggestions.
+`;
+    }
+
     const prompt = `
-As an Amazon advertising optimization expert, analyze this advertising data and provide specific optimization suggestions:
+As an Amazon advertising optimization expert with access to the latest Amazon Ads API documentation, analyze this advertising data and provide specific optimization suggestions:
+
+${documentationContext}
 
 Data Summary:
 - Total Keywords: ${dataSummary.totalKeywords}
@@ -46,16 +81,18 @@ Sample Keywords:
 ${JSON.stringify(dataSummary.sampleKeywords, null, 2)}
 
 Please provide optimization suggestions focusing on:
-1. Bid adjustments for keywords
-2. Underperforming keywords to remove
-3. Match type optimizations
-4. Budget allocation improvements
+1. Bid adjustments for keywords based on Amazon Ads best practices
+2. Underperforming keywords to remove per Amazon's guidelines
+3. Match type optimizations aligned with current Amazon recommendations
+4. Budget allocation improvements following Amazon's latest features
+
+Important: Base your recommendations on the Amazon Ads API documentation provided above. Ensure suggestions are compatible with current Amazon Ads platform capabilities and API limits.
 
 Respond with a JSON array of suggestions in this format:
 [
   {
     "type": "bid_increase",
-    "reason": "High conversion rate, low impression share",
+    "reason": "High conversion rate, low impression share - aligns with Amazon's bid optimization guidelines",
     "originalValue": 1.50,
     "suggestedValue": 2.25
   }
