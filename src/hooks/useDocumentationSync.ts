@@ -12,6 +12,14 @@ export interface DocumentationSource {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  source_type_enum: 'manual' | 'openapi' | 'github' | 'rss' | 'crawler';
+  api_spec_data?: any;
+  github_repo?: string;
+  github_branch?: string;
+  parsing_config?: any;
+  last_analysis_at?: string;
+  analysis_results?: any;
+  content_type?: string;
 }
 
 export interface SyncJob {
@@ -64,12 +72,13 @@ export const useDocumentationSync = () => {
     }
   };
 
-  const triggerSync = async () => {
+  const triggerSync = async (useEnhanced = true) => {
     if (isSyncing) return;
     
     setIsSyncing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('sync-documentation');
+      const functionName = useEnhanced ? 'enhanced-documentation-sync' : 'sync-documentation';
+      const { data, error } = await supabase.functions.invoke(functionName);
       
       if (error) throw error;
       
@@ -91,16 +100,83 @@ export const useDocumentationSync = () => {
     }
   };
 
-  const addDocumentationSource = async (url: string, title: string) => {
+  const fetchOpenAPIDoc = async (url: string, title: string) => {
     try {
-      const { error } = await supabase
-        .from('documentation_sources')
-        .insert({
+      const { data, error } = await supabase.functions.invoke('fetch-openapi-docs', {
+        body: {
           url,
           title,
-          content: 'Pending sync...',
-          version_hash: 'pending'
-        });
+          sourceType: 'openapi'
+        }
+      });
+      
+      if (error) throw error;
+      
+      if (data?.success) {
+        toast.success('OpenAPI documentation fetched successfully!');
+        await fetchDocumentation();
+        return data.sourceId;
+      } else {
+        throw new Error(data?.error || 'Failed to fetch OpenAPI documentation');
+      }
+    } catch (error) {
+      console.error('Error fetching OpenAPI doc:', error);
+      toast.error('Failed to fetch OpenAPI documentation');
+      return null;
+    }
+  };
+
+  const analyzeCompliance = async (
+    connectionId?: string, 
+    analysisType: 'full' | 'authentication' | 'error_handling' | 'rate_limiting' = 'full'
+  ) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('analyze-api-compliance', {
+        body: {
+          connectionId,
+          analysisType
+        }
+      });
+      
+      if (error) throw error;
+      
+      if (data?.success) {
+        toast.success(`Compliance analysis completed! Score: ${(data.complianceScore * 100).toFixed(1)}%`);
+        return data;
+      } else {
+        throw new Error(data?.error || 'Analysis failed');
+      }
+    } catch (error) {
+      console.error('Error analyzing compliance:', error);
+      toast.error('Failed to analyze API compliance');
+      return null;
+    }
+  };
+
+  const addDocumentationSource = async (
+    url: string, 
+    title: string, 
+    sourceType: 'manual' | 'openapi' | 'github' = 'manual',
+    githubRepo?: string,
+    githubBranch: string = 'main'
+  ) => {
+    try {
+      const insertData: any = {
+        url,
+        title,
+        content: 'Pending sync...',
+        version_hash: 'pending',
+        source_type_enum: sourceType
+      };
+
+      if (sourceType === 'github') {
+        insertData.github_repo = githubRepo;
+        insertData.github_branch = githubBranch;
+      }
+
+      const { error } = await supabase
+        .from('documentation_sources')
+        .insert(insertData);
 
       if (error) throw error;
       
@@ -138,6 +214,8 @@ export const useDocumentationSync = () => {
     fetchSyncJobs,
     triggerSync,
     addDocumentationSource,
-    toggleDocumentationSource
+    toggleDocumentationSource,
+    fetchOpenAPIDoc,
+    analyzeCompliance
   };
 };

@@ -44,7 +44,7 @@ serve(async (req) => {
 
     console.log('Starting documentation sync job:', syncJob.id);
 
-    // Get all active documentation sources
+    // Get all active documentation sources with enhanced source types
     const { data: sources, error: sourcesError } = await supabase
       .from('documentation_sources')
       .select('*')

@@ -321,6 +321,75 @@ export type Database = {
         }
         Relationships: []
       }
+      api_analysis_results: {
+        Row: {
+          analysis_type: string
+          confidence_score: number | null
+          created_at: string
+          documentation_source_id: string
+          id: string
+          recommendations: Json | null
+          results: Json
+          updated_at: string
+        }
+        Insert: {
+          analysis_type: string
+          confidence_score?: number | null
+          created_at?: string
+          documentation_source_id: string
+          id?: string
+          recommendations?: Json | null
+          results?: Json
+          updated_at?: string
+        }
+        Update: {
+          analysis_type?: string
+          confidence_score?: number | null
+          created_at?: string
+          documentation_source_id?: string
+          id?: string
+          recommendations?: Json | null
+          results?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      api_best_practices: {
+        Row: {
+          api_version: string | null
+          category: string
+          created_at: string
+          description: string
+          id: string
+          rule_pattern: string | null
+          severity: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          api_version?: string | null
+          category: string
+          created_at?: string
+          description: string
+          id?: string
+          rule_pattern?: string | null
+          severity?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          api_version?: string | null
+          category?: string
+          created_at?: string
+          description?: string
+          id?: string
+          rule_pattern?: string | null
+          severity?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       campaign_performance_history: {
         Row: {
           acos: number | null
@@ -529,41 +598,107 @@ export type Database = {
           },
         ]
       }
+      code_validation_results: {
+        Row: {
+          api_spec_reference: string | null
+          compliance_score: number | null
+          created_at: string
+          file_path: string
+          id: string
+          issues: Json | null
+          recommendations: Json | null
+          updated_at: string
+          user_id: string
+          validation_type: string
+        }
+        Insert: {
+          api_spec_reference?: string | null
+          compliance_score?: number | null
+          created_at?: string
+          file_path: string
+          id?: string
+          issues?: Json | null
+          recommendations?: Json | null
+          updated_at?: string
+          user_id: string
+          validation_type: string
+        }
+        Update: {
+          api_spec_reference?: string | null
+          compliance_score?: number | null
+          created_at?: string
+          file_path?: string
+          id?: string
+          issues?: Json | null
+          recommendations?: Json | null
+          updated_at?: string
+          user_id?: string
+          validation_type?: string
+        }
+        Relationships: []
+      }
       documentation_sources: {
         Row: {
+          analysis_results: Json | null
+          api_spec_data: Json | null
           content: string
           content_type: string
           created_at: string
+          github_branch: string | null
+          github_repo: string | null
           id: string
           is_active: boolean
+          last_analysis_at: string | null
           last_scraped_at: string
           metadata: Json | null
+          parsing_config: Json | null
+          source_type_enum:
+            | Database["public"]["Enums"]["documentation_source_type"]
+            | null
           title: string
           updated_at: string
           url: string
           version_hash: string
         }
         Insert: {
+          analysis_results?: Json | null
+          api_spec_data?: Json | null
           content: string
           content_type?: string
           created_at?: string
+          github_branch?: string | null
+          github_repo?: string | null
           id?: string
           is_active?: boolean
+          last_analysis_at?: string | null
           last_scraped_at?: string
           metadata?: Json | null
+          parsing_config?: Json | null
+          source_type_enum?:
+            | Database["public"]["Enums"]["documentation_source_type"]
+            | null
           title: string
           updated_at?: string
           url: string
           version_hash: string
         }
         Update: {
+          analysis_results?: Json | null
+          api_spec_data?: Json | null
           content?: string
           content_type?: string
           created_at?: string
+          github_branch?: string | null
+          github_repo?: string | null
           id?: string
           is_active?: boolean
+          last_analysis_at?: string | null
           last_scraped_at?: string
           metadata?: Json | null
+          parsing_config?: Json | null
+          source_type_enum?:
+            | Database["public"]["Enums"]["documentation_source_type"]
+            | null
           title?: string
           updated_at?: string
           url?: string
@@ -1196,6 +1331,12 @@ export type Database = {
         | "setup_required"
       app_role: "admin" | "user"
       campaign_status: "enabled" | "paused" | "archived"
+      documentation_source_type:
+        | "manual"
+        | "openapi"
+        | "github"
+        | "rss"
+        | "crawler"
       optimization_status: "pending" | "in_progress" | "completed" | "failed"
       subscription_plan: "free" | "pro"
       subscription_status: "active" | "cancelled" | "past_due" | "incomplete"
@@ -1336,6 +1477,13 @@ export const Constants = {
       ],
       app_role: ["admin", "user"],
       campaign_status: ["enabled", "paused", "archived"],
+      documentation_source_type: [
+        "manual",
+        "openapi",
+        "github",
+        "rss",
+        "crawler",
+      ],
       optimization_status: ["pending", "in_progress", "completed", "failed"],
       subscription_plan: ["free", "pro"],
       subscription_status: ["active", "cancelled", "past_due", "incomplete"],

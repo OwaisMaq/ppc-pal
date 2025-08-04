@@ -66,7 +66,7 @@ export const DocumentationManager = () => {
             </CardDescription>
           </div>
           <Button 
-            onClick={triggerSync} 
+            onClick={() => triggerSync(true)} 
             disabled={isSyncing}
             variant="outline"
           >
