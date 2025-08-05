@@ -169,7 +169,7 @@ export const useSyncMonitoring = () => {
     try {
       console.log('Running health check for connection:', connectionId);
       
-      const { data, error } = await supabase.functions.invoke('health-check-amazon-connections', {
+      const { data, error } = await supabase.functions.invoke('enhanced-amazon-health-check', {
         body: connectionId ? { connectionId } : {},
         headers: {
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,

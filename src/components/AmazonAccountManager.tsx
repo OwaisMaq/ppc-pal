@@ -1,13 +1,17 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, CheckCircle, Clock, XCircle, RotateCw, RefreshCw, Trash2, Plus } from "lucide-react";
+import { AlertTriangle, CheckCircle, Clock, XCircle, RotateCw, RefreshCw, Trash2, Plus, Activity, Zap } from "lucide-react";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
+import { useSyncMonitoring } from "@/hooks/useSyncMonitoring";
 import AmazonOAuthSetup from "@/components/AmazonOAuthSetup";
+import AmazonPermissionGuide from "@/components/AmazonPermissionGuide";
+import AmazonHealthStatus from "@/components/AmazonHealthStatus";
 import { toast } from "sonner";
 
 const AmazonAccountManager = () => {
   const { connections, loading, initiateConnection, syncConnection, refreshConnection, deleteConnection } = useAmazonConnections();
+  const { runHealthCheck } = useSyncMonitoring();
 
   const handleConnect = async () => {
     try {
@@ -15,6 +19,18 @@ const AmazonAccountManager = () => {
       await initiateConnection(redirectUri);
     } catch (error) {
       toast.error("Failed to initiate Amazon connection");
+    }
+  };
+
+  const handleHealthCheck = async (connectionId?: string) => {
+    try {
+      await runHealthCheck(connectionId);
+      toast.success(connectionId 
+        ? "Connection health check completed"
+        : "All connections health check completed"
+      );
+    } catch (error) {
+      toast.error("Health check failed. Please try again.");
     }
   };
 
@@ -58,14 +74,66 @@ const AmazonAccountManager = () => {
     conn => ['setup_required', 'error', 'expired', 'pending_approval', 'rejected'].includes(conn.status)
   );
 
+  // Check if any connections have permission issues
+  const hasPermissionIssues = connections.some(conn => 
+    (conn as any).health_issues?.some((issue: string) => 
+      issue.includes('403') || issue.includes('permission')
+    )
+  );
+
+  const hasTokenIssues = connections.some(conn => 
+    (conn as any).health_issues?.some((issue: string) => 
+      issue.includes('401') || issue.includes('token')
+    ) || new Date(conn.token_expires_at) < new Date(Date.now() + 24 * 60 * 60 * 1000)
+  );
+
   return (
     <div className="space-y-6">
+      {/* Permission Issues Alert */}
+      {hasPermissionIssues && (
+        <AmazonPermissionGuide 
+          healthIssues={connections.flatMap(conn => (conn as any).health_issues || [])}
+          onHealthCheck={handleHealthCheck}
+        />
+      )}
+
+      {/* Health Status Dashboard */}
+      {connections.length > 0 && (
+        <AmazonHealthStatus 
+          connections={connections}
+          onHealthCheck={handleHealthCheck}
+          onRefreshToken={refreshConnection}
+          loading={loading}
+        />
+      )}
+
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            Amazon Account Connections
-            <Badge variant="outline">{connections.length}</Badge>
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Zap className="h-5 w-5 text-blue-600" />
+              Amazon Account Connections
+              <Badge variant="outline">{connections.length}</Badge>
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <Button 
+                onClick={() => handleHealthCheck()}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
+              >
+                <Activity className="h-4 w-4" />
+                Health Check
+              </Button>
+              <Button 
+                onClick={handleConnect}
+                className="flex items-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Connect Account
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {loading ? (
