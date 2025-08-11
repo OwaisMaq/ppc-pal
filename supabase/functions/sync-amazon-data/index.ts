@@ -441,6 +441,15 @@ serve(async (req) => {
               metricsRowsUpdated++
             }
           }
+        } catch (err) {
+          console.error(`Error processing batch ${batchIndex}:`, err)
+        }
+
+        // Brief delay between batches for rate limiting safety
+        if (i + batchSize < campaignIds.length) {
+          await new Promise(r => setTimeout(r, 250))
+        }
+      }
     }
 
     // Sync ad groups for each campaign
