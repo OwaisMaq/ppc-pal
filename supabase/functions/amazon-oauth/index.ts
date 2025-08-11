@@ -7,6 +7,45 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Encryption helpers (AES-256-GCM) for token at-rest protection
+const enc = new TextEncoder();
+const dec = new TextDecoder();
+
+function b64ToBytes(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+function bytesToB64(bytes: Uint8Array): string {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+
+async function getKey(): Promise<CryptoKey> {
+  const keyB64 = Deno.env.get('ENCRYPTION_KEY') ?? '';
+  if (!keyB64) throw new Error('ENCRYPTION_KEY not configured');
+  const raw = b64ToBytes(keyB64);
+  if (raw.byteLength !== 32) throw new Error('ENCRYPTION_KEY must be 32 bytes (base64)');
+  return crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt','decrypt']);
+}
+
+async function encrypt(text: string): Promise<string> {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await getKey();
+  const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(text));
+  return `${bytesToB64(iv)}:${bytesToB64(new Uint8Array(cipher))}`;
+}
+
+async function decrypt(payload: string): Promise<string> {
+  const [ivB64, dataB64] = payload.split(':');
+  if (!ivB64 || !dataB64) throw new Error('Invalid encrypted payload');
+  const key = await getKey();
+  const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64ToBytes(ivB64) }, key, b64ToBytes(dataB64));
+  return dec.decode(new Uint8Array(plain));
+}
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -217,19 +256,23 @@ serve(async (req) => {
         console.log('User ID:', user.id);
         console.log('Profile data:', JSON.stringify(profile, null, 2));
         
+        // Encrypt tokens before storing
+        const encAccess = await encrypt(tokenData.access_token);
+        const encRefresh = await encrypt(tokenData.refresh_token);
+        
         const connectionData = {
           user_id: user.id,
           profile_id: profile.profileId.toString(),
           profile_name: profile.accountInfo?.name || `Profile ${profile.profileId}`,
           marketplace_id: profile.countryCode,
-          access_token: tokenData.access_token,
-          refresh_token: tokenData.refresh_token,
+          access_token: encAccess,
+          refresh_token: encRefresh,
           token_expires_at: expiresAt.toISOString(),
           status: 'active' as const,
           advertising_api_endpoint: profile.advertisingApiEndpoint || 'https://advertising-api.amazon.com', // Fallback to default
         };
         
-        console.log('Connection data to insert:', JSON.stringify(connectionData, null, 2));
+        console.log('Connection data to insert (tokens encrypted).');
         
         const { data: insertData, error: insertError } = await supabase
           .from('amazon_connections')

@@ -7,6 +7,46 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Encryption helpers (AES-256-GCM)
+const enc = new TextEncoder();
+const dec = new TextDecoder();
+
+function b64ToBytes(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+function bytesToB64(bytes: Uint8Array): string {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+
+async function getKey(): Promise<CryptoKey> {
+  const keyB64 = Deno.env.get('ENCRYPTION_KEY') ?? '';
+  if (!keyB64) throw new Error('ENCRYPTION_KEY not configured');
+  const raw = b64ToBytes(keyB64);
+  if (raw.byteLength !== 32) throw new Error('ENCRYPTION_KEY must be 32 bytes (base64)');
+  return crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt','decrypt']);
+}
+
+async function encrypt(text: string): Promise<string> {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await getKey();
+  const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(text));
+  return `${bytesToB64(iv)}:${bytesToB64(new Uint8Array(cipher))}`;
+}
+
+async function decrypt(payload: string): Promise<string> {
+  const [ivB64, dataB64] = payload.split(':');
+  if (!ivB64 || !dataB64) throw new Error('Invalid encrypted payload');
+  const key = await getKey();
+  const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64ToBytes(ivB64) }, key, b64ToBytes(dataB64));
+  return dec.decode(new Uint8Array(plain));
+}
+
 interface ReportRequest {
   reportId: string
   status: 'PENDING' | 'IN_PROGRESS' | 'SUCCESS' | 'FAILURE'
@@ -211,7 +251,12 @@ serve(async (req) => {
     const now = new Date()
     const expiresAt = new Date(connection.token_expires_at)
     
-    let accessToken = connection.access_token
+    let accessToken = ''
+    try {
+      accessToken = await decrypt(connection.access_token)
+    } catch (_) {
+      accessToken = connection.access_token
+    }
     
     // If token expires within 5 minutes, try to refresh it
     const bufferTime = 5 * 60 * 1000 // 5 minutes in milliseconds
@@ -236,6 +281,10 @@ serve(async (req) => {
       try {
         console.log('Attempting token refresh...')
         
+        const refreshTokenPlain = await (async () => {
+          try { return await decrypt(connection.refresh_token) } catch (_) { return connection.refresh_token }
+        })();
+        
         const refreshResponse = await fetch('https://api.amazon.com/auth/o2/token', {
           method: 'POST',
           headers: {
@@ -243,7 +292,7 @@ serve(async (req) => {
           },
           body: new URLSearchParams({
             grant_type: 'refresh_token',
-            refresh_token: connection.refresh_token,
+            refresh_token: refreshTokenPlain,
             client_id: clientId!,
             client_secret: clientSecret,
           }),
@@ -253,12 +302,14 @@ serve(async (req) => {
           const tokenData = await refreshResponse.json()
           const newExpiresAt = new Date(Date.now() + (tokenData.expires_in * 1000))
           
-          // Update connection with new tokens
+          // Update connection with new tokens (encrypt before storing)
+          const encAccess = await encrypt(tokenData.access_token)
+          const encRefresh = tokenData.refresh_token ? await encrypt(tokenData.refresh_token) : null
           await supabase
             .from('amazon_connections')
             .update({
-              access_token: tokenData.access_token,
-              refresh_token: tokenData.refresh_token || connection.refresh_token,
+              access_token: encAccess,
+              refresh_token: encRefresh || connection.refresh_token,
               token_expires_at: newExpiresAt.toISOString(),
               status: 'active',
               setup_required_reason: null
@@ -281,6 +332,16 @@ serve(async (req) => {
             setup_required_reason: 'Token refresh failed - please reconnect'
           })
           .eq('id', connectionId)
+        
+        // Log security incident
+        await supabase.from('security_incidents').insert({
+          user_id: user.id,
+          category: 'amazon_token',
+          severity: 'high',
+          status: 'open',
+          description: 'Token refresh failed during sync',
+          details: { connection_id: connectionId, error: String(refreshError) }
+        })
         
         throw new Error('Token expired and refresh failed, please reconnect your account')
       }
