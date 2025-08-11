@@ -163,6 +163,26 @@ serve(async (req) => {
         return null
       }
 
+      if (resp.status === 425) {
+        // Duplicate request - extract the existing reportId from response and reuse it
+        const errText = await resp.text()
+        let reportId = ''
+        try {
+          const parsed = JSON.parse(errText)
+          const detail: string = parsed?.detail || ''
+          const match = detail.match(/duplicate of\s*:\s*([a-f0-9-]+)/i)
+          if (match?.[1]) reportId = match[1]
+        } catch {
+          const match = errText.match(/duplicate of\s*:\s*([a-f0-9-]+)/i)
+          if (match?.[1]) reportId = match[1]
+        }
+        if (reportId) {
+          console.warn('Duplicate report request detected. Reusing reportId:', reportId)
+          return { reportId, reused: true }
+        }
+        throw new Error(`Failed to create report: 425 ${errText}`)
+      }
+
       if (!resp.ok) {
         const errText = await resp.text()
         throw new Error(`Failed to create report: ${resp.status} ${errText}`)
@@ -172,7 +192,7 @@ serve(async (req) => {
       return json
     }
 
-    const pollReport = async (reportId: string, timeoutMs = 120000, intervalMs = 2000) => {
+    const pollReport = async (reportId: string, timeoutMs = 360000, intervalMs = 5000) => {
       const start = Date.now()
       while (Date.now() - start < timeoutMs) {
         const statusResp = await fetch(`${apiEndpoint}/reporting/reports/${reportId}`, {
@@ -187,13 +207,18 @@ serve(async (req) => {
           throw new Error(`Failed to poll report: ${statusResp.status} ${errText}`)
         }
         const statusData = await statusResp.json()
-        if (statusData.status === 'SUCCESS') {
+        const status = statusData.status
+        if (status === 'SUCCESS') {
           const location = statusData.location || statusData.url
           if (!location) throw new Error('Report success but no download location provided')
           return location
         }
-        if (statusData.status === 'FAILURE') {
+        if (status === 'FAILURE') {
           throw new Error(`Report generation failed: ${JSON.stringify(statusData)}`)
+        }
+        // Occasional debug logging
+        if ((Date.now() - start) % (intervalMs * 6) < intervalMs) {
+          console.log(`Polling report ${reportId} - status: ${status}`)
         }
         await sleep(intervalMs)
       }
