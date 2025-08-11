@@ -126,8 +126,10 @@ const Breakdown = () => {
             </div>
             <div className="flex items-center gap-3">
               <Select value={String(dateRangeDays)} onValueChange={(v) => setDateRangeDays(parseInt(v))}>
-                <SelectTrigger className="w-[140px]"><SelectValue placeholder="Range" /></SelectTrigger>
+                <SelectTrigger className="w-[160px]"><SelectValue placeholder="Range" /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="1">Today (1 day)</SelectItem>
+                  <SelectItem value="7">Last 7 days</SelectItem>
                   <SelectItem value="30">Last 30 days</SelectItem>
                   <SelectItem value="90">Last 90 days</SelectItem>
                   <SelectItem value="365">Last 365 days</SelectItem>

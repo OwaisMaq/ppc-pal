@@ -85,6 +85,7 @@ const Dashboard = () => {
   const selectedConnection = useMemo(() => activeConnections.find(c => c.id === selectedConnectionId), [activeConnections, selectedConnectionId]);
   const { syncAllData, loading: syncLoading } = useAmazonData();
   const [autoSynced, setAutoSynced] = useState(false);
+  const [dateRangeDays, setDateRangeDays] = useState<number>(30);
 
   const campaignIds = useMemo(() => campaigns.map(c => c.id), [campaigns]);
   const { data: budgetUsage } = useBudgetUsage(campaignIds);
@@ -139,9 +140,23 @@ const Dashboard = () => {
                   ))}
                 </SelectContent>
               </Select>
+
+              {/* Date range selector for sync */}
+              <Select value={String(dateRangeDays)} onValueChange={(v) => setDateRangeDays(parseInt(v))}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Range" />
+                </SelectTrigger>
+                <SelectContent className="z-50 bg-background border shadow-md">
+                  <SelectItem value="1">Today (1d)</SelectItem>
+                  <SelectItem value="7">Last 7 days</SelectItem>
+                  <SelectItem value="30">Last 30 days</SelectItem>
+                  <SelectItem value="90">Last 90 days</SelectItem>
+                </SelectContent>
+              </Select>
+
               <div className="flex items-center gap-2">
                 <Button 
-                  onClick={() => selectedConnectionId && syncAllData(selectedConnectionId)} 
+                  onClick={() => selectedConnectionId && syncAllData(selectedConnectionId, { dateRangeDays })} 
                   variant="default" 
                   className="flex items-center gap-2"
                   disabled={syncLoading}
