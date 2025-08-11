@@ -46,25 +46,39 @@ async function createReportRequest(
   columns: string[],
   entityIds?: string[]
 ): Promise<string> {
-  const payload = {
+  const groupBy = reportType === 'campaigns' ? ['campaign'] : reportType === 'adGroups' ? ['adGroup'] : ['targeting']
+  const reportTypeId = reportType === 'campaigns' ? 'spCampaigns' : reportType === 'adGroups' ? 'spAdGroups' : 'spTargets'
+
+  const payload: any = {
     name: `${reportType}_${Date.now()}`,
     startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0],
     configuration: {
       adProduct: 'SPONSORED_PRODUCTS',
-      groupBy: [reportType === 'campaigns' ? 'campaign' : reportType === 'adGroups' ? 'adGroup' : 'adGroup'], // Keywords must use adGroup groupBy
+      groupBy,
       columns,
-      reportTypeId: reportType === 'campaigns' ? 'spCampaigns' : reportType === 'adGroups' ? 'spAdGroups' : 'spTargets', // Use spTargets for keywords
+      reportTypeId,
       timeUnit: 'SUMMARY',
       format: 'GZIP_JSON'
     }
   }
 
+  // v3 filtering uses top-level filters with field names
   if (entityIds && entityIds.length > 0) {
-    const filterKey = reportType === 'campaigns' ? 'campaignIdFilter' : 
-                     reportType === 'adGroups' ? 'adGroupIdFilter' : 'keywordIdFilter'
-    payload[filterKey] = entityIds
+    const field = reportType === 'campaigns' ? 'campaignId' : reportType === 'adGroups' ? 'adGroupId' : 'keywordId'
+    payload.filters = [{ field, values: entityIds }]
   }
+
+  // Log minimal payload details for debugging without dumping all IDs
+  try {
+    const debugPayload = {
+      ...payload,
+      configuration: { ...payload.configuration, columnsCount: columns.length },
+      filtersCount: payload.filters ? payload.filters[0]?.values?.length : 0,
+    }
+    console.log('Creating report with payload:', JSON.stringify(debugPayload))
+  } catch (_) {}
+
 
   const response = await fetch(`${apiEndpoint}/reporting/reports`, {
     method: 'POST',
@@ -442,20 +456,18 @@ serve(async (req) => {
     // Define columns using correct Amazon API v3 column names
     const campaignColumns = [
       'campaignId', 'impressions', 'clicks', 'cost',
-      'sales7d', 'purchases7d', 'sales14d', 'purchases14d',
-      'clickThroughRate', 'costPerClick'
+      'attributedSales7d', 'attributedConversions7d', 'attributedSales14d', 'attributedConversions14d'
     ]
     
     const adGroupColumns = [
       'adGroupId', 'impressions', 'clicks', 'cost',
-      'sales7d', 'purchases7d', 'sales14d', 'purchases14d',
-      'clickThroughRate', 'costPerClick'
+      'attributedSales7d', 'attributedConversions7d', 'attributedSales14d', 'attributedConversions14d'
     ]
     
     const keywordColumns = [
-      'keywordId', 'impressions', 'clicks', 'cost',
-      'sales7d', 'purchases7d', 'sales14d', 'purchases14d',
-      'clickThroughRate', 'costPerClick', 'keywordText', 'matchType'
+      'keywordId', 'targetId', 'impressions', 'clicks', 'cost',
+      'attributedSales7d', 'attributedConversions7d', 'attributedSales14d', 'attributedConversions14d',
+      'keywordText', 'matchType'
     ]
 
     // Campaign Performance
@@ -473,25 +485,27 @@ serve(async (req) => {
         
         const performanceData = await downloadAndParseReport(report.url!)
         console.log(`💾 Processing ${performanceData.length} campaign performance records`)
+        console.log('Campaign report sample keys:', Object.keys(performanceData[0] || {}))
         
         // Update campaigns with performance data
         for (const perf of performanceData) {
           if (!perf.campaignId) continue
           
-          // Calculate derived metrics using correct API field names
-          const impressions = parseInt(perf.impressions || '0')
-          const clicks = parseInt(perf.clicks || '0')
-          const spend = parseFloat(perf.cost || '0')
-          const sales7d = parseFloat(perf.sales7d || '0')
-          const sales14d = parseFloat(perf.sales14d || '0')
-          const orders7d = parseInt(perf.purchases7d || '0')
-          const orders14d = parseInt(perf.purchases14d || '0')
+          const anyPerf = perf as any
+          // Calculate metrics with robust fallbacks for v3 field names
+          const impressions = Number(anyPerf.impressions ?? 0)
+          const clicks = Number(anyPerf.clicks ?? 0)
+          const spend = Number(anyPerf.cost ?? 0)
+          const sales7d = Number(anyPerf.attributedSales7d ?? anyPerf.sales7d ?? 0)
+          const sales14d = Number(anyPerf.attributedSales14d ?? anyPerf.sales14d ?? 0)
+          const orders7d = Number(anyPerf.attributedConversions7d ?? anyPerf.purchases7d ?? anyPerf.unitsOrdered7d ?? 0)
+          const orders14d = Number(anyPerf.attributedConversions14d ?? anyPerf.purchases14d ?? anyPerf.unitsOrdered14d ?? 0)
           
-          // Use API-provided metrics or calculate fallbacks
-          const ctr7d = parseFloat(perf.clickThroughRate || '0') || (impressions > 0 ? (clicks / impressions) * 100 : 0)
-          const ctr14d = ctr7d // Same CTR for both periods
-          const cpc7d = parseFloat(perf.costPerClick || '0') || (clicks > 0 ? spend / clicks : 0)
-          const cpc14d = cpc7d // Same CPC for both periods
+          // Derived metrics
+          const ctr7d = impressions > 0 ? (clicks / impressions) * 100 : 0
+          const ctr14d = ctr7d
+          const cpc7d = clicks > 0 ? spend / clicks : 0
+          const cpc14d = cpc7d
           const acos7d = sales7d > 0 ? (spend / sales7d) * 100 : 0
           const acos14d = sales14d > 0 ? (spend / sales14d) * 100 : 0
           const roas7d = spend > 0 ? sales7d / spend : 0
@@ -558,20 +572,22 @@ serve(async (req) => {
         
         const performanceData = await downloadAndParseReport(report.url!)
         console.log(`💾 Processing ${performanceData.length} ad group performance records`)
+        console.log('AdGroup report sample keys:', Object.keys(performanceData[0] || {}))
         
         for (const perf of performanceData) {
           if (!perf.adGroupId) continue
           
-          const impressions = parseInt(perf.impressions || '0')
-          const clicks = parseInt(perf.clicks || '0')
-          const spend = parseFloat(perf.cost || '0')
-          const sales7d = parseFloat(perf.sales7d || '0')
-          const sales14d = parseFloat(perf.sales14d || '0')
-          const orders7d = parseInt(perf.purchases7d || '0')
-          const orders14d = parseInt(perf.purchases14d || '0')
+          const anyPerf = perf as any
+          const impressions = Number(anyPerf.impressions ?? 0)
+          const clicks = Number(anyPerf.clicks ?? 0)
+          const spend = Number(anyPerf.cost ?? 0)
+          const sales7d = Number(anyPerf.attributedSales7d ?? anyPerf.sales7d ?? 0)
+          const sales14d = Number(anyPerf.attributedSales14d ?? anyPerf.sales14d ?? 0)
+          const orders7d = Number(anyPerf.attributedConversions7d ?? anyPerf.purchases7d ?? anyPerf.unitsOrdered7d ?? 0)
+          const orders14d = Number(anyPerf.attributedConversions14d ?? anyPerf.purchases14d ?? anyPerf.unitsOrdered14d ?? 0)
           
-          const ctr7d = parseFloat(perf.clickThroughRate || '0') || (impressions > 0 ? (clicks / impressions) * 100 : 0)
-          const cpc7d = parseFloat(perf.costPerClick || '0') || (clicks > 0 ? spend / clicks : 0)
+          const ctr7d = impressions > 0 ? (clicks / impressions) * 100 : 0
+          const cpc7d = clicks > 0 ? spend / clicks : 0
           const acos7d = sales7d > 0 ? (spend / sales7d) * 100 : 0
           const acos14d = sales14d > 0 ? (spend / sales14d) * 100 : 0
           const roas7d = spend > 0 ? sales7d / spend : 0
@@ -646,20 +662,21 @@ serve(async (req) => {
         
         const performanceData = await downloadAndParseReport(report.url!)
         console.log(`💾 Processing ${performanceData.length} keyword performance records`)
+        console.log('Keyword report sample keys:', Object.keys(performanceData[0] || {}))
         
         for (const perf of performanceData) {
-          if (!perf.keywordId) continue
+          const anyPerf = perf as any
           
-          const impressions = parseInt(perf.impressions || '0')
-          const clicks = parseInt(perf.clicks || '0')
-          const spend = parseFloat(perf.cost || '0')
-          const sales7d = parseFloat(perf.sales7d || '0')
-          const sales14d = parseFloat(perf.sales14d || '0')
-          const orders7d = parseInt(perf.purchases7d || '0')
-          const orders14d = parseInt(perf.purchases14d || '0')
+          const impressions = Number(anyPerf.impressions ?? 0)
+          const clicks = Number(anyPerf.clicks ?? 0)
+          const spend = Number(anyPerf.cost ?? 0)
+          const sales7d = Number(anyPerf.attributedSales7d ?? anyPerf.sales7d ?? 0)
+          const sales14d = Number(anyPerf.attributedSales14d ?? anyPerf.sales14d ?? 0)
+          const orders7d = Number(anyPerf.attributedConversions7d ?? anyPerf.purchases7d ?? anyPerf.unitsOrdered7d ?? 0)
+          const orders14d = Number(anyPerf.attributedConversions14d ?? anyPerf.purchases14d ?? anyPerf.unitsOrdered14d ?? 0)
           
-          const ctr = parseFloat(perf.clickThroughRate || '0') || (impressions > 0 ? (clicks / impressions) * 100 : 0)
-          const cpc = parseFloat(perf.costPerClick || '0') || (clicks > 0 ? spend / clicks : 0)
+          const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0
+          const cpc = clicks > 0 ? spend / clicks : 0
           const acos7d = sales7d > 0 ? (spend / sales7d) * 100 : 0
           const acos14d = sales14d > 0 ? (spend / sales14d) * 100 : 0
           const roas7d = spend > 0 ? sales7d / spend : 0
@@ -667,10 +684,13 @@ serve(async (req) => {
           const convRate7d = clicks > 0 ? (orders7d / clicks) * 100 : 0
           const convRate14d = clicks > 0 ? (orders14d / clicks) * 100 : 0
 
+          const idToMatch = (anyPerf.keywordId ?? anyPerf.targetId)
+          if (!idToMatch) continue
+
           const { data: keywordRecord } = await supabase
             .from('keywords')
             .select('id')
-            .eq('amazon_keyword_id', perf.keywordId.toString())
+            .eq('amazon_keyword_id', idToMatch.toString())
             .single()
           
           if (keywordRecord) {
