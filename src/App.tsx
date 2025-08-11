@@ -7,13 +7,10 @@ import { AuthProvider } from "@/hooks/useAuth";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Auth from "@/pages/Auth";
 import Dashboard from "@/pages/Dashboard";
-import EnhancedDashboard from "@/pages/EnhancedDashboard";
-import Documentation from "@/pages/Documentation";
 import Feedback from "@/pages/Feedback";
 import DataManagement from "@/pages/DataManagement";
 import Breakdown from "@/pages/Breakdown";
 import Privacy from "@/pages/Privacy";
-import Settings from "@/pages/Settings";
 import PublicLanding from "@/pages/PublicLanding";
 import About from "@/pages/About";
 import Contact from "@/pages/Contact";
@@ -46,16 +43,6 @@ const App = () => {
                   <Dashboard />
                 </ProtectedRoute>
               } />
-              <Route path="/enhanced-dashboard" element={
-                <ProtectedRoute>
-                  <EnhancedDashboard />
-                </ProtectedRoute>
-              } />
-              <Route path="/documentation" element={
-                <ProtectedRoute>
-                  <Documentation />
-                </ProtectedRoute>
-              } />
               <Route path="/feedback" element={
                 <ProtectedRoute>
                   <Feedback />
@@ -74,11 +61,6 @@ const App = () => {
               <Route path="/privacy" element={
                 <ProtectedRoute>
                   <Privacy />
-                </ProtectedRoute>
-              } />
-              <Route path="/settings" element={
-                <ProtectedRoute>
-                  <Settings />
                 </ProtectedRoute>
               } />
               

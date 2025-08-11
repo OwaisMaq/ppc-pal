@@ -7,17 +7,14 @@ interface ComingSoonProps {
   className?: string;
 }
 
-const ComingSoon = ({
-  feature,
-  className
-}: ComingSoonProps) => {
+const ComingSoon = ({ feature, className }: ComingSoonProps) => {
   return (
     <Badge 
       variant="outline" 
-      className={`flex items-center gap-1 text-xs text-gray-500 ${className || ''}`}
+      className={`inline-flex items-center gap-1 text-xs text-muted-foreground border-muted-foreground/30 ${className}`}
     >
       <Clock className="h-3 w-3" />
-      {feature ? `${feature} - Coming Soon` : 'Coming Soon'}
+      Coming Soon{feature && `: ${feature}`}
     </Badge>
   );
 };

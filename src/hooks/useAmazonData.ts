@@ -124,31 +124,25 @@ export const useAmazonData = () => {
   const syncAllData = async (connectionId: string) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('sync-amazon-data', {
+      const { error } = await supabase.functions.invoke('sync-amazon-data', {
         body: { connectionId },
         headers: {
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
         },
       });
 
-      if (error) {
-        console.error('Sync function error:', error);
-        throw error;
-      }
+      if (error) throw error;
       
-      console.log('Sync function response:', data);
       toast.success('Data sync initiated successfully!');
       
-      // Refresh data after sync with longer delay to allow API processing
+      // Refresh data after sync
       setTimeout(() => {
         fetchAllData();
-        toast.info('Data refreshed - check if performance metrics are now available');
-      }, 5000);
+      }, 3000);
       
     } catch (error) {
       console.error('Error syncing data:', error);
-      const errorMessage = error?.message || 'Failed to sync Amazon data';
-      toast.error(`Sync failed: ${errorMessage}`);
+      toast.error('Failed to sync Amazon data');
     } finally {
       setLoading(false);
     }

@@ -1,25 +1,10 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, ExternalLink, Settings, Copy, Clock, DollarSign, Target } from "lucide-react";
+import { AlertTriangle, ExternalLink, Settings, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import AmazonReadinessCheck from "@/components/AmazonReadinessCheck";
-import AmazonApprovalProgress from "@/components/AmazonApprovalProgress";
-import AmazonSupportGuidance from "@/components/AmazonSupportGuidance";
-interface AmazonOAuthSetupProps {
-  connectionStatus?: string;
-  showReadinessCheck?: boolean;
-  showApprovalProgress?: boolean;
-  errorType?: string;
-}
-
-const AmazonOAuthSetup = ({ 
-  connectionStatus,
-  showReadinessCheck = true,
-  showApprovalProgress = false,
-  errorType
-}: AmazonOAuthSetupProps) => {
+const AmazonOAuthSetup = () => {
   const currentDomain = window.location.origin;
   const redirectUri = `${currentDomain}/auth/amazon/callback`;
   
@@ -35,7 +20,6 @@ const AmazonOAuthSetup = ({
   ];
 
   return (
-    <div className="space-y-6">
     <Card className="mt-6 border-orange-200">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-orange-700">
@@ -55,63 +39,26 @@ const AmazonOAuthSetup = ({
           </AlertDescription>
         </Alert>
 
-        <div className="space-y-4">
-          <h4 className="font-semibold text-gray-900">Essential Requirements:</h4>
-          
-          <div className="grid gap-4">
-            <div className="flex items-start gap-3 p-3 border rounded-lg bg-gradient-to-r from-blue-50 to-blue-100">
-              <Settings className="h-5 w-5 text-blue-600 mt-0.5" />
-              <div>
-                <h5 className="font-semibold text-blue-900">Amazon Advertising Account</h5>
-                <p className="text-sm text-blue-800">
-                  You must have an <strong>active Amazon Advertising account</strong> (not just Seller Central).
-                  This includes completed account setup with billing information.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3 p-3 border rounded-lg bg-gradient-to-r from-amber-50 to-amber-100">
-              <Clock className="h-5 w-5 text-amber-600 mt-0.5" />
-              <div>
-                <h5 className="font-semibold text-amber-900">Account Age & Eligibility</h5>
-                <p className="text-sm text-amber-800">
-                  Your account must be <strong>at least 30 days old</strong> and have sufficient advertising activity.
-                  Amazon reviews account history before granting API access.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3 p-3 border rounded-lg bg-gradient-to-r from-green-50 to-green-100">
-              <DollarSign className="h-5 w-5 text-green-600 mt-0.5" />
-              <div>
-                <h5 className="font-semibold text-green-900">Minimum Spend Threshold</h5>
-                <p className="text-sm text-green-800">
-                  <strong>$100+ total advertising spend</strong> is typically required for API access approval.
-                  This demonstrates active use of Amazon's advertising platform.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3 p-3 border rounded-lg bg-gradient-to-r from-purple-50 to-purple-100">
-              <Target className="h-5 w-5 text-purple-600 mt-0.5" />
-              <div>
-                <h5 className="font-semibold text-purple-900">Active Campaigns</h5>
-                <p className="text-sm text-purple-800">
-                  You must have <strong>at least one active advertising campaign</strong> with keywords, 
-                  ad groups, and products properly configured.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <Alert className="border-blue-200 bg-blue-50">
-            <AlertTriangle className="h-4 w-4 text-blue-600" />
-            <AlertDescription className="text-blue-800">
-              <strong>OAuth Permissions:</strong> During connection, you'll grant permissions for:
-              Campaign Management, Reporting Data Access, and Profile Information.
-              All permissions are required for full functionality.
-            </AlertDescription>
-          </Alert>
+        <div className="space-y-3">
+          <h4 className="font-semibold text-gray-900">Prerequisites:</h4>
+          <ul className="list-disc list-inside space-y-2 text-sm text-gray-700">
+            <li>
+              <strong>Amazon Advertising Account:</strong> You must have an active Amazon Advertising account
+              with campaigns, ad groups, and keywords set up.
+            </li>
+            <li>
+              <strong>API Access:</strong> Your account must be eligible for Amazon Advertising API access.
+              New accounts may need to wait 30+ days and have sufficient advertising spend.
+            </li>
+            <li>
+              <strong>Permissions:</strong> When connecting, you'll be asked to grant the following permissions:
+              <ul className="list-disc list-inside ml-4 mt-1 space-y-1">
+                <li>Campaign Management (to view and modify campaigns)</li>
+                <li>Reporting (to access performance data)</li>
+                <li>Profile Access (to identify your advertising profiles)</li>
+              </ul>
+            </li>
+          </ul>
         </div>
 
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -152,21 +99,16 @@ const AmazonOAuthSetup = ({
           </div>
         </div>
 
-        <Alert className="border-red-200 bg-red-50">
-          <AlertTriangle className="h-4 w-4 text-red-600" />
-          <AlertDescription className="text-red-800">
-            <strong>Common Issues:</strong> "No profiles found" errors typically indicate missing API access, 
-            insufficient account activity, or incomplete advertising setup. Ensure all requirements above 
-            are met before attempting to connect.
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            <strong>Troubleshooting:</strong> If you receive "No profiles found" after connecting,
+            it usually means your account doesn't have Amazon Advertising API access or 
+            insufficient permissions were granted during the OAuth flow.
           </AlertDescription>
         </Alert>
       </CardContent>
     </Card>
-    
-    {showReadinessCheck && <AmazonReadinessCheck />}
-    {showApprovalProgress && <AmazonApprovalProgress connectionStatus={connectionStatus} />}
-    <AmazonSupportGuidance connectionStatus={connectionStatus} errorType={errorType} />
-  </div>
   );
 };
 export default AmazonOAuthSetup;

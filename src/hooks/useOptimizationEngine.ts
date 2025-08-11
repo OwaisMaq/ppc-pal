@@ -12,14 +12,7 @@ export const useOptimizationEngine = () => {
   const [optimizations, setOptimizations] = useState<OptimizationResult[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const runOptimization = async (
-    connectionId: string, 
-    options?: {
-      attributionWindow?: '7d' | '14d';
-      optimizationType?: 'full' | 'keywords' | 'bids' | 'budgets';
-      focusAreas?: string[];
-    }
-  ): Promise<string | null> => {
+  const runOptimization = async (connectionId: string): Promise<string | null> => {
     if (!user) return null;
 
     // Check if user can optimize
@@ -32,28 +25,7 @@ export const useOptimizationEngine = () => {
     try {
       setLoading(true);
       
-      // Check connection health before optimization
-      const { data: connection } = await supabase
-        .from('amazon_connections')
-        .select('health_status, last_sync_at')
-        .eq('id', connectionId)
-        .single();
-
-      if (connection?.health_status === 'degraded') {
-        toast.warning('Connection has health issues. Consider running a health check first.');
-      }
-
-      // Check if data is recent enough for optimization
-      if (connection?.last_sync_at) {
-        const lastSync = new Date(connection.last_sync_at);
-        const hoursSinceSync = (Date.now() - lastSync.getTime()) / (1000 * 60 * 60);
-        
-        if (hoursSinceSync > 24) {
-          toast.warning('Data is more than 24 hours old. Consider syncing first for best results.');
-        }
-      }
-      
-      // Create optimization batch with enhanced options
+      // Create optimization batch
       const { data: batchData, error: batchError } = await supabase.rpc('create_optimization_batch', {
         user_uuid: user.id,
         connection_uuid: connectionId
@@ -63,17 +35,11 @@ export const useOptimizationEngine = () => {
 
       const optimizationId = batchData;
       
-      // Call enhanced optimization edge function
+      // Call edge function to run AI optimization
       const { data, error } = await supabase.functions.invoke('run-optimization', {
         body: { 
           connectionId, 
-          optimizationId,
-          options: {
-            attributionWindow: options?.attributionWindow || '14d',
-            optimizationType: options?.optimizationType || 'full',
-            focusAreas: options?.focusAreas || ['keywords', 'bids', 'budgets'],
-            useEnhancedMetrics: true
-          }
+          optimizationId 
         },
         headers: {
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
@@ -86,15 +52,11 @@ export const useOptimizationEngine = () => {
       await incrementUsage();
       await refreshSubscription();
       
-      const message = options?.optimizationType === 'full' 
-        ? 'Enhanced AI optimization started successfully!' 
-        : `${options?.optimizationType} optimization started successfully!`;
-      
-      toast.success(message);
+      toast.success('AI optimization started successfully!');
       return optimizationId;
     } catch (error) {
-      console.error('Error running enhanced optimization:', error);
-      toast.error('Failed to start optimization: ' + (error as Error).message);
+      console.error('Error running optimization:', error);
+      toast.error('Failed to start optimization');
       return null;
     } finally {
       setLoading(false);

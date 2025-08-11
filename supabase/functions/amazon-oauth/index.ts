@@ -219,14 +219,14 @@ serve(async (req) => {
         
         const connectionData = {
           user_id: user.id,
-          profile_id: profile.profileId.toString(), // Store as string but API uses number
+          profile_id: profile.profileId.toString(),
           profile_name: profile.accountInfo?.name || `Profile ${profile.profileId}`,
           marketplace_id: profile.countryCode,
           access_token: tokenData.access_token,
           refresh_token: tokenData.refresh_token,
           token_expires_at: expiresAt.toISOString(),
           status: 'active' as const,
-          advertising_api_endpoint: profile.advertisingApiEndpoint || 'https://advertising-api.amazon.com', // Store dynamic endpoint
+          advertising_api_endpoint: profile.advertisingApiEndpoint || 'https://advertising-api.amazon.com', // Fallback to default
         };
         
         console.log('Connection data to insert:', JSON.stringify(connectionData, null, 2));
