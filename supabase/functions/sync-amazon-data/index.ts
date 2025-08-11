@@ -137,25 +137,38 @@ serve(async (req) => {
     const apiEndpoint = connection.advertising_api_endpoint || 'https://advertising-api.amazon.com'
     console.log('Using API endpoint:', apiEndpoint)
 
-    // Sync campaigns with performance data
-    console.log('Fetching campaigns...')
-    const campaignsResponse = await fetch(`${apiEndpoint}/v2/sp/campaigns?stateFilter=enabled,paused&count=1000`, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Amazon-Advertising-API-ClientId': clientId,
-        'Amazon-Advertising-API-Scope': connection.profile_id,
-      },
-    })
-
-    if (!campaignsResponse.ok) {
-      const errorText = await campaignsResponse.text()
-      console.error('Campaigns API error:', campaignsResponse.status, errorText)
-      throw new Error(`Failed to fetch campaigns: ${campaignsResponse.status} ${errorText}`)
+    // Common headers and fallback fetch helper
+    const commonHeaders = {
+      'Authorization': `Bearer ${accessToken}`,
+      'Amazon-Advertising-API-ClientId': clientId,
+      'Amazon-Advertising-API-Scope': connection.profile_id,
+      'Accept': 'application/json',
     }
 
-    const campaignsData = await campaignsResponse.json()
-    console.log('Retrieved campaigns:', campaignsData.length)
+    const fetchJsonWithFallback = async (primaryPath: string, fallbackPath: string) => {
+      const primaryUrl = `${apiEndpoint}${primaryPath}`
+      const fallbackUrl = `${apiEndpoint}${fallbackPath}`
+      let res = await fetch(primaryUrl, { headers: commonHeaders })
+      if (res.ok) return await res.json()
+      const body = await res.text().catch(() => '')
+      console.error('Primary endpoint failed:', res.status, body)
+      if (res.status === 404 || res.status === 405) {
+        console.log('Falling back to:', fallbackUrl)
+        res = await fetch(fallbackUrl, { headers: commonHeaders })
+        if (res.ok) return await res.json()
+        const fbBody = await res.text().catch(() => '')
+        console.error('Fallback endpoint failed:', res.status, fbBody)
+      }
+      throw new Error(`Request failed for ${primaryUrl} (${res.status})`)
+    }
 
+    // Sync campaigns with performance data
+    console.log('Fetching campaigns...')
+    const campaignsData = await fetchJsonWithFallback(
+      '/v2/sp/campaigns?stateFilter=enabled,paused&count=1000',
+      '/v2/campaigns?stateFilter=enabled,paused&count=1000'
+    )
+    console.log('Retrieved campaigns:', campaignsData.length)
     // Prepare date range for performance data (last 30 days)
     const endDate = new Date()
     const startDate = new Date()
@@ -252,6 +265,7 @@ serve(async (req) => {
               'Amazon-Advertising-API-ClientId': clientId,
               'Amazon-Advertising-API-Scope': connection.profile_id,
               'Content-Type': 'application/json',
+              'Accept': 'application/json',
             },
             body: JSON.stringify(createBody)
           })
@@ -279,6 +293,7 @@ serve(async (req) => {
                 'Authorization': `Bearer ${accessToken}`,
                 'Amazon-Advertising-API-ClientId': clientId,
                 'Amazon-Advertising-API-Scope': connection.profile_id,
+                'Accept': 'application/json',
               },
             })
             if (!statusRes.ok) {
@@ -398,81 +413,74 @@ serve(async (req) => {
     for (const campaign of storedCampaigns || []) {
       console.log('Fetching ad groups for campaign:', campaign.amazon_campaign_id)
       
-      const adGroupsResponse = await fetch(`${apiEndpoint}/v2/sp/adGroups?campaignIdFilter=${campaign.amazon_campaign_id}`, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Amazon-Advertising-API-ClientId': clientId,
-          'Amazon-Advertising-API-Scope': connection.profile_id,
-        },
-      })
+      let adGroupsData: any[] = []
+      try {
+        adGroupsData = await fetchJsonWithFallback(
+          `/v2/sp/adGroups?campaignIdFilter=${campaign.amazon_campaign_id}`,
+          `/v2/adGroups?campaignIdFilter=${campaign.amazon_campaign_id}`
+        )
+      } catch (e) {
+        console.error(`AdGroups API error for campaign ${campaign.amazon_campaign_id}:`, e)
+        continue
+      }
 
-      if (adGroupsResponse.ok) {
-        const adGroupsData = await adGroupsResponse.json()
-        
-        for (const adGroup of adGroupsData) {
-          const { data: storedAdGroup } = await supabase
-            .from('ad_groups')
-            .upsert({
-              campaign_id: campaign.id,
-              amazon_adgroup_id: adGroup.adGroupId.toString(),
-              name: adGroup.name,
-              status: adGroup.state.toLowerCase(),
-              default_bid: adGroup.defaultBid,
-              impressions: 0,
-              clicks: 0,
-              spend: 0,
-              sales: 0,
-              orders: 0,
-            }, {
-              onConflict: 'campaign_id, amazon_adgroup_id'
-            })
-            .select('id')
-            .single()
+      for (const adGroup of adGroupsData) {
+        const { data: storedAdGroup } = await supabase
+          .from('ad_groups')
+          .upsert({
+            campaign_id: campaign.id,
+            amazon_adgroup_id: adGroup.adGroupId?.toString(),
+            name: adGroup.name,
+            status: adGroup.state ? adGroup.state.toLowerCase() : 'enabled',
+            default_bid: adGroup.defaultBid ?? null,
+            impressions: 0,
+            clicks: 0,
+            spend: 0,
+            sales: 0,
+            orders: 0,
+          }, {
+            onConflict: 'campaign_id, amazon_adgroup_id'
+          })
+          .select('id')
+          .single()
 
-          if (storedAdGroup) {
-            // Fetch keywords for this ad group
-            console.log('Fetching keywords for ad group:', adGroup.adGroupId)
-            
-            const keywordsResponse = await fetch(`${apiEndpoint}/v2/sp/keywords?adGroupIdFilter=${adGroup.adGroupId}`, {
-              headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Amazon-Advertising-API-ClientId': clientId,
-                'Amazon-Advertising-API-Scope': connection.profile_id,
-              },
-            })
+        if (storedAdGroup) {
+          console.log('Fetching keywords for ad group:', adGroup.adGroupId)
+          let keywordsData: any[] = []
+          try {
+            keywordsData = await fetchJsonWithFallback(
+              `/v2/sp/keywords?adGroupIdFilter=${adGroup.adGroupId}`,
+              `/v2/keywords?adGroupIdFilter=${adGroup.adGroupId}`
+            )
+          } catch (e) {
+            console.error(`Keywords API error for ad group ${adGroup.adGroupId}:`, e)
+            continue
+          }
 
-            if (keywordsResponse.ok) {
-              const keywordsData = await keywordsResponse.json()
-              console.log(`Retrieved ${keywordsData.length} keywords for ad group ${adGroup.adGroupId}`)
-              
-              for (const keyword of keywordsData) {
-                if (!keyword.keywordId || !keyword.keywordText) {
-                  console.warn('Skipping invalid keyword:', keyword)
-                  continue
-                }
-
-                await supabase
-                  .from('keywords')
-                  .upsert({
-                    adgroup_id: storedAdGroup.id,
-                    amazon_keyword_id: keyword.keywordId.toString(),
-                    keyword_text: keyword.keywordText,
-                    match_type: keyword.matchType || 'exact',
-                    bid: keyword.bid || null,
-                    status: keyword.state ? keyword.state.toLowerCase() : 'enabled',
-                    impressions: 0,
-                    clicks: 0,
-                    spend: 0,
-                    sales: 0,
-                    orders: 0,
-                  }, {
-                    onConflict: 'adgroup_id, amazon_keyword_id'
-                  })
-              }
-            } else {
-              const errorText = await keywordsResponse.text()
-              console.error(`Keywords API error for ad group ${adGroup.adGroupId}:`, keywordsResponse.status, errorText)
+          console.log(`Retrieved ${keywordsData.length} keywords for ad group ${adGroup.adGroupId}`)
+          for (const keyword of keywordsData) {
+            if (!keyword.keywordId || !keyword.keywordText) {
+              console.warn('Skipping invalid keyword:', keyword)
+              continue
             }
+
+            await supabase
+              .from('keywords')
+              .upsert({
+                adgroup_id: storedAdGroup.id,
+                amazon_keyword_id: keyword.keywordId.toString(),
+                keyword_text: keyword.keywordText,
+                match_type: keyword.matchType || 'exact',
+                bid: keyword.bid ?? null,
+                status: keyword.state ? keyword.state.toLowerCase() : 'enabled',
+                impressions: 0,
+                clicks: 0,
+                spend: 0,
+                sales: 0,
+                orders: 0,
+              }, {
+                onConflict: 'adgroup_id, amazon_keyword_id'
+              })
           }
         }
       }
