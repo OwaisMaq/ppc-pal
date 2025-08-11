@@ -11,7 +11,7 @@ const DashboardShell = ({ children }: PropsWithChildren) => {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen w-full bg-background">
+      <div className="min-h-screen flex w-full bg-background">
         <AppSidebar />
         <SidebarInset>
           <header className="sticky top-0 z-40 border-b bg-background/70 backdrop-blur supports-[backdrop-filter]:bg-background/50">
