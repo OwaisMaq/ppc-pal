@@ -348,12 +348,12 @@ serve(async (req) => {
           success: false,
           code: 'NO_CAMPAIGNS',
           message: 'No campaigns found for this profile.',
-          profileId: connection.profile_id,
-          profileName: connection.profile_name ?? null,
-          entitiesSynced: { campaigns: 0, adGroups: 0, keywords: 0 },
-          metricsUpdated: 0,
-          apiVersion: 'v3'
-        }),
+            profileId: connection.profile_id,
+            profileName: connection.profile_name ?? null,
+            entitiesSynced: { campaigns: 0, adGroups: 0, keywords: 0, targets: 0 },
+            metricsUpdated: 0,
+            apiVersion: 'v3'
+          }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       )
     }
@@ -836,7 +836,8 @@ serve(async (req) => {
           entitiesSynced: {
             campaigns: campaignIds.length,
             adGroups: adGroupIds.length, 
-            keywords: keywordIds.length
+            keywords: keywordIds.length,
+            targets: targetIds.length
           },
           metricsUpdated: 0,
           diagnostics
@@ -853,7 +854,8 @@ serve(async (req) => {
         entitiesSynced: {
           campaigns: campaignIds.length,
           adGroups: adGroupIds.length,
-          keywords: keywordIds.length
+          keywords: keywordIds.length,
+          targets: targetIds.length
         },
         metricsUpdated: totalMetricsUpdated,
         apiVersion: 'v3',

@@ -21,6 +21,8 @@ import CookieConsent from "@/components/CookieConsent";
 import Settings from "@/pages/Settings";
 
 
+import { DateRangeProvider } from "@/context/DateRangeContext";
+
 const queryClient = new QueryClient();
 
 const App = () => {
@@ -29,53 +31,55 @@ const App = () => {
       <AuthProvider>
         <TooltipProvider>
           <Toaster />
-          <BrowserRouter>
-            <Routes>
-              {/* Public routes */}
-              <Route path="/" element={<PublicLanding />} />
-              <Route path="/about" element={<About />} />
-              <Route path="/contact" element={<Contact />} />
-              <Route path="/company" element={<Company />} />
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/auth/amazon/callback" element={<AmazonCallback />} />
-              
-              {/* Protected routes */}
-              <Route path="/dashboard" element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              } />
-              <Route path="/feedback" element={
-                <ProtectedRoute>
-                  <Feedback />
-                </ProtectedRoute>
-              } />
-              <Route path="/data-management" element={
-                <ProtectedRoute>
-                  <DataManagement />
-                </ProtectedRoute>
-              } />
-              <Route path="/breakdown" element={
-                <ProtectedRoute>
-                  <Breakdown />
-                </ProtectedRoute>
-              } />
-              <Route path="/privacy" element={
-                <ProtectedRoute>
-                  <Privacy />
-                </ProtectedRoute>
-              } />
-              <Route path="/settings" element={
-                <ProtectedRoute>
-                  <Settings />
-                </ProtectedRoute>
-              } />
-              
-              {/* 404 */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-          <CookieConsent />
+          <DateRangeProvider>
+            <BrowserRouter>
+              <Routes>
+                {/* Public routes */}
+                <Route path="/" element={<PublicLanding />} />
+                <Route path="/about" element={<About />} />
+                <Route path="/contact" element={<Contact />} />
+                <Route path="/company" element={<Company />} />
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/auth/amazon/callback" element={<AmazonCallback />} />
+                
+                {/* Protected routes */}
+                <Route path="/dashboard" element={
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
+                } />
+                <Route path="/feedback" element={
+                  <ProtectedRoute>
+                    <Feedback />
+                  </ProtectedRoute>
+                } />
+                <Route path="/data-management" element={
+                  <ProtectedRoute>
+                    <DataManagement />
+                  </ProtectedRoute>
+                } />
+                <Route path="/breakdown" element={
+                  <ProtectedRoute>
+                    <Breakdown />
+                  </ProtectedRoute>
+                } />
+                <Route path="/privacy" element={
+                  <ProtectedRoute>
+                    <Privacy />
+                  </ProtectedRoute>
+                } />
+                <Route path="/settings" element={
+                  <ProtectedRoute>
+                    <Settings />
+                  </ProtectedRoute>
+                } />
+                
+                {/* 404 */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+            <CookieConsent />
+          </DateRangeProvider>
         </TooltipProvider>
       </AuthProvider>
     </QueryClientProvider>

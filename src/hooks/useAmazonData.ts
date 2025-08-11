@@ -170,7 +170,7 @@ const [loading, setLoading] = useState(false);
       if (error) throw error;
 
       if (data && data.success === false) {
-        const counts = data.entitiesSynced ? ` (campaigns: ${data.entitiesSynced.campaigns || 0}, ad groups: ${data.entitiesSynced.adGroups || 0}, keywords: ${data.entitiesSynced.keywords || 0})` : '';
+        const counts = data.entitiesSynced ? ` (campaigns: ${data.entitiesSynced.campaigns || 0}, ad groups: ${data.entitiesSynced.adGroups || 0}, keywords: ${data.entitiesSynced.keywords || 0}, targets: ${data.entitiesSynced.targets || 0})` : '';
         if (data.code === 'NO_CAMPAIGNS') {
           toast.info(`No campaigns found for this profile.${counts}`);
         } else if (data.code === 'NO_METRICS_UPDATED') {
@@ -179,7 +179,7 @@ const [loading, setLoading] = useState(false);
           toast.info(`${data.message || 'Sync completed with notices.'}${counts}`);
         }
       } else {
-        const counts = data?.entitiesSynced ? ` (campaigns: ${data.entitiesSynced.campaigns || 0}, ad groups: ${data.entitiesSynced.adGroups || 0}, keywords: ${data.entitiesSynced.keywords || 0}; metrics updated: ${data.metricsUpdated || 0})` : '';
+        const counts = data?.entitiesSynced ? ` (campaigns: ${data.entitiesSynced.campaigns || 0}, ad groups: ${data.entitiesSynced.adGroups || 0}, keywords: ${data.entitiesSynced.keywords || 0}, targets: ${data.entitiesSynced.targets || 0}; metrics updated: ${data.metricsUpdated || 0})` : '';
         toast.success(`Data sync completed successfully!${counts}`);
       }
 

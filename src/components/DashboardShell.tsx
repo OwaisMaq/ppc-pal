@@ -4,10 +4,13 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { Input } from "@/components/ui/input";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/useAuth";
+import { useDateRange } from "@/context/DateRangeContext";
 
 const DashboardShell = ({ children }: PropsWithChildren) => {
   const { user, signOut } = useAuth();
+  const { dateRangeDays, setDateRangeDays, diagnosticMode, setDiagnosticMode } = useDateRange();
 
   return (
     <SidebarProvider>
@@ -20,17 +23,22 @@ const DashboardShell = ({ children }: PropsWithChildren) => {
               <div className="flex-1 max-w-xl">
                 <Input placeholder="Search…" className="h-9" />
               </div>
-              <div className="hidden md:block">
-                <Select defaultValue="7d">
+              <div className="hidden md:flex items-center gap-3">
+                <Select value={String(dateRangeDays)} onValueChange={(v) => setDateRangeDays(parseInt(v))}>
                   <SelectTrigger className="h-9 w-[140px]">
                     <SelectValue placeholder="Range" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="7d">Last 7 days</SelectItem>
-                    <SelectItem value="30d">Last 30 days</SelectItem>
-                    <SelectItem value="90d">Last 90 days</SelectItem>
+                    <SelectItem value="1">Today</SelectItem>
+                    <SelectItem value="7">Last 7 days</SelectItem>
+                    <SelectItem value="30">Last 30 days</SelectItem>
+                    <SelectItem value="90">Last 90 days</SelectItem>
                   </SelectContent>
                 </Select>
+                <div className="hidden lg:flex items-center gap-2">
+                  <Switch checked={diagnosticMode} onCheckedChange={setDiagnosticMode} id="diagnostic-switch" />
+                  <label htmlFor="diagnostic-switch" className="text-xs text-muted-foreground">Diagnostic</label>
+                </div>
               </div>
               {user && (
                 <div className="flex items-center gap-2">

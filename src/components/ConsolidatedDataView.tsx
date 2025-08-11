@@ -97,7 +97,7 @@ const ConsolidatedDataView = () => {
               Consolidated Campaign View
             </CardTitle>
             <CardDescription>
-              Hierarchical view of campaigns, ad groups, and keywords
+              Hierarchical view of campaigns, ad groups, keywords and targets
             </CardDescription>
           </div>
           <Button
@@ -219,9 +219,10 @@ const ConsolidatedDataView = () => {
                               </CollapsibleTrigger>
 
                               <CollapsibleContent>
-                                <div className="ml-6 mt-2 space-y-1">
+                                <div className="ml-6 mt-2 space-y-3">
+                                  {/* Keywords */}
                                   {adGroupKeywords.length === 0 ? (
-                                    <div className="text-xs text-muted-foreground p-3">
+                                    <div className="text-xs text-muted-foreground p-3 border rounded-sm bg-background">
                                       No keywords found for this ad group
                                     </div>
                                   ) : (
@@ -263,6 +264,34 @@ const ConsolidatedDataView = () => {
                                       </div>
                                     </div>
                                   ))
+                                )}
+
+                                {/* Targets */}
+                                {adGroupTargets.length > 0 && (
+                                  <div className="space-y-1 pt-1">
+                                    {adGroupTargets.map((t) => (
+                                      <div key={t.id} className="flex items-center justify-between p-2 border rounded-sm bg-background">
+                                        <div className="flex items-center gap-2">
+                                          <Target className="h-3 w-3 text-green-600" />
+                                          <div>
+                                            <span className="text-xs font-medium">{t.type || 'target'}</span>
+                                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                              <Badge variant="outline" className="text-xs py-0 px-1">{t.status}</Badge>
+                                              {t.bid && <span>Bid: {formatCurrency(t.bid)}</span>}
+                                              {t.expression && (
+                                                <span className="truncate max-w-[280px]">{typeof t.expression === 'string' ? t.expression : JSON.stringify(t.expression)}</span>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </div>
+                                        <div className="text-right">
+                                          <div className="text-xs">{formatCurrency(t.spend || 0)}</div>
+                                          <div className="text-xs text-muted-foreground">{formatCurrency(t.sales || 0)}</div>
+                                          <div className="text-xs text-muted-foreground">{formatNumber(t.clicks || 0)} clicks</div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
                                 )}
                               </div>
                               </CollapsibleContent>

@@ -14,6 +14,7 @@ import {
   KeyRound,
   BarChart3
 } from "lucide-react";
+import { useDateRange } from "@/context/DateRangeContext";
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('en-US', {
@@ -32,8 +33,7 @@ const Breakdown = () => {
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>("");
   const [selectedAdGroupId, setSelectedAdGroupId] = useState<string>("");
   const [selectedKeywordId, setSelectedKeywordId] = useState<string>("");
-  const [dateRangeDays, setDateRangeDays] = useState<number>(90);
-  const [diagnosticMode, setDiagnosticMode] = useState<boolean>(false);
+  const { dateRangeDays, setDateRangeDays, diagnosticMode, setDiagnosticMode } = useDateRange();
   const [filterClicks, setFilterClicks] = useState<boolean>(false);
 
   const activeConnections = connections.filter(c => c.status === 'active');
@@ -130,21 +130,21 @@ const Breakdown = () => {
                 Explore your Amazon advertising data with detailed breakdowns
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              <Select value={String(dateRangeDays)} onValueChange={(v) => setDateRangeDays(parseInt(v))}>
-                <SelectTrigger className="w-[160px]"><SelectValue placeholder="Range" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">Today (1 day)</SelectItem>
-                  <SelectItem value="7">Last 7 days</SelectItem>
-                  <SelectItem value="30">Last 30 days</SelectItem>
-                  <SelectItem value="90">Last 90 days</SelectItem>
-                  <SelectItem value="365">Last 365 days</SelectItem>
-                </SelectContent>
-              </Select>
-              <div className="flex items-center gap-2">
-                <Switch checked={diagnosticMode} onCheckedChange={setDiagnosticMode} />
-                <span className="text-sm text-muted-foreground">Diagnostic</span>
-              </div>
+              <div className="flex items-center gap-3">
+                <Select value={String(dateRangeDays)} onValueChange={(v) => setDateRangeDays(parseInt(v))}>
+                  <SelectTrigger className="w-[160px]"><SelectValue placeholder="Range" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">Today (1 day)</SelectItem>
+                    <SelectItem value="7">Last 7 days</SelectItem>
+                    <SelectItem value="30">Last 30 days</SelectItem>
+                    <SelectItem value="90">Last 90 days</SelectItem>
+                    <SelectItem value="365">Last 365 days</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="flex items-center gap-2">
+                  <Switch checked={diagnosticMode} onCheckedChange={setDiagnosticMode} />
+                  <span className="text-sm text-muted-foreground">Diagnostic</span>
+                </div>
               <div className="flex items-center gap-2">
                 <Switch checked={filterClicks} onCheckedChange={setFilterClicks} />
                 <span className="text-sm text-muted-foreground">Clicks &gt; 0</span>

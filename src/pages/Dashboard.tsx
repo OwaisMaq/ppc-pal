@@ -18,6 +18,7 @@ import { Link } from "react-router-dom";
 import { useAmazonData } from "@/hooks/useAmazonData";
 import { formatDistanceToNow } from "date-fns";
 import { useBudgetUsage } from "@/hooks/useBudgetUsage";
+import { useDateRange } from "@/context/DateRangeContext";
 // Map marketplace IDs to region labels and flags
 const MARKETPLACE_INFO: Record<string, { code: string; label: string; flag: string }> = {
   // EU
@@ -85,7 +86,7 @@ const Dashboard = () => {
   const selectedConnection = useMemo(() => activeConnections.find(c => c.id === selectedConnectionId), [activeConnections, selectedConnectionId]);
   const { syncAllData, loading: syncLoading } = useAmazonData();
   const [autoSynced, setAutoSynced] = useState(false);
-  const [dateRangeDays, setDateRangeDays] = useState<number>(30);
+  const { dateRangeDays, setDateRangeDays } = useDateRange();
 
   const campaignIds = useMemo(() => campaigns.map(c => c.id), [campaigns]);
   const { data: budgetUsage } = useBudgetUsage(campaignIds);
@@ -141,7 +142,7 @@ const Dashboard = () => {
                 </SelectContent>
               </Select>
 
-              {/* Date range selector for sync */}
+              {/* Date range selector for sync (kept here but uses global context) */}
               <Select value={String(dateRangeDays)} onValueChange={(v) => setDateRangeDays(parseInt(v))}>
                 <SelectTrigger className="w-40">
                   <SelectValue placeholder="Range" />
