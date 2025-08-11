@@ -169,7 +169,7 @@ const Breakdown = () => {
                         <div>{lastSyncDiagnostics.keyword.reportRows}</div>
                       </div>
                       <div>
-                        <div className="font-medium">Rows Clicks > 0</div>
+                        <div className="font-medium">Rows Clicks &gt; 0</div>
                         <div>{lastSyncDiagnostics.keyword.nonZeroClickRows}</div>
                       </div>
                       <div>

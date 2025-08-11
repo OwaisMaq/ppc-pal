@@ -121,24 +121,6 @@ async function createReportRequest(
   const result = await response.json()
   return result.reportId
 }
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'Amazon-Advertising-API-ClientId': clientId,
-      'Amazon-Advertising-API-Scope': profileId,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload)
-  })
-
-  if (!response.ok) {
-    const errorText = await response.text()
-    throw new Error(`Failed to create report: ${response.status} ${errorText}`)
-  }
-
-  const result = await response.json()
-  return result.reportId
-}
 
 async function pollReportStatus(
   apiEndpoint: string,
