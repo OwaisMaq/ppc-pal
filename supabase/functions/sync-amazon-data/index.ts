@@ -250,55 +250,49 @@ serve(async (req) => {
     const spCampaignPayload = {
       startDate: reportStartDate,
       endDate: reportEndDate,
-      configuration: {
-        adProduct: 'SPONSORED_PRODUCTS',
-        reportTypeId: 'spCampaigns',
-        timeUnit: 'SUMMARY',
-        format: 'GZIP_JSON',
-        groupBy: ['campaignId'],
-        columns: [
-          'campaignId', 'campaignName',
-          'impressions', 'clicks', 'cost',
-          'attributedSales14d', 'attributedUnitsOrdered14d'
-        ],
-      },
+        configuration: {
+          adProduct: 'SPONSORED_PRODUCTS',
+          reportTypeId: 'spCampaigns',
+          timeUnit: 'SUMMARY',
+          format: 'GZIP_JSON',
+          groupBy: ['campaign'],
+          columns: [
+            'impressions', 'clicks', 'spend',
+            'sales14d', 'purchases14d'
+          ],
+        },
     }
 
     const spAdGroupPayload = {
       startDate: reportStartDate,
       endDate: reportEndDate,
-      configuration: {
-        adProduct: 'SPONSORED_PRODUCTS',
-        reportTypeId: 'spAdGroups',
-        timeUnit: 'SUMMARY',
-        format: 'GZIP_JSON',
-        groupBy: ['adGroupId'],
-        columns: [
-          'campaignId', 'campaignName',
-          'adGroupId', 'adGroupName',
-          'impressions', 'clicks', 'cost',
-          'attributedSales14d', 'attributedUnitsOrdered14d'
-        ],
-      },
+        configuration: {
+          adProduct: 'SPONSORED_PRODUCTS',
+          reportTypeId: 'spAdGroups',
+          timeUnit: 'SUMMARY',
+          format: 'GZIP_JSON',
+          groupBy: ['campaign', 'adGroup'],
+          columns: [
+            'impressions', 'clicks', 'spend',
+            'sales14d', 'purchases14d'
+          ],
+        },
     }
 
     const spKeywordPayload = {
       startDate: reportStartDate,
       endDate: reportEndDate,
-      configuration: {
-        adProduct: 'SPONSORED_PRODUCTS',
-        reportTypeId: 'spKeywords',
-        timeUnit: 'SUMMARY',
-        format: 'GZIP_JSON',
-        groupBy: ['keywordId'],
-        columns: [
-          'campaignId', 'campaignName',
-          'adGroupId', 'adGroupName',
-          'keywordId', 'keywordText', 'matchType',
-          'impressions', 'clicks', 'cost',
-          'attributedSales14d', 'attributedUnitsOrdered14d'
-        ],
-      },
+        configuration: {
+          adProduct: 'SPONSORED_PRODUCTS',
+          reportTypeId: 'spKeywords',
+          timeUnit: 'SUMMARY',
+          format: 'GZIP_JSON',
+          groupBy: ['campaign', 'adGroup', 'keyword'],
+          columns: [
+            'impressions', 'clicks', 'spend',
+            'sales14d', 'purchases14d'
+          ],
+        },
     }
 
     console.log('Creating SP Campaign report...')
@@ -338,23 +332,28 @@ serve(async (req) => {
     }
 
     // Upsert campaigns first
-    const campaignUpserts = (spCampaignRows || []).filter((r) => r.campaignId).map((r) => ({
-      connection_id: connectionId,
-      amazon_campaign_id: String(r.campaignId),
-      name: r.campaignName || `Campaign ${r.campaignId}`,
-      campaign_type: 'SPONSORED_PRODUCTS',
-      targeting_type: null,
-      status: 'enabled',
-      daily_budget: null,
-      start_date: null,
-      end_date: null,
-      impressions: parseInt(r.impressions || '0'),
-      clicks: parseInt(r.clicks || '0'),
-      spend: parseFloat(r.cost || '0'),
-      sales: parseFloat(r.attributedSales14d || '0'),
-      orders: parseInt(r.attributedUnitsOrdered14d || '0'),
-      last_updated: new Date().toISOString(),
-    }))
+    const campaignUpserts = (spCampaignRows || []).map((r: any) => {
+      const c = r.campaign || {};
+      const campaignId = (c.id ?? r.campaignId)?.toString() || '';
+      const campaignName = c.name ?? r.campaignName ?? (campaignId ? `Campaign ${campaignId}` : 'Unknown Campaign');
+      return {
+        connection_id: connectionId,
+        amazon_campaign_id: campaignId,
+        name: campaignName,
+        campaign_type: 'SPONSORED_PRODUCTS',
+        targeting_type: null,
+        status: 'enabled',
+        daily_budget: null,
+        start_date: null,
+        end_date: null,
+        impressions: parseInt((r.impressions ?? '0').toString()),
+        clicks: parseInt((r.clicks ?? '0').toString()),
+        spend: parseFloat((r.spend ?? r.cost ?? '0').toString()),
+        sales: parseFloat((r.sales14d ?? r.attributedSales14d ?? '0').toString()),
+        orders: parseInt((r.purchases14d ?? r.attributedUnitsOrdered14d ?? '0').toString()),
+        last_updated: new Date().toISOString(),
+      }
+    }).filter((r: any) => !!r.amazon_campaign_id)
 
     let campaignMap = new Map<string, string>() // amazon_campaign_id -> id
     if (campaignUpserts.length > 0) {
@@ -372,19 +371,25 @@ serve(async (req) => {
     }
 
     // Upsert ad groups using campaign map
-    const adGroupUpserts = (spAdGroupRows || []).filter((r) => r.adGroupId && r.campaignId).map((r) => ({
-      campaign_id: campaignMap.get(String(r.campaignId)) || null,
-      amazon_adgroup_id: String(r.adGroupId),
-      name: r.adGroupName || `Ad Group ${r.adGroupId}`,
-      status: 'enabled',
-      default_bid: null,
-      impressions: parseInt(r.impressions || '0'),
-      clicks: parseInt(r.clicks || '0'),
-      spend: parseFloat(r.cost || '0'),
-      sales: parseFloat(r.attributedSales14d || '0'),
-      orders: parseInt(r.attributedUnitsOrdered14d || '0'),
-      last_updated: new Date().toISOString(),
-    })).filter((r) => r.campaign_id)
+    const adGroupUpserts = (spAdGroupRows || []).map((r: any) => {
+      const c = r.campaign || {};
+      const ag = r.adGroup || {};
+      const campaignAmazonId = (c.id ?? r.campaignId)?.toString() || '';
+      const adGroupAmazonId = (ag.id ?? r.adGroupId)?.toString() || '';
+      return {
+        campaign_id: campaignMap.get(campaignAmazonId) || null,
+        amazon_adgroup_id: adGroupAmazonId,
+        name: ag.name ?? r.adGroupName ?? (adGroupAmazonId ? `Ad Group ${adGroupAmazonId}` : 'Unknown Ad Group'),
+        status: 'enabled',
+        default_bid: null,
+        impressions: parseInt((r.impressions ?? '0').toString()),
+        clicks: parseInt((r.clicks ?? '0').toString()),
+        spend: parseFloat((r.spend ?? r.cost ?? '0').toString()),
+        sales: parseFloat((r.sales14d ?? r.attributedSales14d ?? '0').toString()),
+        orders: parseInt((r.purchases14d ?? r.attributedUnitsOrdered14d ?? '0').toString()),
+        last_updated: new Date().toISOString(),
+      }
+    }).filter((r: any) => r.campaign_id)
 
     let adGroupMap = new Map<string, string>() // amazon_adgroup_id -> id
     if (adGroupUpserts.length > 0) {
@@ -402,20 +407,28 @@ serve(async (req) => {
     }
 
     // Upsert keywords using ad group map
-    const keywordUpserts = (spKeywordRows || []).filter((r) => r.keywordId && r.adGroupId).map((r) => ({
-      adgroup_id: adGroupMap.get(String(r.adGroupId)) || null,
-      amazon_keyword_id: String(r.keywordId),
-      keyword_text: r.keywordText || `Keyword ${r.keywordId}`,
-      match_type: (r.matchType || 'exact').toString().toLowerCase(),
-      bid: null,
-      status: 'enabled',
-      impressions: parseInt(r.impressions || '0'),
-      clicks: parseInt(r.clicks || '0'),
-      spend: parseFloat(r.cost || '0'),
-      sales: parseFloat(r.attributedSales14d || '0'),
-      orders: parseInt(r.attributedUnitsOrdered14d || '0'),
-      last_updated: new Date().toISOString(),
-    })).filter((r) => r.adgroup_id)
+    const keywordUpserts = (spKeywordRows || []).map((r: any) => {
+      const ag = r.adGroup || {};
+      const k = r.keyword || {};
+      const adGroupAmazonId = (ag.id ?? r.adGroupId)?.toString() || '';
+      const keywordAmazonId = (k.id ?? r.keywordId)?.toString() || '';
+      const keywordText = k.text ?? r.keywordText ?? (keywordAmazonId ? `Keyword ${keywordAmazonId}` : 'Unknown Keyword');
+      const matchType = (k.matchType ?? r.matchType ?? 'exact').toString().toLowerCase();
+      return {
+        adgroup_id: adGroupMap.get(adGroupAmazonId) || null,
+        amazon_keyword_id: keywordAmazonId,
+        keyword_text: keywordText,
+        match_type: matchType,
+        bid: null,
+        status: 'enabled',
+        impressions: parseInt((r.impressions ?? '0').toString()),
+        clicks: parseInt((r.clicks ?? '0').toString()),
+        spend: parseFloat((r.spend ?? r.cost ?? '0').toString()),
+        sales: parseFloat((r.sales14d ?? r.attributedSales14d ?? '0').toString()),
+        orders: parseInt((r.purchases14d ?? r.attributedUnitsOrdered14d ?? '0').toString()),
+        last_updated: new Date().toISOString(),
+      }
+    }).filter((r: any) => r.adgroup_id)
 
     if (keywordUpserts.length > 0) {
       const { error: upsertKeywordsError } = await supabase
