@@ -161,6 +161,9 @@ export const useAmazonConnections = () => {
       const token = session.data.session?.access_token;
       if (!token) throw new Error('No valid session found');
 
+      const target = connections.find(c => c.id === connectionId);
+      const label = target?.profile_name || target?.profile_id || 'Selected profile';
+
       const { data, error } = await supabase.functions.invoke('sync-amazon-data', {
         body: { connectionId },
         headers: {
@@ -172,14 +175,19 @@ export const useAmazonConnections = () => {
 
       if (data && data.success === false) {
         if (data.code === 'NO_CAMPAIGNS') {
-          toast.info('No campaigns found for this profile.');
+          toast.info(`No campaigns found for ${label}.`);
         } else if (data.code === 'NO_METRICS_UPDATED') {
-          toast.warning('Synced entities, but no performance metrics were updated yet.');
+          const ent = data.entitiesSynced || {};
+          toast.warning(`Synced ${ent.campaigns ?? 0} campaigns for ${label}, but no new metrics yet.`);
         } else {
-          toast.info(data.message || 'Sync completed with notices.');
+          toast.info(data.message ? `${label}: ${data.message}` : `Sync completed with notices for ${label}.`);
         }
       } else {
-        toast.success('Data sync completed successfully!');
+        const ent = data?.entitiesSynced || {};
+        const metricsUpdated = data?.metricsUpdated ?? undefined;
+        const suffix = metricsUpdated != null ? ` • ${metricsUpdated} metrics updated` : '';
+        const entStr = ent.campaigns != null ? ` (${ent.campaigns} campaigns)` : '';
+        toast.success(`Sync completed for ${label}${entStr}${suffix}`);
       }
 
       await fetchConnections();

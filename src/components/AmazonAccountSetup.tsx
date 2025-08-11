@@ -90,6 +90,9 @@ const AmazonAccountSetup = () => {
                           <h4 className="font-medium">{connection.profile_name || 'Amazon Profile'}</h4>
                           <p className="text-sm text-gray-500">
                             Profile ID: {connection.profile_id}
+                            {typeof connection.campaign_count === 'number' && (
+                              <span className="ml-2">• Campaigns: {connection.campaign_count}</span>
+                            )}
                             {connection.last_sync_at && (
                               <span className="ml-2">
                                 • Last sync: {formatDistanceToNow(new Date(connection.last_sync_at), { addSuffix: true })}

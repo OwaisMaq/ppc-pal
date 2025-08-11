@@ -316,7 +316,7 @@ serve(async (req) => {
     if (!Array.isArray(campaignsData) || campaignsData.length === 0) {
       await supabase
         .from('amazon_connections')
-        .update({ last_sync_at: new Date().toISOString() })
+        .update({ last_sync_at: new Date().toISOString(), campaign_count: 0, reporting_api_version: 'v3' })
         .eq('id', connectionId)
 
       console.log('ℹ️ No campaigns found for this profile')
@@ -325,6 +325,11 @@ serve(async (req) => {
           success: false,
           code: 'NO_CAMPAIGNS',
           message: 'No campaigns found for this profile.',
+          profileId: connection.profile_id,
+          profileName: connection.profile_name ?? null,
+          entitiesSynced: { campaigns: 0, adGroups: 0, keywords: 0 },
+          metricsUpdated: 0,
+          apiVersion: 'v3'
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       )
@@ -746,7 +751,8 @@ serve(async (req) => {
       .from('amazon_connections')
       .update({ 
         last_sync_at: new Date().toISOString(),
-        reporting_api_version: 'v3'
+        reporting_api_version: 'v3',
+        campaign_count: campaignIds.length
       })
       .eq('id', connectionId)
 

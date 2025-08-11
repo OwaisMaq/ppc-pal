@@ -13,12 +13,23 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RefreshCw, BarChart3, Calendar } from "lucide-react";
 import { toast } from "sonner";
+import { useEffect, useState } from "react";
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 
 const Dashboard = () => {
   const { connections, syncConnection, refreshConnections, loading: connectionsLoading } = useAmazonConnections();
   const { metrics, campaigns, loading, error, refetch } = useCampaignMetrics();
   
   const hasActiveConnections = connections.some(c => c.status === 'active');
+  const activeConnections = connections.filter(c => c.status === 'active');
+  const [selectedConnectionId, setSelectedConnectionId] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (activeConnections.length > 0) {
+      const uk = activeConnections.find(c => (c.profile_name || '').toLowerCase().includes('uk') || c.marketplace_id === 'A1F83G8C2ARO7P');
+      setSelectedConnectionId(prev => prev ?? (uk?.id || activeConnections[0].id));
+    }
+  }, [connections]);
 
   const handleSyncData = async () => {
     if (!hasActiveConnections) {
@@ -26,10 +37,10 @@ const Dashboard = () => {
       return;
     }
 
-    const activeConnection = connections.find(c => c.status === 'active');
-    if (activeConnection) {
+    const targetId = selectedConnectionId || activeConnections[0]?.id;
+    if (targetId) {
       try {
-        await syncConnection(activeConnection.id);
+        await syncConnection(targetId);
         setTimeout(() => {
           refetch();
         }, 2000); // Give time for sync to complete
@@ -54,7 +65,19 @@ const Dashboard = () => {
           </div>
           
           {hasActiveConnections && (
-            <div className="flex gap-3">
+            <div className="flex gap-3 items-center">
+              <Select value={selectedConnectionId} onValueChange={setSelectedConnectionId}>
+                <SelectTrigger className="w-56">
+                  <SelectValue placeholder="Select profile" />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeConnections.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.profile_name || c.profile_id}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Button 
                 onClick={refetch} 
                 variant="outline" 
@@ -84,7 +107,9 @@ const Dashboard = () => {
                 <br />
                 Connections count: {connections.length}
                 <br />
-                Active connections: {connections.filter(c => c.status === 'active').length}
+                Active connections: {activeConnections.length}
+                <br />
+                Selected: {selectedConnectionId || 'none'}
                 <br />
                 Connection statuses: {connections.map(c => `${c.profile_name || 'Unknown'}: ${c.status}`).join(', ')}
                 <br />

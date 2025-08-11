@@ -13,6 +13,8 @@ export interface AmazonConnection {
   created_at: string;
   updated_at: string;
   setup_required_reason?: string;
+  // Optional denormalized metrics
+  campaign_count?: number;
 }
 
 export interface Campaign {
