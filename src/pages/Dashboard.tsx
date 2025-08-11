@@ -82,7 +82,13 @@ const Dashboard = () => {
                 <SelectContent className="z-50 bg-background border shadow-md">
                   {activeConnections.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
-                      {getConnectionLabel(c)}
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">{getMarketplaceInfo(c.marketplace_id).flag || '🌐'}</span>
+                        <span>
+                          {(c.profile_name || c.profile_id)}
+                          {getMarketplaceInfo(c.marketplace_id).code ? ` (${getMarketplaceInfo(c.marketplace_id).code})` : ''}
+                        </span>
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
