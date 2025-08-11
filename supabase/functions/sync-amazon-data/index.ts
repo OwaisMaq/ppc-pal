@@ -156,6 +156,25 @@ serve(async (req) => {
     const campaignsData = await campaignsResponse.json()
     console.log('Retrieved campaigns:', campaignsData.length)
 
+    // If no campaigns, treat as benign outcome
+    if (!Array.isArray(campaignsData) || campaignsData.length === 0) {
+      // Update last sync time for visibility
+      await supabase
+        .from('amazon_connections')
+        .update({ last_sync_at: new Date().toISOString() })
+        .eq('id', connectionId)
+
+      console.log('No campaigns found for this profile')
+      return new Response(
+        JSON.stringify({
+          success: false,
+          code: 'NO_CAMPAIGNS',
+          message: 'No campaigns found for this profile.',
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 },
+      )
+    }
+
     // Prepare date range for performance data (last 30 days)
     const endDate = new Date()
     const startDate = new Date()
@@ -201,6 +220,7 @@ serve(async (req) => {
     }
 
     // Fetch performance data for campaigns
+    let metricsUpdated = 0;
     if (campaignIds.length > 0) {
       console.log('Fetching campaign performance data...')
       
@@ -376,11 +396,30 @@ serve(async (req) => {
       .update({ last_sync_at: new Date().toISOString() })
       .eq('id', connectionId)
 
-    console.log('Data sync completed successfully')
+    console.log('Data sync completed')
+
+    if (metricsUpdated === 0) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          code: 'NO_METRICS_UPDATED',
+          message: 'Synced entities, but no performance metrics were updated.',
+          campaignsProcessed: campaignIds.length,
+          metricsUpdated: 0
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      )
+    }
 
     return new Response(
-      JSON.stringify({ success: true, message: 'Data sync completed' }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({
+        success: true,
+        code: 'SYNC_COMPLETE',
+        message: 'Data sync completed',
+        campaignsProcessed: campaignIds.length,
+        metricsUpdated,
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     )
 
   } catch (error) {

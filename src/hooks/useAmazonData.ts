@@ -124,25 +124,39 @@ export const useAmazonData = () => {
   const syncAllData = async (connectionId: string) => {
     setLoading(true);
     try {
-      const { error } = await supabase.functions.invoke('sync-amazon-data', {
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token;
+      if (!token) throw new Error('No valid session found');
+
+      const { data, error } = await supabase.functions.invoke('sync-amazon-data', {
         body: { connectionId },
         headers: {
-          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+          Authorization: `Bearer ${token}`,
         },
       });
 
       if (error) throw error;
-      
-      toast.success('Data sync initiated successfully!');
+
+      if (data && data.success === false) {
+        if (data.code === 'NO_CAMPAIGNS') {
+          toast.info('No campaigns found for this profile.');
+        } else if (data.code === 'NO_METRICS_UPDATED') {
+          toast.warning('Synced entities, but no performance metrics were updated yet.');
+        } else {
+          toast.info(data.message || 'Sync completed with notices.');
+        }
+      } else {
+        toast.success('Data sync completed successfully!');
+      }
       
       // Refresh data after sync
       setTimeout(() => {
         fetchAllData();
       }, 3000);
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error syncing data:', error);
-      toast.error('Failed to sync Amazon data');
+      toast.error(error.message || 'Failed to sync Amazon data');
     } finally {
       setLoading(false);
     }
