@@ -411,6 +411,154 @@ async function fetchCampaignsV2Fallback(
   }
 }
 
+// Fetch ad groups with v3 API (fallback to v2)
+async function fetchAdGroups(
+  apiEndpoint: string,
+  accessToken: string,
+  clientId: string,
+  profileId: string,
+  requestQueue: RequestQueue
+): Promise<any[]> {
+  console.log('Fetching ad groups from API')
+  const allAdGroups: any[] = []
+  let nextToken: string | undefined
+  const maxResults = 100
+
+  try {
+    do {
+      const params = new URLSearchParams({
+        maxResults: maxResults.toString(),
+        ...(nextToken && { nextToken })
+      })
+
+      const response = await requestQueue.add(() =>
+        makeAmazonApiRequest(`${apiEndpoint}/sp/adGroups?${params}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Amazon-Advertising-API-ClientId': clientId,
+            'Amazon-Advertising-API-Scope': profileId,
+            'Amazon-Advertising-API-Version': '3.0',
+            'Content-Type': 'application/json',
+          },
+        })
+      )
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          // v2 fallback
+          const v2Resp = await requestQueue.add(() =>
+            makeAmazonApiRequest(`${apiEndpoint}/v2/sp/adGroups`, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Amazon-Advertising-API-ClientId': clientId,
+                'Amazon-Advertising-API-Scope': profileId,
+                'Content-Type': 'application/json',
+              },
+            })
+          )
+          if (v2Resp.ok) {
+            const v2Data = await v2Resp.json()
+            return Array.isArray(v2Data) ? v2Data : []
+          }
+        }
+        const errTxt = await response.text()
+        console.error(`AdGroups API failed: ${response.status} - ${errTxt}`)
+        break
+      }
+
+      const data = await response.json()
+      if (data.adGroups && Array.isArray(data.adGroups)) {
+        allAdGroups.push(...data.adGroups)
+        nextToken = data.nextToken
+      } else if (Array.isArray(data)) {
+        allAdGroups.push(...data)
+        nextToken = undefined
+      }
+    } while (nextToken)
+  } catch (e) {
+    console.error('Error fetching ad groups:', e)
+  }
+
+  console.log(`Total ad groups retrieved: ${allAdGroups.length}`)
+  return allAdGroups
+}
+
+// Fetch keywords with v3 API (fallback to v2)
+async function fetchKeywords(
+  apiEndpoint: string,
+  accessToken: string,
+  clientId: string,
+  profileId: string,
+  requestQueue: RequestQueue
+): Promise<any[]> {
+  console.log('Fetching keywords from API')
+  const allKeywords: any[] = []
+  let nextToken: string | undefined
+  const maxResults = 100
+
+  try {
+    do {
+      const params = new URLSearchParams({
+        maxResults: maxResults.toString(),
+        ...(nextToken && { nextToken })
+      })
+
+      const response = await requestQueue.add(() =>
+        makeAmazonApiRequest(`${apiEndpoint}/sp/keywords?${params}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Amazon-Advertising-API-ClientId': clientId,
+            'Amazon-Advertising-API-Scope': profileId,
+            'Amazon-Advertising-API-Version': '3.0',
+            'Content-Type': 'application/json',
+          },
+        })
+      )
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          // v2 fallback
+          const v2Resp = await requestQueue.add(() =>
+            makeAmazonApiRequest(`${apiEndpoint}/v2/sp/keywords`, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Amazon-Advertising-API-ClientId': clientId,
+                'Amazon-Advertising-API-Scope': profileId,
+                'Content-Type': 'application/json',
+              },
+            })
+          )
+          if (v2Resp.ok) {
+            const v2Data = await v2Resp.json()
+            return Array.isArray(v2Data) ? v2Data : []
+          }
+        }
+        const errTxt = await response.text()
+        console.error(`Keywords API failed: ${response.status} - ${errTxt}`)
+        break
+      }
+
+      const data = await response.json()
+      if (data.keywords && Array.isArray(data.keywords)) {
+        allKeywords.push(...data.keywords)
+        nextToken = data.nextToken
+      } else if (Array.isArray(data)) {
+        allKeywords.push(...data)
+        nextToken = undefined
+      }
+    } while (nextToken)
+  } catch (e) {
+    console.error('Error fetching keywords:', e)
+  }
+
+  console.log(`Total keywords retrieved: ${allKeywords.length}`)
+  return allKeywords
+}
+
 // Enhanced connection health check with v3 compliance
 async function checkConnectionHealth(
   supabase: any,
@@ -813,22 +961,44 @@ serve(async (req) => {
       campaignIds.push(campaign.campaignId.toString())
       
       try {
-        const { error: campaignError } = await supabase
+        // Upsert without requiring a unique DB constraint: select then update or insert
+        const { data: existingCampaign, error: existingErr } = await supabase
           .from('campaigns')
-          .upsert({
-            connection_id: connectionId,
-            amazon_campaign_id: campaign.campaignId.toString(),
-            name: campaign.name,
-            campaign_type: campaign.campaignType || 'sponsoredProducts',
-            targeting_type: campaign.targetingType || 'auto',
-            product_type: 'Sponsored Products',
-            status: campaign.state ? campaign.state.toLowerCase() : 'enabled',
-            daily_budget: campaign.dailyBudget || null,
-            start_date: campaign.startDate || null,
-            end_date: campaign.endDate || null,
-          }, {
-            onConflict: 'connection_id, amazon_campaign_id'
-          })
+          .select('id')
+          .eq('connection_id', connectionId)
+          .eq('amazon_campaign_id', campaign.campaignId.toString())
+          .maybeSingle();
+
+        if (existingErr) {
+          console.error('Error checking existing campaign:', existingErr);
+        }
+
+        const baseData = {
+          connection_id: connectionId,
+          amazon_campaign_id: campaign.campaignId.toString(),
+          name: campaign.name,
+          campaign_type: campaign.campaignType || 'sponsoredProducts',
+          targeting_type: campaign.targetingType || 'auto',
+          product_type: 'Sponsored Products',
+          status: campaign.state ? campaign.state.toLowerCase() : 'enabled',
+          daily_budget: campaign.dailyBudget || null,
+          start_date: campaign.startDate || null,
+          end_date: campaign.endDate || null,
+        } as const;
+
+        let campaignError = null as any;
+        if (existingCampaign?.id) {
+          const { error } = await supabase
+            .from('campaigns')
+            .update(baseData)
+            .eq('id', existingCampaign.id);
+          campaignError = error || null;
+        } else {
+          const { error } = await supabase
+            .from('campaigns')
+            .insert(baseData);
+          campaignError = error || null;
+        }
 
         if (campaignError) {
           console.error('Error storing campaign:', campaign.campaignId, campaignError)
@@ -839,6 +1009,126 @@ serve(async (req) => {
     }
 
     performanceLog.phases.campaignsStore = Date.now() - startTime
+
+    // Build campaign ID map for relational inserts
+    const { data: campaignRows } = await supabase
+      .from('campaigns')
+      .select('id, amazon_campaign_id')
+      .eq('connection_id', connectionId)
+    const campaignIdMap = new Map<string, string>()
+    campaignRows?.forEach((r: any) => campaignIdMap.set(String(r.amazon_campaign_id), r.id))
+
+    // Fetch and store Ad Groups
+    console.log('Fetching ad groups...')
+    const adGroupsData = await fetchAdGroups(
+      apiEndpoint, accessToken, clientId, connection.profile_id, requestQueue
+    )
+    console.log(`Retrieved ${adGroupsData.length} ad groups`)
+
+    const adGroupAmazonToId = new Map<string, string>()
+    for (const ag of adGroupsData) {
+      const amazonCampaignId = String(ag.campaignId || ag.campaignId)
+      const parentCampaignId = campaignIdMap.get(amazonCampaignId)
+      if (!parentCampaignId) {
+        // Skip if campaign not stored
+        continue
+      }
+
+      const amazonAdGroupId = String(ag.adGroupId || ag.adGroupId)
+      const name = ag.name || ag.adGroupName || 'Ad Group'
+      const state = (ag.state || 'enabled').toLowerCase()
+      const defaultBid = ag.defaultBid ?? null
+
+      const { data: existing, error: checkErr } = await supabase
+        .from('ad_groups')
+        .select('id')
+        .eq('campaign_id', parentCampaignId)
+        .eq('amazon_adgroup_id', amazonAdGroupId)
+        .maybeSingle()
+
+      if (checkErr) console.warn('Error checking ad group exists:', checkErr)
+
+      const baseData = {
+        campaign_id: parentCampaignId,
+        amazon_adgroup_id: amazonAdGroupId,
+        name,
+        status: state,
+        default_bid: defaultBid
+      } as const
+
+      let err = null as any
+      if (existing?.id) {
+        const { error } = await supabase
+          .from('ad_groups')
+          .update(baseData)
+          .eq('id', existing.id)
+        err = error || null
+        adGroupAmazonToId.set(amazonAdGroupId, existing.id)
+      } else {
+        const { data: inserted, error } = await supabase
+          .from('ad_groups')
+          .insert(baseData)
+          .select('id')
+          .single()
+        err = error || null
+        if (inserted?.id) adGroupAmazonToId.set(amazonAdGroupId, inserted.id)
+      }
+      if (err) console.error('Error storing ad group:', amazonAdGroupId, err)
+    }
+
+    // Fetch and store Keywords
+    console.log('Fetching keywords...')
+    const keywordsData = await fetchKeywords(
+      apiEndpoint, accessToken, clientId, connection.profile_id, requestQueue
+    )
+    console.log(`Retrieved ${keywordsData.length} keywords`)
+
+    for (const kw of keywordsData) {
+      const amazonAdGroupId = String(kw.adGroupId || kw.adGroupId)
+      const parentAdGroupId = adGroupAmazonToId.get(amazonAdGroupId)
+      if (!parentAdGroupId) continue
+
+      const amazonKeywordId = String(kw.keywordId || kw.keywordId)
+      const keywordText = kw.keywordText || ''
+      const matchType = kw.matchType || ''
+      const bid = kw.bid ?? null
+      const state = (kw.state || 'enabled').toLowerCase()
+
+      const { data: existingKw, error: checkKwErr } = await supabase
+        .from('keywords')
+        .select('id')
+        .eq('adgroup_id', parentAdGroupId)
+        .eq('amazon_keyword_id', amazonKeywordId)
+        .maybeSingle()
+
+      if (checkKwErr) console.warn('Error checking keyword exists:', checkKwErr)
+
+      const kwBase = {
+        adgroup_id: parentAdGroupId,
+        amazon_keyword_id: amazonKeywordId,
+        keyword_text: keywordText,
+        match_type: matchType,
+        bid,
+        status: state
+      } as const
+
+      let kwErr = null as any
+      if (existingKw?.id) {
+        const { error } = await supabase
+          .from('keywords')
+          .update(kwBase)
+          .eq('id', existingKw.id)
+        kwErr = error || null
+      } else {
+        const { error } = await supabase
+          .from('keywords')
+          .insert(kwBase)
+        kwErr = error || null
+      }
+      if (kwErr) console.error('Error storing keyword:', amazonKeywordId, kwErr)
+    }
+
+    // Continue with performance metrics via reporting API
 
     // Fetch performance data using proper reporting API
     let totalMetricsUpdated = 0
