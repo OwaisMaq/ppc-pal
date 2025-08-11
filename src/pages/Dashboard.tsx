@@ -1,4 +1,4 @@
-import Header from "@/components/Header";
+import DashboardShell from "@/components/DashboardShell";
 
 import OptimizationDashboard from "@/components/OptimizationDashboard";
 import SubscriptionStatus from "@/components/SubscriptionStatus";
@@ -107,8 +107,7 @@ const Dashboard = () => {
     }
   }, [autoSynced, selectedConnectionId, hasActiveConnections, metrics?.totalSpend, campaigns.length, syncAllData]);
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50" role="main">
-      <Header />
+    <DashboardShell>
       <div className="container mx-auto py-6 px-4">
         <div className="mb-8 flex items-center justify-between">
           <div>
@@ -271,7 +270,7 @@ const Dashboard = () => {
           )}
         </div>
       </div>
-    </div>
+    </DashboardShell>
   );
 };
 
