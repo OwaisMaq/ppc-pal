@@ -139,7 +139,7 @@ serve(async (req) => {
 
     // Sync campaigns with performance data
     console.log('Fetching campaigns...')
-    const campaignsResponse = await fetch(`${apiEndpoint}/v2/campaigns`, {
+    const campaignsResponse = await fetch(`${apiEndpoint}/v2/sp/campaigns?stateFilter=enabled,paused&count=1000`, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Amazon-Advertising-API-ClientId': clientId,
@@ -234,14 +234,15 @@ serve(async (req) => {
                 'impressions',
                 'clicks',
                 'cost',
-                'purchases14d',
-                'sales14d'
+                'attributedUnitsOrdered14d',
+                'attributedSales14d'
               ]
             },
             filters: [
-              { field: 'campaignId', values: batch }
+              { field: 'campaignId', values: batch.map((id) => Number(id)) }
             ],
-            format: 'GZIP_JSON'
+            format: 'GZIP_JSON',
+            locale: 'en_US'
           }
 
           const createRes = await fetch(`${apiEndpoint}/reporting/reports`, {
@@ -271,7 +272,7 @@ serve(async (req) => {
           // Poll for completion
           let status = 'IN_PROGRESS'
           let downloadUrl: string | null = null
-          const maxPolls = 30 // ~90s @3s interval
+          const maxPolls = 120 // ~6m @3s interval
           for (let attempt = 1; attempt <= maxPolls; attempt++) {
             const statusRes = await fetch(`${apiEndpoint}/reporting/reports/${reportId}`, {
               headers: {
@@ -357,8 +358,8 @@ serve(async (req) => {
             const impressions = Number(r.impressions ?? 0) || 0
             const clicks = Number(r.clicks ?? 0) || 0
             const spend = toCurrency(r.cost ?? r.spend)
-            const sales = toCurrency(r.sales14d ?? r.attributedSales14d ?? r.sales30d ?? r.attributedSales30d)
-            const orders = Number(r.purchases14d ?? r.attributedUnitsOrdered14d ?? r.purchases30d ?? r.attributedUnitsOrdered30d ?? 0) || 0
+            const sales = toCurrency(r.attributedSales14d ?? r.sales14d ?? r.attributedSales30d ?? r.sales30d)
+            const orders = Number(r.attributedUnitsOrdered14d ?? r.purchases14d ?? r.attributedUnitsOrdered30d ?? r.purchases30d ?? 0) || 0
 
             const { error: updErr } = await supabase
               .from('campaigns')
@@ -397,7 +398,7 @@ serve(async (req) => {
     for (const campaign of storedCampaigns || []) {
       console.log('Fetching ad groups for campaign:', campaign.amazon_campaign_id)
       
-      const adGroupsResponse = await fetch(`${apiEndpoint}/v2/adGroups?campaignIdFilter=${campaign.amazon_campaign_id}`, {
+      const adGroupsResponse = await fetch(`${apiEndpoint}/v2/sp/adGroups?campaignIdFilter=${campaign.amazon_campaign_id}`, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Amazon-Advertising-API-ClientId': clientId,
@@ -432,7 +433,7 @@ serve(async (req) => {
             // Fetch keywords for this ad group
             console.log('Fetching keywords for ad group:', adGroup.adGroupId)
             
-            const keywordsResponse = await fetch(`${apiEndpoint}/v2/keywords?adGroupIdFilter=${adGroup.adGroupId}`, {
+            const keywordsResponse = await fetch(`${apiEndpoint}/v2/sp/keywords?adGroupIdFilter=${adGroup.adGroupId}`, {
               headers: {
                 'Authorization': `Bearer ${accessToken}`,
                 'Amazon-Advertising-API-ClientId': clientId,
