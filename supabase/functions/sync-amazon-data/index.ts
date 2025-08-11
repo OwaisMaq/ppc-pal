@@ -479,6 +479,7 @@ serve(async (req) => {
 
     // Initialize diagnostics
     const diagnostics: any = {
+      writeErrors: [],
       keyword: {
         totalKeywords: keywordIds.length,
         filteredIdsUsed: 0,
@@ -496,21 +497,11 @@ serve(async (req) => {
     let totalMetricsUpdated = 0
 
     // Define columns using correct Amazon API v3 column names
-    const campaignColumns = [
-      'campaignId', 'impressions', 'clicks', 'cost',
-      'attributedSales7d', 'attributedConversions7d', 'attributedSales14d', 'attributedConversions14d'
-    ]
+    const campaignColumns = ['campaignId','impressions','clicks','spend','sales7d','purchases7d','sales14d','purchases14d']
     
-    const adGroupColumns = [
-      'adGroupId', 'impressions', 'clicks', 'cost',
-      'attributedSales7d', 'attributedConversions7d', 'attributedSales14d', 'attributedConversions14d'
-    ]
+    const adGroupColumns = ['adGroupId','impressions','clicks','spend','sales7d','purchases7d','sales14d','purchases14d']
     
-    const keywordColumns = [
-      'keywordId', 'impressions', 'clicks', 'cost',
-      'attributedSales7d', 'attributedConversions7d', 'attributedSales14d', 'attributedConversions14d',
-      'keywordText', 'matchType'
-    ]
+    // Keyword report temporarily disabled (targets support pending)
 
     // Campaign Performance
     if (campaignIds.length > 0) {
@@ -534,14 +525,14 @@ serve(async (req) => {
           if (!perf.campaignId) continue
           
           const anyPerf = perf as any
-          // Calculate metrics with robust fallbacks for v3 field names
+          // Calculate metrics using v3 field names (no micro-unit conversion)
           const impressions = Number(anyPerf.impressions ?? 0)
           const clicks = Number(anyPerf.clicks ?? 0)
-          const spend = Number(anyPerf.cost ?? 0) / 1_000_000
-          const sales7d = Number(anyPerf.attributedSales7d ?? anyPerf.sales7d ?? 0) / 1_000_000
-          const sales14d = Number(anyPerf.attributedSales14d ?? anyPerf.sales14d ?? 0) / 1_000_000
-          const orders7d = Number(anyPerf.attributedConversions7d ?? anyPerf.purchases7d ?? anyPerf.unitsOrdered7d ?? 0)
-          const orders14d = Number(anyPerf.attributedConversions14d ?? anyPerf.purchases14d ?? anyPerf.unitsOrdered14d ?? 0)
+          const spend = Number(anyPerf.spend ?? anyPerf.cost ?? 0)
+          const sales7d = Number(anyPerf.sales7d ?? anyPerf.attributedSales7d ?? 0)
+          const sales14d = Number(anyPerf.sales14d ?? anyPerf.attributedSales14d ?? 0)
+          const orders7d = Number(anyPerf.purchases7d ?? anyPerf.attributedConversions7d ?? 0)
+          const orders14d = Number(anyPerf.purchases14d ?? anyPerf.attributedConversions14d ?? 0)
           
           // Derived metrics
           const ctr7d = impressions > 0 ? (clicks / impressions) * 100 : 0
@@ -555,7 +546,7 @@ serve(async (req) => {
           const convRate7d = clicks > 0 ? (orders7d / clicks) * 100 : 0
           const convRate14d = clicks > 0 ? (orders14d / clicks) * 100 : 0
 
-          await supabase
+          const { error: campErr } = await supabase
             .from('campaigns')
             .update({
               impressions,
@@ -592,7 +583,11 @@ serve(async (req) => {
             .eq('connection_id', connectionId)
             .eq('amazon_campaign_id', perf.campaignId.toString())
           
-          totalMetricsUpdated++
+          if (campErr) {
+            diagnostics.writeErrors.push({ entity: 'campaign', id: perf.campaignId?.toString?.(), error: campErr.message })
+          } else {
+            totalMetricsUpdated++
+          }
         }
       } catch (error) {
         console.error('❌ Campaign performance sync failed:', error)
@@ -622,11 +617,11 @@ serve(async (req) => {
           const anyPerf = perf as any
           const impressions = Number(anyPerf.impressions ?? 0)
           const clicks = Number(anyPerf.clicks ?? 0)
-          const spend = Number(anyPerf.cost ?? 0) / 1_000_000
-          const sales7d = Number(anyPerf.attributedSales7d ?? anyPerf.sales7d ?? 0) / 1_000_000
-          const sales14d = Number(anyPerf.attributedSales14d ?? anyPerf.sales14d ?? 0) / 1_000_000
-          const orders7d = Number(anyPerf.attributedConversions7d ?? anyPerf.purchases7d ?? anyPerf.unitsOrdered7d ?? 0)
-          const orders14d = Number(anyPerf.attributedConversions14d ?? anyPerf.purchases14d ?? anyPerf.unitsOrdered14d ?? 0)
+          const spend = Number(anyPerf.spend ?? anyPerf.cost ?? 0)
+          const sales7d = Number(anyPerf.sales7d ?? anyPerf.attributedSales7d ?? 0)
+          const sales14d = Number(anyPerf.sales14d ?? anyPerf.attributedSales14d ?? 0)
+          const orders7d = Number(anyPerf.purchases7d ?? anyPerf.attributedConversions7d ?? 0)
+          const orders14d = Number(anyPerf.purchases14d ?? anyPerf.attributedConversions14d ?? 0)
           
           const ctr7d = impressions > 0 ? (clicks / impressions) * 100 : 0
           const cpc7d = clicks > 0 ? spend / clicks : 0
@@ -645,7 +640,7 @@ serve(async (req) => {
             .single()
           
           if (adGroupRecord) {
-            await supabase
+            const { error: agErr } = await supabase
               .from('ad_groups')
               .update({
                 impressions,
@@ -681,7 +676,11 @@ serve(async (req) => {
               })
               .eq('id', adGroupRecord.id)
             
-            totalMetricsUpdated++
+            if (agErr) {
+              diagnostics.writeErrors.push({ entity: 'ad_group', id: perf.adGroupId?.toString?.(), error: agErr.message })
+            } else {
+              totalMetricsUpdated++
+            }
           }
         }
       } catch (error) {
@@ -689,110 +688,10 @@ serve(async (req) => {
       }
     }
 
-    // Keyword Performance
+    // Keyword Performance (temporarily disabled)
     if (keywordIds.length > 0) {
-      console.log('🔑 Fetching keyword performance...')
-      try {
-        const keywordDateRange = diag ? Math.max(dateRange, 365) : dateRange
-        diagnostics.keyword.filteredIdsUsed = diag ? 0 : keywordIds.length
-        diagnostics.keyword.timeUnit = diag ? 'DAILY' : 'SUMMARY'
-        diagnostics.keyword.dateRangeDays = keywordDateRange
-
-        const reportId = await createReportRequest(
-          apiEndpoint, accessToken, clientId, connection.profile_id,
-          'keywords', keywordColumns, keywordIds, { dateRangeDays: keywordDateRange, timeUnit: diagnostics.keyword.timeUnit as 'SUMMARY' | 'DAILY', skipEntityFilter: diag }
-        )
-        
-        const report = await pollReportStatus(
-          apiEndpoint, accessToken, clientId, connection.profile_id, reportId
-        )
-        
-        const performanceData = await downloadAndParseReport(report.url!)
-        console.log(`💾 Processing ${performanceData.length} keyword performance records`)
-        console.log('Keyword report sample keys:', Object.keys(performanceData[0] || {}))
-        diagnostics.keyword.reportRows = performanceData.length
-        try {
-          const nz = performanceData.filter((row: any) => Number(row?.clicks ?? 0) > 0).length
-          diagnostics.keyword.nonZeroClickRows = nz
-        } catch (_) {}
-        
-        
-        for (const perf of performanceData) {
-          const anyPerf = perf as any
-          
-          const impressions = Number(anyPerf.impressions ?? 0)
-          const clicks = Number(anyPerf.clicks ?? 0)
-          const spend = Number(anyPerf.cost ?? 0) / 1_000_000
-          const sales7d = Number(anyPerf.attributedSales7d ?? anyPerf.sales7d ?? 0) / 1_000_000
-          const sales14d = Number(anyPerf.attributedSales14d ?? anyPerf.sales14d ?? 0) / 1_000_000
-          const orders7d = Number(anyPerf.attributedConversions7d ?? anyPerf.purchases7d ?? anyPerf.unitsOrdered7d ?? 0)
-          const orders14d = Number(anyPerf.attributedConversions14d ?? anyPerf.purchases14d ?? anyPerf.unitsOrdered14d ?? 0)
-          
-          const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0
-          const cpc = clicks > 0 ? spend / clicks : 0
-          const acos7d = sales7d > 0 ? (spend / sales7d) * 100 : 0
-          const acos14d = sales14d > 0 ? (spend / sales14d) * 100 : 0
-          const roas7d = spend > 0 ? sales7d / spend : 0
-          const roas14d = spend > 0 ? sales14d / spend : 0
-          const convRate7d = clicks > 0 ? (orders7d / clicks) * 100 : 0
-          const convRate14d = clicks > 0 ? (orders14d / clicks) * 100 : 0
-
-          const idToMatch = (anyPerf.keywordId ?? anyPerf.targetId)
-          if (!idToMatch) continue
-
-          const { data: keywordRecord } = await supabase
-            .from('keywords')
-            .select('id')
-            .eq('amazon_keyword_id', idToMatch.toString())
-            .single()
-          
-          if (keywordRecord) {
-            await supabase
-              .from('keywords')
-              .update({
-                impressions,
-                clicks,
-                spend,
-                sales: sales14d,
-                orders: orders14d,
-                acos: acos14d,
-                roas: roas14d,
-                ctr,
-                cpc,
-                conversion_rate: convRate14d,
-                // 7d metrics
-                sales_7d: sales7d,
-                orders_7d: orders7d,
-                acos_7d: acos7d,
-                roas_7d: roas7d,
-                ctr_7d: ctr,
-                cpc_7d: cpc,
-                conversion_rate_7d: convRate7d,
-                clicks_7d: clicks,
-                impressions_7d: impressions,
-                spend_7d: spend,
-                // 14d metrics
-                sales_14d: sales14d,
-                orders_14d: orders14d,
-                acos_14d: acos14d,
-                roas_14d: roas14d,
-                ctr_14d: ctr,
-                cpc_14d: cpc,
-                conversion_rate_14d: convRate14d,
-                clicks_14d: clicks,
-                impressions_14d: impressions,
-                spend_14d: spend,
-                last_updated: new Date().toISOString()
-              })
-              .eq('id', keywordRecord.id)
-            
-            totalMetricsUpdated++
-            diagnostics.keyword.matchedRows = (diagnostics.keyword.matchedRows || 0) + 1
-          }
-        }
-      } catch (error) {
-        console.error('❌ Keyword performance sync failed:', error)
-      }
+      console.log('🔑 Skipping keyword performance sync (targets support pending)')
+      diagnostics.keyword.skipped = true
     }
 
     // Update connection sync status
