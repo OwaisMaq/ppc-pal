@@ -181,6 +181,8 @@ export const CampaignDataTable = ({ campaigns, loading, budgetUsage }: CampaignD
                     <ArrowUpDown className="ml-2 h-4 w-4" />
                   </Button>
                 </TableHead>
+                <TableHead>Budget</TableHead>
+                <TableHead>Usage Today</TableHead>
                 <TableHead>
                   <Button
                     variant="ghost"
@@ -225,40 +227,70 @@ export const CampaignDataTable = ({ campaigns, loading, budgetUsage }: CampaignD
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedCampaigns.slice(0, 20).map((campaign) => (
-                <TableRow key={campaign.id}>
-                  <TableCell className="font-medium">
-                    <div className="max-w-[200px] truncate" title={campaign.name}>
-                      {campaign.name}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={getStatusColor(campaign.status)}>
-                      {campaign.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="font-mono">
-                    {formatCurrency(campaign.spend || 0)}
-                  </TableCell>
-                  <TableCell className="font-mono">
-                    {formatCurrency(campaign.sales || 0)}
-                  </TableCell>
-                  <TableCell className="font-mono">
-                    {formatNumber(campaign.clicks || 0)}
-                  </TableCell>
-                  <TableCell className={`font-mono ${getAcosColor(campaign.acos || 0)}`}>
-                    {formatPercentage(campaign.acos || 0)}
-                  </TableCell>
-                  <TableCell className="font-mono">
-                    {(campaign.roas || 0).toFixed(2)}x
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="text-xs">
-                      {campaign.campaign_type || 'SP'}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {sortedCampaigns.slice(0, 20).map((campaign) => {
+                const usage = budgetUsage?.[campaign.id];
+                const budgetVal = (campaign as any).daily_budget ?? usage?.budget_amount ?? null;
+                const calcPct = (() => {
+                  if (!usage) return null;
+                  if (usage.usage_percentage != null) return Number(usage.usage_percentage);
+                  if (usage.usage_amount != null && budgetVal) {
+                    const v = (Number(usage.usage_amount) / Number(budgetVal)) * 100;
+                    return Number(v.toFixed(2));
+                  }
+                  return null;
+                })();
+                const pctClamped = calcPct != null ? Math.max(0, Math.min(100, calcPct)) : null;
+
+                return (
+                  <TableRow key={campaign.id}>
+                    <TableCell className="font-medium">
+                      <div className="max-w-[200px] truncate" title={campaign.name}>
+                        {campaign.name}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={getStatusColor(campaign.status)}>
+                        {campaign.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-mono">
+                      {formatCurrency(campaign.spend || 0)}
+                    </TableCell>
+                    <TableCell className="font-mono">
+                      {budgetVal != null ? formatCurrency(Number(budgetVal) || 0) : '-'}
+                    </TableCell>
+                    <TableCell>
+                      {pctClamped != null ? (
+                        <div className="min-w-[160px]">
+                          <Progress value={pctClamped} />
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            {formatCurrency(Number(usage?.usage_amount || 0))} / {formatCurrency(Number(budgetVal || usage?.budget_amount || 0))} ({Math.round(pctClamped)}%)
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="font-mono">
+                      {formatCurrency(campaign.sales || 0)}
+                    </TableCell>
+                    <TableCell className="font-mono">
+                      {formatNumber(campaign.clicks || 0)}
+                    </TableCell>
+                    <TableCell className={`font-mono ${getAcosColor(campaign.acos || 0)}`}>
+                      {formatPercentage(campaign.acos || 0)}
+                    </TableCell>
+                    <TableCell className="font-mono">
+                      {(campaign.roas || 0).toFixed(2)}x
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-xs">
+                        {campaign.campaign_type || 'SP'}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>

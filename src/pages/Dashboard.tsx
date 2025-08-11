@@ -17,6 +17,7 @@ import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@
 import { Link } from "react-router-dom";
 import { useAmazonData } from "@/hooks/useAmazonData";
 import { formatDistanceToNow } from "date-fns";
+import { useBudgetUsage } from "@/hooks/useBudgetUsage";
 // Map marketplace IDs to region labels and flags
 const MARKETPLACE_INFO: Record<string, { code: string; label: string; flag: string }> = {
   // EU
@@ -84,6 +85,9 @@ const Dashboard = () => {
   const selectedConnection = useMemo(() => activeConnections.find(c => c.id === selectedConnectionId), [activeConnections, selectedConnectionId]);
   const { syncAllData, loading: syncLoading } = useAmazonData();
   const [autoSynced, setAutoSynced] = useState(false);
+
+  const campaignIds = useMemo(() => campaigns.map(c => c.id), [campaigns]);
+  const { data: budgetUsage } = useBudgetUsage(campaignIds);
 
   useEffect(() => {
     if (activeConnections.length > 0) {
@@ -247,7 +251,7 @@ const Dashboard = () => {
               </div>
 
               {/* Campaign Data Table */}
-              <CampaignDataTable campaigns={campaigns} loading={loading} />
+              <CampaignDataTable campaigns={campaigns} loading={loading} budgetUsage={budgetUsage} />
 
               {/* Consolidated Data View - Full Width */}
               <div className="lg:col-span-3">
