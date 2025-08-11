@@ -49,10 +49,10 @@ const AmazonCallback = () => {
         if (result?.success) {
           setStatus('success');
           const profileCount = result?.profileCount || 0;
-          setMessage(`Amazon account connected successfully! Found ${profileCount} advertising profile(s). Redirecting to dashboard...`);
-          // Redirect to dashboard after 2 seconds
+          setMessage(`Amazon account connected successfully! Found ${profileCount} advertising profile(s). Redirecting to settings...`);
+          // Redirect to settings after 2 seconds
           setTimeout(() => {
-            navigate('/dashboard');
+            navigate('/settings');
           }, 2000);
         } else {
           console.log('OAuth callback returned falsy result:', result);
@@ -110,17 +110,17 @@ const AmazonCallback = () => {
           
           {status === 'error' && (
             <Button 
-              onClick={() => navigate('/dashboard')} 
+              onClick={() => navigate('/settings')} 
               variant="outline"
               className="w-full"
             >
-              Return to Dashboard
+              Go to Settings
             </Button>
           )}
           
           {status === 'success' && (
             <p className="text-sm text-gray-500">
-              Redirecting to dashboard...
+              Redirecting to settings...
             </p>
           )}
         </CardContent>

@@ -3,9 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
-import { LogOut, User, Crown, LinkIcon, MessageSquare, Bot, Shield, Database, BarChart3 } from "lucide-react";
+import { LogOut, User, Crown, MessageSquare, Bot, Shield, Database, BarChart3, Settings as SettingsIcon } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import ComingSoon from "@/components/ComingSoon";
+
 
 const Header = () => {
   const { user, signOut } = useAuth();
@@ -80,6 +80,17 @@ const Header = () => {
             </Link>
             
             <Link 
+              to="/settings"
+              className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
+                location.pathname === '/settings' 
+                  ? 'bg-blue-100 text-blue-700' 
+                  : 'text-gray-600 hover:text-blue-600 hover:bg-gray-100'
+              }`}
+            >
+              <SettingsIcon className="h-4 w-4" />
+              Settings
+            </Link>
+            <Link 
               to="/privacy"
               className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
                 location.pathname === '/privacy' 
@@ -92,13 +103,6 @@ const Header = () => {
             </Link>
           </nav>
 
-          {/* Coming Soon Features */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1">
-              <LinkIcon className="h-4 w-4 text-muted-foreground" />
-              <ComingSoon feature="Account Sync" className="text-xs" />
-            </div>
-          </div>
           
           <Button
             variant="outline"
