@@ -33,14 +33,44 @@ const MARKETPLACE_INFO: Record<string, { code: string; label: string; flag: stri
   A2EUQ1WTGCTBG2: { code: "CA", label: "Canada", flag: "🇨🇦" },
   A1AM78C64UM0Y8: { code: "MX", label: "Mexico", flag: "🇲🇽" },
   // Other common
-  A39IBJ37TRP1C6: { code: "AE", label: "United Arab Emirates", flag: "🇦🇪" },
+  A39IBJ37TRP1C6: { code: "AU", label: "Australia", flag: "🇦🇺" },
+  A1VC38T7YXB528: { code: "JP", label: "Japan", flag: "🇯🇵" },
+  A21TJRUUN4KGV: { code: "IN", label: "India", flag: "🇮🇳" },
+  A33AVAJ2PDY3EV: { code: "TR", label: "Turkey", flag: "🇹🇷" },
+  A19VAU5U5O7RUS: { code: "SG", label: "Singapore", flag: "🇸🇬" },
+  A17E79C6D8DWNP: { code: "SA", label: "Saudi Arabia", flag: "🇸🇦" },
+  A2VIGQ35RCS4UG: { code: "AE", label: "United Arab Emirates", flag: "🇦🇪" },
+  A2Q3Y263D00KWC: { code: "BR", label: "Brazil", flag: "🇧🇷" },
 };
-
 const getMarketplaceInfo = (id?: string) => (id && MARKETPLACE_INFO[id]) || { code: "", label: "", flag: "" };
+const inferFlagFromName = (name?: string) => {
+  const n = (name || '').toLowerCase();
+  if (/uk|united kingdom|gb|britain/.test(n)) return '🇬🇧';
+  if (/us|united states|usa/.test(n)) return '🇺🇸';
+  if (/de|germany|deutschland/.test(n)) return '🇩🇪';
+  if (/fr|france/.test(n)) return '🇫🇷';
+  if (/es|spain|españa/.test(n)) return '🇪🇸';
+  if (/it|italy|italia/.test(n)) return '🇮🇹';
+  if (/nl|netherlands|holland/.test(n)) return '🇳🇱';
+  if (/se|sweden/.test(n)) return '🇸🇪';
+  if (/pl|poland|polska/.test(n)) return '🇵🇱';
+  if (/ca|canada/.test(n)) return '🇨🇦';
+  if (/mx|mexico/.test(n)) return '🇲🇽';
+  if (/jp|japan/.test(n)) return '🇯🇵';
+  if (/ae|uae|united arab emirates|dubai/.test(n)) return '🇦🇪';
+  if (/au|australia/.test(n)) return '🇦🇺';
+  if (/in|india/.test(n)) return '🇮🇳';
+  return '🌐';
+};
+const getFlagForConnection = (c: { profile_name?: string; marketplace_id?: string }) => {
+  const m = getMarketplaceInfo(c.marketplace_id);
+  return m.flag || inferFlagFromName(c.profile_name);
+};
 const getConnectionLabel = (c: { profile_name?: string; profile_id: string; marketplace_id?: string }) => {
   const info = getMarketplaceInfo(c.marketplace_id);
   const name = c.profile_name || c.profile_id;
-  return `${info.flag ? info.flag + " " : ""}${name}${info.code ? ` (${info.code})` : ""}`;
+  const flag = info.flag || inferFlagFromName(name);
+  return `${flag} ${name}${info.code ? ` (${info.code})` : ""}`;
 };
 
 const Dashboard = () => {
@@ -81,9 +111,9 @@ const Dashboard = () => {
                 </SelectTrigger>
                 <SelectContent className="z-50 bg-background border shadow-md">
                   {activeConnections.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
+                    <SelectItem key={c.id} value={c.id} textValue={getConnectionLabel(c)}>
                       <div className="flex items-center gap-2">
-                        <span className="text-base">{getMarketplaceInfo(c.marketplace_id).flag || '🌐'}</span>
+                        <span className="text-base">{getFlagForConnection(c)}</span>
                         <span>
                           {(c.profile_name || c.profile_id)}
                           {getMarketplaceInfo(c.marketplace_id).code ? ` (${getMarketplaceInfo(c.marketplace_id).code})` : ''}
