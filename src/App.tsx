@@ -17,7 +17,6 @@ import Contact from "@/pages/Contact";
 import Company from "@/pages/Company";
 import NotFound from "@/pages/NotFound";
 import AmazonCallback from "@/pages/AmazonCallback";
-import Settings from "@/pages/Settings";
 import CookieConsent from "@/components/CookieConsent";
 
 const queryClient = new QueryClient();
@@ -62,11 +61,6 @@ const App = () => {
               <Route path="/privacy" element={
                 <ProtectedRoute>
                   <Privacy />
-                </ProtectedRoute>
-              } />
-              <Route path="/settings" element={
-                <ProtectedRoute>
-                  <Settings />
                 </ProtectedRoute>
               } />
               
