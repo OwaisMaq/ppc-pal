@@ -251,8 +251,8 @@ serve(async (req) => {
         })
 
       return new Response(
-        JSON.stringify({ success: false, message: 'No campaigns found for this profile.' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ success: false, code: 'NO_CAMPAIGNS', message: 'No campaigns found for this profile.' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
@@ -565,8 +565,8 @@ serve(async (req) => {
 
     console.warn('Sync finished without metrics updates')
     return new Response(
-      JSON.stringify({ success: false, message: 'Sync completed without metrics updates' }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ success: false, code: 'NO_METRICS_UPDATED', message: 'Sync completed without metrics updates' }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error) {

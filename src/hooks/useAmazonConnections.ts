@@ -157,14 +157,29 @@ export const useAmazonConnections = () => {
 
   const syncConnection = async (connectionId: string) => {
     try {
-      const { error } = await supabase.functions.invoke('sync-amazon-data', {
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      const { data, error } = await supabase.functions.invoke('sync-amazon-data', {
         body: { connectionId },
         headers: {
-          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+          Authorization: `Bearer ${token}`,
         },
       });
 
       if (error) throw error;
+
+      if (data && data.success === false) {
+        const code = (data as any).code;
+        const message = (data as any).message || 'Sync could not proceed.';
+        if (code === 'NO_CAMPAIGNS') {
+          toast.info('No Amazon campaigns found for this connection. Nothing to sync.');
+        } else if (code === 'NO_METRICS_UPDATED') {
+          toast.warning('Sync finished but no performance data was updated.');
+        } else {
+          toast.warning(message);
+        }
+        await fetchConnections();
+        return;
+      }
       
       toast.success('Data sync initiated successfully!');
       await fetchConnections();
@@ -172,10 +187,10 @@ export const useAmazonConnections = () => {
       console.error('Error syncing connection:', error);
       
       // Check if it's a token-related error
-      if (error.message && (
-        error.message.includes('Token expired') || 
-        error.message.includes('refresh failed') ||
-        error.message.includes('reconnect')
+      if ((error as any).message && (
+        (error as any).message.includes('Token expired') || 
+        (error as any).message.includes('refresh failed') ||
+        (error as any).message.includes('reconnect')
       )) {
         toast.error('Your Amazon connection has expired. Please refresh or reconnect your account.');
         
