@@ -28,6 +28,7 @@ export interface CampaignData {
   roas: number;
   campaign_type: string;
   created_at: string;
+  daily_budget?: number | null;
 }
 
 export const useCampaignMetrics = () => {

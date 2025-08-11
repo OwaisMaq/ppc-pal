@@ -12,10 +12,13 @@ import { Button } from "@/components/ui/button";
 import { ArrowUpDown, ExternalLink } from "lucide-react";
 import { CampaignData } from "@/hooks/useCampaignMetrics";
 import { useState } from "react";
+import { Progress } from "@/components/ui/progress";
+import type { BudgetUsageMap } from "@/hooks/useBudgetUsage";
 
 interface CampaignDataTableProps {
   campaigns: CampaignData[];
   loading?: boolean;
+  budgetUsage?: BudgetUsageMap;
 }
 
 type SortField = 'name' | 'spend' | 'sales' | 'acos' | 'roas' | 'clicks';
@@ -56,7 +59,7 @@ const getAcosColor = (acos: number) => {
   return "text-red-600";
 };
 
-export const CampaignDataTable = ({ campaigns, loading }: CampaignDataTableProps) => {
+export const CampaignDataTable = ({ campaigns, loading, budgetUsage }: CampaignDataTableProps) => {
   const [sortField, setSortField] = useState<SortField>('spend');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
