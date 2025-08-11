@@ -16,6 +16,33 @@ import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 
+// Map marketplace IDs to region labels and flags
+const MARKETPLACE_INFO: Record<string, { code: string; label: string; flag: string }> = {
+  // EU
+  A1F83G8C2ARO7P: { code: "UK", label: "United Kingdom", flag: "🇬🇧" },
+  A1PA6795UKMFR9: { code: "DE", label: "Germany", flag: "🇩🇪" },
+  A13V1IB3VIYZZH: { code: "FR", label: "France", flag: "🇫🇷" },
+  A1RKKUPIHCS9HS: { code: "ES", label: "Spain", flag: "🇪🇸" },
+  APJ6JRA9NG5V4: { code: "IT", label: "Italy", flag: "🇮🇹" },
+  A1805IZSGTT6HS: { code: "NL", label: "Netherlands", flag: "🇳🇱" },
+  A2N6G2J0Z2T20O: { code: "SE", label: "Sweden", flag: "🇸🇪" },
+  A1C3SOZRARQ6R3: { code: "SE", label: "Sweden", flag: "🇸🇪" }, // alt
+  A1ZFFQZ3HTUKT9: { code: "PL", label: "Poland", flag: "🇵🇱" },
+  // North America
+  ATVPDKIKX0DER: { code: "US", label: "United States", flag: "🇺🇸" },
+  A2EUQ1WTGCTBG2: { code: "CA", label: "Canada", flag: "🇨🇦" },
+  A1AM78C64UM0Y8: { code: "MX", label: "Mexico", flag: "🇲🇽" },
+  // Other common
+  A39IBJ37TRP1C6: { code: "AE", label: "United Arab Emirates", flag: "🇦🇪" },
+};
+
+const getMarketplaceInfo = (id?: string) => (id && MARKETPLACE_INFO[id]) || { code: "", label: "", flag: "" };
+const getConnectionLabel = (c: { profile_name?: string; profile_id: string; marketplace_id?: string }) => {
+  const info = getMarketplaceInfo(c.marketplace_id);
+  const name = c.profile_name || c.profile_id;
+  return `${info.flag ? info.flag + " " : ""}${name}${info.code ? ` (${info.code})` : ""}`;
+};
+
 const Dashboard = () => {
   const { connections, syncConnection, refreshConnections, loading: connectionsLoading } = useAmazonConnections();
   const { metrics, campaigns, loading, error, refetch } = useCampaignMetrics();
@@ -67,13 +94,13 @@ const Dashboard = () => {
           {hasActiveConnections && (
             <div className="flex gap-3 items-center">
               <Select value={selectedConnectionId} onValueChange={setSelectedConnectionId}>
-                <SelectTrigger className="w-56">
+                <SelectTrigger className="w-64">
                   <SelectValue placeholder="Select profile" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-50 bg-background border shadow-md">
                   {activeConnections.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
-                      {c.profile_name || c.profile_id}
+                      {getConnectionLabel(c)}
                     </SelectItem>
                   ))}
                 </SelectContent>
