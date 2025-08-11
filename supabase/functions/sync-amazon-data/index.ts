@@ -19,13 +19,17 @@ interface PerformanceData {
   campaignId?: string
   adGroupId?: string  
   keywordId?: string
+  keywordText?: string
+  matchType?: string
   impressions?: string
   clicks?: string
   cost?: string
-  attributedSales7d?: string
-  attributedSales14d?: string
-  attributedUnitsOrdered7d?: string
-  attributedUnitsOrdered14d?: string
+  sales7d?: string
+  sales14d?: string
+  purchases7d?: string
+  purchases14d?: string
+  clickThroughRate?: string
+  costPerClick?: string
 }
 
 async function waitWithExponentialBackoff(attempt: number, baseDelayMs = 1000, maxDelayMs = 30000) {
@@ -48,9 +52,9 @@ async function createReportRequest(
     endDate: new Date().toISOString().split('T')[0],
     configuration: {
       adProduct: 'SPONSORED_PRODUCTS',
-      groupBy: [reportType === 'campaigns' ? 'campaign' : reportType === 'adGroups' ? 'adGroup' : 'keyword'],
+      groupBy: [reportType === 'campaigns' ? 'campaign' : reportType === 'adGroups' ? 'adGroup' : 'adGroup'], // Keywords must use adGroup groupBy
       columns,
-      reportTypeId: reportType === 'campaigns' ? 'spCampaigns' : reportType === 'adGroups' ? 'spAdGroups' : 'spKeywords',
+      reportTypeId: reportType === 'campaigns' ? 'spCampaigns' : reportType === 'adGroups' ? 'spAdGroups' : 'spTargets', // Use spTargets for keywords
       timeUnit: 'SUMMARY',
       format: 'GZIP_JSON'
     }
@@ -435,23 +439,23 @@ serve(async (req) => {
     console.log('⚡ Starting performance data sync...')
     let totalMetricsUpdated = 0
 
-    // Define columns with both 7d and 14d attribution windows
+    // Define columns using correct Amazon API v3 column names
     const campaignColumns = [
-      'campaignId', 'date', 'impressions', 'clicks', 'cost',
-      'attributedSales7d', 'attributedUnitsOrdered7d',
-      'attributedSales14d', 'attributedUnitsOrdered14d'
+      'campaignId', 'impressions', 'clicks', 'cost',
+      'sales7d', 'purchases7d', 'sales14d', 'purchases14d',
+      'clickThroughRate', 'costPerClick'
     ]
     
     const adGroupColumns = [
-      'adGroupId', 'campaignId', 'date', 'impressions', 'clicks', 'cost',
-      'attributedSales7d', 'attributedUnitsOrdered7d', 
-      'attributedSales14d', 'attributedUnitsOrdered14d'
+      'adGroupId', 'impressions', 'clicks', 'cost',
+      'sales7d', 'purchases7d', 'sales14d', 'purchases14d',
+      'clickThroughRate', 'costPerClick'
     ]
     
     const keywordColumns = [
-      'keywordId', 'adGroupId', 'campaignId', 'date', 'impressions', 'clicks', 'cost',
-      'attributedSales7d', 'attributedUnitsOrdered7d',
-      'attributedSales14d', 'attributedUnitsOrdered14d'
+      'keywordId', 'impressions', 'clicks', 'cost',
+      'sales7d', 'purchases7d', 'sales14d', 'purchases14d',
+      'clickThroughRate', 'costPerClick', 'keywordText', 'matchType'
     ]
 
     // Campaign Performance
@@ -474,18 +478,19 @@ serve(async (req) => {
         for (const perf of performanceData) {
           if (!perf.campaignId) continue
           
-          // Calculate derived metrics
+          // Calculate derived metrics using correct API field names
           const impressions = parseInt(perf.impressions || '0')
           const clicks = parseInt(perf.clicks || '0')
           const spend = parseFloat(perf.cost || '0')
-          const sales7d = parseFloat(perf.attributedSales7d || '0')
-          const sales14d = parseFloat(perf.attributedSales14d || '0')
-          const orders7d = parseInt(perf.attributedUnitsOrdered7d || '0')
-          const orders14d = parseInt(perf.attributedUnitsOrdered14d || '0')
+          const sales7d = parseFloat(perf.sales7d || '0')
+          const sales14d = parseFloat(perf.sales14d || '0')
+          const orders7d = parseInt(perf.purchases7d || '0')
+          const orders14d = parseInt(perf.purchases14d || '0')
           
-          const ctr7d = impressions > 0 ? (clicks / impressions) * 100 : 0
+          // Use API-provided metrics or calculate fallbacks
+          const ctr7d = parseFloat(perf.clickThroughRate || '0') || (impressions > 0 ? (clicks / impressions) * 100 : 0)
           const ctr14d = ctr7d // Same CTR for both periods
-          const cpc7d = clicks > 0 ? spend / clicks : 0
+          const cpc7d = parseFloat(perf.costPerClick || '0') || (clicks > 0 ? spend / clicks : 0)
           const cpc14d = cpc7d // Same CPC for both periods
           const acos7d = sales7d > 0 ? (spend / sales7d) * 100 : 0
           const acos14d = sales14d > 0 ? (spend / sales14d) * 100 : 0
@@ -560,13 +565,13 @@ serve(async (req) => {
           const impressions = parseInt(perf.impressions || '0')
           const clicks = parseInt(perf.clicks || '0')
           const spend = parseFloat(perf.cost || '0')
-          const sales7d = parseFloat(perf.attributedSales7d || '0')
-          const sales14d = parseFloat(perf.attributedSales14d || '0')
-          const orders7d = parseInt(perf.attributedUnitsOrdered7d || '0')
-          const orders14d = parseInt(perf.attributedUnitsOrdered14d || '0')
+          const sales7d = parseFloat(perf.sales7d || '0')
+          const sales14d = parseFloat(perf.sales14d || '0')
+          const orders7d = parseInt(perf.purchases7d || '0')
+          const orders14d = parseInt(perf.purchases14d || '0')
           
-          const ctr7d = impressions > 0 ? (clicks / impressions) * 100 : 0
-          const cpc7d = clicks > 0 ? spend / clicks : 0
+          const ctr7d = parseFloat(perf.clickThroughRate || '0') || (impressions > 0 ? (clicks / impressions) * 100 : 0)
+          const cpc7d = parseFloat(perf.costPerClick || '0') || (clicks > 0 ? spend / clicks : 0)
           const acos7d = sales7d > 0 ? (spend / sales7d) * 100 : 0
           const acos14d = sales14d > 0 ? (spend / sales14d) * 100 : 0
           const roas7d = spend > 0 ? sales7d / spend : 0
@@ -648,13 +653,13 @@ serve(async (req) => {
           const impressions = parseInt(perf.impressions || '0')
           const clicks = parseInt(perf.clicks || '0')
           const spend = parseFloat(perf.cost || '0')
-          const sales7d = parseFloat(perf.attributedSales7d || '0')
-          const sales14d = parseFloat(perf.attributedSales14d || '0')
-          const orders7d = parseInt(perf.attributedUnitsOrdered7d || '0')
-          const orders14d = parseInt(perf.attributedUnitsOrdered14d || '0')
+          const sales7d = parseFloat(perf.sales7d || '0')
+          const sales14d = parseFloat(perf.sales14d || '0')
+          const orders7d = parseInt(perf.purchases7d || '0')
+          const orders14d = parseInt(perf.purchases14d || '0')
           
-          const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0
-          const cpc = clicks > 0 ? spend / clicks : 0
+          const ctr = parseFloat(perf.clickThroughRate || '0') || (impressions > 0 ? (clicks / impressions) * 100 : 0)
+          const cpc = parseFloat(perf.costPerClick || '0') || (clicks > 0 ? spend / clicks : 0)
           const acos7d = sales7d > 0 ? (spend / sales7d) * 100 : 0
           const acos14d = sales14d > 0 ? (spend / sales14d) * 100 : 0
           const roas7d = spend > 0 ? sales7d / spend : 0
