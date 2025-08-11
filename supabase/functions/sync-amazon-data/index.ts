@@ -200,37 +200,48 @@ serve(async (req) => {
       }
     }
 
-    // Fetch performance data for campaigns
+    // Fetch performance data for campaigns using Reporting v3 (proper async flow)
     if (campaignIds.length > 0) {
-      console.log('Fetching campaign performance data...')
-      
-      // Process campaigns in batches of 100
+      console.log('Creating Reporting v3 jobs for campaign performance...')
+
       const batchSize = 100
+
+      // Small helper to convert micro amounts to currency units safely
+      const toCurrency = (val: unknown) => {
+        const num = Number(val ?? 0)
+        if (!isFinite(num)) return 0
+        return num > 100000 ? num / 1_000_000 : num
+      }
+
       for (let i = 0; i < campaignIds.length; i += batchSize) {
         const batch = campaignIds.slice(i, i + batchSize)
-        
+        const batchIndex = Math.floor(i / batchSize) + 1
+
         try {
-          const reportPayload = {
+          const createBody = {
+            name: `SP Campaigns Summary ${reportStartDate}..${reportEndDate} (batch ${batchIndex})`,
             startDate: reportStartDate,
             endDate: reportEndDate,
             configuration: {
               adProduct: 'SPONSORED_PRODUCTS',
+              groupBy: ['campaign'],
+              timeUnit: 'SUMMARY',
               columns: [
                 'campaignId',
                 'impressions',
                 'clicks',
                 'cost',
-                'attributedSales30d',
-                'attributedUnitsOrdered30d'
-              ],
-              reportTypeId: 'spCampaigns',
-              timeUnit: 'SUMMARY',
-              format: 'GZIP_JSON'
+                'purchases14d',
+                'sales14d'
+              ]
             },
-            campaignIdFilter: batch
+            filters: [
+              { field: 'campaignId', values: batch }
+            ],
+            format: 'GZIP_JSON'
           }
 
-          const reportResponse = await fetch(`${apiEndpoint}/reporting/reports`, {
+          const createRes = await fetch(`${apiEndpoint}/reporting/reports`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${accessToken}`,
@@ -238,45 +249,138 @@ serve(async (req) => {
               'Amazon-Advertising-API-Scope': connection.profile_id,
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify(reportPayload)
+            body: JSON.stringify(createBody)
           })
 
-          if (reportResponse.ok) {
-            const reportData = await reportResponse.json()
-            console.log(`Retrieved performance data for ${reportData.length} campaigns in batch ${i/batchSize + 1}`)
-            
-            // Update campaigns with performance data
-            for (const perfData of reportData) {
-              if (!perfData.campaignId) continue
-              
-              const { error: updateError } = await supabase
-                .from('campaigns')
-                .update({
-                  impressions: parseInt(perfData.impressions || '0'),
-                  clicks: parseInt(perfData.clicks || '0'),
-                  spend: parseFloat(perfData.cost || '0'),
-                  sales: parseFloat(perfData.attributedSales30d || '0'),
-                  orders: parseInt(perfData.attributedUnitsOrdered30d || '0'),
-                  last_updated: new Date().toISOString()
-                })
-                .eq('connection_id', connectionId)
-                .eq('amazon_campaign_id', perfData.campaignId.toString())
-
-              if (updateError) {
-                console.error('Error updating campaign performance:', perfData.campaignId, updateError)
-              }
-            }
-          } else {
-            const errorText = await reportResponse.text()
-            console.error(`Performance data API error for batch ${i/batchSize + 1}:`, reportResponse.status, errorText)
+          if (!createRes.ok) {
+            const errTxt = await createRes.text()
+            console.error(`Report create failed (batch ${batchIndex}):`, createRes.status, errTxt)
+            continue
           }
-        } catch (batchError) {
-          console.error(`Error processing batch ${i/batchSize + 1}:`, batchError)
+
+          const created = await createRes.json() as { reportId?: string }
+          const reportId = created.reportId
+          if (!reportId) {
+            console.error(`No reportId returned for batch ${batchIndex}`)
+            continue
+          }
+
+          // Poll for completion
+          let status = 'IN_PROGRESS'
+          let downloadUrl: string | null = null
+          const maxPolls = 12 // ~36s @3s interval
+          for (let attempt = 1; attempt <= maxPolls; attempt++) {
+            const statusRes = await fetch(`${apiEndpoint}/reporting/reports/${reportId}`, {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Amazon-Advertising-API-ClientId': clientId,
+                'Amazon-Advertising-API-Scope': connection.profile_id,
+              },
+            })
+            if (!statusRes.ok) {
+              const errTxt = await statusRes.text()
+              console.error(`Report status error (batch ${batchIndex}, attempt ${attempt}):`, statusRes.status, errTxt)
+              break
+            }
+            const statusJson = await statusRes.json()
+            status = statusJson.status
+            if (status === 'SUCCESS') {
+              downloadUrl = statusJson.url || statusJson.report?.url || null
+              break
+            }
+            if (status === 'FAILURE') {
+              console.error(`Report failed (batch ${batchIndex}):`, statusJson)
+              break
+            }
+            await new Promise(r => setTimeout(r, 3000))
+          }
+
+          if (!downloadUrl) {
+            console.warn(`No downloadUrl for batch ${batchIndex} (status: ${status})`)
+            continue
+          }
+
+          // Download and parse report (GZIP JSON or JSON Lines)
+          const dlRes = await fetch(downloadUrl)
+          if (!dlRes.ok) {
+            const errTxt = await dlRes.text().catch(() => '')
+            console.error(`Report download failed (batch ${batchIndex}):`, dlRes.status, errTxt)
+            continue
+          }
+
+          // Try to handle gzip transparently
+          let textData = ''
+          try {
+            const encoding = dlRes.headers.get('content-encoding') || ''
+            if (encoding.includes('gzip')) {
+              const decompressed = dlRes.body?.pipeThrough(new DecompressionStream('gzip'))
+              textData = await new Response(decompressed).text()
+            } else {
+              textData = await dlRes.text()
+            }
+          } catch (e) {
+            // Fallback: assume body is gzip even if header missing
+            try {
+              const decompressed = dlRes.body?.pipeThrough(new DecompressionStream('gzip'))
+              textData = await new Response(decompressed).text()
+            } catch (e2) {
+              console.error('Failed to read report body', e, e2)
+              continue
+            }
+          }
+
+          let rows: any[] = []
+          try {
+            const json = JSON.parse(textData)
+            if (Array.isArray(json)) rows = json
+            else if (Array.isArray(json.records)) rows = json.records
+            else rows = []
+          } catch {
+            // JSON Lines fallback
+            rows = textData
+              .split('\n')
+              .map(l => l.trim())
+              .filter(Boolean)
+              .map(l => { try { return JSON.parse(l) } catch { return null } })
+              .filter(Boolean)
+          }
+
+          console.log(`Parsed ${rows.length} report rows for batch ${batchIndex}`)
+
+          for (const r of rows) {
+            const cid = (r.campaignId ?? r.campaignID ?? r.campaign_id ?? '').toString()
+            if (!cid) continue
+
+            const impressions = Number(r.impressions ?? 0) || 0
+            const clicks = Number(r.clicks ?? 0) || 0
+            const spend = toCurrency(r.cost ?? r.spend)
+            const sales = toCurrency(r.sales14d ?? r.attributedSales14d ?? r.sales30d ?? r.attributedSales30d)
+            const orders = Number(r.purchases14d ?? r.attributedUnitsOrdered14d ?? r.purchases30d ?? r.attributedUnitsOrdered30d ?? 0) || 0
+
+            const { error: updErr } = await supabase
+              .from('campaigns')
+              .update({
+                impressions,
+                clicks,
+                spend,
+                sales,
+                orders,
+                last_updated: new Date().toISOString()
+              })
+              .eq('connection_id', connectionId)
+              .eq('amazon_campaign_id', cid)
+
+            if (updErr) {
+              console.error('Error updating campaign metrics', cid, updErr)
+            }
+          }
+        } catch (err) {
+          console.error(`Error processing batch ${batchIndex}:`, err)
         }
-        
-        // Small delay between batches to avoid rate limiting
+
+        // Brief delay between batches for rate limiting safety
         if (i + batchSize < campaignIds.length) {
-          await new Promise(resolve => setTimeout(resolve, 100))
+          await new Promise(r => setTimeout(r, 250))
         }
       }
     }
