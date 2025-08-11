@@ -244,25 +244,23 @@ const ConsolidatedDataView = () => {
                                                 <span>Bid: {formatCurrency(keyword.bid)}</span>
                                               )}
                                             </div>
-                                          </div>
-                                        </div>
-                                        <div className="text-right">
-                                          <div className="text-xs">
-                                            {formatCurrency(keyword.spend || 0)}
-                                          </div>
-                                          <div className="text-xs text-muted-foreground">
-                                            {formatCurrency(keyword.sales || 0)}
-                                          </div>
-                                          {keyword.clicks > 0 && (
-                                            <div className="text-xs text-muted-foreground">
-                                              {formatNumber(keyword.clicks)} clicks
-                                            </div>
-                                          )}
                                         </div>
                                       </div>
-                                    ))
-                                  )}
-                                </div>
+                                      <div className="text-right">
+                                        <div className="text-xs">
+                                          {formatCurrency(keyword.spend || 0)}
+                                        </div>
+                                        <div className="text-xs text-muted-foreground">
+                                          {formatCurrency(keyword.sales || 0)}
+                                        </div>
+                                        <div className="text-xs text-muted-foreground">
+                                          {formatNumber(keyword.clicks || 0)} clicks
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
                               </CollapsibleContent>
                             </Collapsible>
                           );

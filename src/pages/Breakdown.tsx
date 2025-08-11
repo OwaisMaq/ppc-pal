@@ -279,6 +279,46 @@ const Breakdown = () => {
                 </Card>
               </div>
 
+              {/* Keywords in Selected Ad Group */}
+              {selectedAdGroupId && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Keywords in Ad Group</CardTitle>
+                    <CardDescription>Clicks, spend, and sales per keyword</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {filteredKeywords.length === 0 ? (
+                      <div className="text-sm text-muted-foreground">No keywords found.</div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <div className="min-w-[640px]">
+                          <div className="grid grid-cols-6 gap-2 px-2 py-2 text-xs text-muted-foreground">
+                            <div className="col-span-2">Keyword</div>
+                            <div>Match</div>
+                            <div className="text-right">Clicks</div>
+                            <div className="text-right">Spend</div>
+                            <div className="text-right">Sales</div>
+                          </div>
+                          <div className="divide-y">
+                            {filteredKeywords.map((k) => (
+                              <div key={k.id} className="grid grid-cols-6 gap-2 px-2 py-2 items-center">
+                                <div className="col-span-2 truncate">{k.keyword_text}</div>
+                                <div>
+                                  <Badge variant="outline" className="text-xs py-0 px-1">{k.match_type}</Badge>
+                                </div>
+                                <div className="text-right">{formatNumber(k.clicks || 0)}</div>
+                                <div className="text-right">{formatCurrency(k.spend || 0)}</div>
+                                <div className="text-right">{formatCurrency(k.sales || 0)}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Selected Entity Details */}
               {(selectedCampaign || selectedAdGroup || selectedKeyword) && (
                 <Card>

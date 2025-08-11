@@ -234,6 +234,9 @@ const AmazonDataDashboard = () => {
                         <div className="text-sm text-gray-500">
                           Sales: {formatCurrency(keyword.sales || 0)}
                         </div>
+                        <div className="text-xs text-muted-foreground">
+                          Clicks: {formatNumber(keyword.clicks || 0)}
+                        </div>
                       </div>
                     </div>
                   ))}

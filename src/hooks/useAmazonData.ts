@@ -138,15 +138,17 @@ export const useAmazonData = () => {
       if (error) throw error;
 
       if (data && data.success === false) {
+        const counts = data.entitiesSynced ? ` (campaigns: ${data.entitiesSynced.campaigns || 0}, ad groups: ${data.entitiesSynced.adGroups || 0}, keywords: ${data.entitiesSynced.keywords || 0})` : '';
         if (data.code === 'NO_CAMPAIGNS') {
-          toast.info('No campaigns found for this profile.');
+          toast.info(`No campaigns found for this profile.${counts}`);
         } else if (data.code === 'NO_METRICS_UPDATED') {
-          toast.warning('Synced entities, but no performance metrics were updated yet.');
+          toast.warning(`Synced entities, but no performance metrics were updated yet.${counts}`);
         } else {
-          toast.info(data.message || 'Sync completed with notices.');
+          toast.info(`${data.message || 'Sync completed with notices.'}${counts}`);
         }
       } else {
-        toast.success('Data sync completed successfully!');
+        const counts = data?.entitiesSynced ? ` (campaigns: ${data.entitiesSynced.campaigns || 0}, ad groups: ${data.entitiesSynced.adGroups || 0}, keywords: ${data.entitiesSynced.keywords || 0}; metrics updated: ${data.metricsUpdated || 0})` : '';
+        toast.success(`Data sync completed successfully!${counts}`);
       }
       
       // Refresh data after sync
