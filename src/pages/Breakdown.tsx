@@ -38,6 +38,22 @@ const Breakdown = () => {
 
   const activeConnections = connections.filter(c => c.status === 'active');
 
+  // Prefer 14d metrics when available, fallback to base fields
+  const getMetric = (k: any, base: 'clicks' | 'spend' | 'sales' | 'orders') => {
+    const fourteen = k?.[`${base}_14d`];
+    const seven = k?.[`${base}_7d`];
+    const baseVal = k?.[base];
+    return (typeof fourteen === 'number' ? fourteen :
+            typeof seven === 'number' ? seven :
+            typeof baseVal === 'number' ? baseVal : 0) as number;
+  };
+
+  const getAcos = (k: any) => {
+    const spend = getMetric(k, 'spend');
+    const sales = getMetric(k, 'sales');
+    return sales > 0 ? (spend / sales) * 100 : 0;
+  };
+
   // Calculate high-level summary
   const summary = useMemo(() => {
     const totals = campaigns.reduce((acc, campaign) => ({
@@ -65,12 +81,12 @@ const Breakdown = () => {
     return adGroups.filter(ag => ag.campaign_id === selectedCampaignId);
   }, [adGroups, selectedCampaignId]);
 
-// Filter keywords based on selected ad group
+  // Filter keywords based on selected ad group and sort by clicks desc (14d preferred)
   const filteredKeywords = useMemo(() => {
-    if (!selectedAdGroupId) return [];
+    if (!selectedAdGroupId) return [] as typeof keywords;
     let list = keywords.filter(k => k.adgroup_id === selectedAdGroupId);
-    if (filterClicks) list = list.filter(k => (k.clicks || 0) > 0);
-    return list;
+    if (filterClicks) list = list.filter(k => getMetric(k as any, 'clicks') > 0);
+    return list.sort((a, b) => getMetric(b as any, 'clicks') - getMetric(a as any, 'clicks'));
   }, [keywords, selectedAdGroupId, filterClicks]);
 
   // Get selected entities for display
@@ -346,7 +362,7 @@ const Breakdown = () => {
                 <Card>
                   <CardHeader>
                     <CardTitle>Keywords in Ad Group</CardTitle>
-                    <CardDescription>Clicks, spend, and sales per keyword</CardDescription>
+                    <CardDescription>Clicks, conversions, spend, sales and ACoS per keyword (14d preferred)</CardDescription>
                   </CardHeader>
                   <CardContent>
                     {filteredKeywords.length === 0 ? (
@@ -354,23 +370,27 @@ const Breakdown = () => {
                     ) : (
                       <div className="overflow-x-auto">
                         <div className="min-w-[640px]">
-                          <div className="grid grid-cols-6 gap-2 px-2 py-2 text-xs text-muted-foreground">
+                          <div className="grid grid-cols-7 gap-2 px-2 py-2 text-xs text-muted-foreground">
                             <div className="col-span-2">Keyword</div>
                             <div>Match</div>
                             <div className="text-right">Clicks</div>
+                            <div className="text-right">Conversions</div>
                             <div className="text-right">Spend</div>
                             <div className="text-right">Sales</div>
+                            <div className="text-right">ACoS</div>
                           </div>
                           <div className="divide-y">
                             {filteredKeywords.map((k) => (
-                              <div key={k.id} className="grid grid-cols-6 gap-2 px-2 py-2 items-center">
+                              <div key={k.id} className="grid grid-cols-7 gap-2 px-2 py-2 items-center">
                                 <div className="col-span-2 truncate">{k.keyword_text}</div>
                                 <div>
                                   <Badge variant="outline" className="text-xs py-0 px-1">{k.match_type}</Badge>
                                 </div>
-                                <div className="text-right">{formatNumber(k.clicks || 0)}</div>
-                                <div className="text-right">{formatCurrency(k.spend || 0)}</div>
-                                <div className="text-right">{formatCurrency(k.sales || 0)}</div>
+                                <div className="text-right">{formatNumber(getMetric(k as any, 'clicks'))}</div>
+                                <div className="text-right">{formatNumber(getMetric(k as any, 'orders'))}</div>
+                                <div className="text-right">{formatCurrency(getMetric(k as any, 'spend'))}</div>
+                                <div className="text-right">{formatCurrency(getMetric(k as any, 'sales'))}</div>
+                                <div className="text-right">{getAcos(k as any).toFixed(1)}%</div>
                               </div>
                             ))}
                           </div>
