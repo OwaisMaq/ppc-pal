@@ -38,14 +38,18 @@ const Breakdown = () => {
 
   const activeConnections = connections.filter(c => c.status === 'active');
 
-  // Prefer 14d metrics when available, fallback to base fields
+  // Coerce Postgres numeric (string) to number
+  const toNum = (v: any): number | undefined => {
+    if (v === null || v === undefined) return undefined;
+    const n = typeof v === 'string' ? Number(v) : (typeof v === 'number' ? v : NaN);
+    return Number.isFinite(n) ? n : undefined;
+  };
+  // Prefer 14d metrics when available, fallback to 7d, then base
   const getMetric = (k: any, base: 'clicks' | 'spend' | 'sales' | 'orders') => {
-    const fourteen = k?.[`${base}_14d`];
-    const seven = k?.[`${base}_7d`];
-    const baseVal = k?.[base];
-    return (typeof fourteen === 'number' ? fourteen :
-            typeof seven === 'number' ? seven :
-            typeof baseVal === 'number' ? baseVal : 0) as number;
+    const fourteen = toNum(k?.[`${base}_14d`]);
+    const seven = toNum(k?.[`${base}_7d`]);
+    const baseVal = toNum(k?.[base]);
+    return (fourteen ?? seven ?? baseVal ?? 0) as number;
   };
 
   const getAcos = (k: any) => {
@@ -56,23 +60,25 @@ const Breakdown = () => {
 
   // Calculate high-level summary
   const summary = useMemo(() => {
-    const totals = campaigns.reduce((acc, campaign) => ({
-      spend: acc.spend + (campaign.spend || 0),
-      sales: acc.sales + (campaign.sales || 0),
-      impressions: acc.impressions + (campaign.impressions || 0),
-      clicks: acc.clicks + (campaign.clicks || 0),
-      orders: acc.orders + (campaign.orders || 0),
-    }), { spend: 0, sales: 0, impressions: 0, clicks: 0, orders: 0 });
+    const totals = campaigns.reduce((acc, campaign) => {
+      const spend = getMetric(campaign as any, 'spend');
+      const sales = getMetric(campaign as any, 'sales');
+      const impressions = toNum((campaign as any).impressions) ?? 0;
+      const clicks = toNum((campaign as any).clicks) ?? 0;
+      const orders = toNum((campaign as any).orders) ?? 0;
+      return {
+        spend: acc.spend + spend,
+        sales: acc.sales + sales,
+        impressions: acc.impressions + impressions,
+        clicks: acc.clicks + clicks,
+        orders: acc.orders + orders,
+      };
+    }, { spend: 0, sales: 0, impressions: 0, clicks: 0, orders: 0 });
 
-    const avgAcos = totals.spend > 0 ? (totals.spend / totals.sales) * 100 : 0;
+    const avgAcos = totals.sales > 0 ? (totals.spend / totals.sales) * 100 : 0;
     const avgRoas = totals.spend > 0 ? totals.sales / totals.spend : 0;
 
-    return {
-      ...totals,
-      avgAcos,
-      avgRoas,
-      totalCampaigns: campaigns.length
-    };
+    return { ...totals, avgAcos, avgRoas, totalCampaigns: campaigns.length };
   }, [campaigns]);
 
   // Filter ad groups based on selected campaign
@@ -421,11 +427,11 @@ const Breakdown = () => {
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                             <div>
                               <div className="font-medium">Spend</div>
-                              <div>{formatCurrency(selectedCampaign.spend || 0)}</div>
+                              <div>{formatCurrency(getMetric(selectedCampaign as any, 'spend'))}</div>
                             </div>
                             <div>
                               <div className="font-medium">Sales</div>
-                              <div>{formatCurrency(selectedCampaign.sales || 0)}</div>
+                              <div>{formatCurrency(getMetric(selectedCampaign as any, 'sales'))}</div>
                             </div>
                             <div>
                               <div className="font-medium">Clicks</div>
@@ -449,11 +455,11 @@ const Breakdown = () => {
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                             <div>
                               <div className="font-medium">Spend</div>
-                              <div>{formatCurrency(selectedAdGroup.spend || 0)}</div>
+                              <div>{formatCurrency(getMetric(selectedAdGroup as any, 'spend'))}</div>
                             </div>
                             <div>
                               <div className="font-medium">Sales</div>
-                              <div>{formatCurrency(selectedAdGroup.sales || 0)}</div>
+                              <div>{formatCurrency(getMetric(selectedAdGroup as any, 'sales'))}</div>
                             </div>
                             <div>
                               <div className="font-medium">Default Bid</div>
@@ -478,11 +484,11 @@ const Breakdown = () => {
                           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
                             <div>
                               <div className="font-medium">Spend</div>
-                              <div>{formatCurrency(selectedKeyword.spend || 0)}</div>
+                              <div>{formatCurrency(getMetric(selectedKeyword as any, 'spend'))}</div>
                             </div>
                             <div>
                               <div className="font-medium">Sales</div>
-                              <div>{formatCurrency(selectedKeyword.sales || 0)}</div>
+                              <div>{formatCurrency(getMetric(selectedKeyword as any, 'sales'))}</div>
                             </div>
                             <div>
                               <div className="font-medium">Bid</div>
