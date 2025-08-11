@@ -255,10 +255,11 @@ serve(async (req) => {
         reportTypeId: 'spCampaigns',
         timeUnit: 'SUMMARY',
         format: 'GZIP_JSON',
+        groupBy: ['campaignId'],
         columns: [
           'campaignId', 'campaignName',
           'impressions', 'clicks', 'cost',
-          'attributedSales30d', 'attributedUnitsOrdered30d'
+          'attributedSales14d', 'attributedUnitsOrdered14d'
         ],
       },
     }
@@ -271,11 +272,12 @@ serve(async (req) => {
         reportTypeId: 'spAdGroups',
         timeUnit: 'SUMMARY',
         format: 'GZIP_JSON',
+        groupBy: ['adGroupId'],
         columns: [
           'campaignId', 'campaignName',
           'adGroupId', 'adGroupName',
           'impressions', 'clicks', 'cost',
-          'attributedSales30d', 'attributedUnitsOrdered30d'
+          'attributedSales14d', 'attributedUnitsOrdered14d'
         ],
       },
     }
@@ -288,12 +290,13 @@ serve(async (req) => {
         reportTypeId: 'spKeywords',
         timeUnit: 'SUMMARY',
         format: 'GZIP_JSON',
+        groupBy: ['keywordId'],
         columns: [
           'campaignId', 'campaignName',
           'adGroupId', 'adGroupName',
           'keywordId', 'keywordText', 'matchType',
           'impressions', 'clicks', 'cost',
-          'attributedSales30d', 'attributedUnitsOrdered30d'
+          'attributedSales14d', 'attributedUnitsOrdered14d'
         ],
       },
     }
@@ -348,8 +351,8 @@ serve(async (req) => {
       impressions: parseInt(r.impressions || '0'),
       clicks: parseInt(r.clicks || '0'),
       spend: parseFloat(r.cost || '0'),
-      sales: parseFloat(r.attributedSales30d || '0'),
-      orders: parseInt(r.attributedUnitsOrdered30d || '0'),
+      sales: parseFloat(r.attributedSales14d || '0'),
+      orders: parseInt(r.attributedUnitsOrdered14d || '0'),
       last_updated: new Date().toISOString(),
     }))
 
@@ -378,8 +381,8 @@ serve(async (req) => {
       impressions: parseInt(r.impressions || '0'),
       clicks: parseInt(r.clicks || '0'),
       spend: parseFloat(r.cost || '0'),
-      sales: parseFloat(r.attributedSales30d || '0'),
-      orders: parseInt(r.attributedUnitsOrdered30d || '0'),
+      sales: parseFloat(r.attributedSales14d || '0'),
+      orders: parseInt(r.attributedUnitsOrdered14d || '0'),
       last_updated: new Date().toISOString(),
     })).filter((r) => r.campaign_id)
 
@@ -409,8 +412,8 @@ serve(async (req) => {
       impressions: parseInt(r.impressions || '0'),
       clicks: parseInt(r.clicks || '0'),
       spend: parseFloat(r.cost || '0'),
-      sales: parseFloat(r.attributedSales30d || '0'),
-      orders: parseInt(r.attributedUnitsOrdered30d || '0'),
+      sales: parseFloat(r.attributedSales14d || '0'),
+      orders: parseInt(r.attributedUnitsOrdered14d || '0'),
       last_updated: new Date().toISOString(),
     })).filter((r) => r.adgroup_id)
 
