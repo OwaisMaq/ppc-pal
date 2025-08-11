@@ -44,28 +44,51 @@ async function createReportRequest(
   profileId: string,
   reportType: string,
   columns: string[],
-  entityIds?: string[]
+  entityIds?: string[],
+  opts?: { dateRangeDays?: number; timeUnit?: 'SUMMARY' | 'DAILY'; skipEntityFilter?: boolean }
 ): Promise<string> {
-  const groupBy = reportType === 'campaigns' ? ['campaign'] : reportType === 'adGroups' ? ['adGroup'] : ['targeting']
-  const reportTypeId = reportType === 'campaigns' ? 'spCampaigns' : reportType === 'adGroups' ? 'spAdGroups' : 'spTargets'
+  const groupBy = reportType === 'campaigns' 
+    ? ['campaign'] 
+    : reportType === 'adGroups' 
+    ? ['adGroup'] 
+    : reportType === 'keywords'
+    ? ['keyword']
+    : ['targeting']
+  const reportTypeId = reportType === 'campaigns' 
+    ? 'spCampaigns' 
+    : reportType === 'adGroups' 
+    ? 'spAdGroups' 
+    : reportType === 'keywords'
+    ? 'spKeywords'
+    : 'spTargets'
+
+  const dateRangeDays = opts?.dateRangeDays ?? 90
+  const endDateStr = new Date().toISOString().split('T')[0]
+  const startDateStr = new Date(Date.now() - dateRangeDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
   const payload: any = {
     name: `${reportType}_${Date.now()}`,
-    startDate: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    endDate: new Date().toISOString().split('T')[0],
+    startDate: startDateStr,
+    endDate: endDateStr,
     configuration: {
       adProduct: 'SPONSORED_PRODUCTS',
       groupBy,
       columns,
       reportTypeId,
-      timeUnit: 'SUMMARY',
+      timeUnit: opts?.timeUnit ?? 'SUMMARY',
       format: 'GZIP_JSON'
     }
   }
 
   // v3 filtering uses top-level filters with field names
-  if (entityIds && entityIds.length > 0) {
-    const field = reportType === 'campaigns' ? 'campaignId' : reportType === 'adGroups' ? 'adGroupId' : 'keywordId'
+  if (!opts?.skipEntityFilter && entityIds && entityIds.length > 0) {
+    const field = reportType === 'campaigns' 
+      ? 'campaignId' 
+      : reportType === 'adGroups' 
+      ? 'adGroupId' 
+      : reportType === 'keywords'
+      ? 'keywordId'
+      : 'keywordId'
     payload.filters = [{ field, values: entityIds }]
   }
 
@@ -79,8 +102,25 @@ async function createReportRequest(
     console.log('Creating report with payload:', JSON.stringify(debugPayload))
   } catch (_) {}
 
-
   const response = await fetch(`${apiEndpoint}/reporting/reports`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Amazon-Advertising-API-ClientId': clientId,
+      'Amazon-Advertising-API-Scope': profileId,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload)
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`Failed to create report: ${response.status} ${errorText}`)
+  }
+
+  const result = await response.json()
+  return result.reportId
+}
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${accessToken}`,
@@ -183,9 +223,10 @@ serve(async (req) => {
       throw new Error('Invalid authorization')
     }
 
-    const { connectionId } = await req.json()
-    console.log('Syncing data for connection:', connectionId)
-
+    const { connectionId, dateRangeDays, diagnosticMode } = await req.json()
+    const dateRange = Number(dateRangeDays) || 90
+    const diag = Boolean(diagnosticMode)
+    console.log('Syncing data for connection:', connectionId, 'dateRangeDays:', dateRange, 'diagnosticMode:', diag)
     // Get the connection details
     const { data: connection, error: connectionError } = await supabase
       .from('amazon_connections')
@@ -454,6 +495,20 @@ serve(async (req) => {
 
     console.log(`📊 Entity sync complete: ${campaignIds.length} campaigns, ${adGroupIds.length} ad groups, ${keywordIds.length} keywords`)
 
+    // Initialize diagnostics
+    const diagnostics: any = {
+      keyword: {
+        totalKeywords: keywordIds.length,
+        filteredIdsUsed: 0,
+        reportRows: 0,
+        nonZeroClickRows: 0,
+        matchedRows: 0,
+        timeUnit: '',
+        dateRangeDays: 0,
+        diagnosticMode: diag
+      }
+    }
+
     // PHASE 2: Fetch performance data via proper Reporting API
     console.log('⚡ Starting performance data sync...')
     let totalMetricsUpdated = 0
@@ -470,7 +525,7 @@ serve(async (req) => {
     ]
     
     const keywordColumns = [
-      'keywordId', 'targetId', 'impressions', 'clicks', 'cost',
+      'keywordId', 'impressions', 'clicks', 'cost',
       'attributedSales7d', 'attributedConversions7d', 'attributedSales14d', 'attributedConversions14d',
       'keywordText', 'matchType'
     ]
@@ -481,7 +536,7 @@ serve(async (req) => {
       try {
         const reportId = await createReportRequest(
           apiEndpoint, accessToken, clientId, connection.profile_id,
-          'campaigns', campaignColumns, campaignIds
+          'campaigns', campaignColumns, campaignIds, { dateRangeDays: dateRange, timeUnit: 'SUMMARY' }
         )
         
         const report = await pollReportStatus(
@@ -500,12 +555,9 @@ serve(async (req) => {
           // Calculate metrics with robust fallbacks for v3 field names
           const impressions = Number(anyPerf.impressions ?? 0)
           const clicks = Number(anyPerf.clicks ?? 0)
-          const rawSpend = Number(anyPerf.cost ?? 0)
-          const spend = rawSpend > 100000 ? rawSpend / 1_000_000 : rawSpend
-          const rawSales7d = Number(anyPerf.attributedSales7d ?? anyPerf.sales7d ?? 0)
-          const rawSales14d = Number(anyPerf.attributedSales14d ?? anyPerf.sales14d ?? 0)
-          const sales7d = rawSales7d > 100000 ? rawSales7d / 1_000_000 : rawSales7d
-          const sales14d = rawSales14d > 100000 ? rawSales14d / 1_000_000 : rawSales14d
+          const spend = Number(anyPerf.cost ?? 0) / 1_000_000
+          const sales7d = Number(anyPerf.attributedSales7d ?? anyPerf.sales7d ?? 0) / 1_000_000
+          const sales14d = Number(anyPerf.attributedSales14d ?? anyPerf.sales14d ?? 0) / 1_000_000
           const orders7d = Number(anyPerf.attributedConversions7d ?? anyPerf.purchases7d ?? anyPerf.unitsOrdered7d ?? 0)
           const orders14d = Number(anyPerf.attributedConversions14d ?? anyPerf.purchases14d ?? anyPerf.unitsOrdered14d ?? 0)
           
@@ -571,7 +623,7 @@ serve(async (req) => {
       try {
         const reportId = await createReportRequest(
           apiEndpoint, accessToken, clientId, connection.profile_id,
-          'adGroups', adGroupColumns, adGroupIds
+          'adGroups', adGroupColumns, adGroupIds, { dateRangeDays: dateRange, timeUnit: 'SUMMARY' }
         )
         
         const report = await pollReportStatus(
@@ -588,12 +640,9 @@ serve(async (req) => {
           const anyPerf = perf as any
           const impressions = Number(anyPerf.impressions ?? 0)
           const clicks = Number(anyPerf.clicks ?? 0)
-          const rawSpend = Number(anyPerf.cost ?? 0)
-          const spend = rawSpend > 100000 ? rawSpend / 1_000_000 : rawSpend
-          const rawSales7d = Number(anyPerf.attributedSales7d ?? anyPerf.sales7d ?? 0)
-          const rawSales14d = Number(anyPerf.attributedSales14d ?? anyPerf.sales14d ?? 0)
-          const sales7d = rawSales7d > 100000 ? rawSales7d / 1_000_000 : rawSales7d
-          const sales14d = rawSales14d > 100000 ? rawSales14d / 1_000_000 : rawSales14d
+          const spend = Number(anyPerf.cost ?? 0) / 1_000_000
+          const sales7d = Number(anyPerf.attributedSales7d ?? anyPerf.sales7d ?? 0) / 1_000_000
+          const sales14d = Number(anyPerf.attributedSales14d ?? anyPerf.sales14d ?? 0) / 1_000_000
           const orders7d = Number(anyPerf.attributedConversions7d ?? anyPerf.purchases7d ?? anyPerf.unitsOrdered7d ?? 0)
           const orders14d = Number(anyPerf.attributedConversions14d ?? anyPerf.purchases14d ?? anyPerf.unitsOrdered14d ?? 0)
           
@@ -662,9 +711,14 @@ serve(async (req) => {
     if (keywordIds.length > 0) {
       console.log('🔑 Fetching keyword performance...')
       try {
+        const keywordDateRange = diag ? Math.max(dateRange, 365) : dateRange
+        diagnostics.keyword.filteredIdsUsed = diag ? 0 : keywordIds.length
+        diagnostics.keyword.timeUnit = diag ? 'DAILY' : 'SUMMARY'
+        diagnostics.keyword.dateRangeDays = keywordDateRange
+
         const reportId = await createReportRequest(
           apiEndpoint, accessToken, clientId, connection.profile_id,
-          'keywords', keywordColumns, keywordIds
+          'keywords', keywordColumns, keywordIds, { dateRangeDays: keywordDateRange, timeUnit: diagnostics.keyword.timeUnit as 'SUMMARY' | 'DAILY', skipEntityFilter: diag }
         )
         
         const report = await pollReportStatus(
@@ -674,18 +728,21 @@ serve(async (req) => {
         const performanceData = await downloadAndParseReport(report.url!)
         console.log(`💾 Processing ${performanceData.length} keyword performance records`)
         console.log('Keyword report sample keys:', Object.keys(performanceData[0] || {}))
+        diagnostics.keyword.reportRows = performanceData.length
+        try {
+          const nz = performanceData.filter((row: any) => Number(row?.clicks ?? 0) > 0).length
+          diagnostics.keyword.nonZeroClickRows = nz
+        } catch (_) {}
+        
         
         for (const perf of performanceData) {
           const anyPerf = perf as any
           
           const impressions = Number(anyPerf.impressions ?? 0)
           const clicks = Number(anyPerf.clicks ?? 0)
-          const rawSpend = Number(anyPerf.cost ?? 0)
-          const spend = rawSpend > 100000 ? rawSpend / 1_000_000 : rawSpend
-          const rawSales7d = Number(anyPerf.attributedSales7d ?? anyPerf.sales7d ?? 0)
-          const rawSales14d = Number(anyPerf.attributedSales14d ?? anyPerf.sales14d ?? 0)
-          const sales7d = rawSales7d > 100000 ? rawSales7d / 1_000_000 : rawSales7d
-          const sales14d = rawSales14d > 100000 ? rawSales14d / 1_000_000 : rawSales14d
+          const spend = Number(anyPerf.cost ?? 0) / 1_000_000
+          const sales7d = Number(anyPerf.attributedSales7d ?? anyPerf.sales7d ?? 0) / 1_000_000
+          const sales14d = Number(anyPerf.attributedSales14d ?? anyPerf.sales14d ?? 0) / 1_000_000
           const orders7d = Number(anyPerf.attributedConversions7d ?? anyPerf.purchases7d ?? anyPerf.unitsOrdered7d ?? 0)
           const orders14d = Number(anyPerf.attributedConversions14d ?? anyPerf.purchases14d ?? anyPerf.unitsOrdered14d ?? 0)
           
@@ -748,6 +805,7 @@ serve(async (req) => {
               .eq('id', keywordRecord.id)
             
             totalMetricsUpdated++
+            diagnostics.keyword.matchedRows = (diagnostics.keyword.matchedRows || 0) + 1
           }
         }
       } catch (error) {
@@ -778,7 +836,8 @@ serve(async (req) => {
             adGroups: adGroupIds.length, 
             keywords: keywordIds.length
           },
-          metricsUpdated: 0
+          metricsUpdated: 0,
+          diagnostics
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       )
@@ -795,7 +854,8 @@ serve(async (req) => {
           keywords: keywordIds.length
         },
         metricsUpdated: totalMetricsUpdated,
-        apiVersion: 'v3'
+        apiVersion: 'v3',
+        diagnostics
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     )

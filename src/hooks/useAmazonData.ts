@@ -10,6 +10,7 @@ export const useAmazonData = () => {
   const [adGroups, setAdGroups] = useState<AdGroup[]>([]);
   const [keywords, setKeywords] = useState<Keyword[]>([]);
   const [loading, setLoading] = useState(false);
+  const [lastSyncDiagnostics, setLastSyncDiagnostics] = useState<any | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -121,7 +122,7 @@ export const useAmazonData = () => {
     }
   };
 
-  const syncAllData = async (connectionId: string) => {
+  const syncAllData = async (connectionId: string, options?: { dateRangeDays?: number; diagnosticMode?: boolean }) => {
     setLoading(true);
     try {
       const session = await supabase.auth.getSession();
@@ -129,7 +130,7 @@ export const useAmazonData = () => {
       if (!token) throw new Error('No valid session found');
 
       const { data, error } = await supabase.functions.invoke('sync-amazon-data', {
-        body: { connectionId },
+        body: { connectionId, ...(options || {}) },
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -150,8 +151,8 @@ export const useAmazonData = () => {
         const counts = data?.entitiesSynced ? ` (campaigns: ${data.entitiesSynced.campaigns || 0}, ad groups: ${data.entitiesSynced.adGroups || 0}, keywords: ${data.entitiesSynced.keywords || 0}; metrics updated: ${data.metricsUpdated || 0})` : '';
         toast.success(`Data sync completed successfully!${counts}`);
       }
-      
-      // Refresh data after sync
+
+      setLastSyncDiagnostics(data?.diagnostics || null);
       setTimeout(() => {
         fetchAllData();
       }, 3000);
@@ -193,6 +194,7 @@ export const useAmazonData = () => {
     loading,
     fetchAllData,
     syncAllData,
-    dataSummary: getDataSummary()
+    dataSummary: getDataSummary(),
+    lastSyncDiagnostics,
   };
 };

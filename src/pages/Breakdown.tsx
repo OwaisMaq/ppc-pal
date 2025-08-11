@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { useAmazonData } from "@/hooks/useAmazonData";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import Header from "@/components/Header";
@@ -26,11 +27,14 @@ const formatNumber = (value: number) => {
 };
 
 const Breakdown = () => {
-  const { campaigns, adGroups, keywords, loading, syncAllData } = useAmazonData();
+  const { campaigns, adGroups, keywords, loading, syncAllData, lastSyncDiagnostics } = useAmazonData();
   const { connections } = useAmazonConnections();
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>("");
   const [selectedAdGroupId, setSelectedAdGroupId] = useState<string>("");
   const [selectedKeywordId, setSelectedKeywordId] = useState<string>("");
+  const [dateRangeDays, setDateRangeDays] = useState<number>(90);
+  const [diagnosticMode, setDiagnosticMode] = useState<boolean>(false);
+  const [filterClicks, setFilterClicks] = useState<boolean>(false);
 
   const activeConnections = connections.filter(c => c.status === 'active');
 
@@ -61,11 +65,13 @@ const Breakdown = () => {
     return adGroups.filter(ag => ag.campaign_id === selectedCampaignId);
   }, [adGroups, selectedCampaignId]);
 
-  // Filter keywords based on selected ad group
+// Filter keywords based on selected ad group
   const filteredKeywords = useMemo(() => {
     if (!selectedAdGroupId) return [];
-    return keywords.filter(k => k.adgroup_id === selectedAdGroupId);
-  }, [keywords, selectedAdGroupId]);
+    let list = keywords.filter(k => k.adgroup_id === selectedAdGroupId);
+    if (filterClicks) list = list.filter(k => (k.clicks || 0) > 0);
+    return list;
+  }, [keywords, selectedAdGroupId, filterClicks]);
 
   // Get selected entities for display
   const selectedCampaign = campaigns.find(c => c.id === selectedCampaignId);
@@ -74,7 +80,7 @@ const Breakdown = () => {
 
   const handleSyncAll = async () => {
     for (const connection of activeConnections) {
-      await syncAllData(connection.id);
+      await syncAllData(connection.id, { dateRangeDays, diagnosticMode });
     }
   };
 
@@ -95,21 +101,39 @@ const Breakdown = () => {
       <main className="container mx-auto px-4 py-8">
         <div className="space-y-6">
           {/* Page Header */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
             <div>
               <h1 className="text-3xl font-bold">Campaign Breakdown</h1>
               <p className="text-muted-foreground">
                 Explore your Amazon advertising data with detailed breakdowns
               </p>
             </div>
-            <Button
-              onClick={handleSyncAll}
-              disabled={loading || activeConnections.length === 0}
-              variant="outline"
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-              Sync Data
-            </Button>
+            <div className="flex items-center gap-3">
+              <Select value={String(dateRangeDays)} onValueChange={(v) => setDateRangeDays(parseInt(v))}>
+                <SelectTrigger className="w-[140px]"><SelectValue placeholder="Range" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="30">Last 30 days</SelectItem>
+                  <SelectItem value="90">Last 90 days</SelectItem>
+                  <SelectItem value="365">Last 365 days</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="flex items-center gap-2">
+                <Switch checked={diagnosticMode} onCheckedChange={setDiagnosticMode} />
+                <span className="text-sm text-muted-foreground">Diagnostic</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch checked={filterClicks} onCheckedChange={setFilterClicks} />
+                <span className="text-sm text-muted-foreground">Clicks &gt; 0</span>
+              </div>
+              <Button
+                onClick={handleSyncAll}
+                disabled={loading || activeConnections.length === 0}
+                variant="outline"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                Sync Data
+              </Button>
+            </div>
           </div>
 
           {activeConnections.length === 0 ? (
@@ -123,6 +147,44 @@ const Breakdown = () => {
             </Card>
           ) : (
             <>
+              {/* Diagnostics Status */}
+              {lastSyncDiagnostics?.keyword && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Last Sync Diagnostics</CardTitle>
+                    <CardDescription>Keyword scope and activity snapshot</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-6 gap-4 text-sm">
+                      <div>
+                        <div className="font-medium">Total Keywords</div>
+                        <div>{lastSyncDiagnostics.keyword.totalKeywords}</div>
+                      </div>
+                      <div>
+                        <div className="font-medium">Filtered IDs Used</div>
+                        <div>{lastSyncDiagnostics.keyword.filteredIdsUsed}</div>
+                      </div>
+                      <div>
+                        <div className="font-medium">Report Rows</div>
+                        <div>{lastSyncDiagnostics.keyword.reportRows}</div>
+                      </div>
+                      <div>
+                        <div className="font-medium">Rows Clicks > 0</div>
+                        <div>{lastSyncDiagnostics.keyword.nonZeroClickRows}</div>
+                      </div>
+                      <div>
+                        <div className="font-medium">Matched to DB</div>
+                        <div>{lastSyncDiagnostics.keyword.matchedRows}</div>
+                      </div>
+                      <div>
+                        <div className="font-medium">Time Unit / Range</div>
+                        <div>{lastSyncDiagnostics.keyword.timeUnit} / {lastSyncDiagnostics.keyword.dateRangeDays}d</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* High-Level Summary */}
               <Card>
                 <CardHeader>
