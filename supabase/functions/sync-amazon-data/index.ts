@@ -49,6 +49,9 @@ serve(async (req) => {
       throw new Error('Connection is not active')
     }
 
+    // Track overall sync duration
+    const overallStart = new Date()
+
     const clientId = Deno.env.get('AMAZON_CLIENT_ID')
     if (!clientId) {
       throw new Error('Amazon Client ID not configured')
@@ -164,11 +167,18 @@ serve(async (req) => {
 
     // Sync campaigns with performance data
     console.log('Fetching campaigns...')
-    const campaignsData = await fetchJsonWithFallback(
-      '/v2/sp/campaigns?stateFilter=enabled,paused&count=1000',
-      '/v2/campaigns?stateFilter=enabled,paused&count=1000'
-    )
+    let campaignsData: any[] = []
+    try {
+      campaignsData = await fetchJsonWithFallback(
+        '/v2/sp/campaigns?stateFilter=enabled,paused&count=1000',
+        '/v2/campaigns?stateFilter=enabled,paused&count=1000'
+      )
+    } catch (e) {
+      console.error('Campaigns API error:', e)
+      campaignsData = []
+    }
     console.log('Retrieved campaigns:', campaignsData.length)
+
     // Prepare date range for performance data (last 30 days)
     const endDate = new Date()
     const startDate = new Date()
@@ -177,41 +187,77 @@ serve(async (req) => {
     const reportStartDate = startDate.toISOString().split('T')[0]
     const reportEndDate = endDate.toISOString().split('T')[0]
 
-    // Store campaigns with basic data first
-    const campaignIds: string[] = []
-    for (const campaign of campaignsData) {
-      if (!campaign.campaignId || !campaign.name) {
-        console.warn('Skipping invalid campaign:', campaign)
-        continue
-      }
+    // Build campaignIds and upsert basic campaign data; fallback to stored campaigns when API returns none
+    let campaignIds: string[] = []
+    if (campaignsData.length > 0) {
+      for (const campaign of campaignsData) {
+        if (!campaign.campaignId || !campaign.name) {
+          console.warn('Skipping invalid campaign:', campaign)
+          continue
+        }
 
-      campaignIds.push(campaign.campaignId.toString())
-      
-      const { error: campaignError } = await supabase
+        campaignIds.push(campaign.campaignId.toString())
+        const { error: campaignError } = await supabase
+          .from('campaigns')
+          .upsert({
+            connection_id: connectionId,
+            amazon_campaign_id: campaign.campaignId.toString(),
+            name: campaign.name,
+            campaign_type: campaign.campaignType,
+            targeting_type: campaign.targetingType,
+            status: campaign.state ? campaign.state.toLowerCase() : 'unknown',
+            daily_budget: campaign.dailyBudget || null,
+            start_date: campaign.startDate || null,
+            end_date: campaign.endDate || null,
+            impressions: 0,
+            clicks: 0,
+            spend: 0,
+            sales: 0,
+            orders: 0,
+          }, {
+            onConflict: 'connection_id, amazon_campaign_id'
+          })
+
+        if (campaignError) {
+          console.error('Error storing campaign:', campaign.campaignId, campaignError)
+        }
+      }
+    } else {
+      console.log('No live campaigns returned, falling back to stored campaigns...')
+      const { data: existingCampaigns } = await supabase
         .from('campaigns')
-        .upsert({
+        .select('amazon_campaign_id')
+        .eq('connection_id', connectionId)
+      campaignIds = (existingCampaigns || [])
+        .map((c: any) => c.amazon_campaign_id?.toString())
+        .filter(Boolean)
+      console.log('Found stored campaign IDs:', campaignIds.length)
+    }
+
+    // If both live and stored lists are empty, return early with clear message and log
+    if (campaignIds.length === 0) {
+      const overallEnd = new Date()
+      await supabase
+        .from('sync_performance_logs')
+        .insert({
           connection_id: connectionId,
-          amazon_campaign_id: campaign.campaignId.toString(),
-          name: campaign.name,
-          campaign_type: campaign.campaignType,
-          targeting_type: campaign.targetingType,
-          status: campaign.state ? campaign.state.toLowerCase() : 'unknown',
-          daily_budget: campaign.dailyBudget || null,
-          start_date: campaign.startDate || null,
-          end_date: campaign.endDate || null,
-          impressions: 0,
-          clicks: 0,
-          spend: 0,
-          sales: 0,
-          orders: 0,
-        }, {
-          onConflict: 'connection_id, amazon_campaign_id'
+          operation_type: 'sync',
+          start_time: overallStart.toISOString(),
+          end_time: overallEnd.toISOString(),
+          total_duration_ms: overallEnd.getTime() - overallStart.getTime(),
+          success: false,
+          campaigns_processed: 0,
+          phases: { message: 'No campaigns found (live API and stored DB empty)' }
         })
 
-      if (campaignError) {
-        console.error('Error storing campaign:', campaign.campaignId, campaignError)
-      }
+      return new Response(
+        JSON.stringify({ success: false, message: 'No campaigns found for this profile.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
+
+    // Counter for processed metrics rows
+    let metricsRowsUpdated = 0
 
     // Fetch performance data for campaigns using Reporting v3 (proper async flow)
     if (campaignIds.length > 0) {
@@ -391,17 +437,10 @@ serve(async (req) => {
 
             if (updErr) {
               console.error('Error updating campaign metrics', cid, updErr)
+            } else {
+              metricsRowsUpdated++
             }
           }
-        } catch (err) {
-          console.error(`Error processing batch ${batchIndex}:`, err)
-        }
-
-        // Brief delay between batches for rate limiting safety
-        if (i + batchSize < campaignIds.length) {
-          await new Promise(r => setTimeout(r, 250))
-        }
-      }
     }
 
     // Sync ad groups for each campaign
@@ -486,17 +525,39 @@ serve(async (req) => {
       }
     }
 
-    // Update last sync time
+    // Finalize: update last_sync_at only if we processed metrics; always log performance
+    const overallEnd = new Date()
+    const totalDuration = overallEnd.getTime() - overallStart.getTime()
+
     await supabase
-      .from('amazon_connections')
-      .update({ last_sync_at: new Date().toISOString() })
-      .eq('id', connectionId)
+      .from('sync_performance_logs')
+      .insert({
+        connection_id: connectionId,
+        operation_type: 'sync',
+        start_time: overallStart.toISOString(),
+        end_time: overallEnd.toISOString(),
+        total_duration_ms: totalDuration,
+        success: metricsRowsUpdated > 0,
+        campaigns_processed: metricsRowsUpdated,
+      })
 
-    console.log('Data sync completed successfully')
+    if (metricsRowsUpdated > 0) {
+      await supabase
+        .from('amazon_connections')
+        .update({ last_sync_at: new Date().toISOString() })
+        .eq('id', connectionId)
 
+      console.log('Data sync completed successfully')
+      return new Response(
+        JSON.stringify({ success: true, message: 'Data sync completed', metricsUpdated: metricsRowsUpdated }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    console.warn('Sync finished without metrics updates')
     return new Response(
-      JSON.stringify({ success: true, message: 'Data sync completed' }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ success: false, message: 'Sync completed without metrics updates' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error) {

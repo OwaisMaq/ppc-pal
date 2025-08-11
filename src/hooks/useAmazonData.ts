@@ -132,7 +132,7 @@ export const useAmazonData = () => {
         .single();
       const prevLastSyncAt = beforeConn?.last_sync_at ? new Date(beforeConn.last_sync_at).getTime() : 0;
 
-      const { error } = await supabase.functions.invoke('sync-amazon-data', {
+      const { data, error } = await supabase.functions.invoke('sync-amazon-data', {
         body: { connectionId },
         headers: {
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
@@ -140,6 +140,10 @@ export const useAmazonData = () => {
       });
 
       if (error) throw error;
+      if (data && data.success === false && typeof data.message === 'string') {
+        // Edge function may return 400 or success false
+        throw new Error(data.message);
+      }
 
       toast.success('Sync started. This can take a few minutes...');
 
@@ -174,7 +178,14 @@ export const useAmazonData = () => {
       }
     } catch (error) {
       console.error('Error syncing data:', error);
-      toast.error('Failed to sync Amazon data');
+      const msg = (error as any)?.message || '';
+      if (typeof msg === 'string' && msg.toLowerCase().includes('no campaigns')) {
+        toast.info('No Amazon campaigns found for this connection. Nothing to sync.');
+      } else if (typeof msg === 'string' && msg.toLowerCase().includes('sync completed without metrics')) {
+        toast.warning('Sync finished but no performance data was updated.');
+      } else {
+        toast.error('Failed to sync Amazon data');
+      }
     } finally {
       setLoading(false);
     }
