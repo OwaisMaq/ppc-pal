@@ -793,8 +793,14 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Sync error:', error)
+    const message = (error as Error)?.message || 'Unknown error'
+    let code = 'SYNC_ERROR'
+    if (message.includes('Connection is not active')) code = 'CONNECTION_INACTIVE'
+    else if (message.includes('Token expired')) code = 'TOKEN_EXPIRED'
+    else if (message.includes('Missing Amazon client secret')) code = 'MISSING_AMAZON_SECRET'
+
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ success: false, code, error: message }),
       { 
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }

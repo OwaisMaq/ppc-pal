@@ -260,12 +260,21 @@ serve(async (req) => {
     throw new Error('Invalid action')
 
   } catch (error) {
-    console.error('Amazon OAuth error:', error.message);
+    console.error('Amazon OAuth error:', (error as Error)?.message);
     console.error('Full error:', error);
+    const message = (error as Error)?.message || 'Unknown error'
+    let code = 'OAUTH_ERROR'
+    if (message.includes('No authorization header')) code = 'NO_AUTH'
+    else if (message.includes('Invalid authorization')) code = 'INVALID_AUTH'
+    else if (message.includes('Amazon Client ID not configured')) code = 'MISSING_AMAZON_CLIENT_ID'
+    else if (message.includes('Amazon credentials not configured')) code = 'MISSING_AMAZON_CREDENTIALS'
+    else if (message.includes('Invalid JSON body')) code = 'INVALID_JSON'
+
     return new Response(
       JSON.stringify({ 
-        error: error.message,
-        details: error.stack?.split('\n')[0] || 'No additional details'
+        success: false,
+        code,
+        error: message,
       }),
       { 
         status: 400,

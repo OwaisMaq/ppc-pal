@@ -120,8 +120,16 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Token refresh error:', error)
+    const message = (error as Error)?.message || 'Unknown error'
+    let code = 'TOKEN_REFRESH_ERROR'
+    if (message.includes('No authorization header')) code = 'NO_AUTH'
+    else if (message.includes('Invalid authorization')) code = 'INVALID_AUTH'
+    else if (message.includes('Connection not found')) code = 'CONNECTION_NOT_FOUND'
+    else if (message.includes('Amazon credentials not configured')) code = 'MISSING_AMAZON_CREDENTIALS'
+    else if (message.includes('Token refresh failed')) code = 'REFRESH_FAILED'
+
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ success: false, code, error: message }),
       { 
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }

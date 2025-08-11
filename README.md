@@ -71,3 +71,14 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+
+## Amazon Ads setup
+
+Required Supabase secrets:
+- AMAZON_CLIENT_ID
+- AMAZON_CLIENT_SECRET
+
+Notes:
+- No ENCRYPTION_KEY is required; tokens are stored directly in the amazon_connections table.
+- Keep Row Level Security enabled and restrict access to your data.
+- For function failures, check Supabase Edge Function logs.
