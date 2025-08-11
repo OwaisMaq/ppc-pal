@@ -1,7 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { decompress } from 'https://deno.land/x/compress@v0.4.5/gzip/decompress.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -130,9 +129,15 @@ async function downloadAndParseReport(url: string): Promise<PerformanceData[]> {
     throw new Error(`Failed to download report: ${response.status}`)
   }
 
-  const compressedData = new Uint8Array(await response.arrayBuffer())
-  const decompressed = decompress(compressedData)
-  const jsonText = new TextDecoder().decode(decompressed)
+  // Use Deno's built-in compression streams to decompress gzip data
+  const compressedStream = response.body
+  if (!compressedStream) {
+    throw new Error('No response body received')
+  }
+
+  const decompressedStream = compressedStream.pipeThrough(new DecompressionStream('gzip'))
+  const decompressedResponse = new Response(decompressedStream)
+  const jsonText = await decompressedResponse.text()
   
   return JSON.parse(jsonText)
 }
