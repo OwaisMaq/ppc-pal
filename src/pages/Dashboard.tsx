@@ -12,10 +12,11 @@ import { useCampaignMetrics } from "@/hooks/useCampaignMetrics";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RefreshCw, BarChart3 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { Link } from "react-router-dom";
-
+import { useAmazonData } from "@/hooks/useAmazonData";
+import { formatDistanceToNow } from "date-fns";
 // Map marketplace IDs to region labels and flags
 const MARKETPLACE_INFO: Record<string, { code: string; label: string; flag: string }> = {
   // EU
@@ -80,6 +81,9 @@ const Dashboard = () => {
   const hasActiveConnections = connections.some(c => c.status === 'active');
   const activeConnections = connections.filter(c => c.status === 'active');
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | undefined>(undefined);
+  const selectedConnection = useMemo(() => activeConnections.find(c => c.id === selectedConnectionId), [activeConnections, selectedConnectionId]);
+  const { syncAllData, loading: syncLoading } = useAmazonData();
+  const [autoSynced, setAutoSynced] = useState(false);
 
   useEffect(() => {
     if (activeConnections.length > 0) {
@@ -88,9 +92,18 @@ const Dashboard = () => {
     }
   }, [connections]);
 
-
+  useEffect(() => {
+    if (!autoSynced && selectedConnectionId && hasActiveConnections) {
+      const zeroSpend = (metrics?.totalSpend ?? 0) === 0;
+      const hasCampaigns = campaigns.length > 0;
+      if (zeroSpend && hasCampaigns) {
+        setAutoSynced(true);
+        syncAllData(selectedConnectionId);
+      }
+    }
+  }, [autoSynced, selectedConnectionId, hasActiveConnections, metrics?.totalSpend, campaigns.length, syncAllData]);
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50" role="main">
       <Header />
       <div className="container mx-auto py-6 px-4">
         <div className="mb-8 flex items-center justify-between">
@@ -123,15 +136,31 @@ const Dashboard = () => {
                   ))}
                 </SelectContent>
               </Select>
-              <Button 
-                onClick={refetch} 
-                variant="outline" 
-                className="flex items-center gap-2"
-                disabled={loading}
-              >
-                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                Refresh Data
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button 
+                  onClick={() => selectedConnectionId && syncAllData(selectedConnectionId)} 
+                  variant="default" 
+                  className="flex items-center gap-2"
+                  disabled={syncLoading}
+                >
+                  <RefreshCw className={`h-4 w-4 ${syncLoading ? 'animate-spin' : ''}`} />
+                  Sync performance
+                </Button>
+                <Button 
+                  onClick={refetch} 
+                  variant="outline" 
+                  className="flex items-center gap-2"
+                  disabled={loading}
+                >
+                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                  Refresh Data
+                </Button>
+              </div>
+              {selectedConnection?.last_sync_at && (
+                <span className="text-xs text-muted-foreground">
+                  Last sync {formatDistanceToNow(new Date(selectedConnection.last_sync_at), { addSuffix: true })}
+                </span>
+              )}
             </div>
           )}
         </div>

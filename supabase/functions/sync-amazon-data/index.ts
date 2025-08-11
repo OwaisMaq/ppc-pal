@@ -51,7 +51,7 @@ async function createReportRequest(
 
   const payload: any = {
     name: `${reportType}_${Date.now()}`,
-    startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    startDate: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0],
     configuration: {
       adProduct: 'SPONSORED_PRODUCTS',
@@ -500,9 +500,12 @@ serve(async (req) => {
           // Calculate metrics with robust fallbacks for v3 field names
           const impressions = Number(anyPerf.impressions ?? 0)
           const clicks = Number(anyPerf.clicks ?? 0)
-          const spend = Number(anyPerf.cost ?? 0)
-          const sales7d = Number(anyPerf.attributedSales7d ?? anyPerf.sales7d ?? 0)
-          const sales14d = Number(anyPerf.attributedSales14d ?? anyPerf.sales14d ?? 0)
+          const rawSpend = Number(anyPerf.cost ?? 0)
+          const spend = rawSpend > 100000 ? rawSpend / 1_000_000 : rawSpend
+          const rawSales7d = Number(anyPerf.attributedSales7d ?? anyPerf.sales7d ?? 0)
+          const rawSales14d = Number(anyPerf.attributedSales14d ?? anyPerf.sales14d ?? 0)
+          const sales7d = rawSales7d > 100000 ? rawSales7d / 1_000_000 : rawSales7d
+          const sales14d = rawSales14d > 100000 ? rawSales14d / 1_000_000 : rawSales14d
           const orders7d = Number(anyPerf.attributedConversions7d ?? anyPerf.purchases7d ?? anyPerf.unitsOrdered7d ?? 0)
           const orders14d = Number(anyPerf.attributedConversions14d ?? anyPerf.purchases14d ?? anyPerf.unitsOrdered14d ?? 0)
           
@@ -585,9 +588,12 @@ serve(async (req) => {
           const anyPerf = perf as any
           const impressions = Number(anyPerf.impressions ?? 0)
           const clicks = Number(anyPerf.clicks ?? 0)
-          const spend = Number(anyPerf.cost ?? 0)
-          const sales7d = Number(anyPerf.attributedSales7d ?? anyPerf.sales7d ?? 0)
-          const sales14d = Number(anyPerf.attributedSales14d ?? anyPerf.sales14d ?? 0)
+          const rawSpend = Number(anyPerf.cost ?? 0)
+          const spend = rawSpend > 100000 ? rawSpend / 1_000_000 : rawSpend
+          const rawSales7d = Number(anyPerf.attributedSales7d ?? anyPerf.sales7d ?? 0)
+          const rawSales14d = Number(anyPerf.attributedSales14d ?? anyPerf.sales14d ?? 0)
+          const sales7d = rawSales7d > 100000 ? rawSales7d / 1_000_000 : rawSales7d
+          const sales14d = rawSales14d > 100000 ? rawSales14d / 1_000_000 : rawSales14d
           const orders7d = Number(anyPerf.attributedConversions7d ?? anyPerf.purchases7d ?? anyPerf.unitsOrdered7d ?? 0)
           const orders14d = Number(anyPerf.attributedConversions14d ?? anyPerf.purchases14d ?? anyPerf.unitsOrdered14d ?? 0)
           
@@ -674,9 +680,12 @@ serve(async (req) => {
           
           const impressions = Number(anyPerf.impressions ?? 0)
           const clicks = Number(anyPerf.clicks ?? 0)
-          const spend = Number(anyPerf.cost ?? 0)
-          const sales7d = Number(anyPerf.attributedSales7d ?? anyPerf.sales7d ?? 0)
-          const sales14d = Number(anyPerf.attributedSales14d ?? anyPerf.sales14d ?? 0)
+          const rawSpend = Number(anyPerf.cost ?? 0)
+          const spend = rawSpend > 100000 ? rawSpend / 1_000_000 : rawSpend
+          const rawSales7d = Number(anyPerf.attributedSales7d ?? anyPerf.sales7d ?? 0)
+          const rawSales14d = Number(anyPerf.attributedSales14d ?? anyPerf.sales14d ?? 0)
+          const sales7d = rawSales7d > 100000 ? rawSales7d / 1_000_000 : rawSales7d
+          const sales14d = rawSales14d > 100000 ? rawSales14d / 1_000_000 : rawSales14d
           const orders7d = Number(anyPerf.attributedConversions7d ?? anyPerf.purchases7d ?? anyPerf.unitsOrdered7d ?? 0)
           const orders14d = Number(anyPerf.attributedConversions14d ?? anyPerf.purchases14d ?? anyPerf.unitsOrdered14d ?? 0)
           
