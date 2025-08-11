@@ -220,12 +220,15 @@ serve(async (req) => {
         try {
           const createBody = {
             name: `SP Campaigns Summary ${reportStartDate}..${reportEndDate} (batch ${batchIndex})`,
-            startDate: reportStartDate,
-            endDate: reportEndDate,
             configuration: {
               adProduct: 'SPONSORED_PRODUCTS',
+              reportTypeId: 'spCampaigns',
               groupBy: ['campaign'],
               timeUnit: 'SUMMARY',
+              timeInterval: {
+                start: reportStartDate,
+                end: reportEndDate
+              },
               columns: [
                 'campaignId',
                 'impressions',
@@ -268,7 +271,7 @@ serve(async (req) => {
           // Poll for completion
           let status = 'IN_PROGRESS'
           let downloadUrl: string | null = null
-          const maxPolls = 12 // ~36s @3s interval
+          const maxPolls = 30 // ~90s @3s interval
           for (let attempt = 1; attempt <= maxPolls; attempt++) {
             const statusRes = await fetch(`${apiEndpoint}/reporting/reports/${reportId}`, {
               headers: {

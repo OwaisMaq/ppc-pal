@@ -13,13 +13,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RefreshCw, BarChart3, Calendar } from "lucide-react";
 import { toast } from "sonner";
-
+import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 const Dashboard = () => {
   const { connections, syncConnection, refreshConnections, loading: connectionsLoading } = useAmazonConnections();
   const { metrics, campaigns, loading, error, refetch } = useCampaignMetrics();
   
   const hasActiveConnections = connections.some(c => c.status === 'active');
-
+  const [isSyncing, setIsSyncing] = useState(false);
   const handleSyncData = async () => {
     if (!hasActiveConnections) {
       toast.error("Please connect your Amazon account first");
@@ -27,15 +28,42 @@ const Dashboard = () => {
     }
 
     const activeConnection = connections.find(c => c.status === 'active');
-    if (activeConnection) {
-      try {
-        await syncConnection(activeConnection.id);
-        setTimeout(() => {
-          refetch();
-        }, 2000); // Give time for sync to complete
-      } catch (error) {
-        toast.error("Failed to sync campaign data");
+    if (!activeConnection) return;
+
+    setIsSyncing(true);
+    const baseline = activeConnection.last_sync_at || null;
+
+    try {
+      await syncConnection(activeConnection.id);
+
+      const maxAttempts = 12; // ~2 minutes total
+      for (let i = 0; i < maxAttempts; i++) {
+        await new Promise(r => setTimeout(r, 10000));
+        const { data, error } = await supabase
+          .from('amazon_connections')
+          .select('last_sync_at')
+          .eq('id', activeConnection.id)
+          .maybeSingle();
+
+        if (error) {
+          console.error('Failed to poll sync status', error);
+          break;
+        }
+
+        if (data?.last_sync_at && data.last_sync_at !== baseline) {
+          toast.success("Sync completed. Updating dashboard...");
+          await refetch();
+          return;
+        }
       }
+
+      toast.info("Sync is still processing. Data will update shortly.");
+      await refetch();
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to sync campaign data");
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -59,7 +87,7 @@ const Dashboard = () => {
                 onClick={refetch} 
                 variant="outline" 
                 className="flex items-center gap-2"
-                disabled={loading}
+                disabled={loading || isSyncing}
               >
                 <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                 Refresh Data
@@ -67,9 +95,10 @@ const Dashboard = () => {
               <Button 
                 onClick={handleSyncData} 
                 className="flex items-center gap-2"
+                disabled={isSyncing}
               >
-                <Calendar className="h-4 w-4" />
-                Sync Amazon Data
+                <Calendar className={`h-4 w-4 ${isSyncing ? 'animate-pulse' : ''}`} />
+                {isSyncing ? 'Syncing…' : 'Sync Amazon Data'}
               </Button>
             </div>
           )}
