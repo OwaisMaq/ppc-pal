@@ -1,249 +1,200 @@
-
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Bot, TrendingUp, Shield, Zap, Users, Mail, Building2, Sparkles, Star, LinkIcon } from "lucide-react";
-import { Link } from "react-router-dom";
 import { useEffect } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Bot, CheckCircle2, Zap, Shield, CalendarDays, BarChart3 } from "lucide-react";
+import HeroBackground from "@/components/HeroBackground";
+import AppPreviewFrame from "@/components/AppPreviewFrame";
+import KpiChip from "@/components/KpiChip";
+import DynamicGridCard from "@/components/DynamicGridCard";
+import FeatureTile from "@/components/FeatureTile";
 
 const PublicLanding = () => {
   const { user, loading } = useAuth();
-  
+
   useEffect(() => {
     console.log('PublicLanding: Component mounted');
     console.log('PublicLanding: Current URL:', window.location.href);
     console.log('PublicLanding: Current pathname:', window.location.pathname);
     console.log('PublicLanding: User:', user?.email || 'No user', 'Loading:', loading);
-    
-    // CRITICAL: This is a public page - NEVER redirect automatically
     console.log('PublicLanding: This is a public page, no redirects should happen');
+    document.title = 'PPC Pal — AI Amazon PPC Optimizer';
   }, [user, loading]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
-      {/* Cosmic background effects */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-purple-900/20 via-slate-900/50 to-black"></div>
-      
-      {/* Animated stars */}
-      <div className="absolute inset-0">
-        {[...Array(50)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute animate-pulse"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 3}s`,
-              animationDuration: `${2 + Math.random() * 2}s`
-            }}
-          >
-            <Star className="h-1 w-1 text-white opacity-60" fill="currentColor" />
-          </div>
-        ))}
-      </div>
-
-      {/* Large cosmic orbs */}
-      <div className="absolute top-20 left-10 w-96 h-96 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
-      <div className="absolute bottom-20 right-10 w-80 h-80 bg-gradient-to-r from-cyan-500/10 to-purple-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
-
-      {/* Header */}
-      <header className="bg-black/20 backdrop-blur-md border-b border-purple-500/20 px-4 py-3 relative z-10">
-        <div className="container mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-full p-2 shadow-lg shadow-purple-500/30">
-              <Bot className="h-6 w-6 text-white" />
-            </div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-white to-purple-200 bg-clip-text text-transparent">
-              PPC Pal
-            </h1>
-          </div>
-          
-          <nav className="hidden md:flex items-center gap-6">
-            <Link to="/company" className="text-purple-200 hover:text-white transition-all duration-300 hover:scale-105">
-              Company
-            </Link>
-            <Link to="/about" className="text-purple-200 hover:text-white transition-all duration-300 hover:scale-105">
-              About
-            </Link>
-            <Link to="/contact" className="text-purple-200 hover:text-white transition-all duration-300 hover:scale-105">
-              Contact
-            </Link>
+    <div className="min-h-screen bg-background text-foreground">
+      {/* Sticky minimal navbar */}
+      <header className="sticky top-0 z-40 w-full border-b border-border/60 bg-background/60 backdrop-blur supports-[backdrop-filter]:bg-background/40">
+        <div className="container mx-auto flex h-14 items-center justify-between px-4">
+          <Link to="/" className="flex items-center gap-2">
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-brand text-white shadow-sm">
+              <Bot className="h-5 w-5" />
+            </span>
+            <span className="font-semibold tracking-tight">PPC Pal</span>
+          </Link>
+          <nav className="hidden md:flex items-center gap-6 text-sm">
+            <Link to="/company" className="transition-colors hover:text-foreground">Company</Link>
+            <Link to="/about" className="transition-colors hover:text-foreground">About</Link>
+            <Link to="/contact" className="transition-colors hover:text-foreground">Contact</Link>
+          </nav>
+          <div className="flex items-center gap-2">
             {user ? (
               <Link to="/dashboard">
-                <Button className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg shadow-purple-500/30 transition-all duration-300 hover:scale-105">
-                  Go to Dashboard
-                </Button>
+                <Button variant="pill" size="sm">Go to Dashboard</Button>
               </Link>
             ) : (
               <Link to="/auth">
-                <Button className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg shadow-purple-500/30 transition-all duration-300 hover:scale-105">
-                  Sign In
-                </Button>
+                <Button variant="hero" size="xl">Join the beta</Button>
               </Link>
             )}
-          </nav>
+          </div>
         </div>
       </header>
 
-      {/* Hero Section */}
-      <section className="container mx-auto px-4 py-16 text-center relative z-10">
-        <div className="max-w-4xl mx-auto">
-          <div className="mb-8 relative">
-            <Sparkles className="absolute -top-4 -left-4 h-8 w-8 text-purple-400 animate-pulse" />
-            <Sparkles className="absolute -top-2 -right-6 h-6 w-6 text-blue-400 animate-pulse" style={{ animationDelay: '0.5s' }} />
-            <h1 className="text-5xl font-bold bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent mb-6 leading-tight">
-              Optimize Your Amazon PPC Campaigns with AI
-            </h1>
-          </div>
-          <p className="text-xl text-purple-100 mb-8 leading-relaxed opacity-90">
-            PPC Pal uses advanced artificial intelligence to analyze and optimize your Amazon advertising campaigns, 
-            helping you increase sales while reducing wasted ad spend in the vast digital cosmos.
+      {/* Hero */}
+      <HeroBackground imageUrl="/lovable-uploads/bda7d203-91b5-4329-947b-2ce46773ed8e.png">
+        <div className="mx-auto max-w-3xl text-center">
+          <h1 className="font-display text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight">
+            Smarter Amazon PPC. Cinematic simplicity.
+          </h1>
+          <p className="mt-6 text-lg text-muted-foreground">
+            Maximise ROAS with AI-driven bids, keyword harvesting, and budget pacing. Clean visuals, less noise.
           </p>
-          
-          {/* Amazon Integration Highlight */}
-          <div className="bg-gradient-to-r from-orange-500/10 to-amber-500/10 border border-orange-400/30 rounded-lg p-6 mb-8 backdrop-blur-sm">
-            <div className="flex items-center justify-center gap-3 mb-4">
-              <div className="bg-gradient-to-r from-orange-600 to-amber-600 rounded-full p-2 shadow-lg shadow-orange-500/30">
-                <LinkIcon className="h-6 w-6 text-white" />
-              </div>
-              <h3 className="text-2xl font-semibold text-white">Direct Amazon Ads API Integration</h3>
-            </div>
-            <p className="text-orange-100 text-lg mb-4">
-              Seamlessly connect your Amazon Advertising accounts for real-time campaign optimization and automated bid management.
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-              <div className="bg-white/5 rounded-lg p-3 border border-orange-400/20">
-                <div className="text-orange-300 font-medium mb-1">Secure Connection</div>
-                <div className="text-orange-100">OAuth 2.0 authentication with Amazon</div>
-              </div>
-              <div className="bg-white/5 rounded-lg p-3 border border-orange-400/20">
-                <div className="text-orange-300 font-medium mb-1">Real-time Sync</div>
-                <div className="text-orange-100">Live campaign data and performance metrics</div>
-              </div>
-              <div className="bg-white/5 rounded-lg p-3 border border-orange-400/20">
-                <div className="text-orange-300 font-medium mb-1">Auto Optimization</div>
-                <div className="text-orange-100">AI-powered bid adjustments and keyword optimization</div>
-              </div>
-            </div>
-          </div>
-          
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
             {user ? (
-              <Link to="/dashboard">
-                <Button size="lg" className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg shadow-purple-500/40 transition-all duration-300 hover:scale-105 border border-purple-400/30">
-                  <Zap className="mr-2 h-5 w-5" />
-                  Go to Dashboard
+              <Link to="/dashboard" className="w-full sm:w-auto">
+                <Button variant="hero" size="xl" className="w-full sm:w-auto">
+                  <Zap className="mr-2 h-5 w-5" /> Go to Dashboard
                 </Button>
               </Link>
             ) : (
-              <Link to="/auth">
-                <Button size="lg" className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg shadow-purple-500/40 transition-all duration-300 hover:scale-105 border border-purple-400/30">
-                  <Zap className="mr-2 h-5 w-5" />
-                  Start Optimizing Now
+              <Link to="/auth" className="w-full sm:w-auto">
+                <Button variant="hero" size="xl" className="w-full sm:w-auto">
+                  <Zap className="mr-2 h-5 w-5" /> Start optimizing
                 </Button>
               </Link>
             )}
-            <Link to="/about">
-              <Button variant="outline" size="lg" className="w-full sm:w-auto bg-transparent border-purple-400/50 text-purple-200 hover:bg-purple-900/50 hover:text-white transition-all duration-300 hover:scale-105">
-                Learn More
-              </Button>
+            <Link to="/about" className="w-full sm:w-auto">
+              <Button variant="pill" className="w-full sm:w-auto" size="xl">Learn more</Button>
             </Link>
+          </div>
+        </div>
+
+        {/* App preview overlapping the fold */}
+        <div className="mx-auto mt-12 max-w-5xl">
+          <AppPreviewFrame>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <KpiChip label="Spend" value="$12.3k" change={{ value: '2.1%', direction: 'down' }} />
+              <KpiChip label="Clicks" value="48,921" change={{ value: '5.4%', direction: 'up' }} />
+              <KpiChip label="ACOS" value="24.6%" change={{ value: '1.2%', direction: 'down' }} />
+              <KpiChip label="ROAS" value="4.1x" change={{ value: '3.0%', direction: 'up' }} />
+            </div>
+            <div className="mt-6 grid gap-6 lg:grid-cols-3">
+              <Card className="p-4 lg:col-span-2">
+                <div className="flex items-center gap-2 mb-3 text-sm text-muted-foreground">
+                  <CalendarDays className="h-4 w-4" /> Last 7 days
+                </div>
+                <div className="h-48 rounded-lg bg-muted" aria-hidden />
+              </Card>
+              <Card className="p-4">
+                <div className="flex items-center gap-2 mb-3 text-sm text-muted-foreground">
+                  <BarChart3 className="h-4 w-4" /> Top keywords
+                </div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center justify-between"><span>organic vitamin c</span><span className="font-medium">ROAS 6.2x</span></div>
+                  <div className="flex items-center justify-between"><span>kids gummies</span><span className="font-medium">ROAS 4.9x</span></div>
+                  <div className="flex items-center justify-between"><span>beauty serum</span><span className="font-medium">ROAS 3.8x</span></div>
+                </div>
+              </Card>
+            </div>
+          </AppPreviewFrame>
+        </div>
+      </HeroBackground>
+
+      {/* Value Section */}
+      <section className="container mx-auto px-4 py-20">
+        <div className="grid items-center gap-10 lg:grid-cols-2">
+          <div>
+            <h2 className="text-3xl sm:text-4xl font-semibold mb-6">Maximise ROAS, every day</h2>
+            <ul className="space-y-4 text-base">
+              <li className="flex items-start gap-3">
+                <CheckCircle2 className="mt-0.5 h-5 w-5 text-brand" />
+                <div>
+                  <div className="font-medium">Dynamic Bids</div>
+                  <p className="text-muted-foreground">Continuous bid adjustments based on performance signals.</p>
+                </div>
+              </li>
+              <li className="flex items-start gap-3">
+                <CheckCircle2 className="mt-0.5 h-5 w-5 text-brand" />
+                <div>
+                  <div className="font-medium">Keyword Harvesting</div>
+                  <p className="text-muted-foreground">Promote winners, pause waste, and mine search terms automatically.</p>
+                </div>
+              </li>
+              <li className="flex items-start gap-3">
+                <CheckCircle2 className="mt-0.5 h-5 w-5 text-brand" />
+                <div>
+                  <div className="font-medium">Budget Pacing</div>
+                  <p className="text-muted-foreground">Avoid mid-day drop-offs and overspend with smart pacing.</p>
+                </div>
+              </li>
+            </ul>
+          </div>
+          <div>
+            <DynamicGridCard />
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="container mx-auto px-4 py-16 relative z-10">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold bg-gradient-to-r from-white to-purple-200 bg-clip-text text-transparent mb-4">
-            Why Choose PPC Pal?
-          </h2>
-          <p className="text-lg text-purple-100 opacity-90">
-            Our AI-powered platform delivers results that matter to your business
-          </p>
-        </div>
-        
-        <div className="grid md:grid-cols-3 gap-8">
-          <Card className="bg-black/20 backdrop-blur-md border-purple-500/20 hover:border-purple-400/40 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-purple-500/20">
-            <CardHeader>
-              <div className="bg-gradient-to-r from-green-500 to-emerald-500 rounded-full p-2 w-fit mb-2 shadow-lg shadow-green-500/30">
-                <TrendingUp className="h-6 w-6 text-white" />
-              </div>
-              <CardTitle className="text-white">Increase ROI</CardTitle>
-              <CardDescription className="text-purple-200">
-                Our AI algorithms identify the best performing keywords and optimize bids to maximize your return on ad spend.
-              </CardDescription>
-            </CardHeader>
-          </Card>
-          
-          <Card className="bg-black/20 backdrop-blur-md border-purple-500/20 hover:border-purple-400/40 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-purple-500/20">
-            <CardHeader>
-              <div className="bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full p-2 w-fit mb-2 shadow-lg shadow-yellow-500/30">
-                <Zap className="h-6 w-6 text-white" />
-              </div>
-              <CardTitle className="text-white">Save Time</CardTitle>
-              <CardDescription className="text-purple-200">
-                Automate campaign optimization tasks that would take hours to do manually. Focus on growing your business instead.
-              </CardDescription>
-            </CardHeader>
-          </Card>
-          
-          <Card className="bg-black/20 backdrop-blur-md border-purple-500/20 hover:border-purple-400/40 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-purple-500/20">
-            <CardHeader>
-              <div className="bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full p-2 w-fit mb-2 shadow-lg shadow-blue-500/30">
-                <Shield className="h-6 w-6 text-white" />
-              </div>
-              <CardTitle className="text-white">Data Security</CardTitle>
-              <CardDescription className="text-purple-200">
-                Your campaign data is encrypted and secure. We follow industry best practices to protect your business information.
-              </CardDescription>
-            </CardHeader>
-          </Card>
+      {/* Time Saver Section */}
+      <section className="container mx-auto px-4 pb-20">
+        <h2 className="text-3xl sm:text-4xl font-semibold mb-8">Your time’s valuable</h2>
+        <div className="grid gap-6 md:grid-cols-3">
+          <FeatureTile
+            title="Automatic Bid Adjustments"
+            subtitle="Always-on optimisation"
+            imageUrl="/lovable-uploads/47be75a0-13ac-45cd-bad8-df3a6e6237a7.png"
+          />
+          <FeatureTile
+            title="Keyword Harvesting"
+            subtitle="Mine winners, prune waste"
+            imageUrl="/lovable-uploads/bda7d203-91b5-4329-947b-2ce46773ed8e.png"
+          />
+          <FeatureTile
+            title="Budget Pacing Alerts"
+            subtitle="Stay within targets"
+          />
         </div>
       </section>
 
-      {/* Company Info Section */}
-      <section className="bg-black/30 backdrop-blur-md border-t border-purple-500/20 relative z-10">
-        <div className="container mx-auto px-4 py-16">
-          <div className="max-w-3xl mx-auto text-center">
-            <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-full p-3 w-fit mx-auto mb-4 shadow-lg shadow-purple-500/30">
-              <Building2 className="h-8 w-8 text-white" />
-            </div>
-            <h2 className="text-3xl font-bold bg-gradient-to-r from-white to-purple-200 bg-clip-text text-transparent mb-4">
-              About WISH AND WILLOW LTD
-            </h2>
-            <p className="text-lg text-purple-100 mb-6 opacity-90">
-              WISH AND WILLOW LTD is a technology company specializing in AI-powered e-commerce optimization tools. 
-              Our flagship product, PPC Pal, helps Amazon sellers optimize their advertising campaigns for maximum profitability.
-            </p>
-            <div className="flex items-center justify-center gap-2 text-purple-200">
-              <Mail className="h-4 w-4" />
-              <a href="mailto:info@ppcpal.online" className="hover:text-white transition-colors duration-300 hover:scale-105 inline-block">
-                info@ppcpal.online
-              </a>
-            </div>
+      {/* Trust/CTA strip */}
+      <section className="border-t py-10">
+        <div className="container mx-auto px-4 flex flex-col items-center justify-between gap-4 text-center md:flex-row">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Shield className="h-5 w-5" /> Data encrypted, OAuth with Amazon
+          </div>
+          <div className="flex gap-3">
+            <Link to="/about"><Button variant="pill">Learn more</Button></Link>
+            {user ? (
+              <Link to="/dashboard"><Button variant="hero">Open dashboard</Button></Link>
+            ) : (
+              <Link to="/auth"><Button variant="hero">Join the beta</Button></Link>
+            )}
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="bg-black/40 backdrop-blur-md text-white border-t border-purple-500/20 relative z-10">
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="flex items-center gap-3 mb-4 md:mb-0">
-              <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-full p-2 shadow-lg shadow-purple-500/30">
-                <Bot className="h-6 w-6 text-white" />
-              </div>
-              <span className="text-lg font-semibold bg-gradient-to-r from-white to-purple-200 bg-clip-text text-transparent">
-                PPC Pal
-              </span>
-            </div>
-            
-            <div className="text-center md:text-right">
-              <p className="text-purple-200 mb-1">© 2024 WISH AND WILLOW LTD</p>
-              <p className="text-purple-300">All rights reserved</p>
-            </div>
+      <footer className="border-t">
+        <div className="container mx-auto px-4 py-6 flex items-center justify-between text-sm text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-brand text-white">
+              <Bot className="h-4 w-4" />
+            </span>
+            <span>PPC Pal</span>
           </div>
+          <span>© 2024 WISH AND WILLOW LTD • All rights reserved</span>
         </div>
       </footer>
     </div>

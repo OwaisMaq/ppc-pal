@@ -51,6 +51,10 @@
     --sidebar-border: 220 13% 91%;
 
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Brand tokens */
+    --brand: 158 64% 52%; /* emerald */
+    --brand-foreground: 210 40% 98%;
   }
 
   .dark {
@@ -98,6 +102,6 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
   }
 }
