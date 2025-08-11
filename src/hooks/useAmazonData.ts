@@ -124,15 +124,7 @@ export const useAmazonData = () => {
   const syncAllData = async (connectionId: string) => {
     setLoading(true);
     try {
-      // Capture previous last_sync_at to detect completion
-      const { data: beforeConn } = await supabase
-        .from('amazon_connections')
-        .select('last_sync_at')
-        .eq('id', connectionId)
-        .single();
-      const prevLastSyncAt = beforeConn?.last_sync_at ? new Date(beforeConn.last_sync_at).getTime() : 0;
-
-      const { data, error } = await supabase.functions.invoke('sync-amazon-data', {
+      const { error } = await supabase.functions.invoke('sync-amazon-data', {
         body: { connectionId },
         headers: {
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
@@ -140,52 +132,17 @@ export const useAmazonData = () => {
       });
 
       if (error) throw error;
-      if (data && data.success === false && typeof data.message === 'string') {
-        // Edge function may return 400 or success false
-        throw new Error(data.message);
-      }
-
-      toast.success('Sync started. This can take a few minutes...');
-
-      // Poll connection until last_sync_at advances or timeout
-      const timeoutMs = 4 * 60 * 1000; // 4 minutes
-      const intervalMs = 10000; // 10 seconds
-      const start = Date.now();
-      let completed = false;
-
-      while (Date.now() - start < timeoutMs) {
-        await new Promise((r) => setTimeout(r, intervalMs));
-        const { data: afterConn, error: pollErr } = await supabase
-          .from('amazon_connections')
-          .select('last_sync_at')
-          .eq('id', connectionId)
-          .single();
-
-        if (pollErr) break;
-
-        const lastSyncTs = afterConn?.last_sync_at ? new Date(afterConn.last_sync_at).getTime() : 0;
-        if (lastSyncTs && lastSyncTs > prevLastSyncAt) {
-          completed = true;
-          break;
-        }
-      }
-
-      if (completed) {
-        await fetchAllData();
-        toast.success('Data sync completed.');
-      } else {
-        toast.warning('Sync is still processing. Data will appear once ready.');
-      }
+      
+      toast.success('Data sync initiated successfully!');
+      
+      // Refresh data after sync
+      setTimeout(() => {
+        fetchAllData();
+      }, 3000);
+      
     } catch (error) {
       console.error('Error syncing data:', error);
-      const msg = (error as any)?.message || '';
-      if (typeof msg === 'string' && msg.toLowerCase().includes('no campaigns')) {
-        toast.info('No Amazon campaigns found for this connection. Nothing to sync.');
-      } else if (typeof msg === 'string' && msg.toLowerCase().includes('sync completed without metrics')) {
-        toast.warning('Sync finished but no performance data was updated.');
-      } else {
-        toast.error('Failed to sync Amazon data');
-      }
+      toast.error('Failed to sync Amazon data');
     } finally {
       setLoading(false);
     }
