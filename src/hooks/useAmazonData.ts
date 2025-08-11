@@ -2,14 +2,15 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Campaign, AdGroup, Keyword } from '@/lib/amazon/types';
+import { Campaign, AdGroup, Keyword, Target } from '@/lib/amazon/types';
 
 export const useAmazonData = () => {
   const { user } = useAuth();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [adGroups, setAdGroups] = useState<AdGroup[]>([]);
-  const [keywords, setKeywords] = useState<Keyword[]>([]);
-  const [loading, setLoading] = useState(false);
+const [keywords, setKeywords] = useState<Keyword[]>([]);
+const [targets, setTargets] = useState<Target[]>([]);
+const [loading, setLoading] = useState(false);
   const [lastSyncDiagnostics, setLastSyncDiagnostics] = useState<any | null>(null);
 
   useEffect(() => {
@@ -24,7 +25,8 @@ export const useAmazonData = () => {
       await Promise.all([
         fetchCampaigns(),
         fetchAdGroups(),
-        fetchKeywords()
+        fetchKeywords(),
+        fetchTargets()
       ]);
     } catch (error) {
       console.error('Error fetching Amazon data:', error);
@@ -121,6 +123,35 @@ export const useAmazonData = () => {
       throw error;
     }
   };
+  const fetchTargets = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('targets')
+        .select(`
+          *,
+          ad_groups!targets_adgroup_id_fkey(
+            campaigns!ad_groups_campaign_id_fkey(
+              amazon_connections!campaigns_connection_id_fkey(
+                user_id
+              )
+            )
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const userTargets = data?.filter((t: any) =>
+        t.ad_groups?.campaigns?.amazon_connections?.user_id === user?.id
+      ) || [];
+
+      setTargets(userTargets);
+      console.log('Fetched targets:', userTargets.length);
+    } catch (error) {
+      console.error('Error fetching targets:', error);
+      throw error;
+    }
+  };
 
   const syncAllData = async (connectionId: string, options?: { dateRangeDays?: number; diagnosticMode?: boolean }) => {
     setLoading(true);
@@ -191,6 +222,7 @@ export const useAmazonData = () => {
     campaigns,
     adGroups,
     keywords,
+    targets,
     loading,
     fetchAllData,
     syncAllData,

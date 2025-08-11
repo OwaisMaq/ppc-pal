@@ -27,7 +27,7 @@ const formatNumber = (value: number) => {
 };
 
 const ConsolidatedDataView = () => {
-  const { campaigns, adGroups, keywords, loading, syncAllData } = useAmazonData();
+  const { campaigns, adGroups, keywords, targets, loading, syncAllData } = useAmazonData();
   const { connections } = useAmazonConnections();
   const [expandedCampaigns, setExpandedCampaigns] = useState<Set<string>>(new Set());
   const [expandedAdGroups, setExpandedAdGroups] = useState<Set<string>>(new Set());
@@ -66,6 +66,9 @@ const ConsolidatedDataView = () => {
 
   const getAdGroupKeywords = (adGroupId: string) => {
     return keywords.filter(k => k.adgroup_id === adGroupId);
+  };
+  const getAdGroupTargets = (adGroupId: string) => {
+    return targets.filter(t => t.adgroup_id === adGroupId);
   };
 
   if (activeConnections.length === 0) {
@@ -170,6 +173,7 @@ const ConsolidatedDataView = () => {
                       ) : (
                         campaignAdGroups.map((adGroup) => {
                           const adGroupKeywords = getAdGroupKeywords(adGroup.id);
+                          const adGroupTargets = getAdGroupTargets(adGroup.id);
                           const isAdGroupExpanded = expandedAdGroups.has(adGroup.id);
                           
                           return (
@@ -196,7 +200,7 @@ const ConsolidatedDataView = () => {
                                         >
                                           {adGroup.status}
                                         </Badge>
-                                        <span>{adGroupKeywords.length} keywords</span>
+                                        <span>{adGroupKeywords.length} keywords, {adGroupTargets.length} targets</span>
                                         {adGroup.default_bid && (
                                           <span>Bid: {formatCurrency(adGroup.default_bid)}</span>
                                         )}

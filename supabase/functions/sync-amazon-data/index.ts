@@ -475,7 +475,43 @@ serve(async (req) => {
       }
     }
 
-    console.log(`📊 Entity sync complete: ${campaignIds.length} campaigns, ${adGroupIds.length} ad groups, ${keywordIds.length} keywords`)
+    // Sync targets for each ad group (auto-targeting)
+    console.log('🎯 Syncing targets...')
+    const targetIds: string[] = []
+
+    for (const [adGroupId, storedAdGroup] of adGroupMap.entries()) {
+      const targetsResponse = await fetch(`${apiEndpoint}/v2/targets?adGroupIdFilter=${adGroupId}`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Amazon-Advertising-API-ClientId': clientId,
+          'Amazon-Advertising-API-Scope': connection.profile_id,
+        },
+      })
+
+      if (targetsResponse.ok) {
+        const targetsData = await targetsResponse.json()
+        console.log(`  🎯 Ad Group ${adGroupId}: ${targetsData.length} targets`)
+        for (const t of targetsData) {
+          if (!t.targetId) continue
+          targetIds.push(t.targetId.toString())
+
+          await supabase
+            .from('targets')
+            .upsert({
+              adgroup_id: storedAdGroup.id,
+              amazon_target_id: t.targetId.toString(),
+              expression: t.expression ?? null,
+              type: t.expressionType ?? null,
+              bid: t.bid ?? null,
+              status: t.state ? t.state.toLowerCase() : 'enabled',
+            }, {
+              onConflict: 'adgroup_id, amazon_target_id'
+            })
+        }
+      }
+    }
+
+    console.log(`📊 Entity sync complete: ${campaignIds.length} campaigns, ${adGroupIds.length} ad groups, ${keywordIds.length} keywords, ${targetIds.length} targets`)
 
     // Initialize diagnostics
     const diagnostics: any = {
@@ -500,6 +536,8 @@ serve(async (req) => {
     const campaignColumns = ['campaignId','impressions','clicks','spend','sales7d','purchases7d','sales14d','purchases14d']
     
     const adGroupColumns = ['adGroupId','impressions','clicks','spend','sales7d','purchases7d','sales14d','purchases14d']
+    
+    const targetColumns = ['targetId','impressions','clicks','spend','sales7d','purchases7d','sales14d','purchases14d']
     
     // Keyword report temporarily disabled (targets support pending)
 
@@ -685,6 +723,89 @@ serve(async (req) => {
         }
       } catch (error) {
         console.error('❌ Ad group performance sync failed:', error)
+      }
+    }
+
+    // Targets Performance
+    if (typeof targetIds !== 'undefined' && targetIds.length > 0) {
+      console.log('🎯 Fetching target performance...')
+      try {
+        const reportId = await createReportRequest(
+          apiEndpoint, accessToken, clientId, connection.profile_id,
+          'targets', targetColumns, targetIds, { dateRangeDays: dateRange, timeUnit: 'SUMMARY' }
+        )
+        const report = await pollReportStatus(
+          apiEndpoint, accessToken, clientId, connection.profile_id, reportId
+        )
+        const performanceData = await downloadAndParseReport(report.url!)
+        console.log(`💾 Processing ${performanceData.length} target performance records`)
+        for (const perf of performanceData) {
+          const anyPerf = perf as any
+          const targetId = anyPerf.targetId ?? anyPerf.keywordId
+          if (!targetId) continue
+          const impressions = Number(anyPerf.impressions ?? 0)
+          const clicks = Number(anyPerf.clicks ?? 0)
+          const spend = Number(anyPerf.spend ?? anyPerf.cost ?? 0)
+          const sales7d = Number(anyPerf.sales7d ?? anyPerf.attributedSales7d ?? 0)
+          const sales14d = Number(anyPerf.sales14d ?? anyPerf.attributedSales14d ?? 0)
+          const orders7d = Number(anyPerf.purchases7d ?? anyPerf.attributedConversions7d ?? 0)
+          const orders14d = Number(anyPerf.purchases14d ?? anyPerf.attributedConversions14d ?? 0)
+          const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0
+          const cpc = clicks > 0 ? spend / clicks : 0
+          const acos7d = sales7d > 0 ? (spend / sales7d) * 100 : 0
+          const acos14d = sales14d > 0 ? (spend / sales14d) * 100 : 0
+          const roas7d = spend > 0 ? sales7d / spend : 0
+          const roas14d = spend > 0 ? sales14d / spend : 0
+          const convRate7d = clicks > 0 ? (orders7d / clicks) * 100 : 0
+          const convRate14d = clicks > 0 ? (orders14d / clicks) * 100 : 0
+
+          const { error: tgtErr } = await supabase
+            .from('targets')
+            .update({
+              impressions,
+              clicks,
+              spend,
+              sales: sales14d,
+              orders: orders14d,
+              acos: acos14d,
+              roas: roas14d,
+              ctr,
+              cpc,
+              conversion_rate: convRate14d,
+              // 7d
+              sales_7d: sales7d,
+              orders_7d: orders7d,
+              acos_7d: acos7d,
+              roas_7d: roas7d,
+              ctr_7d: ctr,
+              cpc_7d: cpc,
+              conversion_rate_7d: convRate7d,
+              clicks_7d: clicks,
+              impressions_7d: impressions,
+              spend_7d: spend,
+              // 14d
+              sales_14d: sales14d,
+              orders_14d: orders14d,
+              acos_14d: acos14d,
+              roas_14d: roas14d,
+              ctr_14d: ctr,
+              cpc_14d: cpc,
+              conversion_rate_14d: convRate14d,
+              clicks_14d: clicks,
+              impressions_14d: impressions,
+              spend_14d: spend,
+              last_updated: new Date().toISOString()
+            })
+            .eq('amazon_target_id', targetId.toString())
+
+          if (tgtErr) {
+            diagnostics.writeErrors.push({ entity: 'target', id: targetId?.toString?.(), error: tgtErr.message })
+          } else {
+            totalMetricsUpdated++
+          }
+        }
+      } catch (error) {
+        console.error('❌ Target performance sync failed:', error)
       }
     }
 

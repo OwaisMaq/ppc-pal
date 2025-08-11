@@ -79,6 +79,27 @@ export interface Keyword {
   last_updated?: string;
   created_at: string;
 }
+export interface Target {
+  id: string;
+  adgroup_id: string;
+  amazon_target_id: string;
+  expression?: any;
+  type?: string;
+  bid?: number;
+  status: 'enabled' | 'paused' | 'archived';
+  impressions: number;
+  clicks: number;
+  spend: number;
+  sales: number;
+  orders: number;
+  acos?: number;
+  roas?: number;
+  ctr?: number;
+  cpc?: number;
+  conversion_rate?: number;
+  last_updated?: string;
+  created_at: string;
+}
 
 export interface OptimizationResult {
   id: string;
