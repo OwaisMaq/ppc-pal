@@ -53,7 +53,7 @@ const PublicLanding = () => {
       </header>
 
       {/* Hero */}
-      <HeroBackground imageUrl="/lovable-uploads/bda7d203-91b5-4329-947b-2ce46773ed8e.png">
+      <HeroBackground imageUrl="/lovable-uploads/4b093e39-3730-4f0a-974c-c04971fa5913.png">
         <div className="mx-auto max-w-3xl text-center">
           <h1 className="font-display text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight">
             Smarter Amazon PPC. Cinematic simplicity.
