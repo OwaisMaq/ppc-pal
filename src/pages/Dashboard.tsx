@@ -1,5 +1,5 @@
 import Header from "@/components/Header";
-import AmazonAccountSetup from "@/components/AmazonAccountSetup";
+
 import OptimizationDashboard from "@/components/OptimizationDashboard";
 import SubscriptionStatus from "@/components/SubscriptionStatus";
 import AmazonDataDashboard from "@/components/AmazonDataDashboard";
@@ -11,10 +11,10 @@ import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { useCampaignMetrics } from "@/hooks/useCampaignMetrics";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { RefreshCw, BarChart3, Calendar } from "lucide-react";
-import { toast } from "sonner";
+import { RefreshCw, BarChart3 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
+import { Link } from "react-router-dom";
 
 // Map marketplace IDs to region labels and flags
 const MARKETPLACE_INFO: Record<string, { code: string; label: string; flag: string }> = {
@@ -44,7 +44,7 @@ const getConnectionLabel = (c: { profile_name?: string; profile_id: string; mark
 };
 
 const Dashboard = () => {
-  const { connections, syncConnection, refreshConnections, loading: connectionsLoading } = useAmazonConnections();
+  const { connections } = useAmazonConnections();
   const { metrics, campaigns, loading, error, refetch } = useCampaignMetrics();
   
   const hasActiveConnections = connections.some(c => c.status === 'active');
@@ -58,24 +58,6 @@ const Dashboard = () => {
     }
   }, [connections]);
 
-  const handleSyncData = async () => {
-    if (!hasActiveConnections) {
-      toast.error("Please connect your Amazon account first");
-      return;
-    }
-
-    const targetId = selectedConnectionId || activeConnections[0]?.id;
-    if (targetId) {
-      try {
-        await syncConnection(targetId);
-        setTimeout(() => {
-          refetch();
-        }, 2000); // Give time for sync to complete
-      } catch (error) {
-        toast.error("Failed to sync campaign data");
-      }
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50">
@@ -114,54 +96,24 @@ const Dashboard = () => {
                 <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                 Refresh Data
               </Button>
-              <Button 
-                onClick={handleSyncData} 
-                className="flex items-center gap-2"
-              >
-                <Calendar className="h-4 w-4" />
-                Sync Amazon Data
-              </Button>
             </div>
           )}
         </div>
 
         <div className="space-y-6">
-          {/* Debug Section - Temporary */}
-          <Card className="border-blue-200 bg-blue-50">
-            <CardContent className="pt-6">
-              <div className="text-sm">
-                <strong>Debug Info:</strong>
-                <br />
-                Connections count: {connections.length}
-                <br />
-                Active connections: {activeConnections.length}
-                <br />
-                Selected: {selectedConnectionId || 'none'}
-                <br />
-                Connection statuses: {connections.map(c => `${c.profile_name || 'Unknown'}: ${c.status}`).join(', ')}
-                <br />
-                Has active connections: {hasActiveConnections ? 'Yes' : 'No'}
-                <br />
-                <Button 
-                  onClick={refreshConnections} 
-                  size="sm" 
-                  variant="outline"
-                  disabled={connectionsLoading}
-                  className="mt-2"
-                >
-                  <RefreshCw className={`h-4 w-4 mr-2 ${connectionsLoading ? 'animate-spin' : ''}`} />
-                  Refresh Connections
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-          {/* Account Setup Section */}
           {!hasActiveConnections && (
-            <div className="grid lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2">
-                <AmazonAccountSetup />
-              </div>
-            </div>
+            <Card className="border-amber-200 bg-amber-50">
+              <CardContent className="pt-6">
+                <p className="text-sm text-amber-800">
+                  No active Amazon connections. Please connect your account in Settings.
+                </p>
+                <div className="mt-3">
+                  <Button asChild>
+                    <Link to="/settings">Go to Settings</Link>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           {/* Performance Overview Section */}
