@@ -573,13 +573,16 @@ serve(async (req) => {
     let totalMetricsUpdated = 0
 
     // Define columns using correct Amazon API v3 column names
-    const campaignColumns = ['campaignId','impressions','clicks','cost','sales7d','purchases7d','sales14d','purchases14d']
-    
-    const adGroupColumns = ['adGroupId','campaignId','impressions','clicks','cost','sales7d','purchases7d','sales14d','purchases14d']
-    
-    const targetColumns = ['targetId','adGroupId','campaignId','impressions','clicks','cost','sales7d','purchases7d','sales14d','purchases14d']
-    
-    const keywordColumns = ['keywordId','adGroupId','campaignId','keywordText','matchType','impressions','clicks','cost','sales7d','purchases7d','sales14d','purchases14d']
+    const campaignColumns = ['campaignId','impressions','clicks','spend','attributedSales7d','attributedConversions7d','attributedSales14d','attributedConversions14d']
+    const adGroupColumns = ['adGroupId','campaignId','impressions','clicks','spend','attributedSales7d','attributedConversions7d','attributedSales14d','attributedConversions14d']
+    const targetColumns = ['targetId','adGroupId','campaignId','impressions','clicks','spend','attributedSales7d','attributedConversions7d','attributedSales14d','attributedConversions14d']
+    const keywordColumns = ['keywordId','adGroupId','campaignId','keywordText','matchType','impressions','clicks','spend','attributedSales7d','attributedConversions7d','attributedSales14d','attributedConversions14d']
+
+    // Minimal columns fallback (in case of config errors)
+    const minCampaignColumns = ['campaignId','impressions','clicks','spend']
+    const minAdGroupColumns = ['adGroupId','campaignId','impressions','clicks','spend']
+    const minTargetColumns = ['targetId','adGroupId','campaignId','impressions','clicks','spend']
+    const minKeywordColumns = ['keywordId','adGroupId','campaignId','impressions','clicks','spend']
 
     // Campaign Performance
     if (campaignIds.length > 0) {
@@ -589,15 +592,12 @@ serve(async (req) => {
           apiEndpoint, accessToken, clientId, connection.profile_id,
           'campaigns', campaignColumns, campaignIds, { dateRangeDays: dateRange, timeUnit: timeUnitOpt }
         )
-        
         const report = await pollReportStatus(
           apiEndpoint, accessToken, clientId, connection.profile_id, reportId
         )
-        
         const performanceData = await downloadAndParseReport(report.url!)
         console.log(`💾 Processing ${performanceData.length} campaign performance records`)
         console.log('Campaign report sample keys:', Object.keys(performanceData[0] || {}))
-        
         // Upsert campaigns with performance data (ensures rows exist)
         for (const perf of performanceData) {
           if (!perf.campaignId) continue
@@ -665,6 +665,56 @@ serve(async (req) => {
         }
       } catch (error) {
         console.error('❌ Campaign performance sync failed:', error)
+        console.log('🔁 Retrying campaign report with minimal columns...')
+        try {
+          const reportId = await createReportRequest(
+            apiEndpoint, accessToken, clientId, connection.profile_id,
+            'campaigns', minCampaignColumns, campaignIds, { dateRangeDays: dateRange, timeUnit: timeUnitOpt }
+          )
+          const report = await pollReportStatus(apiEndpoint, accessToken, clientId, connection.profile_id, reportId)
+          const performanceData = await downloadAndParseReport(report.url!)
+          diagnostics.campaignMinimalColumnsFallbackUsed = true
+          for (const perf of performanceData) {
+            if (!perf.campaignId) continue
+            const anyPerf = perf as any
+            const impressions = Number(anyPerf.impressions ?? 0)
+            const clicks = Number(anyPerf.clicks ?? 0)
+            const spend = Number(anyPerf.spend ?? anyPerf.cost ?? 0)
+            const sales14d = Number(anyPerf.sales14d ?? anyPerf.attributedSales14d ?? 0)
+            const orders14d = Number(anyPerf.purchases14d ?? anyPerf.attributedConversions14d ?? 0)
+            const ctr14d = impressions > 0 ? (clicks / impressions) * 100 : 0
+            const cpc14d = clicks > 0 ? spend / clicks : 0
+            const acos14d = sales14d > 0 ? (spend / sales14d) * 100 : 0
+            const roas14d = spend > 0 ? sales14d / spend : 0
+
+            const { error: campErr } = await supabase
+              .from('campaigns')
+              .upsert({
+                connection_id: connectionId,
+                amazon_campaign_id: perf.campaignId.toString(),
+                impressions,
+                clicks,
+                spend,
+                sales: sales14d,
+                orders: orders14d,
+                acos: acos14d,
+                roas: roas14d,
+                ctr_14d: ctr14d,
+                cpc_14d: cpc14d,
+                clicks_14d: clicks,
+                impressions_14d: impressions,
+                spend_14d: spend,
+                last_updated: new Date().toISOString()
+              }, { onConflict: 'connection_id, amazon_campaign_id' })
+            if (campErr) {
+              diagnostics.writeErrors.push({ entity: 'campaign_min_fallback', id: perf.campaignId?.toString?.(), error: campErr.message })
+            } else {
+              totalMetricsUpdated++
+            }
+          }
+        } catch (err2) {
+          console.error('❌ Minimal-columns campaign report also failed:', err2)
+        }
       }
     } else {
       // Fallback: no campaign IDs from v2, request unfiltered campaign report and upsert metrics
@@ -751,11 +801,9 @@ serve(async (req) => {
           apiEndpoint, accessToken, clientId, connection.profile_id,
           'adGroups', adGroupColumns, adGroupIds, { dateRangeDays: dateRange, timeUnit: timeUnitOpt }
         )
-        
         const report = await pollReportStatus(
           apiEndpoint, accessToken, clientId, connection.profile_id, reportId
         )
-        
         const performanceData = await downloadAndParseReport(report.url!)
         console.log(`💾 Processing ${performanceData.length} ad group performance records`)
         console.log('AdGroup report sample keys:', Object.keys(performanceData[0] || {}))
@@ -834,6 +882,61 @@ serve(async (req) => {
         }
       } catch (error) {
         console.error('❌ Ad group performance sync failed:', error)
+        console.log('🔁 Retrying ad group report with minimal columns...')
+        try {
+          const reportId = await createReportRequest(
+            apiEndpoint, accessToken, clientId, connection.profile_id,
+            'adGroups', minAdGroupColumns, adGroupIds, { dateRangeDays: dateRange, timeUnit: timeUnitOpt }
+          )
+          const report = await pollReportStatus(apiEndpoint, accessToken, clientId, connection.profile_id, reportId)
+          const performanceData = await downloadAndParseReport(report.url!)
+          diagnostics.adGroupMinimalColumnsFallbackUsed = true
+          for (const perf of performanceData) {
+            if (!perf.adGroupId) continue
+            const anyPerf = perf as any
+            const impressions = Number(anyPerf.impressions ?? 0)
+            const clicks = Number(anyPerf.clicks ?? 0)
+            const spend = Number(anyPerf.spend ?? anyPerf.cost ?? 0)
+            const sales14d = Number(anyPerf.sales14d ?? anyPerf.attributedSales14d ?? 0)
+            const orders14d = Number(anyPerf.purchases14d ?? anyPerf.attributedConversions14d ?? 0)
+            const ctr14d = impressions > 0 ? (clicks / impressions) * 100 : 0
+            const cpc14d = clicks > 0 ? spend / clicks : 0
+            const acos14d = sales14d > 0 ? (spend / sales14d) * 100 : 0
+            const roas14d = spend > 0 ? sales14d / spend : 0
+            const { data: agRecord } = await supabase
+              .from('ad_groups')
+              .select('id')
+              .eq('amazon_adgroup_id', perf.adGroupId.toString())
+              .maybeSingle()
+            if (agRecord?.id) {
+              const { error: agErr } = await supabase
+                .from('ad_groups')
+                .update({
+                  impressions,
+                  clicks,
+                  spend,
+                  sales: sales14d,
+                  orders: orders14d,
+                  acos: acos14d,
+                  roas: roas14d,
+                  ctr_14d: ctr14d,
+                  cpc_14d: cpc14d,
+                  clicks_14d: clicks,
+                  impressions_14d: impressions,
+                  spend_14d: spend,
+                  last_updated: new Date().toISOString()
+                })
+                .eq('id', agRecord.id)
+              if (agErr) {
+                diagnostics.writeErrors.push({ entity: 'ad_group_min_fallback', id: perf.adGroupId?.toString?.(), error: agErr.message })
+              } else {
+                totalMetricsUpdated++
+              }
+            }
+          }
+        } catch (err2) {
+          console.error('❌ Minimal-columns ad group report also failed:', err2)
+        }
       }
     } else {
       console.log('📊 Fallback: fetching unfiltered ad group performance (no ID filter)')

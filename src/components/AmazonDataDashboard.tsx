@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAmazonData } from "@/hooks/useAmazonData";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { BarChart3, TrendingUp, TrendingDown, RefreshCw, DollarSign, MousePointer, Eye } from "lucide-react";
+import { useDateRange } from "@/context/DateRangeContext";
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('en-US', {
