@@ -128,14 +128,6 @@ const AmazonDataDashboard = () => {
           </div>
         </CardHeader>
         <CardContent>
-          {lastSyncDiagnostics && (
-            <div className="mb-4 rounded-md border p-3 text-sm">
-              <div className="font-medium mb-1">Last sync diagnostics</div>
-              <pre className="overflow-auto max-h-40 whitespace-pre-wrap">
-                {typeof lastSyncDiagnostics === 'string' ? lastSyncDiagnostics : JSON.stringify(lastSyncDiagnostics, null, 2)}
-              </pre>
-            </div>
-          )}
           <Tabs defaultValue="campaigns" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="campaigns">Campaigns ({campaigns.length})</TabsTrigger>

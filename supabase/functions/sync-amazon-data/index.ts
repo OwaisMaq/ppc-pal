@@ -62,7 +62,6 @@ interface PerformanceData {
   matchType?: string
   impressions?: string
   clicks?: string
-  spend?: string
   cost?: string
   sales7d?: string
   sales14d?: string
@@ -92,7 +91,7 @@ async function createReportRequest(
     : reportType === 'adGroups' 
     ? ['adGroup'] 
     : reportType === 'keywords'
-    ? ['keyword']
+    ? ['adGroup']
     : ['targeting']
   const reportTypeId = reportType === 'campaigns' 
     ? 'spCampaigns' 
@@ -130,7 +129,7 @@ async function createReportRequest(
       ? 'adGroupId' 
       : reportType === 'keywords'
       ? 'keywordId'
-      : 'targetId'
+      : 'keywordId'
     payload.filters = [{ field, values: entityIds }]
   }
 
@@ -588,15 +587,15 @@ serve(async (req) => {
 
     // Define columns using correct Amazon API v3 column names
     const campaignColumns = ['campaignId','impressions','clicks','spend','sales7d','purchases7d','sales14d','purchases14d']
-    const adGroupColumns = ['adGroupId','campaignId','impressions','clicks','spend','sales7d','purchases7d','sales14d','purchases14d']
-    const targetColumns = ['targetId','adGroupId','campaignId','impressions','clicks','spend','sales7d','purchases7d','sales14d','purchases14d']
-    const keywordColumns = ['keywordId','adGroupId','campaignId','keywordText','matchType','impressions','clicks','spend','sales7d','purchases7d','sales14d','purchases14d']
+    const adGroupColumns = ['adGroupId','impressions','clicks','cost','sales7d','purchases7d','sales14d','purchases14d']
+    const targetColumns = ['targetId','impressions','clicks','cost','sales7d','purchases7d','sales14d','purchases14d']
+    const keywordColumns = ['keywordId','keywordText','matchType','impressions','clicks','cost','sales7d','purchases7d','sales14d','purchases14d']
 
     // Minimal columns fallback (in case of config errors)
     const minCampaignColumns = ['campaignId','impressions','clicks','spend']
-    const minAdGroupColumns = ['adGroupId','campaignId','impressions','clicks','spend']
-    const minTargetColumns = ['targetId','adGroupId','campaignId','impressions','clicks','spend']
-    const minKeywordColumns = ['keywordId','adGroupId','campaignId','impressions','clicks','spend']
+    const minAdGroupColumns = ['adGroupId','impressions','clicks','cost']
+    const minTargetColumns = ['targetId','impressions','clicks','cost']
+    const minKeywordColumns = ['keywordId','impressions','clicks','cost']
 
     // Campaign Performance
     if (campaignIds.length > 0) {
