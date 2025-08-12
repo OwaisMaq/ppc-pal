@@ -27,7 +27,7 @@ const formatNumber = (value: number) => {
 };
 
 const ConsolidatedDataView = () => {
-  const { campaigns, adGroups, keywords, targets, loading, syncAllData } = useAmazonData();
+  const { campaigns, adGroups, keywords, targets, loading, syncAllData, lastSyncDiagnostics } = useAmazonData();
   const { connections } = useAmazonConnections();
   const [expandedCampaigns, setExpandedCampaigns] = useState<Set<string>>(new Set());
   const [expandedAdGroups, setExpandedAdGroups] = useState<Set<string>>(new Set());

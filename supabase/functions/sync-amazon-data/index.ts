@@ -469,7 +469,7 @@ serve(async (req) => {
     const targetIds: string[] = []
 
     for (const [adGroupId, storedAdGroup] of adGroupMap.entries()) {
-      const targetsResponse = await fetch(`${apiEndpoint}/v2/targets?adGroupIdFilter=${adGroupId}`, {
+      const targetsResponse = await fetch(`${apiEndpoint}/v2/sp/targets?adGroupIdFilter=${adGroupId}`, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Amazon-Advertising-API-ClientId': clientId,
@@ -497,6 +497,9 @@ serve(async (req) => {
               onConflict: 'adgroup_id, amazon_target_id'
             })
         }
+      } else {
+        const errTxt = await targetsResponse.text().catch(() => '')
+        console.error(`❌ Targets API error for adGroup ${adGroupId}:`, targetsResponse.status, errTxt)
       }
     }
 
@@ -522,13 +525,13 @@ serve(async (req) => {
     let totalMetricsUpdated = 0
 
     // Define columns using correct Amazon API v3 column names
-    const campaignColumns = ['campaignId','impressions','clicks','spend','sales7d','purchases7d','sales14d','purchases14d']
+    const campaignColumns = ['campaignId','impressions','clicks','cost','sales7d','purchases7d','sales14d','purchases14d']
     
-    const adGroupColumns = ['adGroupId','impressions','clicks','spend','sales7d','purchases7d','sales14d','purchases14d']
+    const adGroupColumns = ['adGroupId','impressions','clicks','cost','sales7d','purchases7d','sales14d','purchases14d']
     
-    const targetColumns = ['targetId','impressions','clicks','spend','sales7d','purchases7d','sales14d','purchases14d']
+    const targetColumns = ['targetId','impressions','clicks','cost','sales7d','purchases7d','sales14d','purchases14d']
     
-    const keywordColumns = ['keywordId','impressions','clicks','spend','sales7d','purchases7d','sales14d','purchases14d']
+    const keywordColumns = ['keywordId','impressions','clicks','cost','sales7d','purchases7d','sales14d','purchases14d']
 
     // Campaign Performance
     if (campaignIds.length > 0) {
