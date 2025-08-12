@@ -78,11 +78,10 @@ const getConnectionLabel = (c: { profile_name?: string; profile_id: string; mark
 
 const Dashboard = () => {
   const { connections } = useAmazonConnections();
-  const { metrics, campaigns, loading, error, refetch } = useCampaignMetrics();
-  
+  const [selectedConnectionId, setSelectedConnectionId] = useState<string | undefined>(undefined);
   const hasActiveConnections = connections.some(c => c.status === 'active');
   const activeConnections = connections.filter(c => c.status === 'active');
-  const [selectedConnectionId, setSelectedConnectionId] = useState<string | undefined>(undefined);
+  const { metrics, campaigns, loading, error, refetch } = useCampaignMetrics(selectedConnectionId);
   const selectedConnection = useMemo(() => activeConnections.find(c => c.id === selectedConnectionId), [activeConnections, selectedConnectionId]);
   const { syncAllData, loading: syncLoading } = useAmazonData();
   const [autoSynced, setAutoSynced] = useState(false);

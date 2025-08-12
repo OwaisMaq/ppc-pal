@@ -31,7 +31,7 @@ export interface CampaignData {
   daily_budget?: number | null;
 }
 
-export const useCampaignMetrics = () => {
+export const useCampaignMetrics = (connectionId?: string) => {
   const { user } = useAuth();
   const [metrics, setMetrics] = useState<CampaignMetrics | null>(null);
   const [campaigns, setCampaigns] = useState<CampaignData[]>([]);
@@ -39,19 +39,27 @@ export const useCampaignMetrics = () => {
   const [error, setError] = useState<string | null>(null);
 
   const fetchCampaignData = async () => {
-    if (!user) return;
+    if (!user || !connectionId) {
+      setCampaigns([]);
+      setMetrics(null);
+      setLoading(false);
+      return;
+    }
     
     try {
       setLoading(true);
       setError(null);
 
-      // Fetch campaigns through user's Amazon connections
       const { data: campaignData, error: campaignError } = await supabase
         .from("campaigns")
         .select(`
-          *
+          id, connection_id, name, status, campaign_type, created_at,
+          daily_budget, impressions, clicks, spend, sales, orders, acos, roas,
+          clicks_14d, spend_14d, sales_14d
         `)
-        .order("created_at", { ascending: false });
+        .eq("connection_id", connectionId)
+        .order("spend", { ascending: false })
+        .limit(500);
 
       if (campaignError) {
         throw campaignError;
@@ -95,7 +103,7 @@ export const useCampaignMetrics = () => {
 
   useEffect(() => {
     fetchCampaignData();
-  }, [user]);
+  }, [user, connectionId]);
 
   return {
     metrics,

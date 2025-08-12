@@ -142,10 +142,15 @@ const [loading, setLoading] = useState(false);
       }
 
       setLastSyncDiagnostics(data?.diagnostics || null);
+
+      if (data?.diagnostics?.writeErrors?.length) {
+        const first = data.diagnostics.writeErrors[0];
+        toast.error(`Write error on ${first.entity || 'unknown'} ${first.id || ''}: ${first.error}`);
+      }
+
       setTimeout(() => {
         fetchAllData();
       }, 3000);
-      
     } catch (error: any) {
       console.error('Error syncing data:', error);
       toast.error(error.message || 'Failed to sync Amazon data');
