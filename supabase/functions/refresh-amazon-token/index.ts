@@ -6,6 +6,49 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// AES-GCM helpers for encrypting/decrypting tokens at rest
+const textEncoder = new TextEncoder();
+const textDecoder = new TextDecoder();
+function toBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+function fromBase64(str: string): Uint8Array {
+  const binary = atob(str);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+async function getKey() {
+  const secret = Deno.env.get('ENCRYPTION_KEY') || '';
+  const hash = await crypto.subtle.digest('SHA-256', textEncoder.encode(secret));
+  return crypto.subtle.importKey('raw', hash, 'AES-GCM', false, ['encrypt', 'decrypt']);
+}
+async function encryptText(plain: string): Promise<string> {
+  try {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const key = await getKey();
+    const buf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, textEncoder.encode(plain));
+    return `${toBase64(iv)}:${toBase64(new Uint8Array(buf))}`;
+  } catch {
+    return plain;
+  }
+}
+async function decryptText(enc: string): Promise<string> {
+  try {
+    if (!enc || !enc.includes(':')) return enc;
+    const [ivB64, dataB64] = enc.split(':');
+    const iv = fromBase64(ivB64);
+    const key = await getKey();
+    const buf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, fromBase64(dataB64));
+    return textDecoder.decode(buf);
+  } catch {
+    return enc;
+  }
+}
+
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -32,7 +75,7 @@ serve(async (req) => {
     const { connectionId } = await req.json()
     console.log('Refreshing token for connection:', connectionId)
 
-    // Get the connection details
+    // Get the connection details (using service role)
     const { data: connection, error: connectionError } = await supabase
       .from('amazon_connections')
       .select('*')
@@ -43,6 +86,8 @@ serve(async (req) => {
     if (connectionError || !connection) {
       throw new Error('Connection not found')
     }
+
+    const refreshToken = await decryptText(connection.refresh_token)
 
     const clientId = Deno.env.get('AMAZON_CLIENT_ID')
     const clientSecret = Deno.env.get('AMAZON_CLIENT_SECRET')
@@ -61,7 +106,7 @@ serve(async (req) => {
       },
       body: new URLSearchParams({
         grant_type: 'refresh_token',
-        refresh_token: connection.refresh_token,
+        refresh_token: refreshToken,
         client_id: clientId,
         client_secret: clientSecret,
       }),
@@ -89,12 +134,15 @@ serve(async (req) => {
     // Calculate new expiry time (Amazon tokens typically last 1 hour)
     const expiresAt = new Date(Date.now() + (tokenData.expires_in * 1000))
 
-    // Update the connection with new tokens
+    // Update the connection with new tokens (encrypt at rest)
+    const newAccessEnc = await encryptText(tokenData.access_token)
+    const newRefreshEnc = await encryptText(tokenData.refresh_token || connection.refresh_token)
+
     const { error: updateError } = await supabase
       .from('amazon_connections')
       .update({
-        access_token: tokenData.access_token,
-        refresh_token: tokenData.refresh_token || connection.refresh_token, // Keep old refresh token if new one not provided
+        access_token: newAccessEnc,
+        refresh_token: newRefreshEnc, // Keep old (encrypted) if new one not provided
         token_expires_at: expiresAt.toISOString(),
         status: 'active',
         setup_required_reason: null,

@@ -7,6 +7,45 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// AES-GCM helpers for token encryption at rest
+const textEncoder = new TextEncoder();
+const textDecoder = new TextDecoder();
+function toBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+function fromBase64(str: string): Uint8Array {
+  const binary = atob(str);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+async function getKey() {
+  const secret = Deno.env.get('ENCRYPTION_KEY') || '';
+  const hash = await crypto.subtle.digest('SHA-256', textEncoder.encode(secret));
+  return crypto.subtle.importKey('raw', hash, 'AES-GCM', false, ['encrypt','decrypt']);
+}
+async function encryptText(plain: string): Promise<string> {
+  try {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const key = await getKey();
+    const buf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, textEncoder.encode(plain));
+    return `${toBase64(iv)}:${toBase64(new Uint8Array(buf))}`;
+  } catch { return plain; }
+}
+async function decryptText(enc: string): Promise<string> {
+  try {
+    if (!enc || !enc.includes(':')) return enc;
+    const [ivB64, dataB64] = enc.split(':');
+    const iv = fromBase64(ivB64);
+    const key = await getKey();
+    const buf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, fromBase64(dataB64));
+    return textDecoder.decode(buf);
+  } catch { return enc; }
+}
+
+
 interface ReportRequest {
   reportId: string
   status: 'PENDING' | 'IN_PROGRESS' | 'SUCCESS' | 'FAILURE'
@@ -224,6 +263,9 @@ serve(async (req) => {
       throw new Error('Connection not found')
     }
 
+    const accessTokenDecrypted = await decryptText(connection.access_token)
+    const refreshTokenDecrypted = await decryptText(connection.refresh_token)
+
     if (connection.status !== 'active') {
       throw new Error('Connection is not active')
     }
@@ -237,7 +279,7 @@ serve(async (req) => {
     const now = new Date()
     const expiresAt = new Date(connection.token_expires_at)
     
-    let accessToken = connection.access_token
+    let accessToken = accessTokenDecrypted
     
     // If token expires within 5 minutes, try to refresh it
     const bufferTime = 5 * 60 * 1000 // 5 minutes in milliseconds
@@ -269,7 +311,7 @@ serve(async (req) => {
           },
           body: new URLSearchParams({
             grant_type: 'refresh_token',
-            refresh_token: connection.refresh_token,
+            refresh_token: refreshTokenDecrypted,
             client_id: clientId!,
             client_secret: clientSecret,
           }),
@@ -279,12 +321,15 @@ serve(async (req) => {
           const tokenData = await refreshResponse.json()
           const newExpiresAt = new Date(Date.now() + (tokenData.expires_in * 1000))
           
-          // Update connection with new tokens
+          // Update connection with new tokens (encrypt at rest)
+          const encAccess = await encryptText(tokenData.access_token)
+          const encRefresh = await encryptText(tokenData.refresh_token || refreshTokenDecrypted)
+
           await supabase
             .from('amazon_connections')
             .update({
-              access_token: tokenData.access_token,
-              refresh_token: tokenData.refresh_token || connection.refresh_token,
+              access_token: encAccess,
+              refresh_token: encRefresh,
               token_expires_at: newExpiresAt.toISOString(),
               status: 'active',
               setup_required_reason: null

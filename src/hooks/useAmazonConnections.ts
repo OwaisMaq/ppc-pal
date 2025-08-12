@@ -22,7 +22,7 @@ export const useAmazonConnections = () => {
       setLoading(true);
       console.log('Fetching Amazon connections...');
       const { data, error } = await supabase
-        .from('amazon_connections')
+        .from('amazon_connections_safe' as any)
         .select(`
           id,
           user_id,
@@ -46,9 +46,9 @@ export const useAmazonConnections = () => {
       if (error) throw error;
       
       console.log('Fetched connections:', data);
-      console.log('Active connections:', data?.filter(c => c.status === 'active'));
+      console.log('Active connections:', (data as any[])?.filter((c: any) => c.status === 'active'));
       
-      setConnections(data || []);
+      setConnections((data as any) || []);
     } catch (error) {
       console.error('Error fetching connections:', error);
       toast.error('Failed to load Amazon connections');

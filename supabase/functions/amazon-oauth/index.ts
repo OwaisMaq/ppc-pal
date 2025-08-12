@@ -7,6 +7,51 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Simple AES-GCM helpers for token encryption at rest
+const textEncoder = new TextEncoder();
+const textDecoder = new TextDecoder();
+
+function toBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+function fromBase64(str: string): Uint8Array {
+  const binary = atob(str);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+async function getKey() {
+  const secret = Deno.env.get('ENCRYPTION_KEY') || '';
+  const hash = await crypto.subtle.digest('SHA-256', textEncoder.encode(secret));
+  return crypto.subtle.importKey('raw', hash, 'AES-GCM', false, ['encrypt', 'decrypt']);
+}
+export async function encryptText(plain: string): Promise<string> {
+  try {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const key = await getKey();
+    const buf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, textEncoder.encode(plain));
+    return `${toBase64(iv)}:${toBase64(new Uint8Array(buf))}`;
+  } catch (e) {
+    console.warn('encryptText failed, storing plaintext:', (e as Error).message);
+    return plain;
+  }
+}
+export async function decryptText(enc: string): Promise<string> {
+  try {
+    if (!enc || !enc.includes(':')) return enc;
+    const [ivB64, dataB64] = enc.split(':');
+    const iv = fromBase64(ivB64);
+    const key = await getKey();
+    const buf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, fromBase64(dataB64));
+    return textDecoder.decode(buf);
+  } catch (e) {
+    console.warn('decryptText failed, returning original:', (e as Error).message);
+    return enc;
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -222,14 +267,14 @@ serve(async (req) => {
           profile_id: profile.profileId.toString(),
           profile_name: profile.accountInfo?.name || `Profile ${profile.profileId}`,
           marketplace_id: profile.countryCode,
-          access_token: tokenData.access_token,
-          refresh_token: tokenData.refresh_token,
+          access_token: await encryptText(tokenData.access_token),
+          refresh_token: await encryptText(tokenData.refresh_token),
           token_expires_at: expiresAt.toISOString(),
           status: 'active' as const,
           advertising_api_endpoint: profile.advertisingApiEndpoint || 'https://advertising-api.amazon.com', // Fallback to default
         };
         
-        console.log('Connection data to insert:', JSON.stringify(connectionData, null, 2));
+        console.log('Connection data to insert (sanitized)');
         
         const { data: insertData, error: insertError } = await supabase
           .from('amazon_connections')
