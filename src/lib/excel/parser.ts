@@ -73,15 +73,15 @@ const extractMetrics = (row: any): any => {
   
   // Normalize common metric field names
   const fieldMappings = {
-    'Impressions': ['impressions', 'Impr.', 'Impression'],
-    'Clicks': ['clicks', 'Click'],
-    'Spend': ['spend', 'Cost', 'Ad Spend'],
-    'Sales': ['sales', 'Attributed Sales 7d', 'Total Sales'],
-    'Orders': ['orders', 'Attributed Units Ordered 7d', 'Total Orders'],
-    'CTR': ['ctr', 'Click-Through Rate', 'Click Through Rate'],
-    'CPC': ['cpc', 'Cost Per Click', 'Avg. CPC'],
-    'ACOS': ['acos', 'ACoS', 'Advertising Cost of Sales'],
-    'ROAS': ['roas', 'RoAS', 'Return on Ad Spend']
+    'Impressions': ['impressions', 'impr', 'Impr.', 'Impression'],
+    'Clicks': ['clicks', 'Click', 'Clicks'],
+    'Spend': ['spend', 'cost', 'Cost', 'Ad Spend', 'Total Spend', 'Spend (Advertised currency)', 'Spend (Campaign currency)'],
+    'Sales': ['sales', 'Attributed Sales 7d', 'Attributed Sales 14d', 'Total Sales'],
+    'Orders': ['orders', 'Purchases', 'Attributed Units Ordered 7d', 'Attributed Conversions 7d', 'Attributed Conversions 14d', 'Total Orders'],
+    'CTR': ['ctr', 'CTR', 'Click-Through Rate', 'Click Through Rate', 'Click thru rate (CTR)', 'clickThroughRate'],
+    'CPC': ['cpc', 'CPC', 'Cost Per Click', 'Avg. CPC', 'Avg CPC', 'costPerClick'],
+    'ACOS': ['acos', 'ACOS', 'ACoS', 'Advertising Cost of Sales', 'ACOS (%)'],
+    'ROAS': ['roas', 'RoAS', 'ROAS', 'Return on Ad Spend', 'Return On Advertising Spend']
   };
   
   Object.entries(fieldMappings).forEach(([standardName, variations]) => {
