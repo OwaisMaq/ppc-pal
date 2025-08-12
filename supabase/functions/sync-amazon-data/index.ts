@@ -91,7 +91,7 @@ async function createReportRequest(
     : reportType === 'adGroups' 
     ? ['adGroup'] 
     : reportType === 'keywords'
-    ? ['adGroup']
+    ? ['keyword']
     : ['targeting']
   const reportTypeId = reportType === 'campaigns' 
     ? 'spCampaigns' 
@@ -586,13 +586,13 @@ serve(async (req) => {
     let totalMetricsUpdated = 0
 
     // Define columns using correct Amazon API v3 column names
-    const campaignColumns = ['campaignId','impressions','clicks','spend','sales7d','purchases7d','sales14d','purchases14d']
+    const campaignColumns = ['campaignId','impressions','clicks','cost','sales7d','purchases7d','sales14d','purchases14d']
     const adGroupColumns = ['adGroupId','impressions','clicks','cost','sales7d','purchases7d','sales14d','purchases14d']
     const targetColumns = ['targetId','impressions','clicks','cost','sales7d','purchases7d','sales14d','purchases14d']
     const keywordColumns = ['keywordId','keywordText','matchType','impressions','clicks','cost','sales7d','purchases7d','sales14d','purchases14d']
 
     // Minimal columns fallback (in case of config errors)
-    const minCampaignColumns = ['campaignId','impressions','clicks','spend']
+    const minCampaignColumns = ['campaignId','impressions','clicks','cost']
     const minAdGroupColumns = ['adGroupId','impressions','clicks','cost']
     const minTargetColumns = ['targetId','impressions','clicks','cost']
     const minKeywordColumns = ['keywordId','impressions','clicks','cost']
