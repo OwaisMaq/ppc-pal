@@ -4,6 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { useAmazonData } from "@/hooks/useAmazonData";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import Header from "@/components/Header";
@@ -261,6 +262,15 @@ const Breakdown = () => {
                   </div>
                 </CardContent>
               </Card>
+
+              {summary.spend === 0 && campaigns.length > 0 && (
+                <Alert>
+                  <AlertTitle>No spend data in selected range</AlertTitle>
+                  <AlertDescription>
+                    We synced successfully but got zero spend. Try Sync Data and a 7–14 day range; data will populate once Amazon reports include spend.
+                  </AlertDescription>
+                </Alert>
+              )}
 
               {/* Dropdown Navigation */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

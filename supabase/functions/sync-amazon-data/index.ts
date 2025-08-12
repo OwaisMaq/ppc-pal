@@ -336,27 +336,15 @@ serve(async (req) => {
     const campaignsData = await campaignsResponse.json()
     console.log(`✅ Retrieved ${campaignsData.length} campaigns`)
 
-    // If no campaigns, treat as benign outcome
+    // If no campaigns, still proceed with performance sync using fallbacks
     if (!Array.isArray(campaignsData) || campaignsData.length === 0) {
       await supabase
         .from('amazon_connections')
         .update({ last_sync_at: new Date().toISOString(), campaign_count: 0, reporting_api_version: 'v3' })
         .eq('id', connectionId)
 
-      console.log('ℹ️ No campaigns found for this profile')
-      return new Response(
-        JSON.stringify({
-          success: false,
-          code: 'NO_CAMPAIGNS',
-          message: 'No campaigns found for this profile.',
-            profileId: connection.profile_id,
-            profileName: connection.profile_name ?? null,
-            entitiesSynced: { campaigns: 0, adGroups: 0, keywords: 0, targets: 0 },
-            metricsUpdated: 0,
-            apiVersion: 'v3'
-          }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-      )
+      console.log('ℹ️ No campaigns found for this profile — proceeding with unfiltered reports fallback')
+      // do NOT return; continue to performance phase with unfiltered reports
     }
 
     // Store campaigns with basic data
@@ -559,12 +547,10 @@ serve(async (req) => {
         console.log(`💾 Processing ${performanceData.length} campaign performance records`)
         console.log('Campaign report sample keys:', Object.keys(performanceData[0] || {}))
         
-        // Update campaigns with performance data
+        // Upsert campaigns with performance data (ensures rows exist)
         for (const perf of performanceData) {
           if (!perf.campaignId) continue
-          
           const anyPerf = perf as any
-          // Calculate metrics using v3 field names (no micro-unit conversion)
           const impressions = Number(anyPerf.impressions ?? 0)
           const clicks = Number(anyPerf.clicks ?? 0)
           const spend = Number(anyPerf.spend ?? anyPerf.cost ?? 0)
@@ -572,8 +558,6 @@ serve(async (req) => {
           const sales14d = Number(anyPerf.sales14d ?? anyPerf.attributedSales14d ?? 0)
           const orders7d = Number(anyPerf.purchases7d ?? anyPerf.attributedConversions7d ?? 0)
           const orders14d = Number(anyPerf.purchases14d ?? anyPerf.attributedConversions14d ?? 0)
-          
-          // Derived metrics
           const ctr7d = impressions > 0 ? (clicks / impressions) * 100 : 0
           const ctr14d = ctr7d
           const cpc7d = clicks > 0 ? spend / clicks : 0
@@ -587,11 +571,13 @@ serve(async (req) => {
 
           const { error: campErr } = await supabase
             .from('campaigns')
-            .update({
+            .upsert({
+              connection_id: connectionId,
+              amazon_campaign_id: perf.campaignId.toString(),
               impressions,
               clicks,
               spend,
-              sales: sales14d, // Use 14d as primary
+              sales: sales14d,
               orders: orders14d,
               acos: acos14d,
               roas: roas14d,
@@ -618,9 +604,7 @@ serve(async (req) => {
               impressions_14d: impressions,
               spend_14d: spend,
               last_updated: new Date().toISOString()
-            })
-            .eq('connection_id', connectionId)
-            .eq('amazon_campaign_id', perf.campaignId.toString())
+            }, { onConflict: 'connection_id, amazon_campaign_id' })
           
           if (campErr) {
             diagnostics.writeErrors.push({ entity: 'campaign', id: perf.campaignId?.toString?.(), error: campErr.message })
@@ -630,6 +614,81 @@ serve(async (req) => {
         }
       } catch (error) {
         console.error('❌ Campaign performance sync failed:', error)
+      }
+    } else {
+      // Fallback: no campaign IDs from v2, request unfiltered campaign report and upsert metrics
+      console.log('📈 Fallback: fetching unfiltered campaign performance (no ID filter)')
+      try {
+        const reportId = await createReportRequest(
+          apiEndpoint, accessToken, clientId, connection.profile_id,
+          'campaigns', campaignColumns, undefined, { dateRangeDays: dateRange, timeUnit: 'SUMMARY', skipEntityFilter: true }
+        )
+        const report = await pollReportStatus(apiEndpoint, accessToken, clientId, connection.profile_id, reportId)
+        const performanceData = await downloadAndParseReport(report.url!)
+        console.log(`💾 Processing ${performanceData.length} fallback campaign performance records`)
+        diagnostics.fallbackUnfilteredCampaignReportUsed = true
+        for (const perf of performanceData) {
+          if (!perf.campaignId) continue
+          const anyPerf = perf as any
+          const impressions = Number(anyPerf.impressions ?? 0)
+          const clicks = Number(anyPerf.clicks ?? 0)
+          const spend = Number(anyPerf.spend ?? anyPerf.cost ?? 0)
+          const sales7d = Number(anyPerf.sales7d ?? anyPerf.attributedSales7d ?? 0)
+          const sales14d = Number(anyPerf.sales14d ?? anyPerf.attributedSales14d ?? 0)
+          const orders7d = Number(anyPerf.purchases7d ?? anyPerf.attributedConversions7d ?? 0)
+          const orders14d = Number(anyPerf.purchases14d ?? anyPerf.attributedConversions14d ?? 0)
+          const ctr7d = impressions > 0 ? (clicks / impressions) * 100 : 0
+          const cpc7d = clicks > 0 ? spend / clicks : 0
+          const acos7d = sales7d > 0 ? (spend / sales7d) * 100 : 0
+          const acos14d = sales14d > 0 ? (spend / sales14d) * 100 : 0
+          const roas7d = spend > 0 ? sales7d / spend : 0
+          const roas14d = spend > 0 ? sales14d / spend : 0
+          const convRate7d = clicks > 0 ? (orders7d / clicks) * 100 : 0
+          const convRate14d = clicks > 0 ? (orders14d / clicks) * 100 : 0
+
+          const { error: campErr } = await supabase
+            .from('campaigns')
+            .upsert({
+              connection_id: connectionId,
+              amazon_campaign_id: perf.campaignId.toString(),
+              impressions,
+              clicks,
+              spend,
+              sales: sales14d,
+              orders: orders14d,
+              acos: acos14d,
+              roas: roas14d,
+              sales_7d: sales7d,
+              orders_7d: orders7d,
+              acos_7d: acos7d,
+              roas_7d: roas7d,
+              ctr_7d: ctr7d,
+              cpc_7d: cpc7d,
+              conversion_rate_7d: convRate7d,
+              clicks_7d: clicks,
+              impressions_7d: impressions,
+              spend_7d: spend,
+              sales_14d: sales14d,
+              orders_14d: orders14d,
+              acos_14d: acos14d,
+              roas_14d: roas14d,
+              ctr_14d: ctr7d,
+              cpc_14d: cpc7d,
+              conversion_rate_14d: convRate14d,
+              clicks_14d: clicks,
+              impressions_14d: impressions,
+              spend_14d: spend,
+              last_updated: new Date().toISOString()
+            }, { onConflict: 'connection_id, amazon_campaign_id' })
+
+          if (campErr) {
+            diagnostics.writeErrors.push({ entity: 'campaign', id: perf.campaignId?.toString?.(), error: campErr.message })
+          } else {
+            totalMetricsUpdated++
+          }
+        }
+      } catch (error) {
+        console.error('❌ Fallback unfiltered campaign performance sync failed:', error)
       }
     }
 
