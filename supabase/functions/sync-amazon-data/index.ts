@@ -91,7 +91,7 @@ async function createReportRequest(
     : reportType === 'adGroups' 
     ? ['adGroup'] 
     : reportType === 'keywords'
-    ? ['keyword']
+    ? ['adGroup']
     : ['targeting']
   const reportTypeId = reportType === 'campaigns' 
     ? 'spCampaigns' 
@@ -102,7 +102,7 @@ async function createReportRequest(
     : 'spTargets'
 
    const requestedRange = opts?.dateRangeDays ?? 90
-   const dateRangeDays = Math.min(requestedRange, 31)
+   const dateRangeDays = Math.min(requestedRange, 14)
    // Allow explicit window override for chunking
    const endDateStr = opts?.endDate || new Date().toISOString().split('T')[0]
    const startDateStr = opts?.startDate || new Date(Date.now() - dateRangeDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
@@ -155,7 +155,20 @@ async function createReportRequest(
   })
 
   if (!response.ok) {
-    const errorText = await response.text()
+    const errorText = await response.text().catch(() => '')
+    // Handle duplicate request (HTTP 425) by extracting existing reportId
+    if (response.status === 425) {
+      try {
+        const maybeJson = (() => { try { return JSON.parse(errorText) } catch { return null } })()
+        const detail: string = maybeJson?.detail || errorText || ''
+        const match = detail.match(/[0-9a-fA-F-]{36}/)
+        if (match) {
+          const dupId = match[0]
+          console.log('Duplicate report detected, using existing reportId:', dupId)
+          return dupId
+        }
+      } catch (_) {}
+    }
     throw new Error(`Failed to create report: ${response.status} ${errorText}`)
   }
 
@@ -573,16 +586,16 @@ serve(async (req) => {
     let totalMetricsUpdated = 0
 
     // Define columns using correct Amazon API v3 column names
-    const campaignColumns = ['campaignId','impressions','clicks','spend','attributedSales7d','attributedConversions7d','attributedSales14d','attributedConversions14d']
-    const adGroupColumns = ['adGroupId','campaignId','impressions','clicks','spend','attributedSales7d','attributedConversions7d','attributedSales14d','attributedConversions14d']
-    const targetColumns = ['targetId','adGroupId','campaignId','impressions','clicks','spend','attributedSales7d','attributedConversions7d','attributedSales14d','attributedConversions14d']
-    const keywordColumns = ['keywordId','adGroupId','campaignId','keywordText','matchType','impressions','clicks','spend','attributedSales7d','attributedConversions7d','attributedSales14d','attributedConversions14d']
+    const campaignColumns = ['campaignId','impressions','clicks','spend','sales7d','purchases7d','sales14d','purchases14d']
+    const adGroupColumns = ['adGroupId','impressions','clicks','cost','sales7d','purchases7d','sales14d','purchases14d']
+    const targetColumns = ['targetId','impressions','clicks','cost','sales7d','purchases7d','sales14d','purchases14d']
+    const keywordColumns = ['keywordId','keywordText','matchType','impressions','clicks','cost','sales7d','purchases7d','sales14d','purchases14d']
 
     // Minimal columns fallback (in case of config errors)
     const minCampaignColumns = ['campaignId','impressions','clicks','spend']
-    const minAdGroupColumns = ['adGroupId','campaignId','impressions','clicks','spend']
-    const minTargetColumns = ['targetId','adGroupId','campaignId','impressions','clicks','spend']
-    const minKeywordColumns = ['keywordId','adGroupId','campaignId','impressions','clicks','spend']
+    const minAdGroupColumns = ['adGroupId','impressions','clicks','cost']
+    const minTargetColumns = ['targetId','impressions','clicks','cost']
+    const minKeywordColumns = ['keywordId','impressions','clicks','cost']
 
     // Campaign Performance
     if (campaignIds.length > 0) {

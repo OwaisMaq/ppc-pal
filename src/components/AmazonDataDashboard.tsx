@@ -19,14 +19,14 @@ const formatNumber = (value: number) => {
 };
 
 const AmazonDataDashboard = () => {
-  const { campaigns, adGroups, keywords, loading, dataSummary, syncAllData } = useAmazonData();
+  const { campaigns, adGroups, keywords, loading, dataSummary, syncAllData, lastSyncDiagnostics } = useAmazonData();
   const { connections } = useAmazonConnections();
 
   const activeConnections = connections.filter(c => c.status === 'active');
 
   const handleSyncAll = async () => {
     for (const connection of activeConnections) {
-      await syncAllData(connection.id);
+      await syncAllData(connection.id, { dateRangeDays: 14, diagnosticMode: true });
     }
   };
 
