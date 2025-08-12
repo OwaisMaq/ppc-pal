@@ -646,6 +646,20 @@ export type Database = {
             referencedRelation: "amazon_connections"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "campaigns_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "amazon_connections_client"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaigns_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "amazon_connections_safe"
+            referencedColumns: ["id"]
+          },
         ]
       }
       code_validation_results: {
@@ -1140,6 +1154,20 @@ export type Database = {
             referencedRelation: "amazon_connections"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "optimization_results_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "amazon_connections_client"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "optimization_results_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "amazon_connections_safe"
+            referencedColumns: ["id"]
+          },
         ]
       }
       profiles: {
@@ -1296,6 +1324,20 @@ export type Database = {
             columns: ["connection_id"]
             isOneToOne: false
             referencedRelation: "amazon_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sync_performance_logs_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "amazon_connections_client"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sync_performance_logs_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "amazon_connections_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -1511,7 +1553,132 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      amazon_connections_client: {
+        Row: {
+          advertising_api_endpoint: string | null
+          campaign_count: number | null
+          created_at: string | null
+          health_issues: string[] | null
+          health_status: string | null
+          id: string | null
+          last_health_check: string | null
+          last_sync_at: string | null
+          marketplace_id: string | null
+          profile_id: string | null
+          profile_name: string | null
+          reporting_api_version: string | null
+          setup_required_reason: string | null
+          status: Database["public"]["Enums"]["api_connection_status"] | null
+          supported_attribution_models: string[] | null
+          token_expires_at: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          advertising_api_endpoint?: string | null
+          campaign_count?: number | null
+          created_at?: string | null
+          health_issues?: string[] | null
+          health_status?: string | null
+          id?: string | null
+          last_health_check?: string | null
+          last_sync_at?: string | null
+          marketplace_id?: string | null
+          profile_id?: string | null
+          profile_name?: string | null
+          reporting_api_version?: string | null
+          setup_required_reason?: string | null
+          status?: Database["public"]["Enums"]["api_connection_status"] | null
+          supported_attribution_models?: string[] | null
+          token_expires_at?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          advertising_api_endpoint?: string | null
+          campaign_count?: number | null
+          created_at?: string | null
+          health_issues?: string[] | null
+          health_status?: string | null
+          id?: string | null
+          last_health_check?: string | null
+          last_sync_at?: string | null
+          marketplace_id?: string | null
+          profile_id?: string | null
+          profile_name?: string | null
+          reporting_api_version?: string | null
+          setup_required_reason?: string | null
+          status?: Database["public"]["Enums"]["api_connection_status"] | null
+          supported_attribution_models?: string[] | null
+          token_expires_at?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      amazon_connections_safe: {
+        Row: {
+          advertising_api_endpoint: string | null
+          campaign_count: number | null
+          created_at: string | null
+          health_issues: string[] | null
+          health_status: string | null
+          id: string | null
+          last_health_check: string | null
+          last_sync_at: string | null
+          marketplace_id: string | null
+          profile_id: string | null
+          profile_name: string | null
+          reporting_api_version: string | null
+          setup_required_reason: string | null
+          status: Database["public"]["Enums"]["api_connection_status"] | null
+          supported_attribution_models: string[] | null
+          token_expires_at: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          advertising_api_endpoint?: string | null
+          campaign_count?: number | null
+          created_at?: string | null
+          health_issues?: string[] | null
+          health_status?: string | null
+          id?: string | null
+          last_health_check?: string | null
+          last_sync_at?: string | null
+          marketplace_id?: string | null
+          profile_id?: string | null
+          profile_name?: string | null
+          reporting_api_version?: string | null
+          setup_required_reason?: string | null
+          status?: Database["public"]["Enums"]["api_connection_status"] | null
+          supported_attribution_models?: string[] | null
+          token_expires_at?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          advertising_api_endpoint?: string | null
+          campaign_count?: number | null
+          created_at?: string | null
+          health_issues?: string[] | null
+          health_status?: string | null
+          id?: string | null
+          last_health_check?: string | null
+          last_sync_at?: string | null
+          marketplace_id?: string | null
+          profile_id?: string | null
+          profile_name?: string | null
+          reporting_api_version?: string | null
+          setup_required_reason?: string | null
+          status?: Database["public"]["Enums"]["api_connection_status"] | null
+          supported_attribution_models?: string[] | null
+          token_expires_at?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       calculate_campaign_changes: {
