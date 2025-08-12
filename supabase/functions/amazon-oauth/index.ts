@@ -246,11 +246,31 @@ serve(async (req) => {
         )
       }
 
-      // Store connection for each profile
-      for (const profile of profiles) {
+      // Filter to UK profiles only (countryCode === 'GB')
+      const ukProfiles = profiles.filter((p: any) => p.countryCode === 'GB')
+      console.log('UK profiles found:', ukProfiles.length)
+
+      if (!ukProfiles || ukProfiles.length === 0) {
+        console.warn('No UK (GB) Amazon Advertising profiles found for user:', user.id)
+        return new Response(
+          JSON.stringify({ 
+            error: 'No UK profile found',
+            details: 'Please ensure your Amazon Advertising account includes a UK (GB) profile and that you granted all requested permissions.',
+            profileCount: 0,
+            requiresSetup: true
+          }),
+          { 
+            status: 200, // Setup issue, not a server error
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        )
+      }
+
+      // Store connection for each UK profile only
+      for (const profile of ukProfiles) {
         const expiresAt = new Date(Date.now() + (tokenData.expires_in * 1000))
         
-        console.log('Storing connection for profile:', profile.profileId);
+        console.log('Storing UK connection for profile:', profile.profileId)
         
         const connectionData = {
           user_id: user.id,
@@ -269,15 +289,15 @@ serve(async (req) => {
           .upsert(connectionData, { onConflict: 'user_id, profile_id' });
 
         if (insertError) {
-          console.error('Error storing connection for profile:', profile.profileId, insertError.message);
-          throw insertError;
+          console.error('Error storing UK connection for profile:', profile.profileId, insertError.message)
+          throw insertError
         }
       }
 
-      console.log('Successfully stored connections for user:', user.id)
+      console.log('Successfully stored UK connections for user:', user.id)
       
       return new Response(
-        JSON.stringify({ success: true, profileCount: profiles.length }),
+        JSON.stringify({ success: true, profileCount: ukProfiles.length }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
