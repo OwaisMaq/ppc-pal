@@ -21,31 +21,24 @@ function fromBase64(str: string): Uint8Array {
   return bytes;
 }
 async function getKey() {
-  const secret = Deno.env.get('ENCRYPTION_KEY') || '';
+  const secret = Deno.env.get('ENCRYPTION_KEY');
+  if (!secret) throw new Error('ENCRYPTION_KEY not set');
   const hash = await crypto.subtle.digest('SHA-256', textEncoder.encode(secret));
   return crypto.subtle.importKey('raw', hash, 'AES-GCM', false, ['encrypt', 'decrypt']);
 }
 async function encryptText(plain: string): Promise<string> {
-  try {
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const key = await getKey();
-    const buf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, textEncoder.encode(plain));
-    return `${toBase64(iv)}:${toBase64(new Uint8Array(buf))}`;
-  } catch {
-    return plain;
-  }
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await getKey();
+  const buf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, textEncoder.encode(plain));
+  return `${toBase64(iv)}:${toBase64(new Uint8Array(buf))}`;
 }
 async function decryptText(enc: string): Promise<string> {
-  try {
-    if (!enc || !enc.includes(':')) return enc;
-    const [ivB64, dataB64] = enc.split(':');
-    const iv = fromBase64(ivB64);
-    const key = await getKey();
-    const buf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, fromBase64(dataB64));
-    return textDecoder.decode(buf);
-  } catch {
-    return enc;
-  }
+  if (!enc || !enc.includes(':')) throw new Error('Invalid ciphertext format');
+  const [ivB64, dataB64] = enc.split(':');
+  const iv = fromBase64(ivB64);
+  const key = await getKey();
+  const buf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, fromBase64(dataB64));
+  return textDecoder.decode(buf);
 }
 
 
@@ -87,7 +80,16 @@ serve(async (req) => {
       throw new Error('Connection not found')
     }
 
-    const refreshToken = await decryptText(connection.refresh_token)
+let refreshToken: string;
+    try {
+      refreshToken = await decryptText(connection.refresh_token);
+    } catch (_e) {
+      await supabase
+        .from('amazon_connections')
+        .update({ status: 'expired', setup_required_reason: 'Token decryption failed - please reconnect' })
+        .eq('id', connectionId);
+      throw new Error('Failed to decrypt refresh token');
+    }
 
     const clientId = Deno.env.get('AMAZON_CLIENT_ID')
     const clientSecret = Deno.env.get('AMAZON_CLIENT_SECRET')

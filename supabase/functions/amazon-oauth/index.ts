@@ -23,33 +23,26 @@ function fromBase64(str: string): Uint8Array {
   return bytes;
 }
 async function getKey() {
-  const secret = Deno.env.get('ENCRYPTION_KEY') || '';
+  const secret = Deno.env.get('ENCRYPTION_KEY');
+  if (!secret) {
+    throw new Error('ENCRYPTION_KEY not set');
+  }
   const hash = await crypto.subtle.digest('SHA-256', textEncoder.encode(secret));
   return crypto.subtle.importKey('raw', hash, 'AES-GCM', false, ['encrypt', 'decrypt']);
 }
 export async function encryptText(plain: string): Promise<string> {
-  try {
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const key = await getKey();
-    const buf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, textEncoder.encode(plain));
-    return `${toBase64(iv)}:${toBase64(new Uint8Array(buf))}`;
-  } catch (e) {
-    console.warn('encryptText failed, storing plaintext:', (e as Error).message);
-    return plain;
-  }
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await getKey();
+  const buf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, textEncoder.encode(plain));
+  return `${toBase64(iv)}:${toBase64(new Uint8Array(buf))}`;
 }
 export async function decryptText(enc: string): Promise<string> {
-  try {
-    if (!enc || !enc.includes(':')) return enc;
-    const [ivB64, dataB64] = enc.split(':');
-    const iv = fromBase64(ivB64);
-    const key = await getKey();
-    const buf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, fromBase64(dataB64));
-    return textDecoder.decode(buf);
-  } catch (e) {
-    console.warn('decryptText failed, returning original:', (e as Error).message);
-    return enc;
-  }
+  if (!enc || !enc.includes(':')) throw new Error('Invalid ciphertext format');
+  const [ivB64, dataB64] = enc.split(':');
+  const iv = fromBase64(ivB64);
+  const key = await getKey();
+  const buf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, fromBase64(dataB64));
+  return textDecoder.decode(buf);
 }
 
 serve(async (req) => {
@@ -230,7 +223,6 @@ serve(async (req) => {
       }
 
       console.log('Total profiles found across all regions:', profiles.length);
-      console.log('Profiles data:', JSON.stringify(profiles, null, 2));
 
       // Handle case where no profiles are returned
       if (!profiles || profiles.length === 0) {
@@ -259,8 +251,6 @@ serve(async (req) => {
         const expiresAt = new Date(Date.now() + (tokenData.expires_in * 1000))
         
         console.log('Storing connection for profile:', profile.profileId);
-        console.log('User ID:', user.id);
-        console.log('Profile data:', JSON.stringify(profile, null, 2));
         
         const connectionData = {
           user_id: user.id,
@@ -271,26 +261,17 @@ serve(async (req) => {
           refresh_token: await encryptText(tokenData.refresh_token),
           token_expires_at: expiresAt.toISOString(),
           status: 'active' as const,
-          advertising_api_endpoint: profile.advertisingApiEndpoint || 'https://advertising-api.amazon.com', // Fallback to default
+          advertising_api_endpoint: profile.advertisingApiEndpoint || 'https://advertising-api.amazon.com',
         };
         
-        console.log('Connection data to insert (sanitized)');
-        
-        const { data: insertData, error: insertError } = await supabase
+        const { error: insertError } = await supabase
           .from('amazon_connections')
-          .upsert(connectionData, {
-            onConflict: 'user_id, profile_id'
-          })
-          .select();
-
-        console.log('Insert result:', { insertData, insertError });
+          .upsert(connectionData, { onConflict: 'user_id, profile_id' });
 
         if (insertError) {
-          console.error('Error storing connection:', insertError)
-          throw insertError
+          console.error('Error storing connection for profile:', profile.profileId, insertError.message);
+          throw insertError;
         }
-        
-        console.log('Successfully inserted connection:', insertData);
       }
 
       console.log('Successfully stored connections for user:', user.id)
