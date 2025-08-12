@@ -49,11 +49,8 @@ export const useCampaignMetrics = () => {
       const { data: campaignData, error: campaignError } = await supabase
         .from("campaigns")
         .select(`
-          *,
-          connection_id,
-          amazon_connections!inner(user_id)
+          *
         `)
-        .eq("amazon_connections.user_id", user.id)
         .order("created_at", { ascending: false });
 
       if (campaignError) {

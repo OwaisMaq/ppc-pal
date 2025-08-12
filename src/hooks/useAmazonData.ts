@@ -41,23 +41,14 @@ const [loading, setLoading] = useState(false);
       const { data, error } = await supabase
         .from('campaigns')
         .select(`
-          *,
-          amazon_connections!campaigns_connection_id_fkey(
-            user_id,
-            profile_name
-          )
+          *
         `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      // Filter campaigns for current user
-      const userCampaigns = data?.filter(campaign => 
-        campaign.amazon_connections?.user_id === user?.id
-      ) || [];
-
-      setCampaigns(userCampaigns);
-      console.log('Fetched campaigns:', userCampaigns.length);
+      setCampaigns((data as any) || []);
+      console.log('Fetched campaigns:', (data as any)?.length || 0);
     } catch (error) {
       console.error('Error fetching campaigns:', error);
       throw error;
@@ -69,24 +60,14 @@ const [loading, setLoading] = useState(false);
       const { data, error } = await supabase
         .from('ad_groups')
         .select(`
-          *,
-          campaigns!ad_groups_campaign_id_fkey(
-            amazon_connections!campaigns_connection_id_fkey(
-              user_id
-            )
-          )
+          *
         `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      // Filter ad groups for current user
-      const userAdGroups = data?.filter(adGroup => 
-        adGroup.campaigns?.amazon_connections?.user_id === user?.id
-      ) || [];
-
-      setAdGroups(userAdGroups);
-      console.log('Fetched ad groups:', userAdGroups.length);
+      setAdGroups((data as any) || []);
+      console.log('Fetched ad groups:', (data as any)?.length || 0);
     } catch (error) {
       console.error('Error fetching ad groups:', error);
       throw error;
@@ -98,26 +79,14 @@ const [loading, setLoading] = useState(false);
       const { data, error } = await supabase
         .from('keywords')
         .select(`
-          *,
-          ad_groups!keywords_adgroup_id_fkey(
-            campaigns!ad_groups_campaign_id_fkey(
-              amazon_connections!campaigns_connection_id_fkey(
-                user_id
-              )
-            )
-          )
+          *
         `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      // Filter keywords for current user
-      const userKeywords = data?.filter(keyword => 
-        keyword.ad_groups?.campaigns?.amazon_connections?.user_id === user?.id
-      ) || [];
-
-      setKeywords(userKeywords);
-      console.log('Fetched keywords:', userKeywords.length);
+      setKeywords((data as any) || []);
+      console.log('Fetched keywords:', (data as any)?.length || 0);
     } catch (error) {
       console.error('Error fetching keywords:', error);
       throw error;
@@ -128,25 +97,14 @@ const [loading, setLoading] = useState(false);
       const { data, error } = await supabase
         .from('targets')
         .select(`
-          *,
-          ad_groups!targets_adgroup_id_fkey(
-            campaigns!ad_groups_campaign_id_fkey(
-              amazon_connections!campaigns_connection_id_fkey(
-                user_id
-              )
-            )
-          )
+          *
         `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      const userTargets = data?.filter((t: any) =>
-        t.ad_groups?.campaigns?.amazon_connections?.user_id === user?.id
-      ) || [];
-
-      setTargets(userTargets);
-      console.log('Fetched targets:', userTargets.length);
+      setTargets((data as any) || []);
+      console.log('Fetched targets:', (data as any)?.length || 0);
     } catch (error) {
       console.error('Error fetching targets:', error);
       throw error;
