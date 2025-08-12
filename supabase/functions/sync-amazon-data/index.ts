@@ -1389,9 +1389,9 @@ serve(async (req) => {
     else if (message.includes('Missing Amazon client secret')) code = 'MISSING_AMAZON_SECRET'
 
     return new Response(
-      JSON.stringify({ success: false, code, error: message }),
+      JSON.stringify({ success: false, code, message, error: message }),
       { 
-        status: 400,
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     )
