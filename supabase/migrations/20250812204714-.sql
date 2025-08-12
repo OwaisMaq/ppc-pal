@@ -1,0 +1,70 @@
+-- Ensure 7d/14d metric columns exist for campaigns, ad_groups, and keywords
+
+-- CAMPAIGNS
+ALTER TABLE public.campaigns
+  ADD COLUMN IF NOT EXISTS clicks_7d           integer      DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS impressions_7d      integer      DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS spend_7d            numeric,
+  ADD COLUMN IF NOT EXISTS sales_7d            numeric,
+  ADD COLUMN IF NOT EXISTS orders_7d           integer,
+  ADD COLUMN IF NOT EXISTS acos_7d             numeric,
+  ADD COLUMN IF NOT EXISTS roas_7d             numeric,
+  ADD COLUMN IF NOT EXISTS ctr_7d              numeric,
+  ADD COLUMN IF NOT EXISTS cpc_7d              numeric,
+  ADD COLUMN IF NOT EXISTS conversion_rate_7d  numeric,
+  ADD COLUMN IF NOT EXISTS clicks_14d          integer      DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS impressions_14d     integer      DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS spend_14d           numeric,
+  ADD COLUMN IF NOT EXISTS sales_14d           numeric,
+  ADD COLUMN IF NOT EXISTS orders_14d          integer,
+  ADD COLUMN IF NOT EXISTS acos_14d            numeric,
+  ADD COLUMN IF NOT EXISTS roas_14d            numeric,
+  ADD COLUMN IF NOT EXISTS ctr_14d             numeric,
+  ADD COLUMN IF NOT EXISTS cpc_14d             numeric,
+  ADD COLUMN IF NOT EXISTS conversion_rate_14d numeric;
+
+-- AD GROUPS
+ALTER TABLE public.ad_groups
+  ADD COLUMN IF NOT EXISTS clicks_7d           integer      DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS impressions_7d      integer      DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS spend_7d            numeric,
+  ADD COLUMN IF NOT EXISTS sales_7d            numeric,
+  ADD COLUMN IF NOT EXISTS orders_7d           integer,
+  ADD COLUMN IF NOT EXISTS acos_7d             numeric,
+  ADD COLUMN IF NOT EXISTS roas_7d             numeric,
+  ADD COLUMN IF NOT EXISTS ctr_7d              numeric,
+  ADD COLUMN IF NOT EXISTS cpc_7d              numeric,
+  ADD COLUMN IF NOT EXISTS conversion_rate_7d  numeric,
+  ADD COLUMN IF NOT EXISTS clicks_14d          integer      DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS impressions_14d     integer      DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS spend_14d           numeric,
+  ADD COLUMN IF NOT EXISTS sales_14d           numeric,
+  ADD COLUMN IF NOT EXISTS orders_14d          integer,
+  ADD COLUMN IF NOT EXISTS acos_14d            numeric,
+  ADD COLUMN IF NOT EXISTS roas_14d            numeric,
+  ADD COLUMN IF NOT EXISTS ctr_14d             numeric,
+  ADD COLUMN IF NOT EXISTS cpc_14d             numeric,
+  ADD COLUMN IF NOT EXISTS conversion_rate_14d numeric;
+
+-- KEYWORDS
+ALTER TABLE public.keywords
+  ADD COLUMN IF NOT EXISTS clicks_7d           integer      DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS impressions_7d      integer      DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS spend_7d            numeric,
+  ADD COLUMN IF NOT EXISTS sales_7d            numeric,
+  ADD COLUMN IF NOT EXISTS orders_7d           integer,
+  ADD COLUMN IF NOT EXISTS acos_7d             numeric,
+  ADD COLUMN IF NOT EXISTS roas_7d             numeric,
+  ADD COLUMN IF NOT EXISTS ctr_7d              numeric,
+  ADD COLUMN IF NOT EXISTS cpc_7d              numeric,
+  ADD COLUMN IF NOT EXISTS conversion_rate_7d  numeric,
+  ADD COLUMN IF NOT EXISTS clicks_14d          integer      DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS impressions_14d     integer      DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS spend_14d           numeric,
+  ADD COLUMN IF NOT EXISTS sales_14d           numeric,
+  ADD COLUMN IF NOT EXISTS orders_14d          integer,
+  ADD COLUMN IF NOT EXISTS acos_14d            numeric,
+  ADD COLUMN IF NOT EXISTS roas_14d            numeric,
+  ADD COLUMN IF NOT EXISTS ctr_14d             numeric,
+  ADD COLUMN IF NOT EXISTS cpc_14d             numeric,
+  ADD COLUMN IF NOT EXISTS conversion_rate_14d numeric;
