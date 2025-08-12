@@ -22,7 +22,7 @@ export const useAmazonConnections = () => {
       setLoading(true);
       console.log('Fetching Amazon connections...');
       const { data, error } = await supabase
-        .from('amazon_connections_safe' as any)
+        .from('amazon_connections_client' as any)
         .select(`
           id,
           user_id,

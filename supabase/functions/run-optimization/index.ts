@@ -33,7 +33,29 @@ serve(async (req) => {
     const { connectionId, optimizationId } = await req.json()
     console.log('Running optimization:', optimizationId, 'for connection:', connectionId)
 
-    // Update optimization status to in_progress
+    // Verify ownership of optimization result and connection
+    const { data: opt, error: optErr } = await supabase
+      .from('optimization_results')
+      .select('id,user_id,connection_id')
+      .eq('id', optimizationId)
+      .single();
+
+    if (optErr || !opt || opt.user_id !== user.id || opt.connection_id !== connectionId) {
+      throw new Error('Access denied: invalid optimization or connection');
+    }
+
+    // Defense-in-depth: verify the connection belongs to the user
+    const { data: connection } = await supabase
+      .from('amazon_connections')
+      .select('id,user_id')
+      .eq('id', connectionId)
+      .single()
+
+    if (!connection || connection.user_id !== user.id) {
+      throw new Error('Access denied: connection not found for user');
+    }
+
+    // Update optimization status to in_progress (scoped by user)
     await supabase
       .from('optimization_results')
       .update({ 
@@ -41,13 +63,8 @@ serve(async (req) => {
         started_at: new Date().toISOString()
       })
       .eq('id', optimizationId)
+      .eq('user_id', user.id)
 
-    // Get connection and campaign data
-    const { data: connection } = await supabase
-      .from('amazon_connections')
-      .select('*')
-      .eq('id', connectionId)
-      .single()
 
     if (!connection) {
       throw new Error('Connection not found')
@@ -123,6 +140,7 @@ serve(async (req) => {
         }
       })
       .eq('id', optimizationId)
+      .eq('user_id', user.id)
 
     console.log('Optimization completed:', totalRecommendations, 'recommendations generated')
 
