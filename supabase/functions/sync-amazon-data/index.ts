@@ -130,7 +130,7 @@ async function createReportRequest(
       ? 'adGroupId' 
       : reportType === 'keywords'
       ? 'keywordId'
-      : 'keywordId'
+      : 'targetId'
     payload.filters = [{ field, values: entityIds }]
   }
 
@@ -587,10 +587,10 @@ serve(async (req) => {
     let totalMetricsUpdated = 0
 
     // Define columns using correct Amazon API v3 column names
-    const campaignColumns = ['campaignId','impressions','clicks','cost','sales7d','purchases7d','sales14d','purchases14d']
-    const adGroupColumns = ['adGroupId','impressions','clicks','cost','sales7d','purchases7d','sales14d','purchases14d']
-    const targetColumns = ['targetId','impressions','clicks','cost','sales7d','purchases7d','sales14d','purchases14d']
-    const keywordColumns = ['keywordId','keywordText','matchType','impressions','clicks','cost','sales7d','purchases7d','sales14d','purchases14d']
+    const campaignColumns = ['campaignId','impressions','clicks','cost','attributedSales14d','attributedConversions14d']
+    const adGroupColumns = ['adGroupId','campaignId','impressions','clicks','cost','attributedSales14d','attributedConversions14d']
+    const targetColumns = ['targetId','adGroupId','campaignId','impressions','clicks','cost','attributedSales14d','attributedConversions14d']
+    const keywordColumns = ['keywordId','adGroupId','campaignId','keywordText','matchType','impressions','clicks','cost','attributedSales14d','attributedConversions14d']
 
     // Minimal columns fallback (in case of config errors)
     const minCampaignColumns = ['campaignId','impressions','clicks','cost']
