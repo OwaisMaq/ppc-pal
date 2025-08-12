@@ -45,8 +45,8 @@ async function createReportRequest(
   reportType: string,
   columns: string[],
   entityIds?: string[],
-  opts?: { dateRangeDays?: number; timeUnit?: 'SUMMARY' | 'DAILY'; skipEntityFilter?: boolean }
-): Promise<string> {
+   opts?: { dateRangeDays?: number; timeUnit?: 'SUMMARY' | 'DAILY'; skipEntityFilter?: boolean; startDate?: string; endDate?: string }
+ ): Promise<string> {
   const groupBy = reportType === 'campaigns' 
     ? ['campaign'] 
     : reportType === 'adGroups' 
@@ -62,24 +62,25 @@ async function createReportRequest(
     ? 'spKeywords'
     : 'spTargets'
 
-  const requestedRange = opts?.dateRangeDays ?? 90
-  const dateRangeDays = Math.min(requestedRange, 31)
-  const endDateStr = new Date().toISOString().split('T')[0]
-  const startDateStr = new Date(Date.now() - dateRangeDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-
-  const payload: any = {
-    name: `${reportType}_${Date.now()}`,
-    startDate: startDateStr,
-    endDate: endDateStr,
-    configuration: {
-      adProduct: 'SPONSORED_PRODUCTS',
-      groupBy,
-      columns,
-      reportTypeId,
-      timeUnit: opts?.timeUnit ?? 'SUMMARY',
-      format: 'GZIP_JSON'
-    }
-  }
+   const requestedRange = opts?.dateRangeDays ?? 90
+   const dateRangeDays = Math.min(requestedRange, 31)
+   // Allow explicit window override for chunking
+   const endDateStr = opts?.endDate || new Date().toISOString().split('T')[0]
+   const startDateStr = opts?.startDate || new Date(Date.now() - dateRangeDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+ 
+   const payload: any = {
+     name: `${reportType}_${Date.now()}`,
+     startDate: startDateStr,
+     endDate: endDateStr,
+     configuration: {
+       adProduct: 'SPONSORED_PRODUCTS',
+       groupBy,
+       columns,
+       reportTypeId,
+       timeUnit: opts?.timeUnit ?? 'SUMMARY',
+       format: 'GZIP_JSON'
+     }
+   }
 
   // v3 filtering uses top-level filters with field names
   if (!opts?.skipEntityFilter && entityIds && entityIds.length > 0) {
@@ -206,9 +207,10 @@ serve(async (req) => {
       throw new Error('Invalid authorization')
     }
 
-    const { connectionId, dateRangeDays, diagnosticMode } = await req.json()
+    const { connectionId, dateRangeDays, diagnosticMode, timeUnit } = await req.json()
     const dateRange = Number(dateRangeDays) || 90
     const diag = Boolean(diagnosticMode)
+    const timeUnitOpt: 'SUMMARY' | 'DAILY' = (timeUnit === 'DAILY' ? 'DAILY' : 'SUMMARY')
     console.log('Syncing data for connection:', connectionId, 'dateRangeDays:', dateRange, 'diagnosticMode:', diag)
     // Get the connection details
     const { data: connection, error: connectionError } = await supabase
@@ -315,37 +317,37 @@ serve(async (req) => {
     console.log('Using API endpoint:', apiEndpoint)
 
     // PHASE 1: Sync entity structure (campaigns, ad groups, keywords)
-    console.log('🚀 Starting comprehensive Amazon Ads data sync...')
-    
-    // Fetch campaigns first
-    console.log('📊 Fetching campaigns...')
-    const campaignsResponse = await fetch(`${apiEndpoint}/v2/campaigns`, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Amazon-Advertising-API-ClientId': clientId,
-        'Amazon-Advertising-API-Scope': connection.profile_id,
-      },
-    })
-
-    if (!campaignsResponse.ok) {
-      const errorText = await campaignsResponse.text()
-      console.error('Campaigns API error:', campaignsResponse.status, errorText)
-      throw new Error(`Failed to fetch campaigns: ${campaignsResponse.status} ${errorText}`)
-    }
-
-    const campaignsData = await campaignsResponse.json()
-    console.log(`✅ Retrieved ${campaignsData.length} campaigns`)
-
-    // If no campaigns, still proceed with performance sync using fallbacks
-    if (!Array.isArray(campaignsData) || campaignsData.length === 0) {
-      await supabase
-        .from('amazon_connections')
-        .update({ last_sync_at: new Date().toISOString(), campaign_count: 0, reporting_api_version: 'v3' })
-        .eq('id', connectionId)
-
-      console.log('ℹ️ No campaigns found for this profile — proceeding with unfiltered reports fallback')
-      // do NOT return; continue to performance phase with unfiltered reports
-    }
+     console.log('🚀 Starting comprehensive Amazon Ads data sync...')
+     
+     // Fetch campaigns first
+     console.log('📊 Fetching campaigns...')
+     const campaignsResponse = await fetch(`${apiEndpoint}/v2/campaigns`, {
+       headers: {
+         'Authorization': `Bearer ${accessToken}`,
+         'Amazon-Advertising-API-ClientId': clientId,
+         'Amazon-Advertising-API-Scope': connection.profile_id,
+       },
+     })
+ 
+     if (!campaignsResponse.ok) {
+       const errorText = await campaignsResponse.text()
+       console.error('Campaigns API error:', campaignsResponse.status, errorText)
+       throw new Error(`Failed to fetch campaigns: ${campaignsResponse.status} ${errorText}`)
+     }
+ 
+     const campaignsData = await campaignsResponse.json()
+     console.log(`✅ Retrieved ${Array.isArray(campaignsData) ? campaignsData.length : 0} campaigns`)
+ 
+     // If no campaigns, still proceed with performance sync using fallbacks
+     if (!Array.isArray(campaignsData) || campaignsData.length === 0) {
+       await supabase
+         .from('amazon_connections')
+         .update({ last_sync_at: new Date().toISOString(), campaign_count: 0, reporting_api_version: 'v3' })
+         .eq('id', connectionId)
+ 
+       console.log('ℹ️ No campaigns found for this profile — proceeding with unfiltered reports fallback')
+       // do NOT return; continue to performance phase with unfiltered reports
+     }
 
     // Store campaigns with basic data
     const campaignMap = new Map()
@@ -507,18 +509,19 @@ serve(async (req) => {
 
     // Initialize diagnostics
     const diagnostics: any = {
-      writeErrors: [],
-      keyword: {
-        totalKeywords: keywordIds.length,
-        filteredIdsUsed: 0,
-        reportRows: 0,
-        nonZeroClickRows: 0,
-        matchedRows: 0,
-        timeUnit: '',
-        dateRangeDays: 0,
-        diagnosticMode: diag
-      }
-    }
+       writeErrors: [],
+       backfilled: { keywords: 0, targets: 0 },
+       keyword: {
+         totalKeywords: keywordIds.length,
+         filteredIdsUsed: 0,
+         reportRows: 0,
+         nonZeroClickRows: 0,
+         matchedRows: 0,
+         timeUnit: '',
+         dateRangeDays: 0,
+         diagnosticMode: diag
+       }
+     }
 
     // PHASE 2: Fetch performance data via proper Reporting API
     console.log('⚡ Starting performance data sync...')
@@ -527,11 +530,11 @@ serve(async (req) => {
     // Define columns using correct Amazon API v3 column names
     const campaignColumns = ['campaignId','impressions','clicks','cost','sales7d','purchases7d','sales14d','purchases14d']
     
-    const adGroupColumns = ['adGroupId','impressions','clicks','cost','sales7d','purchases7d','sales14d','purchases14d']
+    const adGroupColumns = ['adGroupId','campaignId','impressions','clicks','cost','sales7d','purchases7d','sales14d','purchases14d']
     
-    const targetColumns = ['targetId','impressions','clicks','cost','sales7d','purchases7d','sales14d','purchases14d']
+    const targetColumns = ['targetId','adGroupId','campaignId','impressions','clicks','cost','sales7d','purchases7d','sales14d','purchases14d']
     
-    const keywordColumns = ['keywordId','impressions','clicks','cost','sales7d','purchases7d','sales14d','purchases14d']
+    const keywordColumns = ['keywordId','adGroupId','campaignId','keywordText','matchType','impressions','clicks','cost','sales7d','purchases7d','sales14d','purchases14d']
 
     // Campaign Performance
     if (campaignIds.length > 0) {
@@ -539,7 +542,7 @@ serve(async (req) => {
       try {
         const reportId = await createReportRequest(
           apiEndpoint, accessToken, clientId, connection.profile_id,
-          'campaigns', campaignColumns, campaignIds, { dateRangeDays: dateRange, timeUnit: 'SUMMARY' }
+          'campaigns', campaignColumns, campaignIds, { dateRangeDays: dateRange, timeUnit: timeUnitOpt }
         )
         
         const report = await pollReportStatus(
@@ -624,7 +627,7 @@ serve(async (req) => {
       try {
         const reportId = await createReportRequest(
           apiEndpoint, accessToken, clientId, connection.profile_id,
-          'campaigns', campaignColumns, undefined, { dateRangeDays: dateRange, timeUnit: 'SUMMARY', skipEntityFilter: true }
+          'campaigns', campaignColumns, undefined, { dateRangeDays: dateRange, timeUnit: timeUnitOpt, skipEntityFilter: true }
         )
         const report = await pollReportStatus(apiEndpoint, accessToken, clientId, connection.profile_id, reportId)
         const performanceData = await downloadAndParseReport(report.url!)
@@ -701,7 +704,7 @@ serve(async (req) => {
       try {
         const reportId = await createReportRequest(
           apiEndpoint, accessToken, clientId, connection.profile_id,
-          'adGroups', adGroupColumns, adGroupIds, { dateRangeDays: dateRange, timeUnit: 'SUMMARY' }
+          'adGroups', adGroupColumns, adGroupIds, { dateRangeDays: dateRange, timeUnit: timeUnitOpt }
         )
         
         const report = await pollReportStatus(
@@ -795,7 +798,7 @@ serve(async (req) => {
       try {
         const reportId = await createReportRequest(
           apiEndpoint, accessToken, clientId, connection.profile_id,
-          'targets', targetColumns, targetIds, { dateRangeDays: dateRange, timeUnit: 'SUMMARY' }
+          'targets', targetColumns, targetIds, { dateRangeDays: dateRange, timeUnit: timeUnitOpt }
         )
         const report = await pollReportStatus(
           apiEndpoint, accessToken, clientId, connection.profile_id, reportId
@@ -822,7 +825,7 @@ serve(async (req) => {
           const convRate7d = clicks > 0 ? (orders7d / clicks) * 100 : 0
           const convRate14d = clicks > 0 ? (orders14d / clicks) * 100 : 0
 
-          const { error: tgtErr } = await supabase
+          const { data: tgtUpd, error: tgtErr } = await supabase
             .from('targets')
             .update({
               impressions,
@@ -860,11 +863,75 @@ serve(async (req) => {
               last_updated: new Date().toISOString()
             })
             .eq('amazon_target_id', targetId.toString())
+            .select('id')
 
           if (tgtErr) {
             diagnostics.writeErrors.push({ entity: 'target', id: targetId?.toString?.(), error: tgtErr.message })
-          } else {
+          } else if (tgtUpd && tgtUpd.length > 0) {
             totalMetricsUpdated++
+          } else {
+            // Backfill missing target using adGroupId from report
+            const agAmazonId = anyPerf.adGroupId?.toString?.()
+            if (agAmazonId) {
+              const { data: ag } = await supabase
+                .from('ad_groups')
+                .select('id')
+                .eq('amazon_adgroup_id', agAmazonId)
+                .maybeSingle()
+              if (ag?.id) {
+                const { error: upErr } = await supabase
+                  .from('targets')
+                  .upsert({
+                    adgroup_id: ag.id,
+                    amazon_target_id: targetId.toString(),
+                    type: anyPerf.expressionType ?? null,
+                    expression: anyPerf.expression ?? null,
+                    status: 'enabled',
+                    bid: null,
+                    impressions,
+                    clicks,
+                    spend,
+                    sales: sales14d,
+                    orders: orders14d,
+                    acos: acos14d,
+                    roas: roas14d,
+                    ctr,
+                    cpc,
+                    conversion_rate: convRate14d,
+                    // 7d
+                    sales_7d: sales7d,
+                    orders_7d: orders7d,
+                    acos_7d: acos7d,
+                    roas_7d: roas7d,
+                    ctr_7d: ctr,
+                    cpc_7d: cpc,
+                    conversion_rate_7d: convRate7d,
+                    clicks_7d: clicks,
+                    impressions_7d: impressions,
+                    spend_7d: spend,
+                    // 14d
+                    sales_14d: sales14d,
+                    orders_14d: orders14d,
+                    acos_14d: acos14d,
+                    roas_14d: roas14d,
+                    ctr_14d: ctr,
+                    cpc_14d: cpc,
+                    conversion_rate_14d: convRate14d,
+                    clicks_14d: clicks,
+                    impressions_14d: impressions,
+                    spend_14d: spend,
+                    last_updated: new Date().toISOString()
+                  }, { onConflict: 'adgroup_id, amazon_target_id' })
+                if (upErr) {
+                  diagnostics.writeErrors.push({ entity: 'target_backfill', id: targetId?.toString?.(), error: upErr.message })
+                } else {
+                  diagnostics.backfilled.targets++
+                  totalMetricsUpdated++
+                }
+              } else {
+                diagnostics.writeErrors.push({ entity: 'target_backfill_missing_adgroup', id: targetId?.toString?.(), adGroupId: agAmazonId })
+              }
+            }
           }
         }
       } catch (error) {
@@ -878,7 +945,7 @@ serve(async (req) => {
       try {
         const reportId = await createReportRequest(
           apiEndpoint, accessToken, clientId, connection.profile_id,
-          'keywords', keywordColumns, keywordIds, { dateRangeDays: dateRange, timeUnit: 'SUMMARY' }
+          'keywords', keywordColumns, keywordIds, { dateRangeDays: dateRange, timeUnit: timeUnitOpt }
         )
         const report = await pollReportStatus(
           apiEndpoint, accessToken, clientId, connection.profile_id, reportId
@@ -955,6 +1022,68 @@ serve(async (req) => {
           } else if (kwUpd && kwUpd.length > 0) {
             diagnostics.keyword.matchedRows++
             totalMetricsUpdated++
+          } else {
+            // Backfill missing keyword using adGroupId and keyword details from report
+            const agAmazonId = anyPerf.adGroupId?.toString?.()
+            if (agAmazonId) {
+              const { data: ag } = await supabase
+                .from('ad_groups')
+                .select('id')
+                .eq('amazon_adgroup_id', agAmazonId)
+                .maybeSingle()
+              if (ag?.id) {
+                const { error: upErr } = await supabase
+                  .from('keywords')
+                  .upsert({
+                    adgroup_id: ag.id,
+                    amazon_keyword_id: keywordId.toString(),
+                    keyword_text: anyPerf.keywordText || 'unknown',
+                    match_type: (anyPerf.matchType || 'exact').toLowerCase(),
+                    status: 'enabled',
+                    impressions,
+                    clicks,
+                    spend,
+                    sales: sales14d,
+                    orders: orders14d,
+                    acos: acos14d,
+                    roas: roas14d,
+                    ctr,
+                    cpc,
+                    conversion_rate: convRate14d,
+                    // 7d
+                    sales_7d: sales7d,
+                    orders_7d: orders7d,
+                    acos_7d: acos7d,
+                    roas_7d: roas7d,
+                    ctr_7d: ctr,
+                    cpc_7d: cpc,
+                    conversion_rate_7d: convRate7d,
+                    clicks_7d: clicks,
+                    impressions_7d: impressions,
+                    spend_7d: spend,
+                    // 14d
+                    sales_14d: sales14d,
+                    orders_14d: orders14d,
+                    acos_14d: acos14d,
+                    roas_14d: roas14d,
+                    ctr_14d: ctr,
+                    cpc_14d: cpc,
+                    conversion_rate_14d: convRate14d,
+                    clicks_14d: clicks,
+                    impressions_14d: impressions,
+                    spend_14d: spend,
+                    last_updated: new Date().toISOString()
+                  }, { onConflict: 'adgroup_id, amazon_keyword_id' })
+                if (upErr) {
+                  diagnostics.writeErrors.push({ entity: 'keyword_backfill', id: keywordId?.toString?.(), error: upErr.message })
+                } else {
+                  diagnostics.backfilled.keywords++
+                  totalMetricsUpdated++
+                }
+              } else {
+                diagnostics.writeErrors.push({ entity: 'keyword_backfill_missing_adgroup', id: keywordId?.toString?.(), adGroupId: agAmazonId })
+              }
+            }
           }
         }
       } catch (error) {

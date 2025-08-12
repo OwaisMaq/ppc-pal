@@ -112,6 +112,11 @@ const ConsolidatedDataView = () => {
         </div>
       </CardHeader>
       <CardContent>
+        {lastSyncDiagnostics && (
+          <div className="mb-4 text-xs text-muted-foreground">
+            Last sync: metricsUpdated={lastSyncDiagnostics?.metricsUpdated ?? 'n/a'}; backfilled: kw {lastSyncDiagnostics?.backfilled?.keywords ?? 0}, tgt {lastSyncDiagnostics?.backfilled?.targets ?? 0}
+          </div>
+        )}
         {campaigns.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             No campaigns found. Sync your Amazon data to get started.
