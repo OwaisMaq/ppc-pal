@@ -98,9 +98,7 @@ async function createReportRequest(
     ? 'spCampaigns' 
     : reportType === 'adGroups' 
     ? 'spAdGroups' 
-    : reportType === 'keywords'
-    ? 'spKeywords'
-    : 'spTargets'
+    : 'spTargeting'
 
    const requestedRange = opts?.dateRangeDays ?? 90
    const dateRangeDays = Math.min(requestedRange, 14)
@@ -132,6 +130,14 @@ async function createReportRequest(
       ? 'keywordId'
       : 'targetId'
     payload.filters = [{ field, values: entityIds }]
+  }
+
+  // If requesting keyword performance via v3 targeting reports, restrict to keyword rows
+  if (reportType === 'keywords') {
+    payload.filters = [
+      ...(payload.filters ?? []),
+      { field: 'keywordType', values: ['BROAD', 'PHRASE', 'EXACT'] },
+    ]
   }
 
   // Log minimal payload details for debugging without dumping all IDs
