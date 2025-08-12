@@ -23,7 +23,24 @@ export const useAmazonConnections = () => {
       console.log('Fetching Amazon connections...');
       const { data, error } = await supabase
         .from('amazon_connections')
-        .select('*')
+        .select(`
+          id,
+          user_id,
+          profile_id,
+          profile_name,
+          marketplace_id,
+          token_expires_at,
+          status,
+          last_sync_at,
+          created_at,
+          updated_at,
+          campaign_count,
+          advertising_api_endpoint,
+          reporting_api_version,
+          supported_attribution_models,
+          health_status,
+          health_issues
+        `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;

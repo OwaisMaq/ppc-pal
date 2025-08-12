@@ -5,8 +5,8 @@ export interface AmazonConnection {
   profile_id: string;
   profile_name?: string;
   marketplace_id?: string;
-  access_token: string;
-  refresh_token: string;
+  access_token?: string; // intentionally optional; never exposed to client fetches
+  refresh_token?: string; // intentionally optional; never exposed to client fetches
   token_expires_at: string;
   status: 'active' | 'expired' | 'error' | 'pending' | 'warning' | 'setup_required';
   last_sync_at?: string;
