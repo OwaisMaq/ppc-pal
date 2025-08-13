@@ -73,6 +73,17 @@ serve(async (req) => {
     const clientId = Deno.env.get("AMAZON_CLIENT_ID") || "";
     const accessToken: string = conn.access_token as string;
 
+    // Debug logging
+    console.log("AMS API Debug:", {
+      apiEndpoint,
+      hasClientId: !!clientId,
+      clientIdLength: clientId.length,
+      hasAccessToken: !!accessToken,
+      accessTokenLength: accessToken?.length,
+      profileId: conn.profile_id,
+      action
+    });
+
     if (action === "subscribe") {
       const { datasetId, destinationType, destinationArn, region } = body as any;
       if (!datasetId || !destinationType || !destinationArn || !region) {
@@ -83,6 +94,16 @@ serve(async (req) => {
         datasetId,
         destination: { type: destinationType, arn: destinationArn, region },
       };
+
+      console.log("AMS Subscribe Request:", {
+        url: `${apiEndpoint}/streams/subscriptions`,
+        payload,
+        headers: {
+          hasAuth: !!accessToken,
+          clientId: clientId || "(empty)",
+          scope: conn.profile_id
+        }
+      });
 
       const res = await fetchWithRetry(`${apiEndpoint}/streams/subscriptions`, {
         method: "POST",
@@ -97,6 +118,13 @@ serve(async (req) => {
       });
 
       const text = await res.text();
+      console.log("AMS Subscribe Response:", {
+        status: res.status,
+        statusText: res.statusText,
+        headers: Object.fromEntries(res.headers.entries()),
+        body: text
+      });
+
       if (!res.ok) {
         console.error("AMS subscribe error:", res.status, text);
         return new Response(JSON.stringify({ error: `AMS subscribe failed: ${res.status} ${text}` }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
