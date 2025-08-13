@@ -406,7 +406,7 @@ serve(async (req) => {
      
      // Fetch campaigns first
      console.log('📊 Fetching campaigns...')
-     const campaignsResponse = await fetchWithRetry(`${apiEndpoint}/v2/sp/campaigns`, {
+     const campaignsResponse = await fetchWithRetry(`${apiEndpoint}/v2/campaigns`, {
        headers: {
          'Authorization': `Bearer ${accessToken}`,
          'Amazon-Advertising-API-ClientId': clientId,
@@ -475,7 +475,7 @@ serve(async (req) => {
     const adGroupIds: string[] = []
     
     for (const [campaignId, storedCampaign] of campaignMap.entries()) {
-      const adGroupsResponse = await fetchWithRetry(`${apiEndpoint}/v2/sp/adGroups?campaignIdFilter=${campaignId}`, {
+      const adGroupsResponse = await fetchWithRetry(`${apiEndpoint}/v2/adGroups?campaignIdFilter=${campaignId}`, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Amazon-Advertising-API-ClientId': clientId,
@@ -518,7 +518,7 @@ serve(async (req) => {
     const keywordIds: string[] = []
     
     for (const [adGroupId, storedAdGroup] of adGroupMap.entries()) {
-      const keywordsResponse = await fetchWithRetry(`${apiEndpoint}/v2/sp/keywords?adGroupIdFilter=${adGroupId}`, {
+      const keywordsResponse = await fetchWithRetry(`${apiEndpoint}/v2/keywords?adGroupIdFilter=${adGroupId}`, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Amazon-Advertising-API-ClientId': clientId,
