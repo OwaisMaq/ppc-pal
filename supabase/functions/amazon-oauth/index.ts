@@ -246,17 +246,36 @@ serve(async (req) => {
         )
       }
 
-      // Filter to UK profiles only (countryCode === 'GB')
-      const ukProfiles = profiles.filter((p: any) => p.countryCode === 'GB')
-      console.log('UK profiles found:', ukProfiles.length)
+      // Robust UK profile detection across EU endpoint results
+      function isUKProfile(profile: any) {
+        const cc = (profile.countryCode || profile.country || '').toUpperCase();
+        const currency = (profile.currencyCode || '').toUpperCase();
+        const mk = (profile.marketplaceString || profile.marketplace || profile.accountInfo?.marketplaceString || '').toLowerCase();
+        const name = (profile.accountInfo?.name || '').toLowerCase();
+        const hasUKDomain = mk.includes('.co.uk') || mk.includes('united kingdom');
+        const hasUKToken = /\buk\b/.test(mk) || /\buk\b/.test(name);
+        return cc === 'GB' || cc === 'UK' || currency === 'GBP' || hasUKDomain || hasUKToken;
+      }
+
+      const ukProfiles = profiles
+        .map((p: any) => ({ ...p, _isUK: isUKProfile(p) }))
+        .filter((p: any) => p._isUK);
+
+      console.log('UK profiles found (robust match):', ukProfiles.length)
 
       if (!ukProfiles || ukProfiles.length === 0) {
-        console.warn('No UK (GB) Amazon Advertising profiles found for user:', user.id)
+        const foundCountryCodes = Array.from(new Set(profiles.map((p: any) => (p.countryCode || p.country || '').toUpperCase()).filter(Boolean)));
+        const foundCurrencies = Array.from(new Set(profiles.map((p: any) => (p.currencyCode || '').toUpperCase()).filter(Boolean)));
+        const marketplaces = Array.from(new Set(profiles.map((p: any) => (p.marketplaceString || p.marketplace || '').toLowerCase()).filter(Boolean))).slice(0, 10);
+        console.warn('No UK profile matched. Found countries:', foundCountryCodes, 'currencies:', foundCurrencies, 'marketplaces sample:', marketplaces);
         return new Response(
           JSON.stringify({ 
             error: 'No UK profile found',
-            details: 'Please ensure your Amazon Advertising account includes a UK (GB) profile and that you granted all requested permissions.',
-            profileCount: 0,
+            details: 'We could not confidently detect a UK profile. We look for GB/UK country, GBP currency, or .co.uk/United Kingdom in marketplace.',
+            profileCount: profiles.length,
+            foundCountryCodes,
+            foundCurrencies,
+            marketplacesSample: marketplaces,
             requiresSetup: true
           }),
           { 
@@ -276,7 +295,7 @@ serve(async (req) => {
           user_id: user.id,
           profile_id: profile.profileId.toString(),
           profile_name: profile.accountInfo?.name || `Profile ${profile.profileId}`,
-          marketplace_id: profile.countryCode,
+          marketplace_id: 'GB',
           access_token: await encryptText(tokenData.access_token),
           refresh_token: await encryptText(tokenData.refresh_token),
           token_expires_at: expiresAt.toISOString(),
