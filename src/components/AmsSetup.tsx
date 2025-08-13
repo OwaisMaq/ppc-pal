@@ -9,8 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { useAMS, AmsDataset } from "@/hooks/useAMS";
 import { useAmsMetrics } from "@/hooks/useAmsMetrics";
-import { Loader2, Server, Network, Clock, Activity } from "lucide-react";
+import { DataFreshnessIndicator } from "@/components/DataFreshnessIndicator";
+import { Loader2, Server, Network, Clock, Activity, Zap } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 
 const DEFAULT_REGION = "eu-west-1";
 
@@ -22,7 +24,9 @@ export default function AmsSetup() {
   const [region, setRegion] = useState(DEFAULT_REGION);
   const [destinationType, setDestinationType] = useState("firehose");
   const [subs, setSubs] = useState<Record<string, any>>({});
+  const [isProcessing, setIsProcessing] = useState(false);
   const { metrics } = useAmsMetrics(selectedConnectionId || undefined);
+  const { toast } = useToast();
 
   const activeConnections = useMemo(() => connections.filter(c => c.status === "active"), [connections]);
 
@@ -44,24 +48,60 @@ export default function AmsSetup() {
 
   const toggleDataset = async (datasetId: AmsDataset, enabled: boolean) => {
     if (!selectedConnectionId) return;
-    if (enabled) {
-      await subscribe({
-        connectionId: selectedConnectionId,
-        datasetId,
-        destinationType: destinationType as any,
-        destinationArn,
-        region,
-      });
-    } else {
-      const sub = subs[datasetId];
-      if (sub?.subscription_id) {
-        await archive({ connectionId: selectedConnectionId, subscriptionId: sub.subscription_id });
+    try {
+      if (enabled) {
+        await subscribe({
+          connectionId: selectedConnectionId,
+          datasetId,
+          destinationType: destinationType as any,
+          destinationArn,
+          region,
+        });
+        toast({
+          title: "Subscription activated",
+          description: `${datasetId} data stream is now active`,
+        });
+      } else {
+        const sub = subs[datasetId];
+        if (sub?.subscription_id) {
+          await archive({ connectionId: selectedConnectionId, subscriptionId: sub.subscription_id });
+          toast({
+            title: "Subscription archived", 
+            description: `${datasetId} data stream has been stopped`,
+          });
+        }
       }
+      const rows = await list(selectedConnectionId);
+      const byDataset: Record<string, any> = {};
+      rows.forEach(r => { byDataset[r.dataset_id] = r; });
+      setSubs(byDataset);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update subscription",
+        variant: "destructive",
+      });
     }
-    const rows = await list(selectedConnectionId);
-    const byDataset: Record<string, any> = {};
-    rows.forEach(r => { byDataset[r.dataset_id] = r; });
-    setSubs(byDataset);
+  };
+
+  const handleProcessStreamData = async () => {
+    if (!selectedConnectionId) return;
+    setIsProcessing(true);
+    try {
+      await processStreamData(selectedConnectionId);
+      toast({
+        title: "Processing complete",
+        description: "Stream data has been aggregated successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Processing failed",
+        description: error.message || "Failed to process stream data",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const processing = loading || loadingConnections;
@@ -95,11 +135,20 @@ export default function AmsSetup() {
                 </Select>
               </div>
               <div className="flex items-end gap-2">
-                <Button variant="outline" onClick={refreshConnections}>
+                <Button variant="outline" onClick={refreshConnections} disabled={processing}>
                   Refresh
                 </Button>
-                <Button variant="default" onClick={() => selectedConnectionId && processStreamData(selectedConnectionId)}>
-                  <Network className="h-4 w-4 mr-2" /> Process Stream Data
+                <Button 
+                  variant="default" 
+                  onClick={handleProcessStreamData}
+                  disabled={!selectedConnectionId || isProcessing}
+                >
+                  {isProcessing ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Zap className="h-4 w-4 mr-2" />
+                  )}
+                  Process Now
                 </Button>
               </div>
             </div>
@@ -137,11 +186,24 @@ export default function AmsSetup() {
               </div>
             </div>
 
+            {/* Data Freshness Indicator */}
+            {selectedConnectionId && (
+              <DataFreshnessIndicator 
+                connectionId={selectedConnectionId}
+                className="pb-4 border-b border-border/50"
+              />
+            )}
+
             <div className="grid sm:grid-cols-2 gap-4">
-              <div className="flex flex-col space-y-3 rounded-md border p-4">
+              <div className="flex flex-col space-y-3 rounded-md border p-4 transition-colors hover:bg-muted/50">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-medium">sp-traffic</p>
+                    <p className="font-medium flex items-center gap-2">
+                      sp-traffic
+                      {subs["sp-traffic"]?.status === "active" && (
+                        <Badge variant="secondary" className="h-4 text-xs">Active</Badge>
+                      )}
+                    </p>
                     <p className="text-sm text-muted-foreground">Impressions, clicks, cost (hourly)</p>
                   </div>
                   <Switch
@@ -163,10 +225,15 @@ export default function AmsSetup() {
                   </div>
                 )}
               </div>
-              <div className="flex flex-col space-y-3 rounded-md border p-4">
+              <div className="flex flex-col space-y-3 rounded-md border p-4 transition-colors hover:bg-muted/50">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-medium">sp-conversion</p>
+                    <p className="font-medium flex items-center gap-2">
+                      sp-conversion
+                      {subs["sp-conversion"]?.status === "active" && (
+                        <Badge variant="secondary" className="h-4 text-xs">Active</Badge>
+                      )}
+                    </p>
                     <p className="text-sm text-muted-foreground">Attributed conversions and sales (hourly)</p>
                   </div>
                   <Switch
@@ -177,11 +244,11 @@ export default function AmsSetup() {
                 </div>
                 {subs["sp-conversion"] && (
                   <div className="flex items-center gap-2 text-xs">
-                    <Badge variant="secondary" className="text-xs">
-                      {subs["sp-conversion"].status === "active" ? "Active" : "Inactive"}
+                    <Badge variant={subs["sp-conversion"].status === "active" ? "default" : "secondary"} className="text-xs">
+                      {subs["sp-conversion"].status === "active" ? "Streaming" : "Inactive"}
                     </Badge>
                     {subs["sp-conversion"].last_delivery_at && (
-                      <span className="text-muted-foreground">
+                      <span className="text-muted-foreground ml-2">
                         Last delivery: {formatDistanceToNow(new Date(subs["sp-conversion"].last_delivery_at), { addSuffix: true })}
                       </span>
                     )}

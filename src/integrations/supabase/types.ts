@@ -1903,6 +1903,15 @@ export type Database = {
         Args: { user_uuid: string; connection_uuid: string }
         Returns: string
       }
+      get_ams_data_freshness: {
+        Args: { connection_uuid: string }
+        Returns: {
+          last_traffic_message: string
+          last_conversion_message: string
+          messages_24h: number
+          data_age_hours: number
+        }[]
+      }
       grant_admin_role_by_email: {
         Args: { user_email: string }
         Returns: undefined

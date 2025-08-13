@@ -13,7 +13,6 @@ import { useAmsMetrics } from "@/hooks/useAmsMetrics";
 import { useAMS } from "@/hooks/useAMS";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { RefreshCw, BarChart3, AlertTriangle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { DateRangeSelector } from "@/components/DateRangeSelector";
@@ -22,6 +21,9 @@ import { useAmazonData } from "@/hooks/useAmazonData";
 import { formatDistanceToNow } from "date-fns";
 import { useBudgetUsage } from "@/hooks/useBudgetUsage";
 import { useDateRange } from "@/context/DateRangeContext";
+import { DataFreshnessIndicator } from "@/components/DataFreshnessIndicator";
+import { Loader2, RefreshCw, Activity, AlertTriangle, TrendingUp, DollarSign, MousePointer, Eye, Zap, BarChart3 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 // Map marketplace IDs to region labels and flags
 const MARKETPLACE_INFO: Record<string, { code: string; label: string; flag: string }> = {
   // EU
@@ -96,12 +98,19 @@ const Dashboard = () => {
   // Fallback to campaign metrics from reports (if no AMS data)
   const { metrics: campaignMetrics, campaigns, loading: campaignLoading, error: campaignError, refetch: refetchCampaigns } = useCampaignMetrics(selectedConnectionId);
   
-  // Use AMS data if available, otherwise fallback to campaign data
-  const metrics = amsMetrics?.totalSpend > 0 ? amsMetrics : campaignMetrics;
+  // Smart data prioritization: Use AMS if available and recent
+  const hasRecentAmsData = amsMetrics && (
+    amsMetrics.totalSpend > 0 || 
+    amsMetrics.totalImpressions > 0 ||
+    (amsMetrics.messageCount24h && amsMetrics.messageCount24h > 0)
+  );
+  
+  const metrics = hasRecentAmsData ? amsMetrics : campaignMetrics;
   const entityData = amsEntityData.length > 0 ? amsEntityData : campaigns;
   const loading = amsLoading || campaignLoading;
   const error = amsError || campaignError;
-  const hasAmsData = amsMetrics && amsMetrics.totalSpend > 0;
+  const isUsingAmsData = hasRecentAmsData;
+  const dataSource = isUsingAmsData ? "AMS Streaming" : "Campaign Reports";
   
   const selectedConnection = useMemo(() => activeConnections.find(c => c.id === selectedConnectionId), [activeConnections, selectedConnectionId]);
   const { syncAllData, loading: syncLoading } = useAmazonData();
@@ -130,12 +139,12 @@ const Dashboard = () => {
     if (!autoSynced && selectedConnectionId && hasActiveConnections) {
       const zeroSpend = (metrics?.totalSpend ?? 0) === 0;
       const hasCampaigns = campaigns.length > 0;
-      if (zeroSpend && hasCampaigns && !hasAmsData) {
+      if (zeroSpend && hasCampaigns && !isUsingAmsData) {
         setAutoSynced(true);
         syncAllData(selectedConnectionId);
       }
     }
-  }, [autoSynced, selectedConnectionId, hasActiveConnections, metrics?.totalSpend, campaigns.length, syncAllData, hasAmsData]);
+  }, [autoSynced, selectedConnectionId, hasActiveConnections, metrics?.totalSpend, campaigns.length, syncAllData, isUsingAmsData]);
   return (
     <DashboardShell>
       <div className="container mx-auto py-6 px-4">
@@ -174,7 +183,7 @@ const Dashboard = () => {
               <DateRangeSelector />
 
               <div className="flex items-center gap-2">
-                {hasAmsData ? (
+                {isUsingAmsData ? (
                   <>
                     <Button 
                       onClick={() => selectedConnectionId && processStreamData(selectedConnectionId)} 
@@ -210,12 +219,12 @@ const Dashboard = () => {
                 )}
                 <Button 
                   onClick={() => {
-                    if (hasAmsData) {
+                    if (isUsingAmsData) {
                       refetchAms();
                     } else {
                       refetchCampaigns();
                     }
-                  }} 
+                  }}
                   variant="outline" 
                   className="flex items-center gap-2"
                   disabled={loading}
@@ -225,13 +234,13 @@ const Dashboard = () => {
                 </Button>
               </div>
               <div className="flex flex-col items-end text-xs text-muted-foreground">
-                {hasAmsData && amsMetrics?.lastMessageAt && (
+                {isUsingAmsData && amsMetrics?.lastMessageAt && (
                   <span>Stream: {formatDistanceToNow(new Date(amsMetrics.lastMessageAt), { addSuffix: true })}</span>
                 )}
                 {selectedConnection?.last_sync_at && (
                   <span>Reports: {formatDistanceToNow(new Date(selectedConnection.last_sync_at), { addSuffix: true })}</span>
                 )}
-                {hasAmsData && (
+                {isUsingAmsData && (
                   <span className="text-green-600 font-medium">Live streaming data</span>
                 )}
               </div>
@@ -293,8 +302,8 @@ const Dashboard = () => {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Data Source</span>
-                        <span className={`font-semibold text-xs ${hasAmsData ? 'text-green-600' : 'text-amber-600'}`}>
-                          {hasAmsData ? 'Streaming' : 'Reports'}
+                        <span className={`font-semibold text-xs ${isUsingAmsData ? 'text-green-600' : 'text-amber-600'}`}>
+                          {isUsingAmsData ? 'Streaming' : 'Reports'}
                         </span>
                       </div>
                       <div className="flex justify-between">
