@@ -73,6 +73,23 @@ serve(async (req) => {
     const clientId = Deno.env.get("AMAZON_CLIENT_ID") || "";
     const accessToken: string = conn.access_token as string;
 
+    // Check for missing credentials
+    if (!clientId) {
+      console.error("Missing AMAZON_CLIENT_ID environment variable");
+      return new Response(JSON.stringify({ error: "Amazon API credentials not configured. Please set AMAZON_CLIENT_ID in Supabase secrets." }), { 
+        status: 500, 
+        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+      });
+    }
+
+    if (!accessToken) {
+      console.error("Missing access token for connection");
+      return new Response(JSON.stringify({ error: "No access token found for this connection" }), { 
+        status: 500, 
+        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+      });
+    }
+
     // Debug logging
     console.log("AMS API Debug:", {
       apiEndpoint,
