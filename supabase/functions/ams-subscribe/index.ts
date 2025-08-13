@@ -20,13 +20,23 @@ serve(async (req) => {
 
   try {
     console.log("AMS Subscribe function started");
-    console.log("Environment check:", { 
-      hasUrl: !!SB_URL, 
-      hasAnon: !!SB_ANON, 
-      hasService: !!SB_SERVICE, 
-      hasClientId: !!AMZ_CLIENT_ID, 
-      hasClientSecret: !!AMZ_CLIENT_SECRET 
-    });
+    
+    // Check environment variables first
+    if (!SB_URL || !SB_ANON || !SB_SERVICE || !AMZ_CLIENT_ID || !AMZ_CLIENT_SECRET) {
+      console.error("Missing required environment variables:", { 
+        hasUrl: !!SB_URL, 
+        hasAnon: !!SB_ANON, 
+        hasService: !!SB_SERVICE, 
+        hasClientId: !!AMZ_CLIENT_ID, 
+        hasClientSecret: !!AMZ_CLIENT_SECRET 
+      });
+      return new Response("Server configuration error: Missing required environment variables", { 
+        status: 500, 
+        headers: corsHeaders 
+      });
+    }
+    
+    console.log("Environment variables validated successfully");
 
     // 1) Who is calling?
     const auth = createClient(SB_URL, SB_ANON, {
@@ -49,12 +59,22 @@ serve(async (req) => {
     }
     console.log("User authenticated:", user.id);
 
-    // 2) Parse payload
-    const { connectionId, datasetId, destinationArn, region } = await req.json();
-    console.log("Request payload:", { connectionId, datasetId, destinationArn, region });
+    // 2) Parse payload with error handling
+    let connectionId, datasetId, destinationArn, region;
+    try {
+      const body = await req.json();
+      ({ connectionId, datasetId, destinationArn, region } = body);
+      console.log("Request payload:", { connectionId, datasetId, destinationArn, region });
+    } catch (e) {
+      console.error("Failed to parse request body:", e);
+      return new Response("Invalid JSON in request body", { 
+        status: 400, 
+        headers: corsHeaders 
+      });
+    }
     
     if (!connectionId || !datasetId || !destinationArn || !region) {
-      console.error("Missing required parameters");
+      console.error("Missing required parameters:", { connectionId: !!connectionId, datasetId: !!datasetId, destinationArn: !!destinationArn, region: !!region });
       return new Response("Bad request: Missing connectionId, datasetId, destinationArn, or region", { 
         status: 400, 
         headers: corsHeaders 
