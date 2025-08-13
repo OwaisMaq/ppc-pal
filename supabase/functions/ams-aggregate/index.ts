@@ -27,26 +27,41 @@ type ConvRow = {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-  const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-    global: { headers: { Authorization: req.headers.get("Authorization") || "" } },
-  });
-
   try {
+    // 1) Authenticate the caller with anon client
+    const auth = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      {
+        global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
+      }
+    );
+    const { data: { user } } = await auth.auth.getUser();
+    if (!user) return new Response(JSON.stringify({ error: "Unauthorized" }), { 
+      status: 401, 
+      headers: { ...corsHeaders, "Content-Type": "application/json" } 
+    });
+
+    // 2) Service role client for database operations (bypasses RLS)
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
     const body = await req.json().catch(() => ({}));
     const { connectionId, action } = body as { connectionId?: string; action?: string };
 
-    // Handle scheduled aggregation for all connections
+    console.log("AMS Aggregate request:", { action, connectionId, userId: user.id });
+
+    // Handle scheduled aggregation for all connections owned by user
     if (action === "aggregate_all") {
-      console.log("🔄 Starting scheduled aggregation for all connections");
+      console.log(`🔄 Starting aggregation for all connections owned by user ${user.id}`);
       
-      // Get all active connections
+      // Get all active connections owned by this user
       const { data: connections, error: connError } = await supabase
         .from("amazon_connections")
         .select("id, profile_id")
+        .eq("user_id", user.id)
         .eq("status", "active");
 
       if (connError) throw connError;
@@ -54,7 +69,7 @@ serve(async (req) => {
       let processed = 0;
       for (const conn of connections || []) {
         try {
-          await processConnection(conn.id);
+          await processConnection(conn.id, supabase);
           processed++;
           console.log(`✅ Processed connection ${conn.profile_id} (${processed}/${connections?.length})`);
         } catch (error) {
@@ -70,7 +85,7 @@ serve(async (req) => {
       });
     }
 
-    // Handle single connection aggregation
+    // Handle single connection aggregation with ownership verification
     if (!connectionId) {
       return new Response(JSON.stringify({ error: "Missing connectionId" }), { 
         status: 400, 
@@ -78,14 +93,35 @@ serve(async (req) => {
       });
     }
 
-    await processConnection(connectionId);
+    // 3) Verify ownership before processing specific connection
+    const { data: conn, error: connErr } = await supabase
+      .from("amazon_connections")
+      .select("id, user_id")
+      .eq("id", connectionId)
+      .single();
+
+    if (connErr || !conn) {
+      return new Response(JSON.stringify({ error: "Connection not found" }), { 
+        status: 404, 
+        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+      });
+    }
+    
+    if (conn.user_id !== user.id) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), { 
+        status: 403, 
+        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+      });
+    }
+
+    await processConnection(connectionId, supabase);
 
     return new Response(JSON.stringify({ ok: true }), { 
       headers: { ...corsHeaders, "Content-Type": "application/json" } 
     });
 
     // Connection processing function
-    async function processConnection(connectionId: string) {
+    async function processConnection(connectionId: string, supabase: any) {
       const now = new Date();
       const start7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
       const start14 = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString();

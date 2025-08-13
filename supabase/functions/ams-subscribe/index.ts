@@ -1,213 +1,75 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
-async function wait(attempt: number) {
-  const delay = Math.min(1000 * 2 ** attempt, 8000);
-  return new Promise((r) => setTimeout(r, delay));
-}
-
-async function fetchWithRetry(url: string, init: RequestInit, attempts = 3) {
-  for (let i = 0; i < attempts; i++) {
-    try {
-      const res = await fetch(url, init);
-      if (res.ok) return res;
-      if ([408, 425, 429, 500, 502, 503, 504].includes(res.status)) {
-        await wait(i);
-        continue;
-      }
-      return res;
-    } catch (e) {
-      await wait(i);
-    }
-  }
-  return fetch(url, init);
-}
+const SB_URL = Deno.env.get("SUPABASE_URL")!;
+const SB_ANON = Deno.env.get("SUPABASE_ANON_KEY")!;
+const SB_SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const AMZ_CLIENT_ID = Deno.env.get("AMAZON_CLIENT_ID")!;
+const AMZ_CLIENT_SECRET = Deno.env.get("AMAZON_CLIENT_SECRET")!;
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-
-  const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-  const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-  const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
-  // Client for user auth verification  
-  const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: { Authorization: req.headers.get("Authorization") || "" } },
-  });
-
-  // Service role client for database access (bypasses RLS)
-  const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-
   try {
-    // Authenticate user with anon client
-    const { data: { user }, error: userErr } = await authClient.auth.getUser();
-    if (userErr || !user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    // 1) Who is calling?
+    const auth = createClient(SB_URL, SB_ANON, {
+      global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
+    });
+    const { data: { user } } = await auth.auth.getUser();
+    if (!user) return new Response("Unauthorized", { status: 401 });
 
-    const body = await req.json().catch(() => ({}));
-    const { action, connectionId } = body as { action: string; connectionId: string };
-
-    if (!action || !connectionId) {
-      return new Response(JSON.stringify({ error: "Missing action or connectionId" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    // 2) Parse payload
+    const { connectionId, datasetId, destinationArn, region } = await req.json();
+    if (!connectionId || !datasetId || !destinationArn || !region) {
+      return new Response("Bad request", { status: 400 });
     }
 
-    // Load connection with service role and verify ownership
-    const { data: conn, error: connErr } = await serviceClient
+    // 3) Load connection with service role (bypass RLS) and enforce ownership
+    const db = createClient(SB_URL, SB_SERVICE);
+    const { data: conn, error: connErr } = await db
       .from("amazon_connections")
-      .select("id, user_id, profile_id, advertising_api_endpoint, access_token")
+      .select("id,user_id,profile_id,refresh_token")
       .eq("id", connectionId)
       .single();
-    if (connErr || !conn) throw new Error(connErr?.message || "Connection not found");
-    
-    // Verify ownership - user must own this connection
-    if (conn.user_id !== user.id) {
-      return new Response(JSON.stringify({ error: "Access denied - connection not owned by user" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    if (connErr || !conn) return new Response("Connection not found", { status: 404 });
+    if (conn.user_id !== user.id) return new Response("Forbidden", { status: 403 });
 
-    const apiEndpoint: string = conn.advertising_api_endpoint || "https://advertising-api-eu.amazon.com";
-    const clientId = Deno.env.get("AMAZON_CLIENT_ID") || "";
-    const accessToken: string = conn.access_token as string;
-
-    // Check for missing credentials
-    if (!clientId) {
-      console.error("Missing AMAZON_CLIENT_ID environment variable");
-      return new Response(JSON.stringify({ error: "Amazon API credentials not configured. Please set AMAZON_CLIENT_ID in Supabase secrets." }), { 
-        status: 500, 
-        headers: { ...corsHeaders, "Content-Type": "application/json" } 
-      });
-    }
-
-    if (!accessToken) {
-      console.error("Missing access token for connection");
-      return new Response(JSON.stringify({ error: "No access token found for this connection" }), { 
-        status: 500, 
-        headers: { ...corsHeaders, "Content-Type": "application/json" } 
-      });
-    }
-
-    // Debug logging
-    console.log("AMS API Debug:", {
-      apiEndpoint,
-      hasClientId: !!clientId,
-      clientIdLength: clientId.length,
-      hasAccessToken: !!accessToken,
-      accessTokenLength: accessToken?.length,
-      profileId: conn.profile_id,
-      action
+    // 4) Exchange refresh token → access token
+    const tokRes = await fetch("https://api.amazon.com/auth/o2/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: conn.refresh_token,
+        client_id: AMZ_CLIENT_ID,
+        client_secret: AMZ_CLIENT_SECRET,
+      }),
     });
+    if (!tokRes.ok) return new Response(`token ${tokRes.status}: ${await tokRes.text()}`, { status: 502 });
+    const { access_token } = await tokRes.json();
 
-    if (action === "subscribe") {
-      const { datasetId, destinationType, destinationArn, region } = body as any;
-      if (!datasetId || !destinationType || !destinationArn || !region) {
-        return new Response(JSON.stringify({ error: "Missing subscription parameters" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
+    // 5) Region → AMS base URL
+    const base =
+      region === "eu-west-1" ? "https://advertising-api-eu.amazon.com" :
+      region === "us-east-1" ? "https://advertising-api.amazon.com" :
+      region === "us-west-2" ? "https://advertising-api-fe.amazon.com" :
+      null;
+    if (!base) return new Response("Unsupported region", { status: 400 });
 
-      const payload = {
-        datasetId,
-        destination: { type: destinationType, arn: destinationArn, region },
-      };
+    // 6) Create subscription
+    const res = await fetch(`${base}/streams/subscriptions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${access_token}`,
+        "Amazon-Advertising-API-ClientId": AMZ_CLIENT_ID,
+        "Amazon-Advertising-API-Scope": String(conn.profile_id),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ datasetId, destinationArn, compression: "GZIP" }),
+    });
+    const text = await res.text();
+    if (!res.ok) return new Response(`ams ${res.status}: ${text}`, { status: 502 });
 
-      console.log("AMS Subscribe Request:", {
-        url: `${apiEndpoint}/streams/subscriptions`,
-        payload,
-        headers: {
-          hasAuth: !!accessToken,
-          clientId: clientId || "(empty)",
-          scope: conn.profile_id
-        }
-      });
-
-      const res = await fetchWithRetry(`${apiEndpoint}/streams/subscriptions`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Amazon-Advertising-API-ClientId": clientId,
-          "Amazon-Advertising-API-Scope": conn.profile_id,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const text = await res.text();
-      console.log("AMS Subscribe Response:", {
-        status: res.status,
-        statusText: res.statusText,
-        headers: Object.fromEntries(res.headers.entries()),
-        body: text
-      });
-
-      if (!res.ok) {
-        console.error("AMS subscribe error:", res.status, text);
-        return new Response(JSON.stringify({ error: `AMS subscribe failed: ${res.status} ${text}` }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-      const out = (() => { try { return JSON.parse(text) } catch { return { raw: text } } })();
-
-      // Persist reference for UI using service client (best-effort)
-      const { id: subscriptionId, status } = out || {};
-      await serviceClient.from("ams_subscriptions").insert({
-        connection_id: connectionId,
-        dataset_id: datasetId,
-        destination_type: destinationType,
-        destination_arn: destinationArn,
-        region,
-        subscription_id: subscriptionId || null,
-        status: status || "active",
-      });
-
-      return new Response(JSON.stringify({ ok: true, response: out }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
-    if (action === "archive") {
-      const { subscriptionId } = body as any;
-      if (!subscriptionId) return new Response(JSON.stringify({ error: "Missing subscriptionId" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-
-      const res = await fetchWithRetry(`${apiEndpoint}/streams/subscriptions/${subscriptionId}`, {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Amazon-Advertising-API-ClientId": clientId,
-          "Amazon-Advertising-API-Scope": conn.profile_id,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({ status: "archived" }),
-      });
-      const text = await res.text();
-      if (!res.ok) {
-        console.error("AMS archive error:", res.status, text);
-        return new Response(JSON.stringify({ error: `AMS archive failed: ${res.status} ${text}` }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-
-      // Mirror locally using service client
-      await serviceClient
-        .from("ams_subscriptions")
-        .update({ status: "archived" })
-        .eq("connection_id", connectionId)
-        .eq("subscription_id", subscriptionId);
-
-      return new Response(JSON.stringify({ ok: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
-    if (action === "list") {
-      // Use service client to list subscriptions for the verified connection
-      const { data, error } = await serviceClient
-        .from("ams_subscriptions")
-        .select("*")
-        .eq("connection_id", connectionId)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return new Response(JSON.stringify({ items: data || [] }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
-    return new Response(JSON.stringify({ error: "Unknown action" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-  } catch (e: any) {
-    console.error("ams-subscribe error:", e);
-    return new Response(JSON.stringify({ error: e.message || "Unexpected error" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(text, { status: 200, headers: { "Content-Type": "application/json" } });
+  } catch (e) {
+    return new Response(`error: ${e?.message ?? e}`, { status: 500 });
   }
 });
