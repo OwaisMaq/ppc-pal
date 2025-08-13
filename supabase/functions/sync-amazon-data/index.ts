@@ -101,7 +101,7 @@ async function createReportRequest(
     : 'spTargeting'
 
    const requestedRange = opts?.dateRangeDays ?? 90
-   const dateRangeDays = Math.min(requestedRange, 14)
+   const dateRangeDays = Math.min(requestedRange, 90)
    // Allow explicit window override for chunking
    const endDateStr = opts?.endDate || new Date().toISOString().split('T')[0]
    const startDateStr = opts?.startDate || new Date(Date.now() - dateRangeDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
@@ -593,16 +593,16 @@ serve(async (req) => {
     let totalMetricsUpdated = 0
 
     // Define columns using correct Amazon API v3 column names
-    const campaignColumns = ['campaignId','impressions','clicks','cost','attributedSales14d','attributedConversions14d']
-    const adGroupColumns = ['adGroupId','campaignId','impressions','clicks','cost','attributedSales14d','attributedConversions14d']
-    const targetColumns = ['targetId','adGroupId','campaignId','impressions','clicks','cost','attributedSales14d','attributedConversions14d']
-    const keywordColumns = ['keywordId','adGroupId','campaignId','keywordText','matchType','impressions','clicks','cost','attributedSales14d','attributedConversions14d']
+    const campaignColumns = ['campaignId','impressions','clicks','spend','sales14d','purchases14d']
+    const adGroupColumns = ['adGroupId','campaignId','impressions','clicks','spend','sales14d','purchases14d']
+    const targetColumns = ['targetId','adGroupId','campaignId','impressions','clicks','spend','sales14d','purchases14d']
+    const keywordColumns = ['keywordId','adGroupId','campaignId','keywordText','matchType','impressions','clicks','spend','sales14d','purchases14d']
 
     // Minimal columns fallback (in case of config errors)
-    const minCampaignColumns = ['campaignId','impressions','clicks','cost']
-    const minAdGroupColumns = ['adGroupId','impressions','clicks','cost']
-    const minTargetColumns = ['targetId','impressions','clicks','cost']
-    const minKeywordColumns = ['keywordId','impressions','clicks','cost']
+    const minCampaignColumns = ['campaignId','impressions','clicks','spend','sales14d','purchases14d']
+    const minAdGroupColumns = ['adGroupId','impressions','clicks','spend','sales14d','purchases14d']
+    const minTargetColumns = ['targetId','impressions','clicks','spend','sales14d','purchases14d']
+    const minKeywordColumns = ['keywordId','impressions','clicks','spend','sales14d','purchases14d']
 
     // Campaign Performance
     if (campaignIds.length > 0) {
