@@ -6,83 +6,99 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const SB_URL = Deno.env.get("SUPABASE_URL")!;
-const SB_ANON = Deno.env.get("SUPABASE_ANON_KEY")!;
-const SB_SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const AMZ_CLIENT_ID = Deno.env.get("AMAZON_CLIENT_ID")!;
-const AMZ_CLIENT_SECRET = Deno.env.get("AMAZON_CLIENT_SECRET")!;
-
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
+    console.log("Handling OPTIONS request");
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    console.log("AMS Subscribe function started");
+    console.log("=== AMS Subscribe function started ===");
+    console.log("Request method:", req.method);
+    console.log("Request headers:", Object.fromEntries(req.headers.entries()));
     
-    // Check environment variables first
+    // Get environment variables
+    const SB_URL = Deno.env.get("SUPABASE_URL");
+    const SB_ANON = Deno.env.get("SUPABASE_ANON_KEY");
+    const SB_SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const AMZ_CLIENT_ID = Deno.env.get("AMAZON_CLIENT_ID");
+    const AMZ_CLIENT_SECRET = Deno.env.get("AMAZON_CLIENT_SECRET");
+    
+    console.log("Environment variables check:", {
+      hasUrl: !!SB_URL,
+      hasAnon: !!SB_ANON,
+      hasService: !!SB_SERVICE,
+      hasClientId: !!AMZ_CLIENT_ID,
+      hasClientSecret: !!AMZ_CLIENT_SECRET
+    });
+    
     if (!SB_URL || !SB_ANON || !SB_SERVICE || !AMZ_CLIENT_ID || !AMZ_CLIENT_SECRET) {
-      console.error("Missing required environment variables:", { 
-        hasUrl: !!SB_URL, 
-        hasAnon: !!SB_ANON, 
-        hasService: !!SB_SERVICE, 
-        hasClientId: !!AMZ_CLIENT_ID, 
-        hasClientSecret: !!AMZ_CLIENT_SECRET 
-      });
-      return new Response("Server configuration error: Missing required environment variables", { 
+      console.error("Missing environment variables!");
+      return new Response("Missing environment variables", { 
         status: 500, 
         headers: corsHeaders 
       });
     }
-    
-    console.log("Environment variables validated successfully");
 
-    // 1) Who is calling?
+    // Parse request body
+    let body;
+    try {
+      const text = await req.text();
+      console.log("Raw request body:", text);
+      body = JSON.parse(text);
+      console.log("Parsed request body:", body);
+    } catch (e) {
+      console.error("JSON parse error:", e);
+      return new Response(`JSON parse error: ${e.message}`, { 
+        status: 400, 
+        headers: corsHeaders 
+      });
+    }
+
+    const { connectionId, datasetId, destinationArn, region } = body;
+    console.log("Extracted parameters:", { connectionId, datasetId, destinationArn, region });
+    
+    if (!connectionId || !datasetId || !destinationArn || !region) {
+      console.error("Missing required parameters");
+      return new Response("Missing required parameters", { 
+        status: 400, 
+        headers: corsHeaders 
+      });
+    }
+
+    // Authenticate user
+    console.log("Creating auth client...");
     const auth = createClient(SB_URL, SB_ANON, {
       global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
     });
+    
+    console.log("Getting user...");
     const { data: { user }, error: authError } = await auth.auth.getUser();
+    
     if (authError) {
       console.error("Auth error:", authError);
-      return new Response(`Authentication failed: ${authError.message}`, { 
+      return new Response(`Auth error: ${authError.message}`, { 
         status: 401, 
-        headers: corsHeaders 
-      });
-    }
-    if (!user) {
-      console.error("No user found");
-      return new Response("Unauthorized", { 
-        status: 401, 
-        headers: corsHeaders 
-      });
-    }
-    console.log("User authenticated:", user.id);
-
-    // 2) Parse payload with error handling
-    let connectionId, datasetId, destinationArn, region;
-    try {
-      const body = await req.json();
-      ({ connectionId, datasetId, destinationArn, region } = body);
-      console.log("Request payload:", { connectionId, datasetId, destinationArn, region });
-    } catch (e) {
-      console.error("Failed to parse request body:", e);
-      return new Response("Invalid JSON in request body", { 
-        status: 400, 
         headers: corsHeaders 
       });
     }
     
-    if (!connectionId || !datasetId || !destinationArn || !region) {
-      console.error("Missing required parameters:", { connectionId: !!connectionId, datasetId: !!datasetId, destinationArn: !!destinationArn, region: !!region });
-      return new Response("Bad request: Missing connectionId, datasetId, destinationArn, or region", { 
-        status: 400, 
+    if (!user) {
+      console.error("No user found");
+      return new Response("No user found", { 
+        status: 401, 
         headers: corsHeaders 
       });
     }
+    
+    console.log("User authenticated:", user.id);
 
-    // 3) Load connection with service role (bypass RLS) and enforce ownership
+    // Get connection
+    console.log("Creating service client...");
     const db = createClient(SB_URL, SB_SERVICE);
+    
+    console.log("Querying connection...");
     const { data: conn, error: connErr } = await db
       .from("amazon_connections")
       .select("id,user_id,profile_id,refresh_token")
@@ -107,16 +123,16 @@ serve(async (req) => {
     
     if (conn.user_id !== user.id) {
       console.error("User ownership mismatch:", { connectionUserId: conn.user_id, requestUserId: user.id });
-      return new Response("Forbidden: Connection not owned by user", { 
+      return new Response("Forbidden", { 
         status: 403, 
         headers: corsHeaders 
       });
     }
     
-    console.log("Connection verified for user:", { connectionId, profileId: conn.profile_id });
+    console.log("Connection verified for user");
 
-    // 4) Exchange refresh token → access token
-    console.log("Exchanging refresh token for access token");
+    // Exchange refresh token for access token
+    console.log("Exchanging refresh token...");
     const tokRes = await fetch("https://api.amazon.com/auth/o2/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -128,10 +144,12 @@ serve(async (req) => {
       }),
     });
     
+    console.log("Token response status:", tokRes.status);
+    
     if (!tokRes.ok) {
       const errorText = await tokRes.text();
       console.error("Amazon token exchange failed:", { status: tokRes.status, error: errorText });
-      return new Response(`Token exchange failed (${tokRes.status}): ${errorText}`, { 
+      return new Response(`Token exchange failed: ${errorText}`, { 
         status: 502, 
         headers: corsHeaders 
       });
@@ -139,9 +157,9 @@ serve(async (req) => {
     
     const tokenData = await tokRes.json();
     const { access_token } = tokenData;
-    console.log("Access token obtained successfully");
+    console.log("Access token obtained");
 
-    // 5) Region → AMS base URL
+    // Get AMS base URL
     const base =
       region === "eu-west-1" ? "https://advertising-api-eu.amazon.com" :
       region === "us-east-1" ? "https://advertising-api.amazon.com" :
@@ -158,9 +176,9 @@ serve(async (req) => {
     
     console.log("Using AMS base URL:", base);
 
-    // 6) Create subscription
+    // Create subscription
     const subscriptionPayload = { datasetId, destinationArn, compression: "GZIP" };
-    console.log("Creating AMS subscription:", subscriptionPayload);
+    console.log("Creating AMS subscription with payload:", subscriptionPayload);
     
     const res = await fetch(`${base}/streams/subscriptions`, {
       method: "POST",
@@ -173,28 +191,35 @@ serve(async (req) => {
       body: JSON.stringify(subscriptionPayload),
     });
     
-    const text = await res.text();
-    console.log("AMS API response:", { status: res.status, response: text });
+    console.log("AMS API response status:", res.status);
+    const responseText = await res.text();
+    console.log("AMS API response body:", responseText);
     
     if (!res.ok) {
-      console.error("AMS subscription creation failed:", { status: res.status, error: text });
-      return new Response(`AMS API error (${res.status}): ${text}`, { 
+      console.error("AMS subscription creation failed");
+      return new Response(`AMS API error (${res.status}): ${responseText}`, { 
         status: 502, 
         headers: corsHeaders 
       });
     }
 
-    console.log("AMS subscription created successfully");
-    return new Response(text, { 
+    console.log("=== AMS subscription created successfully ===");
+    return new Response(responseText, { 
       status: 200, 
       headers: { 
         "Content-Type": "application/json",
         ...corsHeaders
       } 
     });
+    
   } catch (e) {
-    console.error("Unexpected error:", e);
-    return new Response(`Unexpected error: ${e?.message ?? e}`, { 
+    console.error("=== Unexpected error in AMS Subscribe function ===");
+    console.error("Error type:", typeof e);
+    console.error("Error message:", e?.message);
+    console.error("Error stack:", e?.stack);
+    console.error("Full error:", e);
+    
+    return new Response(`Unexpected error: ${e?.message ?? String(e)}`, { 
       status: 500, 
       headers: corsHeaders 
     });
