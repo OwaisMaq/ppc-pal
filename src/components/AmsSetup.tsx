@@ -47,6 +47,7 @@ export default function AmsSetup() {
   }, [selectedConnectionId, list]);
 
   const toggleDataset = async (datasetId: AmsDataset, enabled: boolean) => {
+    console.log('toggleDataset called:', { datasetId, enabled, selectedConnectionId, destinationArn });
     if (!selectedConnectionId) return;
     try {
       if (enabled) {
@@ -85,6 +86,7 @@ export default function AmsSetup() {
   };
 
   const handleProcessStreamData = async () => {
+    console.log('handleProcessStreamData called:', { selectedConnectionId });
     if (!selectedConnectionId) return;
     setIsProcessing(true);
     try {
@@ -105,6 +107,18 @@ export default function AmsSetup() {
   };
 
   const processing = loading || loadingConnections;
+  
+  // Debug logging
+  console.log('AmsSetup Debug:', {
+    destinationArn,
+    region,
+    destinationType,
+    processing,
+    loading,
+    loadingConnections,
+    selectedConnectionId,
+    activeConnectionsCount: activeConnections.length
+  });
 
   return (
     <Card className="mt-6">

@@ -22,6 +22,7 @@ export interface AmsSubscription {
 export const useAMS = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  console.log('useAMS initialized, loading:', loading);
 
   const list = useCallback(async (connectionId: string) => {
     const { data, error } = await supabase
@@ -43,6 +44,7 @@ export const useAMS = () => {
     destinationArn: string;
     region: string;
   }) => {
+    console.log('useAMS.subscribe called with:', params);
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("ams-subscribe", {
