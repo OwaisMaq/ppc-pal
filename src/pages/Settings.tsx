@@ -1,5 +1,6 @@
 import Header from "@/components/Header";
 import AmazonAccountSetup from "@/components/AmazonAccountSetup";
+import AmsSetup from "@/components/AmsSetup";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Settings as SettingsIcon } from "lucide-react";
@@ -38,8 +39,9 @@ const Settings = () => {
         </header>
 
         <section className="grid lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 space-y-6">
             <AmazonAccountSetup />
+            <AmsSetup />
           </div>
           <aside>
             <Card className="border-blue-200 bg-blue-50">
