@@ -5,9 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { useAMS, AmsDataset } from "@/hooks/useAMS";
-import { Loader2, Server, Network } from "lucide-react";
+import { useAmsMetrics } from "@/hooks/useAmsMetrics";
+import { Loader2, Server, Network, Clock, Activity } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
 
 const DEFAULT_REGION = "eu-west-1";
 
@@ -19,6 +22,7 @@ export default function AmsSetup() {
   const [region, setRegion] = useState(DEFAULT_REGION);
   const [destinationType, setDestinationType] = useState("firehose");
   const [subs, setSubs] = useState<Record<string, any>>({});
+  const { metrics } = useAmsMetrics(selectedConnectionId || undefined);
 
   const activeConnections = useMemo(() => connections.filter(c => c.status === "active"), [connections]);
 
@@ -134,27 +138,55 @@ export default function AmsSetup() {
             </div>
 
             <div className="grid sm:grid-cols-2 gap-4">
-              <div className="flex items-center justify-between rounded-md border p-4">
-                <div>
-                  <p className="font-medium">sp-traffic</p>
-                  <p className="text-sm text-muted-foreground">Impressions, clicks, cost (hourly)</p>
+              <div className="flex flex-col space-y-3 rounded-md border p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">sp-traffic</p>
+                    <p className="text-sm text-muted-foreground">Impressions, clicks, cost (hourly)</p>
+                  </div>
+                  <Switch
+                    checked={!!subs["sp-traffic"] && subs["sp-traffic"].status !== "archived"}
+                    disabled={processing || !destinationArn}
+                    onCheckedChange={(v) => toggleDataset("sp-traffic", v)}
+                  />
                 </div>
-                <Switch
-                  checked={!!subs["sp-traffic"] && subs["sp-traffic"].status !== "archived"}
-                  disabled={processing || !destinationArn}
-                  onCheckedChange={(v) => toggleDataset("sp-traffic", v)}
-                />
+                {subs["sp-traffic"] && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Activity className="h-3 w-3" />
+                    <span>Messages (24h): {metrics?.messageCount24h || 0}</span>
+                    {metrics?.lastMessageAt && (
+                      <>
+                        <Clock className="h-3 w-3 ml-2" />
+                        <span>Last: {formatDistanceToNow(new Date(metrics.lastMessageAt), { addSuffix: true })}</span>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
-              <div className="flex items-center justify-between rounded-md border p-4">
-                <div>
-                  <p className="font-medium">sp-conversion</p>
-                  <p className="text-sm text-muted-foreground">Attributed conversions and sales (hourly)</p>
+              <div className="flex flex-col space-y-3 rounded-md border p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">sp-conversion</p>
+                    <p className="text-sm text-muted-foreground">Attributed conversions and sales (hourly)</p>
+                  </div>
+                  <Switch
+                    checked={!!subs["sp-conversion"] && subs["sp-conversion"].status !== "archived"}
+                    disabled={processing || !destinationArn}
+                    onCheckedChange={(v) => toggleDataset("sp-conversion", v)}
+                  />
                 </div>
-                <Switch
-                  checked={!!subs["sp-conversion"] && subs["sp-conversion"].status !== "archived"}
-                  disabled={processing || !destinationArn}
-                  onCheckedChange={(v) => toggleDataset("sp-conversion", v)}
-                />
+                {subs["sp-conversion"] && (
+                  <div className="flex items-center gap-2 text-xs">
+                    <Badge variant="secondary" className="text-xs">
+                      {subs["sp-conversion"].status === "active" ? "Active" : "Inactive"}
+                    </Badge>
+                    {subs["sp-conversion"].last_delivery_at && (
+                      <span className="text-muted-foreground">
+                        Last delivery: {formatDistanceToNow(new Date(subs["sp-conversion"].last_delivery_at), { addSuffix: true })}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 

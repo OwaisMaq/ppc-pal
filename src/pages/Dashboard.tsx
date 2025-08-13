@@ -9,11 +9,14 @@ import { CampaignDataTable } from "@/components/CampaignDataTable";
 import { WeeklyPerformanceChart } from "@/components/WeeklyPerformanceChart";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { useCampaignMetrics } from "@/hooks/useCampaignMetrics";
+import { useAmsMetrics } from "@/hooks/useAmsMetrics";
+import { useAMS } from "@/hooks/useAMS";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { RefreshCw, BarChart3 } from "lucide-react";
+import { RefreshCw, BarChart3, AlertTriangle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
+import { DateRangeSelector } from "@/components/DateRangeSelector";
 import { Link } from "react-router-dom";
 import { useAmazonData } from "@/hooks/useAmazonData";
 import { formatDistanceToNow } from "date-fns";
@@ -81,14 +84,40 @@ const Dashboard = () => {
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | undefined>(undefined);
   const hasActiveConnections = connections.some(c => c.status === 'active');
   const activeConnections = connections.filter(c => c.status === 'active');
-  const { metrics, campaigns, loading, error, refetch } = useCampaignMetrics(selectedConnectionId);
+  
+  // Date range context
+  const { dateRangeDays } = useDateRange();
+  const dateFrom = useMemo(() => new Date(Date.now() - dateRangeDays * 24 * 60 * 60 * 1000), [dateRangeDays]);
+  const dateTo = useMemo(() => new Date(), []);
+  
+  // AMS streaming data (primary)
+  const { metrics: amsMetrics, entityData: amsEntityData, loading: amsLoading, error: amsError, refetch: refetchAms } = useAmsMetrics(selectedConnectionId, dateFrom, dateTo);
+  
+  // Fallback to campaign metrics from reports (if no AMS data)
+  const { metrics: campaignMetrics, campaigns, loading: campaignLoading, error: campaignError, refetch: refetchCampaigns } = useCampaignMetrics(selectedConnectionId);
+  
+  // Use AMS data if available, otherwise fallback to campaign data
+  const metrics = amsMetrics?.totalSpend > 0 ? amsMetrics : campaignMetrics;
+  const entityData = amsEntityData.length > 0 ? amsEntityData : campaigns;
+  const loading = amsLoading || campaignLoading;
+  const error = amsError || campaignError;
+  const hasAmsData = amsMetrics && amsMetrics.totalSpend > 0;
+  
   const selectedConnection = useMemo(() => activeConnections.find(c => c.id === selectedConnectionId), [activeConnections, selectedConnectionId]);
   const { syncAllData, loading: syncLoading } = useAmazonData();
+  const { processStreamData, loading: processLoading } = useAMS();
   const [autoSynced, setAutoSynced] = useState(false);
-  const { dateRangeDays, setDateRangeDays } = useDateRange();
 
   const campaignIds = useMemo(() => campaigns.map(c => c.id), [campaigns]);
   const { data: budgetUsage } = useBudgetUsage(campaignIds);
+  
+  // Check if AMS aggregation is needed (data older than 90 minutes)
+  const needsAggregation = useMemo(() => {
+    if (!amsMetrics?.lastMessageAt) return false;
+    const lastMessage = new Date(amsMetrics.lastMessageAt);
+    const ninetyMinutesAgo = new Date(Date.now() - 90 * 60 * 1000);
+    return lastMessage < ninetyMinutesAgo;
+  }, [amsMetrics?.lastMessageAt]);
 
   useEffect(() => {
     if (activeConnections.length > 0) {
@@ -101,12 +130,12 @@ const Dashboard = () => {
     if (!autoSynced && selectedConnectionId && hasActiveConnections) {
       const zeroSpend = (metrics?.totalSpend ?? 0) === 0;
       const hasCampaigns = campaigns.length > 0;
-      if (zeroSpend && hasCampaigns) {
+      if (zeroSpend && hasCampaigns && !hasAmsData) {
         setAutoSynced(true);
         syncAllData(selectedConnectionId);
       }
     }
-  }, [autoSynced, selectedConnectionId, hasActiveConnections, metrics?.totalSpend, campaigns.length, syncAllData]);
+  }, [autoSynced, selectedConnectionId, hasActiveConnections, metrics?.totalSpend, campaigns.length, syncAllData, hasAmsData]);
   return (
     <DashboardShell>
       <div className="container mx-auto py-6 px-4">
@@ -141,31 +170,52 @@ const Dashboard = () => {
                 </SelectContent>
               </Select>
 
-              {/* Date range selector for sync (kept here but uses global context) */}
-              <Select value={String(dateRangeDays)} onValueChange={(v) => setDateRangeDays(parseInt(v))}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Range" />
-                </SelectTrigger>
-                <SelectContent className="z-50 bg-background border shadow-md">
-                  <SelectItem value="1">Today (1d)</SelectItem>
-                  <SelectItem value="7">Last 7 days</SelectItem>
-                  <SelectItem value="30">Last 30 days</SelectItem>
-                  <SelectItem value="90">Last 90 days</SelectItem>
-                </SelectContent>
-              </Select>
+              {/* Date range selector */}
+              <DateRangeSelector />
 
               <div className="flex items-center gap-2">
+                {hasAmsData ? (
+                  <>
+                    <Button 
+                      onClick={() => selectedConnectionId && processStreamData(selectedConnectionId)} 
+                      variant="default" 
+                      className="flex items-center gap-2"
+                      disabled={processLoading}
+                    >
+                      <RefreshCw className={`h-4 w-4 ${processLoading ? 'animate-spin' : ''}`} />
+                      Process Stream Data
+                    </Button>
+                    {needsAggregation && (
+                      <Button 
+                        onClick={() => selectedConnectionId && processStreamData(selectedConnectionId)} 
+                        variant="outline" 
+                        className="flex items-center gap-2"
+                        disabled={processLoading}
+                      >
+                        <AlertTriangle className="h-4 w-4 text-amber-500" />
+                        Refresh Aggregates
+                      </Button>
+                    )}
+                  </>
+                ) : (
+                  <Button 
+                    onClick={() => selectedConnectionId && syncAllData(selectedConnectionId, { dateRangeDays })} 
+                    variant="default" 
+                    className="flex items-center gap-2"
+                    disabled={syncLoading}
+                  >
+                    <RefreshCw className={`h-4 w-4 ${syncLoading ? 'animate-spin' : ''}`} />
+                    Sync Reports
+                  </Button>
+                )}
                 <Button 
-                  onClick={() => selectedConnectionId && syncAllData(selectedConnectionId, { dateRangeDays })} 
-                  variant="default" 
-                  className="flex items-center gap-2"
-                  disabled={syncLoading}
-                >
-                  <RefreshCw className={`h-4 w-4 ${syncLoading ? 'animate-spin' : ''}`} />
-                  Sync performance
-                </Button>
-                <Button 
-                  onClick={refetch} 
+                  onClick={() => {
+                    if (hasAmsData) {
+                      refetchAms();
+                    } else {
+                      refetchCampaigns();
+                    }
+                  }} 
                   variant="outline" 
                   className="flex items-center gap-2"
                   disabled={loading}
@@ -174,11 +224,17 @@ const Dashboard = () => {
                   Refresh Data
                 </Button>
               </div>
-              {selectedConnection?.last_sync_at && (
-                <span className="text-xs text-muted-foreground">
-                  Last sync {formatDistanceToNow(new Date(selectedConnection.last_sync_at), { addSuffix: true })}
-                </span>
-              )}
+              <div className="flex flex-col items-end text-xs text-muted-foreground">
+                {hasAmsData && amsMetrics?.lastMessageAt && (
+                  <span>Stream: {formatDistanceToNow(new Date(amsMetrics.lastMessageAt), { addSuffix: true })}</span>
+                )}
+                {selectedConnection?.last_sync_at && (
+                  <span>Reports: {formatDistanceToNow(new Date(selectedConnection.last_sync_at), { addSuffix: true })}</span>
+                )}
+                {hasAmsData && (
+                  <span className="text-green-600 font-medium">Live streaming data</span>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -230,15 +286,15 @@ const Dashboard = () => {
                   <CardContent>
                     <div className="space-y-4">
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Active Campaigns</span>
+                        <span className="text-muted-foreground">Total Campaigns</span>
                         <span className="font-semibold">
-                          {campaigns.filter(c => c.status === 'enabled').length}
+                          {campaigns.length}
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Paused Campaigns</span>
-                        <span className="font-semibold">
-                          {campaigns.filter(c => c.status === 'paused').length}
+                        <span className="text-muted-foreground">Data Source</span>
+                        <span className={`font-semibold text-xs ${hasAmsData ? 'text-green-600' : 'text-amber-600'}`}>
+                          {hasAmsData ? 'Streaming' : 'Reports'}
                         </span>
                       </div>
                       <div className="flex justify-between">
