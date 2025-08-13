@@ -41,6 +41,7 @@ export const useAmazonConnections = () => {
           health_status,
           health_issues
         `)
+        .eq('user_id', user.id)  // Explicitly filter by current user ID
         .order('created_at', { ascending: false });
 
       if (error) throw error;

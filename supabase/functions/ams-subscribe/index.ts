@@ -34,13 +34,19 @@ serve(async (req) => {
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+  const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  // Client for user auth verification  
+  const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     global: { headers: { Authorization: req.headers.get("Authorization") || "" } },
   });
 
+  // Service role client for database access (bypasses RLS)
+  const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
   try {
-    const { data: { user }, error: userErr } = await supabase.auth.getUser();
+    // Authenticate user with anon client
+    const { data: { user }, error: userErr } = await authClient.auth.getUser();
     if (userErr || !user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const body = await req.json().catch(() => ({}));
@@ -50,13 +56,18 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Missing action or connectionId" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Load connection (RLS ensures ownership)
-    const { data: conn, error: connErr } = await supabase
+    // Load connection with service role and verify ownership
+    const { data: conn, error: connErr } = await serviceClient
       .from("amazon_connections")
-      .select("id, profile_id, advertising_api_endpoint, access_token")
+      .select("id, user_id, profile_id, advertising_api_endpoint, access_token")
       .eq("id", connectionId)
       .single();
     if (connErr || !conn) throw new Error(connErr?.message || "Connection not found");
+    
+    // Verify ownership - user must own this connection
+    if (conn.user_id !== user.id) {
+      return new Response(JSON.stringify({ error: "Access denied - connection not owned by user" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     const apiEndpoint: string = conn.advertising_api_endpoint || "https://advertising-api-eu.amazon.com";
     const clientId = Deno.env.get("AMAZON_CLIENT_ID") || "";
@@ -92,9 +103,9 @@ serve(async (req) => {
       }
       const out = (() => { try { return JSON.parse(text) } catch { return { raw: text } } })();
 
-      // Persist reference for UI (best-effort)
+      // Persist reference for UI using service client (best-effort)
       const { id: subscriptionId, status } = out || {};
-      await supabase.from("ams_subscriptions").insert({
+      await serviceClient.from("ams_subscriptions").insert({
         connection_id: connectionId,
         dataset_id: datasetId,
         destination_type: destinationType,
@@ -128,8 +139,8 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: `AMS archive failed: ${res.status} ${text}` }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      // Mirror locally
-      await supabase
+      // Mirror locally using service client
+      await serviceClient
         .from("ams_subscriptions")
         .update({ status: "archived" })
         .eq("connection_id", connectionId)
@@ -139,7 +150,8 @@ serve(async (req) => {
     }
 
     if (action === "list") {
-      const { data, error } = await supabase
+      // Use service client to list subscriptions for the verified connection
+      const { data, error } = await serviceClient
         .from("ams_subscriptions")
         .select("*")
         .eq("connection_id", connectionId)
