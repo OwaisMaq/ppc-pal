@@ -21,6 +21,9 @@ export interface AmsMetrics {
 export interface AmsEntityData {
   id: string;
   name: string;
+  status?: string;
+  campaign_type?: string;
+  created_at?: string;
   impressions: number;
   clicks: number;
   spend: number;
@@ -33,6 +36,7 @@ export interface AmsEntityData {
   conversionRate: number;
   entityType: 'campaign' | 'adGroup' | 'keyword' | 'target';
   entityId?: string;
+  daily_budget?: number;
 }
 
 export const useAmsMetrics = (connectionId?: string, from?: Date, to?: Date) => {
@@ -136,6 +140,9 @@ export const useAmsMetrics = (connectionId?: string, from?: Date, to?: Date) => 
       const campaignData: AmsEntityData[] = (campaigns || []).map(campaign => ({
         id: campaign.id,
         name: campaign.name,
+        status: campaign.status || 'enabled',
+        campaign_type: campaign.campaign_type,
+        created_at: campaign.created_at,
         impressions: campaign.impressions || 0,
         clicks: campaign.clicks || 0,
         spend: Number(campaign.spend || 0),
@@ -148,6 +155,7 @@ export const useAmsMetrics = (connectionId?: string, from?: Date, to?: Date) => 
         conversionRate: campaign.clicks > 0 ? ((campaign.orders || 0) / campaign.clicks) * 100 : 0,
         entityType: 'campaign' as const,
         entityId: campaign.id,
+        daily_budget: campaign.daily_budget,
       }));
 
       setEntityData(campaignData);

@@ -40,7 +40,11 @@ const formatPercentage = (num: number) => {
   return `${num.toFixed(2)}%`;
 };
 
-const getStatusColor = (status: string) => {
+const getStatusColor = (status: string | undefined) => {
+  if (!status) {
+    return 'bg-gray-100 text-gray-800';
+  }
+  
   switch (status.toLowerCase()) {
     case 'enabled':
       return 'bg-green-100 text-green-800';
