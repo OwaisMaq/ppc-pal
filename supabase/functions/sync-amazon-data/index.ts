@@ -120,8 +120,8 @@ async function createReportRequest(
     ? 'spAdGroups' 
     : 'spTargeting'
 
-   const requestedRange = opts?.dateRangeDays ?? 90
-   const dateRangeDays = Math.min(requestedRange, 90)
+   const requestedRange = opts?.dateRangeDays ?? 30
+   const dateRangeDays = Math.min(requestedRange, 30)  // Amazon API has 31-day limit for most reports
    // Allow explicit window override for chunking
    const endDateStr = opts?.endDate || new Date().toISOString().split('T')[0]
    const startDateStr = opts?.startDate || new Date(Date.now() - dateRangeDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
@@ -287,7 +287,7 @@ serve(async (req) => {
     }
 
     const { connectionId, dateRangeDays, diagnosticMode, timeUnit } = await req.json()
-    const dateRange = Number(dateRangeDays) || 90
+    const dateRange = Number(dateRangeDays) || 30  // Changed from 90 to 30 days to comply with Amazon API limits
     const diag = Boolean(diagnosticMode)
     const timeUnitOpt: 'SUMMARY' | 'DAILY' = (timeUnit === 'DAILY' ? 'DAILY' : 'SUMMARY')
     console.log('Syncing data for connection:', connectionId, 'dateRangeDays:', dateRange, 'diagnosticMode:', diag)
