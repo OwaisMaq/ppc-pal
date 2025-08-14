@@ -13,6 +13,7 @@ import { DataFreshnessIndicator } from "@/components/DataFreshnessIndicator";
 import { Loader2, Server, Network, Clock, Activity, Zap } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const DEFAULT_REGION = "eu-west-1";
 
@@ -82,6 +83,31 @@ export default function AmsSetup() {
         description: error.message || "Failed to update subscription",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleRefreshToken = async () => {
+    if (!selectedConnectionId) return;
+    setIsProcessing(true);
+    try {
+      const { error } = await supabase.functions.invoke('refresh-amazon-token', {
+        body: { connectionId: selectedConnectionId }
+      });
+      if (error) throw error;
+      toast({
+        title: "Token refreshed",
+        description: "Amazon connection token has been refreshed successfully",
+      });
+      // Refresh connections to update the UI
+      refreshConnections();
+    } catch (error: any) {
+      toast({
+        title: "Token refresh failed",
+        description: error.message || "Failed to refresh Amazon token",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -202,6 +228,16 @@ export default function AmsSetup() {
               <div className="flex items-end gap-2">
                 <Button variant="outline" onClick={refreshConnections} disabled={processing}>
                   Refresh
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={handleRefreshToken}
+                  disabled={!selectedConnectionId || isProcessing}
+                >
+                  {isProcessing ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : null}
+                  Refresh Token
                 </Button>
                 <Button 
                   variant="default" 
