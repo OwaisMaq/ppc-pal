@@ -108,12 +108,22 @@ export const useAmazonConnections = () => {
     try {
       console.log('Handling OAuth callback with code:', code?.substring(0, 10) + '...', 'state:', state);
       
-      // Get current session
-      const session = await supabase.auth.getSession();
+      // Wait for session restoration with retry mechanism
+      let session = await supabase.auth.getSession();
+      let retries = 0;
+      const maxRetries = 5;
+      
+      while ((!session.data.session?.access_token) && retries < maxRetries) {
+        console.log(`Session not available, waiting... (attempt ${retries + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+        session = await supabase.auth.getSession();
+        retries++;
+      }
+      
       console.log('Session for callback:', session.data.session ? 'Valid' : 'None');
       
       if (!session.data.session?.access_token) {
-        throw new Error('No valid session found for callback');
+        throw new Error('No valid session found for callback after retries');
       }
 
       // Generate the same redirect URI that was used for initiation

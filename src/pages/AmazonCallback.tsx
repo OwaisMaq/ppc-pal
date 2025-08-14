@@ -18,6 +18,9 @@ const AmazonCallback = () => {
       if (processed) return;
       processed = true;
       
+      // Give auth context time to restore session after redirect
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
       const urlParams = new URLSearchParams(window.location.search);
       const code = urlParams.get('code');
       const state = urlParams.get('state');
