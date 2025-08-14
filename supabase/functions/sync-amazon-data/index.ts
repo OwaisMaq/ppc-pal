@@ -406,6 +406,9 @@ serve(async (req) => {
      
      // Fetch campaigns first
      console.log('📊 Fetching campaigns...')
+     
+     // Also sync budget usage data
+     console.log('💰 Will sync budget usage data after entity sync...')
      const campaignsResponse = await fetchWithRetry(`${apiEndpoint}/v2/campaigns`, {
        headers: {
          'Authorization': `Bearer ${accessToken}`,
@@ -1357,6 +1360,100 @@ serve(async (req) => {
       }
     }
 
+    // PHASE 4: Budget Usage Sync
+    console.log('💰 Syncing campaign budget usage...')
+    let budgetRecordsProcessed = 0
+    
+    if (campaignIds.length > 0) {
+      try {
+        // Calculate date range for budget usage (last 30 days)
+        const budgetEndDate = new Date().toISOString().split('T')[0]
+        const budgetStartDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+        
+        // Process campaigns in batches for budget usage API
+        const budgetBatchSize = 50
+        for (let i = 0; i < campaignIds.length; i += budgetBatchSize) {
+          const batch = campaignIds.slice(i, i + budgetBatchSize)
+          
+          try {
+            // Amazon's Budget Usage API endpoint
+            const budgetResponse = await fetchWithRetry(`${apiEndpoint}/budgets/usage/campaigns`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Amazon-Advertising-API-ClientId': clientId,
+                'Amazon-Advertising-API-Scope': connection.profile_id,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                campaignIds: batch,
+                startDate: budgetStartDate,
+                endDate: budgetEndDate,
+                timeUnit: 'DAILY'
+              })
+            })
+
+            if (budgetResponse.ok) {
+              const budgetData = await budgetResponse.json()
+              
+              if (budgetData.usage && Array.isArray(budgetData.usage)) {
+                for (const usageEntry of budgetData.usage) {
+                  if (usageEntry.campaignId && usageEntry.date) {
+                    // Find the internal campaign ID
+                    const campaign = campaignMap.get(usageEntry.campaignId.toString())
+                    if (campaign) {
+                      const { error: budgetError } = await supabase
+                        .from('campaign_budget_usage')
+                        .upsert({
+                          campaign_id: campaign.id,
+                          date: usageEntry.date,
+                          period_type: usageEntry.budget?.budgetType || 'DAILY',
+                          currency: usageEntry.budget?.currency || 'USD',
+                          budget_amount: usageEntry.budget?.amount || 0,
+                          usage_amount: usageEntry.usage?.amount || 0,
+                          usage_percentage: usageEntry.usage?.percentage || 0,
+                          window_start: `${usageEntry.date}T00:00:00.000Z`,
+                          window_end: `${usageEntry.date}T23:59:59.999Z`
+                        }, {
+                          onConflict: 'campaign_id, date, period_type'
+                        })
+
+                      if (budgetError) {
+                        diagnostics.writeErrors.push({ 
+                          entity: 'budget_usage', 
+                          id: usageEntry.campaignId?.toString?.(), 
+                          error: budgetError.message 
+                        })
+                      } else {
+                        budgetRecordsProcessed++
+                      }
+                    }
+                  }
+                }
+              }
+            } else {
+              console.warn(`Budget usage API failed for batch: ${budgetResponse.status}`)
+            }
+          } catch (batchError) {
+            console.warn('Budget usage batch error:', batchError)
+          }
+
+          // Small delay between batches
+          await new Promise(resolve => setTimeout(resolve, 100))
+        }
+        
+        console.log(`✅ Budget usage sync complete: ${budgetRecordsProcessed} records processed`)
+      } catch (error) {
+        console.error('❌ Budget usage sync failed:', error)
+        diagnostics.writeErrors.push({ 
+          entity: 'budget_usage_sync', 
+          error: (error as Error)?.message || 'Budget usage sync failed'
+        })
+      }
+    } else {
+      console.log('ℹ️ No campaigns available for budget usage sync')
+    }
+
     // Update connection sync status
     await supabase
       .from('amazon_connections')
@@ -1367,7 +1464,7 @@ serve(async (req) => {
       })
       .eq('id', connectionId)
 
-    console.log(`🎉 Complete sync finished: ${totalMetricsUpdated} metrics updated`)
+    console.log(`🎉 Complete sync finished: ${totalMetricsUpdated} metrics updated, ${budgetRecordsProcessed} budget records processed`)
 
     if (totalMetricsUpdated === 0) {
       return new Response(
