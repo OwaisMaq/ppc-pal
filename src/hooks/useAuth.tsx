@@ -24,25 +24,54 @@ export const useAuth = () => {
   return context;
 };
 
-// Cleanup function to remove stale auth data
+// Comprehensive cleanup function to remove all auth data
 const cleanupAuthState = () => {
-  console.log('AuthProvider: Cleaning up auth state');
+  console.log('AuthProvider: Performing comprehensive auth state cleanup');
   
-  // Remove all Supabase auth keys from localStorage
-  Object.keys(localStorage).forEach((key) => {
-    if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
-      console.log('AuthProvider: Removing localStorage key:', key);
-      localStorage.removeItem(key);
-    }
-  });
-  
-  // Remove from sessionStorage if in use
-  Object.keys(sessionStorage || {}).forEach((key) => {
-    if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
-      console.log('AuthProvider: Removing sessionStorage key:', key);
-      sessionStorage.removeItem(key);
-    }
-  });
+  try {
+    // Remove all Supabase auth keys from localStorage
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith('supabase.auth.') || key.includes('sb-') || 
+          key.startsWith('supabase-auth-') || key.includes('supabase_auth')) {
+        console.log('AuthProvider: Removing localStorage key:', key);
+        localStorage.removeItem(key);
+      }
+    });
+    
+    // Remove from sessionStorage
+    Object.keys(sessionStorage || {}).forEach((key) => {
+      if (key.startsWith('supabase.auth.') || key.includes('sb-') ||
+          key.startsWith('supabase-auth-') || key.includes('supabase_auth')) {
+        console.log('AuthProvider: Removing sessionStorage key:', key);
+        sessionStorage.removeItem(key);
+      }
+    });
+
+    // Clear auth-related cookies that might be causing the size issue
+    const cookiesToClear = [
+      'sb-access-token',
+      'sb-refresh-token', 
+      'supabase-auth-token',
+      'supabase-refresh-token',
+      'sb-ucbkcxupzjbblnzyiyui-auth-token'
+    ];
+    
+    cookiesToClear.forEach(cookieName => {
+      // Clear cookie for current domain
+      document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+      // Clear for subdomain
+      document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${window.location.hostname};`;
+      // Clear for root domain
+      const rootDomain = window.location.hostname.split('.').slice(-2).join('.');
+      if (rootDomain !== window.location.hostname) {
+        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.${rootDomain};`;
+      }
+    });
+
+    console.log('AuthProvider: Auth cleanup completed successfully');
+  } catch (error) {
+    console.error('AuthProvider: Error during auth cleanup:', error);
+  }
 };
 
 // Define protected routes that require authentication
@@ -59,6 +88,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     console.log('AuthProvider: Setting up auth state listener');
+    
+    // Clean up any existing large tokens that might cause 400 errors
+    cleanupAuthState();
     
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
