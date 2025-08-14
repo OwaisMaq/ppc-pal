@@ -101,7 +101,7 @@ serve(async (req) => {
     console.log("Querying connection...");
     const { data: conn, error: connErr } = await db
       .from("amazon_connections")
-      .select("id,user_id,profile_id,refresh_token")
+      .select("id,user_id,profile_id")
       .eq("id", connectionId)
       .single();
       
@@ -131,33 +131,38 @@ serve(async (req) => {
     
     console.log("Connection verified for user");
 
-    // Exchange refresh token for access token
-    console.log("Exchanging refresh token...");
-    const tokRes = await fetch("https://api.amazon.com/auth/o2/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        grant_type: "refresh_token",
-        refresh_token: conn.refresh_token,
-        client_id: AMZ_CLIENT_ID,
-        client_secret: AMZ_CLIENT_SECRET,
-      }),
+    // Refresh the Amazon token first to ensure we have a valid access token
+    console.log("Refreshing Amazon token...");
+    const refreshResult = await db.functions.invoke('refresh-amazon-token', {
+      body: { connectionId }
     });
     
-    console.log("Token response status:", tokRes.status);
-    
-    if (!tokRes.ok) {
-      const errorText = await tokRes.text();
-      console.error("Amazon token exchange failed:", { status: tokRes.status, error: errorText });
-      return new Response(`Token exchange failed: ${errorText}`, { 
+    if (refreshResult.error) {
+      console.error("Token refresh failed:", refreshResult.error);
+      return new Response(`Token refresh failed: ${refreshResult.error.message}`, { 
+        status: 502, 
+        headers: corsHeaders 
+      });
+    }
+
+    // Get the updated connection with fresh access token
+    console.log("Getting fresh access token...");
+    const { data: freshConn, error: freshConnErr } = await db
+      .from("amazon_connections")
+      .select("access_token")
+      .eq("id", connectionId)
+      .single();
+      
+    if (freshConnErr || !freshConn?.access_token) {
+      console.error("Failed to get fresh access token:", freshConnErr);
+      return new Response("Failed to get fresh access token", { 
         status: 502, 
         headers: corsHeaders 
       });
     }
     
-    const tokenData = await tokRes.json();
-    const { access_token } = tokenData;
-    console.log("Access token obtained");
+    const access_token = freshConn.access_token;
+    console.log("Fresh access token obtained");
 
     // Get AMS base URL
     const base =
