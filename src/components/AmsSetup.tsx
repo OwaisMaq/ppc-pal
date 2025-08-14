@@ -134,34 +134,54 @@ export default function AmsSetup() {
           <p className="text-sm text-muted-foreground">Select a connection to continue.</p>
         ) : (
           <>
-            <div className="rounded-md border border-red-200 bg-red-50 p-4 mb-4">
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.19-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-sm font-medium text-red-800">Amazon Connection Issue</h3>
-                  <div className="mt-2 text-sm text-red-700">
-                    <p>Your Amazon connection token is invalid. Please reconnect your Amazon account to enable AMS streaming.</p>
-                  </div>
-                  <div className="mt-3">
-                    <Button 
-                      onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-                      variant="outline"
-                      size="sm"
-                      className="text-red-600 border-red-200 hover:bg-red-50"
-                    >
-                      <svg className="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.989a.75.75 0 00-.75.75v4.242a.75.75 0 001.5 0v-2.43l.31.31a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.23-3.723a.75.75 0 00.219-.30V2.929a.75.75 0 00-1.5 0V5.36l-.31-.31A7 7 0 003.239 8.188a.75.75 0 101.448.389A5.5 5.5 0 0113.89 6.11l.311.31h-2.432a.75.75 0 000 1.5h4.243a.75.75 0 00.53-.219z" clipRule="evenodd" />
+            {(() => {
+              const selectedConnection = activeConnections.find(c => c.id === selectedConnectionId);
+              const isTokenExpired = selectedConnection && new Date(selectedConnection.token_expires_at) < new Date();
+              const hasHealthIssues = selectedConnection?.health_status === 'error' || selectedConnection?.health_issues?.length > 0;
+              
+              return (isTokenExpired || hasHealthIssues) && (
+                <div className="rounded-md border border-red-200 bg-red-50 p-4 mb-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.19-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
                       </svg>
-                      Go to Amazon Account Setup Above
-                    </Button>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-sm font-medium text-red-800">Amazon Connection Issue</h3>
+                      <div className="mt-2 text-sm text-red-700">
+                        <p>
+                          {isTokenExpired 
+                            ? "Your Amazon connection token has expired. Please reconnect your Amazon account to enable AMS streaming."
+                            : "There's an issue with your Amazon connection. Please reconnect your Amazon account to enable AMS streaming."
+                          }
+                        </p>
+                        {selectedConnection?.health_issues && selectedConnection.health_issues.length > 0 && (
+                          <ul className="mt-2 list-disc list-inside text-xs">
+                            {selectedConnection.health_issues.map((issue: string, idx: number) => (
+                              <li key={idx}>{issue}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                      <div className="mt-3">
+                        <Button 
+                          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                          variant="outline"
+                          size="sm"
+                          className="text-red-600 border-red-200 hover:bg-red-50"
+                        >
+                          <svg className="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.989a.75.75 0 00-.75.75v4.242a.75.75 0 001.5 0v-2.43l.31.31a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.23-3.723a.75.75 0 00.219-.30V2.929a.75.75 0 00-1.5 0V5.36l-.31-.31A7 7 0 003.239 8.188a.75.75 0 101.448.389A5.5 5.5 0 0113.89 6.11l.311.31h-2.432a.75.75 0 000 1.5h4.243a.75.75 0 00.53-.219z" clipRule="evenodd" />
+                          </svg>
+                          Go to Amazon Account Setup Above
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
+              );
+            })()}
             <div className="space-y-4">
             <div className="grid sm:grid-cols-2 gap-4">
               <div>
