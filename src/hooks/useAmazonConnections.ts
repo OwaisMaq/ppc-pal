@@ -70,6 +70,14 @@ export const useAmazonConnections = () => {
         throw new Error('No valid session found');
       }
 
+      // Store session info for callback restoration
+      localStorage.setItem('oauth_session_backup', JSON.stringify({
+        access_token: session.data.session.access_token,
+        refresh_token: session.data.session.refresh_token,
+        user_id: session.data.session.user.id,
+        timestamp: Date.now()
+      }));
+
       // Call edge function to initiate Amazon OAuth
       console.log('Calling amazon-oauth edge function...');
       const { data, error } = await supabase.functions.invoke('amazon-oauth', {
@@ -108,23 +116,52 @@ export const useAmazonConnections = () => {
     try {
       console.log('Handling OAuth callback with code:', code?.substring(0, 10) + '...', 'state:', state);
       
-      // Wait for session restoration with retry mechanism
+      // Try to get current session first
       let session = await supabase.auth.getSession();
-      let retries = 0;
-      const maxRetries = 5;
       
-      while ((!session.data.session?.access_token) && retries < maxRetries) {
-        console.log(`Session not available, waiting... (attempt ${retries + 1}/${maxRetries})`);
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
-        session = await supabase.auth.getSession();
-        retries++;
+      // If no session, try to restore from backup
+      if (!session.data.session?.access_token) {
+        console.log('No active session, attempting to restore from backup...');
+        
+        const backupData = localStorage.getItem('oauth_session_backup');
+        if (backupData) {
+          try {
+            const backup = JSON.parse(backupData);
+            // Check if backup is recent (within 10 minutes)
+            if (Date.now() - backup.timestamp < 10 * 60 * 1000) {
+              console.log('Attempting session restoration...');
+              
+              // Try to restore session using refresh token
+              const { data: refreshData, error: refreshError } = await supabase.auth.setSession({
+                access_token: backup.access_token,
+                refresh_token: backup.refresh_token
+              });
+              
+              if (!refreshError && refreshData.session) {
+                console.log('Session restored successfully');
+                session = { data: { session: refreshData.session }, error: null };
+              } else {
+                console.log('Session restoration failed:', refreshError?.message);
+              }
+            }
+            // Clean up backup
+            localStorage.removeItem('oauth_session_backup');
+          } catch (e) {
+            console.error('Error parsing session backup:', e);
+            localStorage.removeItem('oauth_session_backup');
+          }
+        }
+      }
+      
+      // Final session check
+      if (!session.data.session?.access_token) {
+        // Extract user ID from state parameter as fallback
+        const userId = state.split('_')[0];
+        console.log('No session available, but found user ID in state:', userId);
+        throw new Error('Session expired during OAuth flow. Please sign in again and retry the connection.');
       }
       
       console.log('Session for callback:', session.data.session ? 'Valid' : 'None');
-      
-      if (!session.data.session?.access_token) {
-        throw new Error('No valid session found for callback after retries');
-      }
 
       // Generate the same redirect URI that was used for initiation
       const redirectUri = `${window.location.origin}/auth/amazon/callback`;
