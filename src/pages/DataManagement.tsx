@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import Header from '@/components/Header';
+import DashboardShell from '@/components/DashboardShell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -123,9 +123,8 @@ const DataManagement = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50">
-      <Header />
-      <div className="container mx-auto py-6 px-4 max-w-4xl">
+    <DashboardShell>
+      <div className="container mx-auto py-6 px-4">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Data Management</h1>
           <p className="text-gray-600">
@@ -319,7 +318,7 @@ const DataManagement = () => {
           </Card>
         </div>
       </div>
-    </div>
+    </DashboardShell>
   );
 };
 

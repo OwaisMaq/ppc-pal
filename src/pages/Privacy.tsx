@@ -1,16 +1,19 @@
 
 import React from 'react';
-import Header from '@/components/Header';
+import DashboardShell from '@/components/DashboardShell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { Shield, FileText } from 'lucide-react';
 
 const Privacy = () => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50">
-      <Header />
-      <div className="container mx-auto py-6 px-4 max-w-4xl">
+    <DashboardShell>
+      <div className="container mx-auto py-6 px-4">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Privacy Policy</h1>
+          <div className="flex items-center gap-2 mb-2">
+            <Shield className="h-6 w-6 text-blue-600" />
+            <h1 className="text-3xl font-bold text-gray-900">Privacy Policy</h1>
+          </div>
           <p className="text-gray-600">
             Last updated: {new Date().toLocaleDateString()}
           </p>
@@ -167,7 +170,7 @@ const Privacy = () => {
           </Card>
         </div>
       </div>
-    </div>
+    </DashboardShell>
   );
 };
 

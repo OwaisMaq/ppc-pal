@@ -1,9 +1,9 @@
-import Header from "@/components/Header";
+import DashboardShell from "@/components/DashboardShell";
 import AmazonAccountSetup from "@/components/AmazonAccountSetup";
 import AmsSetup from "@/components/AmsSetup";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Settings as SettingsIcon } from "lucide-react";
+import { RefreshCw, Settings as SettingsIcon, Info } from "lucide-react";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { useEffect } from "react";
 
@@ -24,37 +24,61 @@ const Settings = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50">
-      <Header />
-      <main className="container mx-auto py-6 px-4">
-        <header className="mb-8 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <SettingsIcon className="h-5 w-5 text-blue-600" />
-            <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
+    <DashboardShell>
+      <div className="container mx-auto py-6 px-4">
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              Settings
+            </h1>
+            <p className="text-gray-600">
+              Manage your Amazon connections and account preferences
+            </p>
           </div>
           <Button onClick={refreshConnections} variant="outline" disabled={loading} className="flex items-center gap-2">
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh Connections
           </Button>
-        </header>
+        </div>
 
-        <section className="grid lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            <AmazonAccountSetup />
-            <AmsSetup />
+        <div className="space-y-6">
+          {/* Amazon Connections Section */}
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <SettingsIcon className="h-5 w-5 text-blue-600" />
+              <h2 className="text-xl font-semibold">Amazon Connections</h2>
+            </div>
+            <div className="grid lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 space-y-6">
+                <AmazonAccountSetup />
+                <AmsSetup />
+              </div>
+              <aside>
+                <Card className="border-blue-200 bg-blue-50">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-blue-800">
+                      <Info className="h-4 w-4" />
+                      Connection Status
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-sm">
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Active Connections</span>
+                        <span className="font-semibold">{connections.length}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-3">
+                        Manage connection status, re-authenticate, and configure data sync from this panel.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </aside>
+            </div>
           </div>
-          <aside>
-            <Card className="border-blue-200 bg-blue-50">
-              <CardContent className="pt-6 text-sm">
-                <p className="mb-2"><strong>Debug Info</strong></p>
-                <p>Connections: {connections.length}</p>
-                <p className="mt-1 text-muted-foreground">Manage connection status, re-auth, and sync from here.</p>
-              </CardContent>
-            </Card>
-          </aside>
-        </section>
-      </main>
-    </div>
+        </div>
+      </div>
+    </DashboardShell>
   );
 };
 

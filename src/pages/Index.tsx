@@ -1,5 +1,5 @@
 
-import Header from "@/components/Header";
+import DashboardShell from "@/components/DashboardShell";
 import HeroSection from "@/components/HeroSection";
 import ProcessingProgress from "@/components/ProcessingProgress";
 import UploadSection from "@/components/UploadSection";
@@ -35,9 +35,16 @@ const Index = () => {
   } = useOptimization();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50">
-      <Header />
+    <DashboardShell>
       <div className="container mx-auto py-6 px-4">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            File Upload & Optimization
+          </h1>
+          <p className="text-gray-600">
+            Upload your Amazon advertising data files and optimize campaigns with AI
+          </p>
+        </div>
         <HeroSection 
           uploadedData={uploadedData}
           optimizedData={optimizedData}
@@ -180,7 +187,7 @@ const Index = () => {
           </div>
         </div>
       </div>
-    </div>
+    </DashboardShell>
   );
 };
 

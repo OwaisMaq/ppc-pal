@@ -1,9 +1,10 @@
 
 import React, { useState } from 'react';
-import Header from '@/components/Header';
+import DashboardShell from '@/components/DashboardShell';
 import FeedbackForm from '@/components/FeedbackForm';
 import FeedbackList from '@/components/FeedbackList';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { MessageSquare } from 'lucide-react';
 
 const Feedback = () => {
   const [activeTab, setActiveTab] = useState('submit');
@@ -13,11 +14,13 @@ const Feedback = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50">
-      <Header />
+    <DashboardShell>
       <div className="container mx-auto py-6 px-4">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Feedback</h1>
+          <div className="flex items-center gap-2 mb-2">
+            <MessageSquare className="h-6 w-6 text-blue-600" />
+            <h1 className="text-3xl font-bold text-gray-900">Feedback</h1>
+          </div>
           <p className="text-gray-600">
             Help us improve PPC Pal by sharing your thoughts, reporting issues, or suggesting new features.
           </p>
@@ -40,7 +43,7 @@ const Feedback = () => {
           </Tabs>
         </div>
       </div>
-    </div>
+    </DashboardShell>
   );
 };
 
