@@ -11,7 +11,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton
 } from "@/components/ui/sidebar";
-import { Bot, LayoutDashboard, Database, BarChart3, Settings, Shield } from "lucide-react";
+import { Bot, LayoutDashboard, Database, Settings, Shield } from "lucide-react";
 
 export function AppSidebar() {
   const location = useLocation();
@@ -19,7 +19,6 @@ export function AppSidebar() {
   const items = [
     { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
     { title: "Data", url: "/data-management", icon: Database },
-    { title: "Breakdown", url: "/breakdown", icon: BarChart3 },
     { title: "Settings", url: "/settings", icon: Settings },
     { title: "Privacy", url: "/privacy", icon: Shield },
   ];
