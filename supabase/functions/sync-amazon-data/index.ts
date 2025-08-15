@@ -146,11 +146,12 @@ async function createReportRequest(
  
    // Apply entity filtering unless explicitly skipped
    if (!opts?.skipEntityFilter && entityIds && entityIds.length > 0) {
-     const filterField = reportType === 'campaigns' ? 'campaignId'
-                      : reportType === 'adGroups' ? 'adGroupId'
-                      : reportType === 'keywords' ? 'keywordId'
-                      : reportType === 'targets' ? 'targetId'
-                      : 'campaignId'
+      const filterField = reportType === 'campaigns' ? 'campaignId'
+                       : reportType === 'adGroups' ? 'adGroupId'
+                       : reportType === 'keywords' ? 'keywordId'
+                       : reportType === 'targets' ? 'targetId'
+                       : reportType === 'advertisedProducts' ? 'adGroupId'
+                       : 'campaignId'
       
       payload.filters = [{ field: filterField, operator: 'IN', values: entityIds }]
    }
