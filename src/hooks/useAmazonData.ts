@@ -149,7 +149,7 @@ const [loading, setLoading] = useState(false);
     }
   };
 
-  const syncAllData = async (connectionId: string, options?: { dateRangeDays?: number; diagnosticMode?: boolean }) => {
+  const syncAllData = async (connectionId: string, options?: { dateRangeDays?: number; diagnosticMode?: boolean; timeUnit?: 'DAILY' | 'SUMMARY' }) => {
     setLoading(true);
     try {
       console.log('Starting sync for connection:', connectionId, 'user:', user?.id);
