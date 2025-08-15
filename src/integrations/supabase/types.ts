@@ -718,6 +718,7 @@ export type Database = {
           acos_14d: number | null
           acos_7d: number | null
           amazon_campaign_id: string
+          asin: string | null
           attributed_conversions_14d: number | null
           attributed_conversions_1d: number | null
           attributed_conversions_30d: number | null
@@ -769,6 +770,7 @@ export type Database = {
           acos_14d?: number | null
           acos_7d?: number | null
           amazon_campaign_id: string
+          asin?: string | null
           attributed_conversions_14d?: number | null
           attributed_conversions_1d?: number | null
           attributed_conversions_30d?: number | null
@@ -820,6 +822,7 @@ export type Database = {
           acos_14d?: number | null
           acos_7d?: number | null
           amazon_campaign_id?: string
+          asin?: string | null
           attributed_conversions_14d?: number | null
           attributed_conversions_1d?: number | null
           attributed_conversions_30d?: number | null
@@ -1142,6 +1145,7 @@ export type Database = {
           acos_7d: number | null
           adgroup_id: string
           amazon_keyword_id: string
+          asin: string | null
           bid: number | null
           clicks: number | null
           clicks_14d: number | null
@@ -1183,6 +1187,7 @@ export type Database = {
           acos_7d?: number | null
           adgroup_id: string
           amazon_keyword_id: string
+          asin?: string | null
           bid?: number | null
           clicks?: number | null
           clicks_14d?: number | null
@@ -1224,6 +1229,7 @@ export type Database = {
           acos_7d?: number | null
           adgroup_id?: string
           amazon_keyword_id?: string
+          asin?: string | null
           bid?: number | null
           clicks?: number | null
           clicks_14d?: number | null
@@ -1577,6 +1583,7 @@ export type Database = {
           acos_7d: number | null
           adgroup_id: string
           amazon_target_id: string
+          asin: string | null
           bid: number | null
           clicks: number | null
           clicks_14d: number | null
@@ -1618,6 +1625,7 @@ export type Database = {
           acos_7d?: number | null
           adgroup_id: string
           amazon_target_id: string
+          asin?: string | null
           bid?: number | null
           clicks?: number | null
           clicks_14d?: number | null
@@ -1659,6 +1667,7 @@ export type Database = {
           acos_7d?: number | null
           adgroup_id?: string
           amazon_target_id?: string
+          asin?: string | null
           bid?: number | null
           clicks?: number | null
           clicks_14d?: number | null

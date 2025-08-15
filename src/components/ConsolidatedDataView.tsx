@@ -26,7 +26,11 @@ const formatNumber = (value: number) => {
   return new Intl.NumberFormat('en-US').format(value);
 };
 
-const ConsolidatedDataView = () => {
+interface ConsolidatedDataViewProps {
+  selectedASIN?: string | null;
+}
+
+const ConsolidatedDataView = ({ selectedASIN }: ConsolidatedDataViewProps) => {
   const { campaigns, adGroups, keywords, targets, loading, syncAllData, lastSyncDiagnostics } = useAmazonData();
   const { connections } = useAmazonConnections();
   const [expandedCampaigns, setExpandedCampaigns] = useState<Set<string>>(new Set());
@@ -123,7 +127,24 @@ const ConsolidatedDataView = () => {
           </div>
         ) : (
           <div className="space-y-2">
-            {campaigns.map((campaign) => {
+            {campaigns
+              .filter(campaign => {
+                if (!selectedASIN) return true;
+                
+                // Check if campaign has the selected ASIN
+                if ((campaign as any).asin === selectedASIN) return true;
+                
+                // Check if any ad groups in this campaign have keywords/targets with the selected ASIN
+                const campaignAdGroups = getCampaignAdGroups(campaign.id);
+                return campaignAdGroups.some(adGroup => {
+                  const adGroupKeywords = getAdGroupKeywords(adGroup.id);
+                  const adGroupTargets = getAdGroupTargets(adGroup.id);
+                  
+                  return adGroupKeywords.some(keyword => (keyword as any).asin === selectedASIN) ||
+                         adGroupTargets.some(target => (target as any).asin === selectedASIN);
+                });
+              })
+              .map((campaign) => {
               const campaignAdGroups = getCampaignAdGroups(campaign.id);
               const isExpanded = expandedCampaigns.has(campaign.id);
               
@@ -176,7 +197,17 @@ const ConsolidatedDataView = () => {
                           No ad groups found for this campaign
                         </div>
                       ) : (
-                        campaignAdGroups.map((adGroup) => {
+                        campaignAdGroups
+                          .filter(adGroup => {
+                            if (!selectedASIN) return true;
+                            
+                            const adGroupKeywords = getAdGroupKeywords(adGroup.id);
+                            const adGroupTargets = getAdGroupTargets(adGroup.id);
+                            
+                            return adGroupKeywords.some(keyword => (keyword as any).asin === selectedASIN) ||
+                                   adGroupTargets.some(target => (target as any).asin === selectedASIN);
+                          })
+                          .map((adGroup) => {
                           const adGroupKeywords = getAdGroupKeywords(adGroup.id);
                           const adGroupTargets = getAdGroupTargets(adGroup.id);
                           const isAdGroupExpanded = expandedAdGroups.has(adGroup.id);
@@ -231,7 +262,9 @@ const ConsolidatedDataView = () => {
                                       No keywords found for this ad group
                                     </div>
                                   ) : (
-                                    adGroupKeywords.map((keyword) => (
+                                    adGroupKeywords
+                                      .filter(keyword => !selectedASIN || (keyword as any).asin === selectedASIN)
+                                      .map((keyword) => (
                                       <div 
                                         key={keyword.id} 
                                         className="flex items-center justify-between p-2 border rounded-sm bg-background"
@@ -240,20 +273,25 @@ const ConsolidatedDataView = () => {
                                           <KeyRound className="h-3 w-3 text-orange-600" />
                                           <div>
                                             <span className="text-xs font-medium">{keyword.keyword_text}</span>
-                                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                              <Badge variant="outline" className="text-xs py-0 px-1">
-                                                {keyword.match_type}
-                                              </Badge>
-                                              <Badge 
-                                                variant={keyword.status === 'enabled' ? 'default' : 'secondary'}
-                                                className="text-xs py-0 px-1"
-                                              >
-                                                {keyword.status}
-                                              </Badge>
-                                              {keyword.bid && (
-                                                <span>Bid: {formatCurrency(keyword.bid)}</span>
-                                              )}
-                                            </div>
+                                             <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                               <Badge variant="outline" className="text-xs py-0 px-1">
+                                                 {keyword.match_type}
+                                               </Badge>
+                                               <Badge 
+                                                 variant={keyword.status === 'enabled' ? 'default' : 'secondary'}
+                                                 className="text-xs py-0 px-1"
+                                               >
+                                                 {keyword.status}
+                                               </Badge>
+                                               {(keyword as any).asin && (
+                                                 <Badge variant="secondary" className="text-xs py-0 px-1">
+                                                   ASIN: {(keyword as any).asin}
+                                                 </Badge>
+                                               )}
+                                               {keyword.bid && (
+                                                 <span>Bid: {formatCurrency(keyword.bid)}</span>
+                                               )}
+                                             </div>
                                         </div>
                                       </div>
                                       <div className="text-right">
@@ -272,21 +310,28 @@ const ConsolidatedDataView = () => {
                                 )}
 
                                 {/* Targets */}
-                                {adGroupTargets.length > 0 && (
-                                  <div className="space-y-1 pt-1">
-                                    {adGroupTargets.map((t) => (
+                                 {adGroupTargets.length > 0 && (
+                                   <div className="space-y-1 pt-1">
+                                     {adGroupTargets
+                                       .filter(target => !selectedASIN || (target as any).asin === selectedASIN)
+                                       .map((t) => (
                                       <div key={t.id} className="flex items-center justify-between p-2 border rounded-sm bg-background">
                                         <div className="flex items-center gap-2">
                                           <Target className="h-3 w-3 text-green-600" />
                                           <div>
                                             <span className="text-xs font-medium">{t.type || 'target'}</span>
-                                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                              <Badge variant="outline" className="text-xs py-0 px-1">{t.status}</Badge>
-                                              {t.bid && <span>Bid: {formatCurrency(t.bid)}</span>}
-                                              {t.expression && (
-                                                <span className="truncate max-w-[280px]">{typeof t.expression === 'string' ? t.expression : JSON.stringify(t.expression)}</span>
-                                              )}
-                                            </div>
+                                             <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                               <Badge variant="outline" className="text-xs py-0 px-1">{t.status}</Badge>
+                                               {(t as any).asin && (
+                                                 <Badge variant="secondary" className="text-xs py-0 px-1">
+                                                   ASIN: {(t as any).asin}
+                                                 </Badge>
+                                               )}
+                                               {t.bid && <span>Bid: {formatCurrency(t.bid)}</span>}
+                                               {t.expression && (
+                                                 <span className="truncate max-w-[280px]">{typeof t.expression === 'string' ? t.expression : JSON.stringify(t.expression)}</span>
+                                               )}
+                                             </div>
                                           </div>
                                         </div>
                                         <div className="text-right">

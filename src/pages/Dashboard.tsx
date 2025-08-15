@@ -1,12 +1,15 @@
 import DashboardShell from "@/components/DashboardShell";
 import ConsolidatedDataView from "@/components/ConsolidatedDataView";
+import { ASINFilter } from "@/components/ASINFilter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
+import { useState } from "react";
 const Dashboard = () => {
   const { connections } = useAmazonConnections();
   const hasActiveConnections = connections.some(c => c.status === 'active');
+  const [selectedASIN, setSelectedASIN] = useState<string | null>(null);
   return (
     <DashboardShell>
       <div className="container mx-auto py-6 px-4">
@@ -19,6 +22,19 @@ const Dashboard = () => {
               Monitor and manage your Amazon Advertising campaigns
             </p>
           </div>
+          
+          {/* ASIN Filter */}
+          {hasActiveConnections && (
+            <div className="mt-4">
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium text-muted-foreground">Filter by ASIN:</span>
+                <ASINFilter 
+                  selectedASIN={selectedASIN}
+                  onASINChange={setSelectedASIN}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="space-y-6">
@@ -39,7 +55,7 @@ const Dashboard = () => {
 
           {hasActiveConnections && (
             <div className="lg:col-span-3">
-              <ConsolidatedDataView />
+              <ConsolidatedDataView selectedASIN={selectedASIN} />
             </div>
           )}
         </div>
