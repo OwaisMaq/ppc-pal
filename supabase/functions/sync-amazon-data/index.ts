@@ -791,8 +791,8 @@ serve(async (req) => {
     // Define columns using correct Amazon API v3 column names - FIXED: removed advertisedAsin from campaign/adGroup reports
     const campaignColumns = ['campaignId','impressions','clicks','spend','sales14d','purchases14d']
     const adGroupColumns = ['adGroupId','campaignId','impressions','clicks','spend','sales14d','purchases14d']
-    const targetColumns = ['targetId','adGroupId','campaignId','advertisedAsin','impressions','clicks','spend','sales14d','purchases14d']
-    const keywordColumns = ['keywordId','adGroupId','campaignId','advertisedAsin','keywordText','matchType','impressions','clicks','spend','sales14d','purchases14d']
+    const targetColumns = ['targetId','adGroupId','campaignId','impressions','clicks','spend','sales14d','purchases14d']
+    const keywordColumns = ['keywordId','adGroupId','campaignId','keywordText','matchType','impressions','clicks','spend','sales14d','purchases14d']
 
     // Minimal columns fallback (in case of config errors)
     const minCampaignColumns = ['campaignId','impressions','clicks','spend','sales14d','purchases14d']
@@ -841,17 +841,17 @@ serve(async (req) => {
             .upsert({
               connection_id: connectionId,
               amazon_campaign_id: perf.campaignId.toString(),
-              // FIXED: Removed advertisedAsin as it's not valid for campaign reports
-              impressions, // Write both flat and windowed metrics
+              // CRITICAL FIX: Write to correct database fields that UI expects
+              impressions, // Legacy/default metrics
               clicks,
-              spend,
-              sales: sales14d, // Use 14d as primary
-              orders: orders14d,
+              cost_legacy: spend, // Write spend to cost_legacy (what UI reads)
+              attributed_sales_legacy: sales14d, // Use 14d as primary sales
+              attributed_conversions_legacy: orders14d,
               acos: acos14d,
               roas: roas14d,
-              // 7d metrics
-              sales_7d: sales7d,
-              orders_7d: orders7d,
+              // 7d windowed metrics
+              attributed_sales_7d: sales7d,
+              attributed_conversions_7d: orders7d,
               acos_7d: acos7d,
               roas_7d: roas7d,
               ctr_7d: ctr7d,
@@ -859,10 +859,10 @@ serve(async (req) => {
               conversion_rate_7d: convRate7d,
               clicks_7d: clicks,
               impressions_7d: impressions,
-              spend_7d: spend,
-              // 14d metrics
-              sales_14d: sales14d,
-              orders_14d: orders14d,
+              cost_7d: spend,
+              // 14d windowed metrics
+              attributed_sales_14d: sales14d,
+              attributed_conversions_14d: orders14d,
               acos_14d: acos14d,
               roas_14d: roas14d,
               ctr_14d: ctr14d,
@@ -870,7 +870,7 @@ serve(async (req) => {
               conversion_rate_14d: convRate14d,
               clicks_14d: clicks,
               impressions_14d: impressions,
-              spend_14d: spend,
+              cost_14d: spend,
               last_updated: new Date().toISOString()
             }, { onConflict: 'connection_id, amazon_campaign_id' })
           
@@ -917,7 +917,7 @@ serve(async (req) => {
                 impressions, // FIXED: Write both flat and windowed metrics
                 clicks,
                 spend,
-                sales: sales14d,
+                sales: sales14d, // Keep flat fields for backward compatibility  
                 orders: orders14d,
                 acos: acos14d,
                 roas: roas14d,
@@ -993,7 +993,7 @@ serve(async (req) => {
               impressions,
               clicks,
               spend,
-              sales: sales14d,
+              sales: sales14d, // Keep flat fields for backward compatibility
               orders: orders14d,
               acos: acos14d,
               roas: roas14d,
@@ -1081,7 +1081,7 @@ serve(async (req) => {
                 impressions,
                 clicks,
                 spend,
-                sales: sales14d,
+                sales: sales14d, // Keep flat fields for backward compatibility
                 orders: orders14d,
                 acos: acos14d,
                 roas: roas14d,
@@ -1289,13 +1289,11 @@ serve(async (req) => {
           const convRate7d = clicks > 0 ? (orders7d / clicks) * 100 : 0
           const convRate14d = clicks > 0 ? (orders14d / clicks) * 100 : 0
 
-          // Extract ASIN from target performance data
-          const advertisedAsin = anyPerf.advertisedAsin || null
-
+          // ASIN not available in v3 target reports
           const { data: tgtUpd, error: tgtErr } = await supabase
             .from('targets')
             .update({
-              asin: advertisedAsin,
+              asin: null, // ASIN not available in v3 target reports
               impressions,
               clicks,
               spend,
@@ -1354,13 +1352,13 @@ serve(async (req) => {
                     amazon_target_id: targetId.toString(),
                     type: anyPerf.expressionType ?? null,
                     expression: anyPerf.expression ?? null,
-                    asin: advertisedAsin,
+                    asin: null, // ASIN not available in v3 keyword reports
                     status: 'enabled',
                     bid: null,
                     impressions,
                     clicks,
                     spend,
-                    sales: sales14d,
+                    sales: sales14d, // Keep flat fields for backward compatibility
                     orders: orders14d,
                     acos: acos14d,
                     roas: roas14d,
