@@ -3,7 +3,7 @@ import SubscriptionStatus from "@/components/SubscriptionStatus";
 import AmazonDataDashboard from "@/components/AmazonDataDashboard";
 import ConsolidatedDataView from "@/components/ConsolidatedDataView";
 import { PerformanceMetricCards } from "@/components/PerformanceMetricCards";
-import { CampaignDataTable } from "@/components/CampaignDataTable";
+
 import { WeeklyPerformanceChart } from "@/components/WeeklyPerformanceChart";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { useCampaignMetrics } from "@/hooks/useCampaignMetrics";
@@ -17,7 +17,7 @@ import { DateRangeSelector } from "@/components/DateRangeSelector";
 import { Link } from "react-router-dom";
 import { useAmazonData } from "@/hooks/useAmazonData";
 import { formatDistanceToNow } from "date-fns";
-import { useBudgetUsage } from "@/hooks/useBudgetUsage";
+
 import { useDateRange } from "@/context/DateRangeContext";
 import { DataFreshnessIndicator } from "@/components/DataFreshnessIndicator";
 import { Loader2, RefreshCw, Activity, AlertTriangle, TrendingUp, DollarSign, MousePointer, Eye, Zap, BarChart3 } from "lucide-react";
@@ -115,8 +115,6 @@ const Dashboard = () => {
   const { processStreamData, loading: processLoading } = useAMS();
   const [autoSynced, setAutoSynced] = useState(false);
 
-  const campaignIds = useMemo(() => campaigns.map(c => c.id), [campaigns]);
-  const { data: budgetUsage } = useBudgetUsage(campaignIds);
   
   // Check if AMS aggregation is needed (data older than 90 minutes)
   const needsAggregation = useMemo(() => {
@@ -327,8 +325,6 @@ const Dashboard = () => {
                 </Card>
               </div>
 
-              {/* Campaign Data Table */}
-              <CampaignDataTable campaigns={campaigns} loading={loading} budgetUsage={budgetUsage} />
 
               {/* Consolidated Data View - Full Width */}
               <div className="lg:col-span-3">
