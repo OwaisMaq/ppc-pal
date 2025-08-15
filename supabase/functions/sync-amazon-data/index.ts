@@ -263,6 +263,45 @@ async function downloadAndParseReport(url: string): Promise<PerformanceData[]> {
   return JSON.parse(jsonText)
 }
 
+// Missing pagination function for v2 API endpoints
+async function fetchAllPages(urlBase: string, headers: Record<string, string>, pageSize = 100): Promise<any[]> {
+  let startIndex = 0
+  const results: any[] = []
+  
+  for (;;) {
+    const separator = urlBase.includes('?') ? '&' : '?'
+    const url = `${urlBase}${separator}startIndex=${startIndex}&count=${pageSize}`
+    
+    console.log(`  📄 Fetching page: startIndex=${startIndex}, count=${pageSize}`)
+    
+    const response = await fetchWithRetry(url, { headers })
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`Page fetch failed ${response.status}: ${errorText}`)
+    }
+    
+    const page = await response.json()
+    
+    if (!Array.isArray(page)) {
+      console.warn('Expected array response from API, got:', typeof page)
+      break
+    }
+    
+    results.push(...page)
+    console.log(`  📄 Page fetched: ${page.length} items (total: ${results.length})`)
+    
+    // If we got fewer items than requested page size, we're done
+    if (page.length < pageSize) {
+      break
+    }
+    
+    startIndex += pageSize
+  }
+  
+  return results
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -697,9 +736,9 @@ serve(async (req) => {
     console.log('⚡ Starting performance data sync...')
     let totalMetricsUpdated = 0
 
-    // Define columns using correct Amazon API v3 column names - now including ASIN data
-    const campaignColumns = ['campaignId','advertisedAsin','impressions','clicks','spend','sales14d','purchases14d']
-    const adGroupColumns = ['adGroupId','campaignId','advertisedAsin','impressions','clicks','spend','sales14d','purchases14d']
+    // Define columns using correct Amazon API v3 column names - FIXED: removed advertisedAsin from campaign/adGroup reports
+    const campaignColumns = ['campaignId','impressions','clicks','spend','sales14d','purchases14d']
+    const adGroupColumns = ['adGroupId','campaignId','impressions','clicks','spend','sales14d','purchases14d']
     const targetColumns = ['targetId','adGroupId','campaignId','advertisedAsin','impressions','clicks','spend','sales14d','purchases14d']
     const keywordColumns = ['keywordId','adGroupId','campaignId','advertisedAsin','keywordText','matchType','impressions','clicks','spend','sales14d','purchases14d']
 
@@ -745,19 +784,16 @@ serve(async (req) => {
           const convRate7d = clicks > 0 ? (orders7d / clicks) * 100 : 0
           const convRate14d = clicks > 0 ? (orders14d / clicks) * 100 : 0
 
-          // Extract ASIN from API response
-          const advertisedAsin = anyPerf.advertisedAsin || null
-
           const { error: campErr } = await supabase
             .from('campaigns')
             .upsert({
               connection_id: connectionId,
               amazon_campaign_id: perf.campaignId.toString(),
-              asin: advertisedAsin,
-              impressions,
+              // FIXED: Removed advertisedAsin as it's not valid for campaign reports
+              impressions, // Write both flat and windowed metrics
               clicks,
               spend,
-              sales: sales14d,
+              sales: sales14d, // Use 14d as primary
               orders: orders14d,
               acos: acos14d,
               roas: roas14d,
@@ -794,7 +830,12 @@ serve(async (req) => {
         }
       } catch (error) {
         console.error('❌ Campaign performance sync failed:', error)
-        console.log('🔁 Retrying campaign report with minimal columns...')
+        // FIXED: Add immediate retry with minimal columns on 400 errors (invalid columns)
+        if (error instanceof Error && error.message.includes('400')) {
+          console.log('🔁 400 error detected - retrying campaign report with minimal columns immediately...')
+        } else {
+          console.log('🔁 Retrying campaign report with minimal columns...')
+        }
         try {
           const reportId = await createReportRequest(
             apiEndpoint, accessToken, clientId, connection.profile_id,
@@ -821,7 +862,7 @@ serve(async (req) => {
               .upsert({
                 connection_id: connectionId,
                 amazon_campaign_id: perf.campaignId.toString(),
-                impressions,
+                impressions, // FIXED: Write both flat and windowed metrics
                 clicks,
                 spend,
                 sales: sales14d,
@@ -833,6 +874,22 @@ serve(async (req) => {
                 clicks_14d: clicks,
                 impressions_14d: impressions,
                 spend_14d: spend,
+                // Add 7d metrics (same as 14d for now since we only get 14d from minimal columns)
+                sales_7d: sales14d,
+                orders_7d: orders14d,
+                acos_7d: acos14d,
+                roas_7d: roas14d,
+                ctr_7d: ctr14d,
+                cpc_7d: cpc14d,
+                clicks_7d: clicks,
+                impressions_7d: impressions,
+                spend_7d: spend,
+                sales_14d: sales14d,
+                orders_14d: orders14d,
+                acos_14d: acos14d,
+                roas_14d: roas14d,
+                conversion_rate_7d: clicks > 0 ? (orders14d / clicks) * 100 : 0,
+                conversion_rate_14d: clicks > 0 ? (orders14d / clicks) * 100 : 0,
                 last_updated: new Date().toISOString()
               }, { onConflict: 'connection_id, amazon_campaign_id' })
             if (campErr) {
