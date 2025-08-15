@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.12 (cd3cf9e)"
@@ -1900,16 +1900,16 @@ export type Database = {
         Returns: boolean
       }
       create_optimization_batch: {
-        Args: { user_uuid: string; connection_uuid: string }
+        Args: { connection_uuid: string; user_uuid: string }
         Returns: string
       }
       get_ams_data_freshness: {
         Args: { connection_uuid: string }
         Returns: {
-          last_traffic_message: string
-          last_conversion_message: string
-          messages_24h: number
           data_age_hours: number
+          last_conversion_message: string
+          last_traffic_message: string
+          messages_24h: number
         }[]
       }
       grant_admin_role_by_email: {
@@ -1918,8 +1918,8 @@ export type Database = {
       }
       has_role: {
         Args: {
-          user_uuid: string
           role_name: Database["public"]["Enums"]["app_role"]
+          user_uuid: string
         }
         Returns: boolean
       }
