@@ -114,18 +114,35 @@ async function createReportRequest(
    const endDateStr = opts?.endDate || endDate.toISOString().split('T')[0]
    const startDateStr = opts?.startDate || new Date(endDate.getTime() - dateRangeDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
  
-   const payload: any = {
-     name: `${reportType}_${Date.now()}`,
-     startDate: startDateStr,
-     endDate: endDateStr,
-     configuration: {
-       adProduct: 'SPONSORED_PRODUCTS',
-       columns: columns,
-       reportTypeId: reportType.toUpperCase(),
-       timeUnit: timeUnit,
-       format: 'GZIP_JSON'
-     }
-   }
+  // Fix: correct reportTypeId mapping for v3 API
+  const reportTypeId = (() => {
+    switch (reportType) {
+      case 'campaigns': return 'spCampaigns'
+      case 'adGroups': return 'spAdGroups'
+      case 'targets': return 'spTargeting'
+      case 'keywords': return 'spKeywords'
+      case 'advertisedProducts': return 'spAdvertisedProduct'
+      default: throw new Error(`Unknown reportType: ${reportType}`)
+    }
+  })()
+
+  const payload: any = {
+    name: `${reportType}_${Date.now()}`,
+    startDate: startDateStr,
+    endDate: endDateStr,
+    configuration: {
+      adProduct: 'SPONSORED_PRODUCTS',
+      columns: columns,
+      reportTypeId,
+      timeUnit: timeUnit,
+      format: 'GZIP_JSON'
+    }
+  }
+
+  // If DAILY, include the 'date' column so we can insert time-series rows
+  if (timeUnit === 'DAILY' && !payload.configuration.columns.includes('date')) {
+    payload.configuration.columns = ['date', ...payload.configuration.columns]
+  }
  
    // Apply entity filtering unless explicitly skipped
    if (!opts?.skipEntityFilter && entityIds && entityIds.length > 0) {
