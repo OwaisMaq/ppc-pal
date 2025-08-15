@@ -122,9 +122,13 @@ async function createReportRequest(
 
    const requestedRange = opts?.dateRangeDays ?? 30
    const dateRangeDays = Math.min(requestedRange, 30)  // Amazon API has 31-day limit for most reports
-   // Allow explicit window override for chunking
-   const endDateStr = opts?.endDate || new Date().toISOString().split('T')[0]
-   const startDateStr = opts?.startDate || new Date(Date.now() - dateRangeDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+   // For daily reports, end yesterday to avoid attribution issues
+   const today = new Date()
+   const endDate = opts?.timeUnit === 'DAILY' ? 
+     new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1) : 
+     today
+   const endDateStr = opts?.endDate || endDate.toISOString().split('T')[0]
+   const startDateStr = opts?.startDate || new Date(endDate.getTime() - dateRangeDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
  
    const payload: any = {
      name: `${reportType}_${Date.now()}`,
@@ -133,11 +137,11 @@ async function createReportRequest(
      configuration: {
        adProduct: 'SPONSORED_PRODUCTS',
        groupBy,
-       columns,
-       reportTypeId,
-       timeUnit: opts?.timeUnit ?? 'SUMMARY',
-       format: 'GZIP_JSON'
-     }
+        columns: opts?.timeUnit === 'DAILY' && !columns.includes('date') ? ['date', ...columns] : columns,
+        reportTypeId,
+        timeUnit: opts?.timeUnit ?? 'SUMMARY',
+        format: 'GZIP_JSON'
+      }
    }
 
   // v3 filtering uses top-level filters with field names
@@ -878,6 +882,28 @@ serve(async (req) => {
             diagnostics.writeErrors.push({ entity: 'campaign', id: perf.campaignId?.toString?.(), error: campErr.message })
           } else {
             totalMetricsUpdated++
+            
+            // If DAILY, also insert into performance history
+            if (timeUnitOpt === 'DAILY' && anyPerf.date) {
+              const campaign = campaignMap.get(perf.campaignId.toString())
+              if (campaign) {
+                await supabase.from('campaign_performance_history').upsert({
+                  campaign_id: campaign.id,
+                  date: anyPerf.date,
+                  attribution_window: '14d',
+                  impressions,
+                  clicks,
+                  spend,
+                  sales: sales14d,
+                  orders: orders14d,
+                  ctr: ctr14d,
+                  cpc: cpc14d,
+                  conversion_rate: convRate14d,
+                  acos: acos14d,
+                  roas: roas14d,
+                }, { onConflict: 'campaign_id,date,attribution_window' })
+              }
+            }
           }
         }
       } catch (error) {

@@ -41,7 +41,7 @@ const ConsolidatedDataView = ({ selectedASIN }: ConsolidatedDataViewProps) => {
 
   const handleSyncAll = async () => {
     for (const connection of activeConnections) {
-      await syncAllData(connection.id, { dateRangeDays: 30 }); // Default to last 30 days to avoid attribution delay
+      await syncAllData(connection.id, { dateRangeDays: 30, timeUnit: 'DAILY' });
     }
   };
 
