@@ -600,6 +600,33 @@ export type Database = {
         }
         Relationships: []
       }
+      asin_labels: {
+        Row: {
+          asin: string
+          created_at: string
+          id: string
+          label: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          asin: string
+          created_at?: string
+          id?: string
+          label: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          asin?: string
+          created_at?: string
+          id?: string
+          label?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       campaign_budget_usage: {
         Row: {
           budget_amount: number | null
@@ -1928,6 +1955,10 @@ export type Database = {
       }
       create_optimization_batch: {
         Args: { connection_uuid: string; user_uuid: string }
+        Returns: string
+      }
+      extract_asin_from_name: {
+        Args: { campaign_name: string }
         Returns: string
       }
       get_ams_data_freshness: {

@@ -1,9 +1,10 @@
 import DashboardShell from "@/components/DashboardShell";
 import AmazonAccountSetup from "@/components/AmazonAccountSetup";
 import AmsSetup from "@/components/AmsSetup";
+import { ASINLabelManager } from "@/components/ASINLabelManager";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Settings as SettingsIcon, Info } from "lucide-react";
+import { RefreshCw, Settings as SettingsIcon, Info, Tag } from "lucide-react";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { useEffect } from "react";
 
@@ -75,6 +76,15 @@ const Settings = () => {
                 </Card>
               </aside>
             </div>
+          </div>
+
+          {/* ASIN Labels Section */}
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <Tag className="h-5 w-5 text-green-600" />
+              <h2 className="text-xl font-semibold">ASIN Labels</h2>
+            </div>
+            <ASINLabelManager />
           </div>
         </div>
       </div>

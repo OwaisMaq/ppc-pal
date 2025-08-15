@@ -38,14 +38,11 @@ export const ASINFilter = ({ selectedASIN, onASINChange, className = "w-64" }: A
         {asins.map((asinInfo) => (
           <SelectItem key={asinInfo.asin} value={asinInfo.asin}>
             <div className="flex items-center gap-2">
-              <span>{asinInfo.asin}</span>
-              <div className="flex gap-1">
-                {asinInfo.sources.map(source => (
-                  <Badge key={source} variant="outline" className="text-xs">
-                    {source === 'campaigns' ? 'C' : source === 'targets' ? 'T' : 'K'}
-                  </Badge>
-                ))}
-              </div>
+              {asinInfo.label ? (
+                <span>{asinInfo.label} ({asinInfo.asin})</span>
+              ) : (
+                <span>{asinInfo.asin}</span>
+              )}
             </div>
           </SelectItem>
         ))}

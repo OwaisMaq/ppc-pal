@@ -1,14 +1,16 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useASINLabels } from "@/hooks/useASINLabels";
 
 export interface ASINInfo {
   asin: string;
-  sources: string[]; // Which tables the ASIN appears in (campaigns, targets, keywords)
+  label?: string; // Custom user-defined label for the ASIN
 }
 
 export const useASINs = () => {
   const { user } = useAuth();
+  const { labels } = useASINLabels();
   const [asins, setAsins] = useState<ASINInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,39 +47,34 @@ export const useASINs = () => {
       if (keywordError) throw keywordError;
 
       // Combine and deduplicate ASINs
-      const asinMap = new Map<string, Set<string>>();
+      const asinSet = new Set<string>();
 
       campaignASINs?.forEach(item => {
         if (item.asin) {
-          if (!asinMap.has(item.asin)) {
-            asinMap.set(item.asin, new Set());
-          }
-          asinMap.get(item.asin)!.add('campaigns');
+          asinSet.add(item.asin);
         }
       });
 
       targetASINs?.forEach(item => {
         if (item.asin) {
-          if (!asinMap.has(item.asin)) {
-            asinMap.set(item.asin, new Set());
-          }
-          asinMap.get(item.asin)!.add('targets');
+          asinSet.add(item.asin);
         }
       });
 
       keywordASINs?.forEach(item => {
         if (item.asin) {
-          if (!asinMap.has(item.asin)) {
-            asinMap.set(item.asin, new Set());
-          }
-          asinMap.get(item.asin)!.add('keywords');
+          asinSet.add(item.asin);
         }
       });
 
-      const asinList: ASINInfo[] = Array.from(asinMap.entries()).map(([asin, sources]) => ({
-        asin,
-        sources: Array.from(sources)
-      }));
+      // Create ASIN list with labels
+      const asinList: ASINInfo[] = Array.from(asinSet).map(asin => {
+        const labelInfo = labels.find(l => l.asin === asin);
+        return {
+          asin,
+          label: labelInfo?.label
+        };
+      });
 
       asinList.sort((a, b) => a.asin.localeCompare(b.asin));
       setAsins(asinList);
@@ -91,7 +88,7 @@ export const useASINs = () => {
 
   useEffect(() => {
     fetchASINs();
-  }, [user]);
+  }, [user, labels]);
 
   return {
     asins,
