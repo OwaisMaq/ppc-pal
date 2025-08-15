@@ -22,7 +22,7 @@ export const useAmazonConnections = () => {
       setLoading(true);
       console.log('Fetching Amazon connections...');
       const { data, error } = await supabase
-        .from('amazon_connections_client' as any)
+        .from('amazon_connections')
         .select(`
           id,
           user_id,
@@ -41,7 +41,7 @@ export const useAmazonConnections = () => {
           health_status,
           health_issues
         `)
-        .eq('user_id', user.id)  // Explicitly filter by current user ID
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
