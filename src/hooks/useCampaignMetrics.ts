@@ -100,7 +100,7 @@ export const useCampaignMetrics = (connectionId?: string) => {
         roas,
         ctr,
         conversionRate,
-        campaignCount: campaigns.length,
+        campaignCount: campaignsWithLegacyFields.length,
       });
 
     } catch (err) {

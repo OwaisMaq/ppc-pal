@@ -1408,7 +1408,7 @@ serve(async (req) => {
                     const campaign = campaignMap.get(usageEntry.campaignId.toString())
                     if (campaign) {
                       // Store budget usage data
-                      await supabase
+                      const { error: budgetError } = await supabase
                         .from('campaign_budget_usage')
                         .upsert({
                           campaign_id: campaign.id,
@@ -1422,8 +1422,6 @@ serve(async (req) => {
                           onConflict: 'campaign_id,date,period_type',
                           ignoreDuplicates: false
                         })
-
-                      const { error: budgetError } = result
                       if (budgetError) {
                         console.error(`Failed to store budget usage for campaign ${campaign.id}:`, budgetError)
                       }
