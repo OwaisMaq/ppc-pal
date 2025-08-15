@@ -1,6 +1,6 @@
 import DashboardShell from "@/components/DashboardShell";
 import SubscriptionStatus from "@/components/SubscriptionStatus";
-import AmazonDataDashboard from "@/components/AmazonDataDashboard";
+
 import ConsolidatedDataView from "@/components/ConsolidatedDataView";
 import { PerformanceMetricCards } from "@/components/PerformanceMetricCards";
 
@@ -329,10 +329,6 @@ const Dashboard = () => {
                 <ConsolidatedDataView />
               </div>
 
-              {/* Amazon Data Dashboard - Full Width */}
-              <div className="lg:col-span-3">
-                <AmazonDataDashboard />
-              </div>
 
             </>
           )}
