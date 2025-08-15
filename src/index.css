@@ -24,8 +24,21 @@
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 214 84% 56%;
+    --accent-foreground: 210 40% 98%;
+
+    /* Professional accent colors for subtle highlights */
+    --accent-blue: 214 84% 56%;
+    --accent-blue-foreground: 210 40% 98%;
+    
+    --accent-emerald: 158 64% 52%;
+    --accent-emerald-foreground: 210 40% 98%;
+    
+    --accent-amber: 38 92% 50%;
+    --accent-amber-foreground: 222.2 47.4% 11.2%;
+    
+    --accent-purple: 262 52% 47%;
+    --accent-purple-foreground: 210 40% 98%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
@@ -85,8 +98,21 @@
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
 
-    --accent: 217.2 32.6% 17.5%;
+    --accent: 214 84% 56%;
     --accent-foreground: 210 40% 98%;
+
+    /* Professional accent colors for dark mode */
+    --accent-blue: 214 84% 56%;
+    --accent-blue-foreground: 210 40% 98%;
+    
+    --accent-emerald: 158 64% 52%;
+    --accent-emerald-foreground: 210 40% 98%;
+    
+    --accent-amber: 38 92% 50%;
+    --accent-amber-foreground: 222.2 47.4% 11.2%;
+    
+    --accent-purple: 262 52% 47%;
+    --accent-purple-foreground: 210 40% 98%;
 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;

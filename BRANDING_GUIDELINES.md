@@ -34,6 +34,15 @@ PPC Pal embodies clean, minimalistic, and modern design principles. Our interfac
 --secondary-foreground: 222.2 47.4% 11.2%;
 ```
 
+### Professional Accent Colors
+```css
+--accent: 214 84% 56%;                  /* Clean blue - primary accent */
+--accent-blue: 214 84% 56%;             /* Professional blue */
+--accent-emerald: 158 64% 52%;          /* Success green */
+--accent-amber: 38 92% 50%;             /* Warning amber */
+--accent-purple: 262 52% 47%;           /* Secondary accent purple */
+```
+
 ### Neutral Colors
 ```css
 --background: 0 0% 100%;                /* Pure white background */

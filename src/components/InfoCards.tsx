@@ -8,19 +8,19 @@ const InfoCards = () => {
       icon: Upload,
       title: "1. Upload Data",
       description: "Upload your Amazon advertising Excel workbook",
-      color: "text-blue-600"
+      color: "text-accent-blue"
     },
     {
       icon: BarChart3,
       title: "2. Performance Analysis",
       description: "Analyze campaign performance and identify optimization opportunities",
-      color: "text-yellow-600"
+      color: "text-accent-amber"
     },
     {
       icon: Download,
       title: "3. Download Results",
       description: "Get your optimized data in Excel format",
-      color: "text-green-600"
+      color: "text-accent-emerald"
     }
   ];
 
@@ -31,7 +31,7 @@ const InfoCards = () => {
           <CardContent className="p-0 flex flex-col items-center justify-center">
             <card.icon className={`h-6 w-6 ${card.color} mb-1`} />
             <h3 className="font-semibold text-xs mb-1">{card.title}</h3>
-            <p className="text-xs text-gray-600 leading-tight">{card.description}</p>
+            <p className="text-xs text-muted-foreground leading-tight">{card.description}</p>
           </CardContent>
         </Card>
       ))}

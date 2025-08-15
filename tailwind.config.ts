@@ -42,7 +42,15 @@ export default {
                 },
                 accent: {
                     DEFAULT: 'hsl(var(--accent))',
-                    foreground: 'hsl(var(--accent-foreground))'
+                    foreground: 'hsl(var(--accent-foreground))',
+                    blue: 'hsl(var(--accent-blue))',
+                    'blue-foreground': 'hsl(var(--accent-blue-foreground))',
+                    emerald: 'hsl(var(--accent-emerald))',
+                    'emerald-foreground': 'hsl(var(--accent-emerald-foreground))',
+                    amber: 'hsl(var(--accent-amber))',
+                    'amber-foreground': 'hsl(var(--accent-amber-foreground))',
+                    purple: 'hsl(var(--accent-purple))',
+                    'purple-foreground': 'hsl(var(--accent-purple-foreground))'
                 },
                 popover: {
                     DEFAULT: 'hsl(var(--popover))',
