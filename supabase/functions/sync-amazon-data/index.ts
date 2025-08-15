@@ -615,11 +615,11 @@ serve(async (req) => {
     console.log('⚡ Starting performance data sync...')
     let totalMetricsUpdated = 0
 
-    // Define columns using correct Amazon API v3 column names
-    const campaignColumns = ['campaignId','impressions','clicks','spend','sales14d','purchases14d']
-    const adGroupColumns = ['adGroupId','campaignId','impressions','clicks','spend','sales14d','purchases14d']
-    const targetColumns = ['targetId','adGroupId','campaignId','impressions','clicks','spend','sales14d','purchases14d']
-    const keywordColumns = ['keywordId','adGroupId','campaignId','keywordText','matchType','impressions','clicks','spend','sales14d','purchases14d']
+    // Define columns using correct Amazon API v3 column names - now including ASIN data
+    const campaignColumns = ['campaignId','advertisedAsin','impressions','clicks','spend','sales14d','purchases14d']
+    const adGroupColumns = ['adGroupId','campaignId','advertisedAsin','impressions','clicks','spend','sales14d','purchases14d']
+    const targetColumns = ['targetId','adGroupId','campaignId','advertisedAsin','impressions','clicks','spend','sales14d','purchases14d']
+    const keywordColumns = ['keywordId','adGroupId','campaignId','advertisedAsin','keywordText','matchType','impressions','clicks','spend','sales14d','purchases14d']
 
     // Minimal columns fallback (in case of config errors)
     const minCampaignColumns = ['campaignId','impressions','clicks','spend','sales14d','purchases14d']
@@ -663,11 +663,15 @@ serve(async (req) => {
           const convRate7d = clicks > 0 ? (orders7d / clicks) * 100 : 0
           const convRate14d = clicks > 0 ? (orders14d / clicks) * 100 : 0
 
+          // Extract ASIN from API response
+          const advertisedAsin = anyPerf.advertisedAsin || null
+
           const { error: campErr } = await supabase
             .from('campaigns')
             .upsert({
               connection_id: connectionId,
               amazon_campaign_id: perf.campaignId.toString(),
+              asin: advertisedAsin,
               impressions,
               clicks,
               spend,
@@ -1094,9 +1098,13 @@ serve(async (req) => {
           const convRate7d = clicks > 0 ? (orders7d / clicks) * 100 : 0
           const convRate14d = clicks > 0 ? (orders14d / clicks) * 100 : 0
 
+          // Extract ASIN from target performance data
+          const advertisedAsin = anyPerf.advertisedAsin || null
+
           const { data: tgtUpd, error: tgtErr } = await supabase
             .from('targets')
             .update({
+              asin: advertisedAsin,
               impressions,
               clicks,
               spend,
@@ -1155,6 +1163,7 @@ serve(async (req) => {
                     amazon_target_id: targetId.toString(),
                     type: anyPerf.expressionType ?? null,
                     expression: anyPerf.expression ?? null,
+                    asin: advertisedAsin,
                     status: 'enabled',
                     bid: null,
                     impressions,
@@ -1301,48 +1310,52 @@ serve(async (req) => {
                 .eq('amazon_adgroup_id', agAmazonId)
                 .maybeSingle()
               if (ag?.id) {
-                const { error: upErr } = await supabase
-                  .from('keywords')
-                  .upsert({
-                    adgroup_id: ag.id,
-                    amazon_keyword_id: keywordId.toString(),
-                    keyword_text: anyPerf.keywordText || 'unknown',
-                    match_type: (anyPerf.matchType || 'exact').toLowerCase(),
-                    status: 'enabled',
-                    impressions,
-                    clicks,
-                    spend,
-                    sales: sales14d,
-                    orders: orders14d,
-                    acos: acos14d,
-                    roas: roas14d,
-                    ctr,
-                    cpc,
-                    conversion_rate: convRate14d,
-                    // 7d
-                    sales_7d: sales7d,
-                    orders_7d: orders7d,
-                    acos_7d: acos7d,
-                    roas_7d: roas7d,
-                    ctr_7d: ctr,
-                    cpc_7d: cpc,
-                    conversion_rate_7d: convRate7d,
-                    clicks_7d: clicks,
-                    impressions_7d: impressions,
-                    spend_7d: spend,
-                    // 14d
-                    sales_14d: sales14d,
-                    orders_14d: orders14d,
-                    acos_14d: acos14d,
-                    roas_14d: roas14d,
-                    ctr_14d: ctr,
-                    cpc_14d: cpc,
-                    conversion_rate_14d: convRate14d,
-                    clicks_14d: clicks,
-                    impressions_14d: impressions,
-                    spend_14d: spend,
-                    last_updated: new Date().toISOString()
-                  }, { onConflict: 'adgroup_id, amazon_keyword_id' })
+                  // Extract ASIN from keyword performance data
+                  const advertisedAsin = anyPerf.advertisedAsin || null
+
+                  const { error: upErr } = await supabase
+                    .from('keywords')
+                    .upsert({
+                      adgroup_id: ag.id,
+                      amazon_keyword_id: keywordId.toString(),
+                      keyword_text: anyPerf.keywordText || 'unknown',
+                      match_type: (anyPerf.matchType || 'exact').toLowerCase(),
+                      asin: advertisedAsin,
+                      status: 'enabled',
+                      impressions,
+                      clicks,
+                      spend,
+                      sales: sales14d,
+                      orders: orders14d,
+                      acos: acos14d,
+                      roas: roas14d,
+                      ctr,
+                      cpc,
+                      conversion_rate: convRate14d,
+                      // 7d
+                      sales_7d: sales7d,
+                      orders_7d: orders7d,
+                      acos_7d: acos7d,
+                      roas_7d: roas7d,
+                      ctr_7d: ctr,
+                      cpc_7d: cpc,
+                      conversion_rate_7d: convRate7d,
+                      clicks_7d: clicks,
+                      impressions_7d: impressions,
+                      spend_7d: spend,
+                      // 14d
+                      sales_14d: sales14d,
+                      orders_14d: orders14d,
+                      acos_14d: acos14d,
+                      roas_14d: roas14d,
+                      ctr_14d: ctr,
+                      cpc_14d: cpc,
+                      conversion_rate_14d: convRate14d,
+                      clicks_14d: clicks,
+                      impressions_14d: impressions,
+                      spend_14d: spend,
+                      last_updated: new Date().toISOString()
+                    }, { onConflict: 'adgroup_id, amazon_keyword_id' })
                 if (upErr) {
                   diagnostics.writeErrors.push({ entity: 'keyword_backfill', id: keywordId?.toString?.(), error: upErr.message })
                 } else {
