@@ -10,6 +10,7 @@ import KpiChip from "@/components/KpiChip";
 import DynamicGridCard from "@/components/DynamicGridCard";
 import FeatureTile from "@/components/FeatureTile";
 import TrustSection from "@/components/TrustSection";
+import TrustedCompanies from "@/components/TrustedCompanies";
 const PublicLanding = () => {
   const {
     user,
@@ -131,6 +132,9 @@ const PublicLanding = () => {
           </AppPreviewFrame>
         </div>
       </HeroBackground>
+
+      {/* Trusted Companies */}
+      <TrustedCompanies />
 
       {/* Clean Value Section */}
       <section className="py-24 bg-black">
