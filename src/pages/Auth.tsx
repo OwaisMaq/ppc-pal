@@ -171,8 +171,8 @@ const Auth = () => {
   if (loading && location.pathname === '/auth') {
     console.log('Auth: Showing loading spinner while auth state loads');
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -181,8 +181,8 @@ const Auth = () => {
   if (user && location.pathname === '/auth') {
     console.log('Auth: User authenticated on auth page, showing loading during redirect');
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -190,7 +190,7 @@ const Auth = () => {
   console.log('Auth: Rendering auth form');
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50 flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-md">
         <AuthHeader />
         
