@@ -157,10 +157,10 @@ const AmazonDataDashboard = () => {
                       </div>
                       <div className="text-right">
                         <div className="text-sm font-medium">
-                          Spend: {formatCurrency(campaign.spend || 0)}
+                          Spend: {formatCurrency((campaign as any).cost_legacy || (campaign as any).cost_14d || 0)}
                         </div>
                         <div className="text-sm text-gray-500">
-                          Sales: {formatCurrency(campaign.sales || 0)}
+                          Sales: {formatCurrency((campaign as any).attributed_sales_legacy || (campaign as any).attributed_sales_14d || 0)}
                         </div>
                       </div>
                     </div>
@@ -193,10 +193,10 @@ const AmazonDataDashboard = () => {
                       </div>
                       <div className="text-right">
                         <div className="text-sm font-medium">
-                          Spend: {formatCurrency(adGroup.spend || 0)}
+                          Spend: {formatCurrency((adGroup as any).cost_legacy || (adGroup as any).cost_14d || 0)}
                         </div>
                         <div className="text-sm text-gray-500">
-                          Sales: {formatCurrency(adGroup.sales || 0)}
+                          Sales: {formatCurrency((adGroup as any).attributed_sales_legacy || (adGroup as any).attributed_sales_14d || 0)}
                         </div>
                       </div>
                     </div>
@@ -230,10 +230,10 @@ const AmazonDataDashboard = () => {
                       </div>
                       <div className="text-right">
                         <div className="text-sm font-medium">
-                          Spend: {formatCurrency(keyword.spend || 0)}
+                          Spend: {formatCurrency((keyword as any).cost_legacy || (keyword as any).cost_14d || 0)}
                         </div>
                         <div className="text-sm text-gray-500">
-                          Sales: {formatCurrency(keyword.sales || 0)}
+                          Sales: {formatCurrency((keyword as any).attributed_sales_legacy || (keyword as any).attributed_sales_14d || 0)}
                         </div>
                         <div className="text-xs text-muted-foreground">
                           Clicks: {formatNumber(keyword.clicks || 0)}

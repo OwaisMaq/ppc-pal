@@ -33,9 +33,29 @@ export interface Campaign {
   end_date?: string;
   impressions: number;
   clicks: number;
-  spend: number;
-  sales: number;
-  orders: number;
+  
+  // Amazon-standard attribution window fields
+  cost_1d?: number;
+  cost_7d?: number;
+  cost_14d?: number;
+  cost_30d?: number;
+  
+  attributed_sales_1d?: number;
+  attributed_sales_7d?: number;
+  attributed_sales_14d?: number;
+  attributed_sales_30d?: number;
+  
+  attributed_conversions_1d?: number;
+  attributed_conversions_7d?: number;
+  attributed_conversions_14d?: number;
+  attributed_conversions_30d?: number;
+  
+  // Legacy fields for backward compatibility
+  cost_legacy?: number; // formerly 'spend'
+  attributed_sales_legacy?: number; // formerly 'sales'
+  attributed_conversions_legacy?: number; // formerly 'orders'
+  
+  // Calculated metrics
   acos?: number;
   roas?: number;
   last_updated?: string;
@@ -51,9 +71,29 @@ export interface AdGroup {
   default_bid?: number;
   impressions: number;
   clicks: number;
-  spend: number;
-  sales: number;
-  orders: number;
+  
+  // Amazon-standard attribution window fields
+  cost_1d?: number;
+  cost_7d?: number;
+  cost_14d?: number;
+  cost_30d?: number;
+  
+  attributed_sales_1d?: number;
+  attributed_sales_7d?: number;
+  attributed_sales_14d?: number;
+  attributed_sales_30d?: number;
+  
+  attributed_conversions_1d?: number;
+  attributed_conversions_7d?: number;
+  attributed_conversions_14d?: number;
+  attributed_conversions_30d?: number;
+  
+  // Legacy fields for backward compatibility
+  cost_legacy?: number; // formerly 'spend'
+  attributed_sales_legacy?: number; // formerly 'sales'
+  attributed_conversions_legacy?: number; // formerly 'orders'
+  
+  // Calculated metrics
   acos?: number;
   roas?: number;
   last_updated?: string;
@@ -70,9 +110,29 @@ export interface Keyword {
   status: 'enabled' | 'paused' | 'archived';
   impressions: number;
   clicks: number;
-  spend: number;
-  sales: number;
-  orders: number;
+  
+  // Amazon-standard attribution window fields
+  cost_1d?: number;
+  cost_7d?: number;
+  cost_14d?: number;
+  cost_30d?: number;
+  
+  attributed_sales_1d?: number;
+  attributed_sales_7d?: number;
+  attributed_sales_14d?: number;
+  attributed_sales_30d?: number;
+  
+  attributed_conversions_1d?: number;
+  attributed_conversions_7d?: number;
+  attributed_conversions_14d?: number;
+  attributed_conversions_30d?: number;
+  
+  // Legacy fields for backward compatibility  
+  cost_legacy?: number; // formerly 'spend'
+  attributed_sales_legacy?: number; // formerly 'sales'
+  attributed_conversions_legacy?: number; // formerly 'orders'
+  
+  // Calculated metrics
   acos?: number;
   roas?: number;
   ctr?: number;

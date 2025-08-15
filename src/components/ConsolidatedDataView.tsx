@@ -157,10 +157,10 @@ const ConsolidatedDataView = () => {
                       </div>
                       <div className="text-right">
                         <div className="text-sm font-medium">
-                          Spend: {formatCurrency(campaign.spend || 0)}
+                          Spend: {formatCurrency((campaign as any).cost_legacy || (campaign as any).cost_14d || 0)}
                         </div>
                         <div className="text-sm text-muted-foreground">
-                          Sales: {formatCurrency(campaign.sales || 0)}
+                          Sales: {formatCurrency((campaign as any).attributed_sales_legacy || (campaign as any).attributed_sales_14d || 0)}
                         </div>
                         <div className="text-xs text-muted-foreground">
                           {campaign.acos ? `ACoS: ${campaign.acos.toFixed(1)}%` : ''}
@@ -214,10 +214,10 @@ const ConsolidatedDataView = () => {
                                   </div>
                                   <div className="text-right">
                                     <div className="text-xs font-medium">
-                                      Spend: {formatCurrency(adGroup.spend || 0)}
+                                      Spend: {formatCurrency((adGroup as any).cost_legacy || (adGroup as any).cost_14d || 0)}
                                     </div>
                                     <div className="text-xs text-muted-foreground">
-                                      Sales: {formatCurrency(adGroup.sales || 0)}
+                                      Sales: {formatCurrency((adGroup as any).attributed_sales_legacy || (adGroup as any).attributed_sales_14d || 0)}
                                     </div>
                                   </div>
                                 </div>
@@ -258,10 +258,10 @@ const ConsolidatedDataView = () => {
                                       </div>
                                       <div className="text-right">
                                         <div className="text-xs">
-                                          {formatCurrency(keyword.spend || 0)}
+                                          {formatCurrency((keyword as any).cost_legacy || (keyword as any).cost_14d || 0)}
                                         </div>
                                         <div className="text-xs text-muted-foreground">
-                                          {formatCurrency(keyword.sales || 0)}
+                                          {formatCurrency((keyword as any).attributed_sales_legacy || (keyword as any).attributed_sales_14d || 0)}
                                         </div>
                                         <div className="text-xs text-muted-foreground">
                                           {formatNumber(keyword.clicks || 0)} clicks

@@ -13,15 +13,15 @@ type TrafficRow = {
   keyword_id: string | null;
   impressions: number | null;
   clicks: number | null;
-  spend: number | null;
+  cost: number | null; // Amazon's official term
 };
 
 type ConvRow = {
   campaign_id: string | null;
   ad_group_id: string | null;
   keyword_id: string | null;
-  orders: number | null;
-  sales: number | null;
+  attributed_conversions: number | null; // Amazon's official term
+  attributed_sales: number | null; // Amazon's official term
 };
 
 serve(async (req) => {
@@ -130,14 +130,14 @@ serve(async (req) => {
       async function aggregate(windowStartISO: string) {
         const { data: tRows, error: tErr } = await supabase
           .from("ams_messages_sp_traffic")
-          .select("campaign_id, ad_group_id, keyword_id, impressions, clicks, spend")
+          .select("campaign_id, ad_group_id, keyword_id, impressions, clicks, cost")
           .eq("connection_id", connectionId)
           .gte("hour_start", windowStartISO);
         if (tErr) throw tErr;
 
         const { data: cRows, error: cErr } = await supabase
           .from("ams_messages_sp_conversion")
-          .select("campaign_id, ad_group_id, keyword_id, orders, sales")
+          .select("campaign_id, ad_group_id, keyword_id, attributed_conversions, attributed_sales")
           .eq("connection_id", connectionId)
           .gte("hour_start", windowStartISO);
         if (cErr) throw cErr;
@@ -149,7 +149,7 @@ serve(async (req) => {
           const acc = trafficByKey.get(k) || { imp: 0, clk: 0, sp: 0 };
           acc.imp += r.impressions || 0;
           acc.clk += r.clicks || 0;
-          acc.sp += Number(r.spend || 0);
+          acc.sp += Number(r.cost || 0);
           trafficByKey.set(k, acc);
         });
 
@@ -158,8 +158,8 @@ serve(async (req) => {
         (cRows || []).forEach((r: ConvRow) => {
           const k = `${r.campaign_id || ''}|${r.ad_group_id || ''}|${r.keyword_id || ''}`;
           const acc = convByKey.get(k) || { ord: 0, sal: 0 };
-          acc.ord += r.orders || 0;
-          acc.sal += Number(r.sales || 0);
+          acc.ord += r.attributed_conversions || 0;
+          acc.sal += Number(r.attributed_sales || 0);
           convByKey.set(k, acc);
         });
 
@@ -246,9 +246,9 @@ serve(async (req) => {
         await supabase
           .from("campaigns")
           .update({
-            clicks_7d: clicks7, impressions_7d: impressions7, spend_7d: spend7, sales_7d: sales7, orders_7d: orders7,
+            clicks_7d: clicks7, impressions_7d: impressions7, cost_7d: spend7, attributed_sales_7d: sales7, attributed_conversions_7d: orders7,
             ctr_7d: ctr7, cpc_7d: cpc7, conversion_rate_7d: cr7, acos_7d: acos7, roas_7d: roas7,
-            clicks_14d: clicks14, impressions_14d: impressions14, spend_14d: spend14, sales_14d: sales14, orders_14d: orders14,
+            clicks_14d: clicks14, impressions_14d: impressions14, cost_14d: spend14, attributed_sales_14d: sales14, attributed_conversions_14d: orders14,
             ctr_14d: ctr14, cpc_14d: cpc14, conversion_rate_14d: cr14, acos_14d: acos14, roas_14d: roas14,
             last_updated: new Date().toISOString(),
           })
@@ -283,9 +283,9 @@ serve(async (req) => {
         await supabase
           .from("ad_groups")
           .update({
-            clicks_7d: clicks7, impressions_7d: impressions7, spend_7d: spend7, sales_7d: sales7, orders_7d: orders7,
+            clicks_7d: clicks7, impressions_7d: impressions7, cost_7d: spend7, attributed_sales_7d: sales7, attributed_conversions_7d: orders7,
             ctr_7d: ctr7, cpc_7d: cpc7, conversion_rate_7d: cr7, acos_7d: acos7, roas_7d: roas7,
-            clicks_14d: clicks14, impressions_14d: impressions14, spend_14d: spend14, sales_14d: sales14, orders_14d: orders14,
+            clicks_14d: clicks14, impressions_14d: impressions14, cost_14d: spend14, attributed_sales_14d: sales14, attributed_conversions_14d: orders14,
             ctr_14d: ctr14, cpc_14d: cpc14, conversion_rate_14d: cr14, acos_14d: acos14, roas_14d: roas14,
             last_updated: new Date().toISOString(),
           })
@@ -320,9 +320,9 @@ serve(async (req) => {
         await supabase
           .from("keywords")
           .update({
-            clicks_7d: clicks7, impressions_7d: impressions7, spend_7d: spend7, sales_7d: sales7, orders_7d: orders7,
+            clicks_7d: clicks7, impressions_7d: impressions7, cost_7d: spend7, attributed_sales_7d: sales7, attributed_conversions_7d: orders7,
             ctr_7d: ctr7, cpc_7d: cpc7, conversion_rate_7d: cr7, acos_7d: acos7, roas_7d: roas7,
-            clicks_14d: clicks14, impressions_14d: impressions14, spend_14d: spend14, sales_14d: sales14, orders_14d: orders14,
+            clicks_14d: clicks14, impressions_14d: impressions14, cost_14d: spend14, attributed_sales_14d: sales14, attributed_conversions_14d: orders14,
             ctr_14d: ctr14, cpc_14d: cpc14, conversion_rate_14d: cr14, acos_14d: acos14, roas_14d: roas14,
             last_updated: new Date().toISOString(),
           })

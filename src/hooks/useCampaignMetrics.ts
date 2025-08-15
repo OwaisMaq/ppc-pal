@@ -54,26 +54,36 @@ export const useCampaignMetrics = (connectionId?: string) => {
         .from("campaigns")
         .select(`
           id, connection_id, name, status, campaign_type, created_at,
-          daily_budget, impressions, clicks, spend, sales, orders, acos, roas,
-          clicks_14d, spend_14d, sales_14d
+          daily_budget, impressions, clicks, 
+          cost_legacy, cost_14d, cost_7d,
+          attributed_sales_legacy, attributed_sales_14d, attributed_sales_7d,
+          attributed_conversions_legacy, attributed_conversions_14d, attributed_conversions_7d,
+          acos, roas
         `)
         .eq("connection_id", connectionId)
-        .order("spend", { ascending: false })
+        .order("cost_legacy", { ascending: false })
         .limit(500);
 
       if (campaignError) {
         throw campaignError;
       }
 
-      const campaigns = campaignData || [];
-      setCampaigns(campaigns);
+      // Add legacy field compatibility
+      const campaignsWithLegacyFields = (campaignData || []).map(campaign => ({
+        ...campaign,
+        spend: campaign.cost_legacy || campaign.cost_14d || 0,
+        sales: campaign.attributed_sales_legacy || campaign.attributed_sales_14d || 0,
+        orders: campaign.attributed_conversions_legacy || campaign.attributed_conversions_14d || 0,
+      }));
+
+      setCampaigns(campaignsWithLegacyFields);
 
       // Calculate aggregated metrics
-      const totalSpend = campaigns.reduce((sum, c) => sum + (c.spend || 0), 0);
-      const totalSales = campaigns.reduce((sum, c) => sum + (c.sales || 0), 0);
-      const totalClicks = campaigns.reduce((sum, c) => sum + (c.clicks || 0), 0);
-      const totalImpressions = campaigns.reduce((sum, c) => sum + (c.impressions || 0), 0);
-      const totalOrders = campaigns.reduce((sum, c) => sum + (c.orders || 0), 0);
+      const totalSpend = campaignsWithLegacyFields.reduce((sum, c) => sum + (c.spend || 0), 0);
+      const totalSales = campaignsWithLegacyFields.reduce((sum, c) => sum + (c.sales || 0), 0);
+      const totalClicks = campaignsWithLegacyFields.reduce((sum, c) => sum + (c.clicks || 0), 0);
+      const totalImpressions = campaignsWithLegacyFields.reduce((sum, c) => sum + (c.impressions || 0), 0);
+      const totalOrders = campaignsWithLegacyFields.reduce((sum, c) => sum + (c.orders || 0), 0);
 
       const acos = totalSales > 0 ? (totalSpend / totalSales) * 100 : 0;
       const roas = totalSpend > 0 ? totalSales / totalSpend : 0;

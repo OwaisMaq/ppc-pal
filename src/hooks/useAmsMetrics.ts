@@ -64,7 +64,7 @@ export const useAmsMetrics = (connectionId?: string, from?: Date, to?: Date) => 
       // Get aggregated traffic data
       const { data: trafficData, error: trafficError } = await supabase
         .from("ams_messages_sp_traffic")
-        .select("impressions, clicks, spend, hour_start")
+        .select("impressions, clicks, cost, hour_start")
         .eq("connection_id", connectionId)
         .gte("hour_start", startDate.toISOString())
         .lte("hour_start", endDate.toISOString())
@@ -75,7 +75,7 @@ export const useAmsMetrics = (connectionId?: string, from?: Date, to?: Date) => 
       // Get aggregated conversion data
       const { data: conversionData, error: conversionError } = await supabase
         .from("ams_messages_sp_conversion")
-        .select("orders, sales, hour_start")
+        .select("attributed_conversions, attributed_sales, hour_start")
         .eq("connection_id", connectionId)
         .gte("hour_start", startDate.toISOString())
         .lte("hour_start", endDate.toISOString())
@@ -86,9 +86,9 @@ export const useAmsMetrics = (connectionId?: string, from?: Date, to?: Date) => 
       // Calculate aggregated metrics
       const totalImpressions = (trafficData || []).reduce((sum, row) => sum + (row.impressions || 0), 0);
       const totalClicks = (trafficData || []).reduce((sum, row) => sum + (row.clicks || 0), 0);
-      const totalSpend = (trafficData || []).reduce((sum, row) => sum + Number(row.spend || 0), 0);
-      const totalOrders = (conversionData || []).reduce((sum, row) => sum + (row.orders || 0), 0);
-      const totalSales = (conversionData || []).reduce((sum, row) => sum + Number(row.sales || 0), 0);
+      const totalSpend = (trafficData || []).reduce((sum, row) => sum + Number(row.cost || 0), 0);
+      const totalOrders = (conversionData || []).reduce((sum, row) => sum + (row.attributed_conversions || 0), 0);
+      const totalSales = (conversionData || []).reduce((sum, row) => sum + Number(row.attributed_sales || 0), 0);
 
       const acos = totalSales > 0 ? (totalSpend / totalSales) * 100 : 0;
       const roas = totalSpend > 0 ? totalSales / totalSpend : 0;
@@ -101,7 +101,7 @@ export const useAmsMetrics = (connectionId?: string, from?: Date, to?: Date) => 
         .from("campaigns")
         .select("*")
         .eq("connection_id", connectionId)
-        .order("spend", { ascending: false })
+        .order("cost_legacy", { ascending: false })
         .limit(100);
 
       if (campaignError) throw campaignError;
@@ -137,26 +137,32 @@ export const useAmsMetrics = (connectionId?: string, from?: Date, to?: Date) => 
         messageCount24h: messageCount24h || 0,
       });
 
-      const campaignData: AmsEntityData[] = (campaigns || []).map(campaign => ({
-        id: campaign.id,
-        name: campaign.name,
-        status: campaign.status || 'enabled',
-        campaign_type: campaign.campaign_type,
-        created_at: campaign.created_at,
-        impressions: campaign.impressions || 0,
-        clicks: campaign.clicks || 0,
-        spend: Number(campaign.spend || 0),
-        orders: campaign.orders || 0,
-        sales: Number(campaign.sales || 0),
-        acos: campaign.acos || 0,
-        roas: campaign.roas || 0,
-        ctr: campaign.impressions > 0 ? ((campaign.clicks || 0) / campaign.impressions) * 100 : 0,
-        cpc: campaign.clicks > 0 ? Number(campaign.spend || 0) / campaign.clicks : 0,
-        conversionRate: campaign.clicks > 0 ? ((campaign.orders || 0) / campaign.clicks) * 100 : 0,
-        entityType: 'campaign' as const,
-        entityId: campaign.id,
-        daily_budget: campaign.daily_budget,
-      }));
+      const campaignData: AmsEntityData[] = (campaigns || []).map(campaign => {
+        const spend = campaign.cost_legacy || campaign.cost_14d || 0;
+        const orders = campaign.attributed_conversions_legacy || campaign.attributed_conversions_14d || 0;
+        const sales = campaign.attributed_sales_legacy || campaign.attributed_sales_14d || 0;
+        
+        return {
+          id: campaign.id,
+          name: campaign.name,
+          status: campaign.status || 'enabled',
+          campaign_type: campaign.campaign_type,
+          created_at: campaign.created_at,
+          impressions: campaign.impressions || 0,
+          clicks: campaign.clicks || 0,
+          spend: Number(spend),
+          orders,
+          sales: Number(sales),
+          acos: campaign.acos || 0,
+          roas: campaign.roas || 0,
+          ctr: campaign.impressions > 0 ? ((campaign.clicks || 0) / campaign.impressions) * 100 : 0,
+          cpc: campaign.clicks > 0 ? Number(spend) / campaign.clicks : 0,
+          conversionRate: campaign.clicks > 0 ? (orders / campaign.clicks) * 100 : 0,
+          entityType: 'campaign' as const,
+          entityId: campaign.id,
+          daily_budget: campaign.daily_budget,
+        };
+      });
 
       setEntityData(campaignData);
 

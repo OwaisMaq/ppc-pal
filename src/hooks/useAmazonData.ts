@@ -160,8 +160,8 @@ const [loading, setLoading] = useState(false);
   };
 
   const getDataSummary = () => {
-    const totalSpend = campaigns.reduce((sum, campaign) => sum + (campaign.spend || 0), 0);
-    const totalSales = campaigns.reduce((sum, campaign) => sum + (campaign.sales || 0), 0);
+    const totalSpend = campaigns.reduce((sum, campaign) => sum + (campaign.cost_legacy || campaign.cost_14d || 0), 0);
+    const totalSales = campaigns.reduce((sum, campaign) => sum + (campaign.attributed_sales_legacy || campaign.attributed_sales_14d || 0), 0);
     const totalClicks = campaigns.reduce((sum, campaign) => sum + (campaign.clicks || 0), 0);
     const totalImpressions = campaigns.reduce((sum, campaign) => sum + (campaign.impressions || 0), 0);
     

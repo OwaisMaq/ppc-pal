@@ -324,47 +324,47 @@ export type Database = {
       ams_messages_sp_conversion: {
         Row: {
           ad_group_id: string | null
+          attributed_conversions: number
+          attributed_sales: number
           campaign_id: string | null
           connection_id: string
           created_at: string
           hour_start: string
           id: string
           keyword_id: string | null
-          orders: number
           payload: Json
           profile_id: string
           received_at: string
-          sales: number
           target_id: string | null
         }
         Insert: {
           ad_group_id?: string | null
+          attributed_conversions?: number
+          attributed_sales?: number
           campaign_id?: string | null
           connection_id: string
           created_at?: string
           hour_start: string
           id?: string
           keyword_id?: string | null
-          orders?: number
           payload?: Json
           profile_id: string
           received_at?: string
-          sales?: number
           target_id?: string | null
         }
         Update: {
           ad_group_id?: string | null
+          attributed_conversions?: number
+          attributed_sales?: number
           campaign_id?: string | null
           connection_id?: string
           created_at?: string
           hour_start?: string
           id?: string
           keyword_id?: string | null
-          orders?: number
           payload?: Json
           profile_id?: string
           received_at?: string
-          sales?: number
           target_id?: string | null
         }
         Relationships: [
@@ -397,6 +397,7 @@ export type Database = {
           campaign_id: string | null
           clicks: number
           connection_id: string
+          cost: number
           created_at: string
           hour_start: string
           id: string
@@ -405,7 +406,6 @@ export type Database = {
           payload: Json
           profile_id: string
           received_at: string
-          spend: number
           target_id: string | null
         }
         Insert: {
@@ -413,6 +413,7 @@ export type Database = {
           campaign_id?: string | null
           clicks?: number
           connection_id: string
+          cost?: number
           created_at?: string
           hour_start: string
           id?: string
@@ -421,7 +422,6 @@ export type Database = {
           payload?: Json
           profile_id: string
           received_at?: string
-          spend?: number
           target_id?: string | null
         }
         Update: {
@@ -429,6 +429,7 @@ export type Database = {
           campaign_id?: string | null
           clicks?: number
           connection_id?: string
+          cost?: number
           created_at?: string
           hour_start?: string
           id?: string
@@ -437,7 +438,6 @@ export type Database = {
           payload?: Json
           profile_id?: string
           received_at?: string
-          spend?: number
           target_id?: string | null
         }
         Relationships: [
@@ -718,6 +718,16 @@ export type Database = {
           acos_14d: number | null
           acos_7d: number | null
           amazon_campaign_id: string
+          attributed_conversions_14d: number | null
+          attributed_conversions_1d: number | null
+          attributed_conversions_30d: number | null
+          attributed_conversions_7d: number | null
+          attributed_conversions_legacy: number | null
+          attributed_sales_14d: number | null
+          attributed_sales_1d: number | null
+          attributed_sales_30d: number | null
+          attributed_sales_7d: number | null
+          attributed_sales_legacy: number | null
           attribution_model: string | null
           budget: number | null
           campaign_type: string | null
@@ -727,6 +737,11 @@ export type Database = {
           connection_id: string
           conversion_rate_14d: number | null
           conversion_rate_7d: number | null
+          cost_14d: number | null
+          cost_1d: number | null
+          cost_30d: number | null
+          cost_7d: number | null
+          cost_legacy: number | null
           cpc_14d: number | null
           cpc_7d: number | null
           created_at: string
@@ -741,19 +756,10 @@ export type Database = {
           impressions_7d: number | null
           last_updated: string | null
           name: string
-          orders: number | null
-          orders_14d: number | null
-          orders_7d: number | null
           product_type: string | null
           roas: number | null
           roas_14d: number | null
           roas_7d: number | null
-          sales: number | null
-          sales_14d: number | null
-          sales_7d: number | null
-          spend: number | null
-          spend_14d: number | null
-          spend_7d: number | null
           start_date: string | null
           status: Database["public"]["Enums"]["campaign_status"]
           targeting_type: string | null
@@ -763,6 +769,16 @@ export type Database = {
           acos_14d?: number | null
           acos_7d?: number | null
           amazon_campaign_id: string
+          attributed_conversions_14d?: number | null
+          attributed_conversions_1d?: number | null
+          attributed_conversions_30d?: number | null
+          attributed_conversions_7d?: number | null
+          attributed_conversions_legacy?: number | null
+          attributed_sales_14d?: number | null
+          attributed_sales_1d?: number | null
+          attributed_sales_30d?: number | null
+          attributed_sales_7d?: number | null
+          attributed_sales_legacy?: number | null
           attribution_model?: string | null
           budget?: number | null
           campaign_type?: string | null
@@ -772,6 +788,11 @@ export type Database = {
           connection_id: string
           conversion_rate_14d?: number | null
           conversion_rate_7d?: number | null
+          cost_14d?: number | null
+          cost_1d?: number | null
+          cost_30d?: number | null
+          cost_7d?: number | null
+          cost_legacy?: number | null
           cpc_14d?: number | null
           cpc_7d?: number | null
           created_at?: string
@@ -786,19 +807,10 @@ export type Database = {
           impressions_7d?: number | null
           last_updated?: string | null
           name: string
-          orders?: number | null
-          orders_14d?: number | null
-          orders_7d?: number | null
           product_type?: string | null
           roas?: number | null
           roas_14d?: number | null
           roas_7d?: number | null
-          sales?: number | null
-          sales_14d?: number | null
-          sales_7d?: number | null
-          spend?: number | null
-          spend_14d?: number | null
-          spend_7d?: number | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["campaign_status"]
           targeting_type?: string | null
@@ -808,6 +820,16 @@ export type Database = {
           acos_14d?: number | null
           acos_7d?: number | null
           amazon_campaign_id?: string
+          attributed_conversions_14d?: number | null
+          attributed_conversions_1d?: number | null
+          attributed_conversions_30d?: number | null
+          attributed_conversions_7d?: number | null
+          attributed_conversions_legacy?: number | null
+          attributed_sales_14d?: number | null
+          attributed_sales_1d?: number | null
+          attributed_sales_30d?: number | null
+          attributed_sales_7d?: number | null
+          attributed_sales_legacy?: number | null
           attribution_model?: string | null
           budget?: number | null
           campaign_type?: string | null
@@ -817,6 +839,11 @@ export type Database = {
           connection_id?: string
           conversion_rate_14d?: number | null
           conversion_rate_7d?: number | null
+          cost_14d?: number | null
+          cost_1d?: number | null
+          cost_30d?: number | null
+          cost_7d?: number | null
+          cost_legacy?: number | null
           cpc_14d?: number | null
           cpc_7d?: number | null
           created_at?: string
@@ -831,19 +858,10 @@ export type Database = {
           impressions_7d?: number | null
           last_updated?: string | null
           name?: string
-          orders?: number | null
-          orders_14d?: number | null
-          orders_7d?: number | null
           product_type?: string | null
           roas?: number | null
           roas_14d?: number | null
           roas_7d?: number | null
-          sales?: number | null
-          sales_14d?: number | null
-          sales_7d?: number | null
-          spend?: number | null
-          spend_14d?: number | null
-          spend_7d?: number | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["campaign_status"]
           targeting_type?: string | null
