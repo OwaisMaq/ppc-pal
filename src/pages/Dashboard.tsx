@@ -4,7 +4,7 @@ import AmazonDataDashboard from "@/components/AmazonDataDashboard";
 import ConsolidatedDataView from "@/components/ConsolidatedDataView";
 import { PerformanceMetricCards } from "@/components/PerformanceMetricCards";
 
-import { WeeklyPerformanceChart } from "@/components/WeeklyPerformanceChart";
+
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { useCampaignMetrics } from "@/hooks/useCampaignMetrics";
 import { useAmsMetrics } from "@/hooks/useAmsMetrics";
@@ -280,10 +280,8 @@ const Dashboard = () => {
                 <PerformanceMetricCards metrics={metrics} loading={loading} />
               </div>
 
-              {/* Charts and Tables */}
-              <div className="grid lg:grid-cols-2 gap-6">
-                <WeeklyPerformanceChart campaigns={campaigns} loading={loading} />
-                
+              {/* Quick Stats */}
+              <div className="grid lg:grid-cols-1 gap-6">
                 <Card>
                   <CardHeader>
                     <CardTitle>Quick Stats</CardTitle>
