@@ -1930,10 +1930,6 @@ export type Database = {
         Args: { connection_uuid: string; user_uuid: string }
         Returns: string
       }
-      extract_asin_from_name: {
-        Args: { campaign_name: string }
-        Returns: string
-      }
       get_ams_data_freshness: {
         Args: { connection_uuid: string }
         Returns: {
