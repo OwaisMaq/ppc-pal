@@ -315,8 +315,45 @@ serve(async (req) => {
 
       console.log('Successfully stored UK connections for user:', user.id)
       
+      // Automatically trigger sync for the newly connected profiles
+      console.log('🚀 Auto-triggering sync for newly connected profiles...')
+      for (const profile of ukProfiles) {
+        try {
+          // Find the connection ID for this profile
+          const { data: connection } = await supabase
+            .from('amazon_connections')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('profile_id', profile.profileId.toString())
+            .single()
+          
+          if (connection?.id) {
+            // Trigger sync in the background - don't await to avoid timeout
+            supabase.functions.invoke('sync-amazon-data', {
+              body: { 
+                connectionId: connection.id,
+                dateRangeDays: 30,
+                timeUnit: 'DAILY',
+                diagnosticMode: false
+              }
+            }).then(result => {
+              console.log(`✅ Auto-sync triggered for connection ${connection.id}:`, result)
+            }).catch(error => {
+              console.log(`⚠️ Auto-sync failed for connection ${connection.id}:`, error)
+            })
+          }
+        } catch (error) {
+          console.log('Failed to trigger auto-sync for profile:', profile.profileId, error.message)
+        }
+      }
+      
       return new Response(
-        JSON.stringify({ success: true, profileCount: ukProfiles.length }),
+        JSON.stringify({ 
+          success: true, 
+          profileCount: ukProfiles.length,
+          syncStarted: true,
+          message: `Connected ${ukProfiles.length} profile(s) and started data sync`
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }

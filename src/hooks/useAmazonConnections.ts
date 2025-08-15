@@ -205,9 +205,16 @@ export const useAmazonConnections = () => {
       
       console.log('Connection successful, refreshing connections...');
       const profileCount = data?.profileCount || 0;
-      toast.success(`Amazon account connected successfully! Found ${profileCount} advertising profile(s).`);
+      const syncStarted = data?.syncStarted || false;
+      
+      if (syncStarted) {
+        toast.success(`Amazon account connected! Found ${profileCount} profile(s) and started syncing data automatically.`);
+      } else {
+        toast.success(`Amazon account connected successfully! Found ${profileCount} advertising profile(s).`);
+      }
+      
       await fetchConnections();
-      return { success: true, profileCount };
+      return { success: true, profileCount, syncStarted, message: data?.message };
     } catch (error) {
       console.error('Error handling OAuth callback:', error);
       console.error('Callback error details:', {

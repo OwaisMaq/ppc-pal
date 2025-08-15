@@ -52,11 +52,18 @@ const AmazonCallback = () => {
         if (result?.success) {
           setStatus('success');
           const profileCount = result?.profileCount || 0;
-          setMessage(`Amazon account connected successfully! Found ${profileCount} advertising profile(s). Redirecting to dashboard...`);
-          // Redirect to dashboard after 2 seconds
+          const syncStarted = result?.syncStarted || false;
+          
+          if (syncStarted) {
+            setMessage(`Amazon account connected! Found ${profileCount} profile(s) and started syncing your advertising data. You can view the data in your dashboard as it loads.`);
+          } else {
+            setMessage(`Amazon account connected successfully! Found ${profileCount} advertising profile(s). Redirecting to dashboard...`);
+          }
+          
+          // Redirect to dashboard after 3 seconds to give users time to read the message
           setTimeout(() => {
             navigate('/dashboard');
-          }, 2000);
+          }, 3000);
         } else {
           console.log('OAuth callback returned falsy result:', result);
           setStatus('error');
