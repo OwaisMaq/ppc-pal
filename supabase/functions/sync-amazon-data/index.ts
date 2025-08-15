@@ -451,14 +451,24 @@ serve(async (req) => {
        // do NOT return; continue to performance phase with unfiltered reports
      }
 
-    // Store campaigns with basic data
+    // Store SP campaigns with basic data and enhanced logging
     const campaignMap = new Map()
     const campaignIds: string[] = []
+    let autoCampaignCount = 0
+    let manualCampaignCount = 0
     
     for (const campaign of campaignsData) {
       if (!campaign.campaignId || !campaign.name) {
-        console.warn('⚠️ Skipping invalid campaign:', campaign)
+        console.warn('⚠️ Skipping invalid SP campaign:', campaign)
         continue
+      }
+
+      // Log campaign targeting type for diagnostics
+      const targetingType = campaign.targetingType || 'unknown'
+      if (targetingType === 'auto') {
+        autoCampaignCount++
+      } else if (targetingType === 'manual') {
+        manualCampaignCount++
       }
 
       campaignIds.push(campaign.campaignId.toString())
@@ -470,42 +480,48 @@ serve(async (req) => {
           amazon_campaign_id: campaign.campaignId.toString(),
           name: campaign.name,
           campaign_type: campaign.campaignType,
-          targeting_type: campaign.targetingType,
+          targeting_type: targetingType,
           status: campaign.state ? campaign.state.toLowerCase() : 'unknown',
           daily_budget: campaign.dailyBudget || null,
           start_date: campaign.startDate || null,
           end_date: campaign.endDate || null,
+          product_type: 'Sponsored Products', // Ensure we mark as SP
         }, {
           onConflict: 'connection_id, amazon_campaign_id'
         })
-        .select('id, amazon_campaign_id')
+        .select('id, amazon_campaign_id, name, targeting_type')
         .single()
 
       if (storedCampaign) {
-        campaignMap.set(campaign.campaignId.toString(), storedCampaign)
+        campaignMap.set(campaign.campaignId.toString(), {
+          ...storedCampaign,
+          targeting_type: targetingType
+        })
       }
     }
+    
+    console.log(`📊 Campaign breakdown: ${autoCampaignCount} auto-targeting, ${manualCampaignCount} manual-targeting (${campaignIds.length} total)`)
 
-    // Sync ad groups for each campaign
-    console.log('📝 Syncing ad groups...')
+    // Sync SP ad groups for each campaign with pagination
+    console.log('📝 Syncing SP ad groups...')
     const adGroupMap = new Map()
     const adGroupIds: string[] = []
     
     for (const [campaignId, storedCampaign] of campaignMap.entries()) {
-      const adGroupsResponse = await fetchWithRetry(`${apiEndpoint}/v2/adGroups?campaignIdFilter=${campaignId}`, {
-        headers: {
+      try {
+        const adGroupsData = await fetchAllPages(`${apiEndpoint}/v2/sp/adGroups?campaignIdFilter=${campaignId}`, {
           'Authorization': `Bearer ${accessToken}`,
           'Amazon-Advertising-API-ClientId': clientId,
           'Amazon-Advertising-API-Scope': connection.profile_id,
-        },
-      })
-
-      if (adGroupsResponse.ok) {
-        const adGroupsData = await adGroupsResponse.json()
-        console.log(`  📁 Campaign ${campaignId}: ${adGroupsData.length} ad groups`)
+        })
+        
+        console.log(`  📁 SP Campaign ${storedCampaign.name} (${campaignId}): ${adGroupsData.length} ad groups`)
         
         for (const adGroup of adGroupsData) {
-          if (!adGroup.adGroupId || !adGroup.name) continue
+          if (!adGroup.adGroupId || !adGroup.name) {
+            console.warn(`⚠️ Skipping invalid ad group in campaign ${campaignId}:`, adGroup)
+            continue
+          }
           
           adGroupIds.push(adGroup.adGroupId.toString())
           
@@ -520,35 +536,47 @@ serve(async (req) => {
             }, {
               onConflict: 'campaign_id, amazon_adgroup_id'
             })
-            .select('id, amazon_adgroup_id')
+            .select('id, amazon_adgroup_id, name')
             .single()
 
           if (storedAdGroup) {
-            adGroupMap.set(adGroup.adGroupId.toString(), storedAdGroup)
+            adGroupMap.set(adGroup.adGroupId.toString(), {
+              ...storedAdGroup,
+              campaign_targeting_type: storedCampaign.targeting_type,
+              campaign_name: storedCampaign.name
+            })
           }
         }
+      } catch (error) {
+        console.error(`❌ Failed to fetch ad groups for campaign ${campaignId}:`, error)
       }
     }
 
-    // Sync keywords for each ad group
-    console.log('🔑 Syncing keywords...')
+    // Sync SP keywords for each ad group with pagination
+    console.log('🔑 Syncing SP keywords...')
     const keywordIds: string[] = []
     
     for (const [adGroupId, storedAdGroup] of adGroupMap.entries()) {
-      const keywordsResponse = await fetchWithRetry(`${apiEndpoint}/v2/keywords?adGroupIdFilter=${adGroupId}`, {
-        headers: {
+      // Only fetch keywords for manual campaigns (auto campaigns use targets instead)
+      if (storedAdGroup.campaign_targeting_type === 'auto') {
+        console.log(`  ⏭️ Skipping keywords for auto campaign ad group ${storedAdGroup.name} (${adGroupId}) - will fetch targets instead`)
+        continue
+      }
+      
+      try {
+        const keywordsData = await fetchAllPages(`${apiEndpoint}/v2/sp/keywords?adGroupIdFilter=${adGroupId}`, {
           'Authorization': `Bearer ${accessToken}`,
           'Amazon-Advertising-API-ClientId': clientId,
           'Amazon-Advertising-API-Scope': connection.profile_id,
-        },
-      })
-
-      if (keywordsResponse.ok) {
-        const keywordsData = await keywordsResponse.json()
-        console.log(`  🔤 Ad Group ${adGroupId}: ${keywordsData.length} keywords`)
+        })
+        
+        console.log(`  🔤 Manual Ad Group ${storedAdGroup.name} (${adGroupId}): ${keywordsData.length} keywords`)
         
         for (const keyword of keywordsData) {
-          if (!keyword.keywordId || !keyword.keywordText) continue
+          if (!keyword.keywordId || !keyword.keywordText) {
+            console.warn(`⚠️ Skipping invalid keyword in ad group ${adGroupId}:`, keyword)
+            continue
+          }
           
           keywordIds.push(keyword.keywordId.toString())
           
@@ -565,89 +593,79 @@ serve(async (req) => {
               onConflict: 'adgroup_id, amazon_keyword_id'
             })
         }
+      } catch (error) {
+        console.error(`❌ Failed to fetch keywords for ad group ${adGroupId}:`, error)
       }
     }
 
-    // Sync targets for each ad group (auto-targeting)
-    console.log('🎯 Syncing targets...')
+    // Sync SP targets for auto-targeting ad groups with pagination
+    console.log('🎯 Syncing SP targets...')
     const targetIds: string[] = []
+    let autoAdGroupsProcessed = 0
+    let targetsFoundCount = 0
 
     for (const [adGroupId, storedAdGroup] of adGroupMap.entries()) {
-      // Try multiple potential endpoints for targets
-      let targetsResponse;
-      let targetsData = [];
-      
-      // Try the primary targets endpoint first
-      try {
-        targetsResponse = await fetchWithRetry(`${apiEndpoint}/v2/sp/targets?adGroupIdFilter=${adGroupId}`, {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Amazon-Advertising-API-ClientId': clientId,
-            'Amazon-Advertising-API-Scope': connection.profile_id,
-          },
-        });
-        
-        if (targetsResponse.ok) {
-          targetsData = await targetsResponse.json();
-          console.log(`  🎯 Ad Group ${adGroupId}: ${targetsData.length} targets (primary endpoint)`);
-        } else {
-          const errTxt = await targetsResponse.text().catch(() => '');
-          console.warn(`⚠️ Primary targets endpoint failed for adGroup ${adGroupId}: ${targetsResponse.status} ${errTxt}`);
-          
-          // Try alternative endpoint without /sp/ prefix
-          console.log(`  🔄 Trying alternative targets endpoint for adGroup ${adGroupId}...`);
-          targetsResponse = await fetchWithRetry(`${apiEndpoint}/v2/targets?adGroupIdFilter=${adGroupId}`, {
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'Amazon-Advertising-API-ClientId': clientId,
-              'Amazon-Advertising-API-Scope': connection.profile_id,
-            },
-          });
-          
-          if (targetsResponse.ok) {
-            targetsData = await targetsResponse.json();
-            console.log(`  🎯 Ad Group ${adGroupId}: ${targetsData.length} targets (alternative endpoint)`);
-          } else {
-            const altErrTxt = await targetsResponse.text().catch(() => '');
-            console.error(`❌ Both targets endpoints failed for adGroup ${adGroupId}. Primary: ${targetsResponse.status}, Alternative: ${targetsResponse.status} ${altErrTxt}`);
-          }
-        }
-      } catch (error) {
-        console.error(`❌ Network error fetching targets for adGroup ${adGroupId}:`, error);
-        continue;
+      // Only fetch targets for auto campaigns (manual campaigns use keywords instead)
+      if (storedAdGroup.campaign_targeting_type !== 'auto') {
+        console.log(`  ⏭️ Skipping targets for manual campaign ad group ${storedAdGroup.name} (${adGroupId}) - using keywords instead`)
+        continue
       }
-
-      // Process targets data
-      if (Array.isArray(targetsData)) {
-        for (const t of targetsData) {
-          if (!t.targetId) {
-            console.warn(`⚠️ Skipping target without targetId:`, t);
+      
+      autoAdGroupsProcessed++
+      console.log(`  🎯 Processing auto ad group ${storedAdGroup.name} (${adGroupId}) from ${storedAdGroup.campaign_name}`)
+      
+      try {
+        // Use SP-specific endpoint with pagination - this should now work since we're using SP ad groups
+        const targetsData = await fetchAllPages(`${apiEndpoint}/v2/sp/targets?adGroupIdFilter=${adGroupId}`, {
+          'Authorization': `Bearer ${accessToken}`,
+          'Amazon-Advertising-API-ClientId': clientId,
+          'Amazon-Advertising-API-Scope': connection.profile_id,
+        })
+        
+        console.log(`  🎯 Auto Ad Group ${storedAdGroup.name} (${adGroupId}): ${targetsData.length} targets`)
+        targetsFoundCount += targetsData.length
+        
+        // Process targets data
+        for (const target of targetsData) {
+          if (!target.targetId) {
+            console.warn(`⚠️ Skipping target without targetId:`, target);
             continue;
           }
           
-          targetIds.push(t.targetId.toString());
+          targetIds.push(target.targetId.toString());
 
           try {
             await supabase
               .from('targets')
               .upsert({
                 adgroup_id: storedAdGroup.id,
-                amazon_target_id: t.targetId.toString(),
-                expression: t.expression ?? null,
-                type: t.expressionType ?? null,
-                bid: t.bid ?? null,
-                status: t.state ? t.state.toLowerCase() : 'enabled',
+                amazon_target_id: target.targetId.toString(),
+                expression: target.expression ?? null,
+                type: target.expressionType ?? null,
+                bid: target.bid ?? null,
+                status: target.state ? target.state.toLowerCase() : 'enabled',
               }, {
                 onConflict: 'adgroup_id, amazon_target_id'
               });
           } catch (upsertError) {
-            console.error(`❌ Failed to upsert target ${t.targetId}:`, upsertError);
+            console.error(`❌ Failed to upsert target ${target.targetId}:`, upsertError);
           }
         }
+      } catch (error) {
+        console.error(`❌ Failed to fetch targets for auto ad group ${adGroupId} (${storedAdGroup.name}):`, error);
       }
     }
+    
+    console.log(`🎯 Targets summary: ${targetsFoundCount} targets found across ${autoAdGroupsProcessed} auto ad groups`)
 
-    console.log(`📊 Entity sync complete: ${campaignIds.length} campaigns, ${adGroupIds.length} ad groups, ${keywordIds.length} keywords, ${targetIds.length} targets`)
+    console.log(`📊 SP Entity sync complete: ${campaignIds.length} campaigns (${autoCampaignCount} auto, ${manualCampaignCount} manual), ${adGroupIds.length} ad groups, ${keywordIds.length} keywords, ${targetIds.length} targets`)
+    
+    // Enhanced diagnostics logging
+    if (targetIds.length === 0 && autoCampaignCount > 0) {
+      console.warn(`⚠️ Found ${autoCampaignCount} auto campaigns but 0 targets - this suggests an API issue or account setup problem`)
+    } else if (targetIds.length > 0) {
+      console.log(`✅ Successfully found ${targetIds.length} targets for auto campaigns - API endpoints working correctly`)
+    }
 
     // Update connection with entity counts
     await supabase
