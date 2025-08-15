@@ -84,6 +84,7 @@ PPC Pal embodies clean, minimalistic, and modern design principles. Our interfac
 <Button variant="secondary">Secondary Action</Button>
 <Button variant="outline">Outline Style</Button>
 <Button variant="ghost">Ghost Style</Button>
+<Button variant="translucent">Glass-inspired Style</Button>
 ```
 
 **Design Rules:**
@@ -92,6 +93,7 @@ PPC Pal embodies clean, minimalistic, and modern design principles. Our interfac
 - Clean border radius (rounded-md)
 - Consistent padding and heights
 - Professional color palette only
+- Translucent variant uses glass-inspired styling with subtle transparency
 
 ### Cards
 ```tsx
