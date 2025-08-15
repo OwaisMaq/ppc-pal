@@ -1,22 +1,13 @@
-import React, { createContext, useContext, useState, PropsWithChildren } from "react";
+import React, { createContext, useContext, PropsWithChildren } from "react";
 
-export type DateRangeValue = 1 | 7 | 30 | 31 | 90 | 365;
-
-type DateRangeContextType = {
-  dateRangeDays: number;
-  setDateRangeDays: (days: DateRangeValue | number) => void;
-  diagnosticMode: boolean;
-  setDiagnosticMode: (val: boolean) => void;
-};
+// Simplified context - no date range or diagnostic functionality needed
+type DateRangeContextType = {};
 
 const DateRangeContext = createContext<DateRangeContextType | undefined>(undefined);
 
 export const DateRangeProvider = ({ children }: PropsWithChildren) => {
-  const [dateRangeDays, setDateRangeDays] = useState<number>(30);
-  const [diagnosticMode, setDiagnosticMode] = useState<boolean>(false);
-
   return (
-    <DateRangeContext.Provider value={{ dateRangeDays, setDateRangeDays, diagnosticMode, setDiagnosticMode }}>
+    <DateRangeContext.Provider value={{}}>
       {children}
     </DateRangeContext.Provider>
   );
