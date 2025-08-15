@@ -2,7 +2,7 @@ import DashboardShell from "@/components/DashboardShell";
 import SubscriptionStatus from "@/components/SubscriptionStatus";
 
 import ConsolidatedDataView from "@/components/ConsolidatedDataView";
-import { PerformanceMetricCards } from "@/components/PerformanceMetricCards";
+
 
 
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
@@ -271,14 +271,6 @@ const Dashboard = () => {
                 </Card>
               )}
 
-              {/* KPI Cards */}
-              <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <BarChart3 className="h-5 w-5 text-blue-600" />
-                  <h2 className="text-xl font-semibold">Performance Overview</h2>
-                </div>
-                <PerformanceMetricCards metrics={metrics} loading={loading} />
-              </div>
 
               {/* Quick Stats */}
               <div className="grid lg:grid-cols-1 gap-6">
