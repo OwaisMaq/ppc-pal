@@ -56,6 +56,13 @@ export default {
                     DEFAULT: 'hsl(var(--brand))',
                     foreground: 'hsl(var(--brand-foreground))'
                 },
+                electric: {
+                    purple: 'hsl(var(--electric-purple))',
+                    orange: 'hsl(var(--electric-orange))',
+                    green: 'hsl(var(--electric-green))',
+                    blue: 'hsl(var(--electric-blue))',
+                    pink: 'hsl(var(--electric-pink))'
+                },
                 sidebar: {
                     DEFAULT: 'hsl(var(--sidebar-background))',
                     foreground: 'hsl(var(--sidebar-foreground))',
@@ -105,6 +112,22 @@ export default {
                     '0%': { transform: 'translateX(0)' },
                     '100%': { transform: 'translateX(100%)' }
                 },
+                'float': {
+                    '0%, 100%': { transform: 'translateY(0px)' },
+                    '50%': { transform: 'translateY(-10px)' }
+                },
+                'float-slow': {
+                    '0%, 100%': { transform: 'translateY(0px)' },
+                    '50%': { transform: 'translateY(-15px)' }
+                },
+                'float-reverse': {
+                    '0%, 100%': { transform: 'translateY(0px)' },
+                    '50%': { transform: 'translateY(10px)' }
+                },
+                'pulse-glow': {
+                    '0%, 100%': { boxShadow: '0 0 20px hsl(var(--electric-purple) / 0.5)' },
+                    '50%': { boxShadow: '0 0 40px hsl(var(--electric-purple) / 0.8), 0 0 60px hsl(var(--electric-orange) / 0.4)' }
+                },
             },
             animation: {
                 'accordion-down': 'accordion-down 0.2s ease-out',
@@ -116,7 +139,11 @@ export default {
                 'slide-in-right': 'slide-in-right 0.3s ease-out',
                 'slide-out-right': 'slide-out-right 0.3s ease-out',
                 'enter': 'fade-in 0.3s ease-out, scale-in 0.2s ease-out',
-                'exit': 'fade-out 0.3s ease-out, scale-out 0.2s ease-out'
+                'exit': 'fade-out 0.3s ease-out, scale-out 0.2s ease-out',
+                'float': 'float 3s ease-in-out infinite',
+                'float-slow': 'float-slow 4s ease-in-out infinite',
+                'float-reverse': 'float-reverse 2.5s ease-in-out infinite',
+                'pulse-glow': 'pulse-glow 2s ease-in-out infinite'
             },
             fontFamily: {
                 sans: ['Inter', 'ui-sans-serif', 'system-ui', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol'],

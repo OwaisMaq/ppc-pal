@@ -9,6 +9,8 @@ import AppPreviewFrame from "@/components/AppPreviewFrame";
 import KpiChip from "@/components/KpiChip";
 import DynamicGridCard from "@/components/DynamicGridCard";
 import FeatureTile from "@/components/FeatureTile";
+import TrustSection from "@/components/TrustSection";
+import FloatingShapes from "@/components/FloatingShapes";
 
 const PublicLanding = () => {
   const { user, loading } = useAuth();
@@ -23,88 +25,131 @@ const PublicLanding = () => {
   }, [user, loading]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      {/* Sticky minimal navbar */}
-      <header className="sticky top-0 z-40 w-full border-b border-border/60 bg-background/60 backdrop-blur supports-[backdrop-filter]:bg-background/40">
-        <div className="container mx-auto flex h-14 items-center justify-between px-4">
-          <Link to="/" className="flex items-center gap-2">
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-brand text-white shadow-sm">
-              <Bot className="h-5 w-5" />
+    <div className="min-h-screen bg-background text-foreground relative overflow-hidden">
+      {/* Global floating shapes */}
+      <FloatingShapes density="light" className="fixed inset-0 z-0" />
+      
+      {/* Sticky enhanced navbar */}
+      <header className="sticky top-0 z-50 w-full border-b border-border/30 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
+        <div className="container mx-auto flex h-16 items-center justify-between px-4">
+          <Link to="/" className="flex items-center gap-3 group">
+            <span className="relative inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-r from-brand to-electric-green text-white shadow-lg group-hover:shadow-xl transition-all duration-300">
+              <Bot className="h-6 w-6" />
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-electric-purple/20 to-electric-orange/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             </span>
-            <span className="font-semibold tracking-tight">PPC Pal</span>
+            <span className="font-bold tracking-tight text-lg">PPC Pal</span>
           </Link>
-          <nav className="hidden md:flex items-center gap-6 text-sm">
-            <Link to="/company" className="transition-colors hover:text-foreground">Company</Link>
-            <Link to="/about" className="transition-colors hover:text-foreground">About</Link>
-            <Link to="/contact" className="transition-colors hover:text-foreground">Contact</Link>
+          <nav className="hidden md:flex items-center gap-8 text-sm font-medium">
+            <Link to="/company" className="transition-colors hover:text-electric-purple">Company</Link>
+            <Link to="/about" className="transition-colors hover:text-electric-purple">About</Link>
+            <Link to="/contact" className="transition-colors hover:text-electric-purple">Contact</Link>
           </nav>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             {user ? (
               <Link to="/dashboard">
-                <Button variant="pill" size="sm">Go to Dashboard</Button>
+                <Button variant="pill" size="default" className="bg-gradient-to-r from-brand to-electric-green hover:shadow-lg">
+                  Go to Dashboard
+                </Button>
               </Link>
             ) : (
               <Link to="/auth">
-                <Button variant="hero" size="xl">Join the beta</Button>
+                <Button variant="hero" size="lg" className="bg-gradient-to-r from-electric-purple to-electric-orange hover:shadow-xl animate-pulse-glow">
+                  Join the beta
+                </Button>
               </Link>
             )}
           </div>
         </div>
       </header>
 
-      {/* Hero */}
+      {/* Enhanced Hero */}
       <HeroBackground imageUrl="/lovable-uploads/4b093e39-3730-4f0a-974c-c04971fa5913.png">
-        <div className="mx-auto max-w-3xl text-center">
-          <h1 className="font-display text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight">
-            Smarter Amazon PPC. Cinematic simplicity.
-          </h1>
-          <p className="mt-6 text-lg text-muted-foreground">
-            Maximise ROAS with AI-driven bids, keyword harvesting, and budget pacing. Clean visuals, less noise.
-          </p>
-          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+        <div className="mx-auto max-w-4xl text-center relative z-10">
+          <div className="animate-fade-in">
+            <h1 className="font-display text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold tracking-tight mb-6">
+              <span className="bg-gradient-to-r from-foreground via-electric-purple to-electric-orange bg-clip-text text-transparent">
+                Smarter Amazon PPC.
+              </span>
+              <br />
+              <span className="bg-gradient-to-r from-electric-green via-brand to-electric-blue bg-clip-text text-transparent">
+                Cinematic simplicity.
+              </span>
+            </h1>
+            <p className="mt-8 text-xl text-muted-foreground leading-relaxed max-w-2xl mx-auto">
+              Maximise ROAS with AI-driven bids, keyword harvesting, and budget pacing. 
+              <span className="text-electric-purple font-medium"> Clean visuals, less noise.</span>
+            </p>
+          </div>
+          
+          <div className="mt-12 flex flex-col items-center justify-center gap-4 sm:flex-row animate-scale-in">
             {user ? (
               <Link to="/dashboard" className="w-full sm:w-auto">
-                <Button variant="hero" size="xl" className="w-full sm:w-auto">
-                  <Zap className="mr-2 h-5 w-5" /> Go to Dashboard
+                <Button 
+                  size="xl" 
+                  className="w-full sm:w-auto bg-gradient-to-r from-brand to-electric-green hover:from-electric-green hover:to-brand shadow-2xl hover:shadow-electric-green/50 transition-all duration-300 text-white font-semibold px-8 py-4"
+                >
+                  <Zap className="mr-3 h-6 w-6" /> Go to Dashboard
                 </Button>
               </Link>
             ) : (
               <Link to="/auth" className="w-full sm:w-auto">
-                <Button variant="hero" size="xl" className="w-full sm:w-auto">
-                  <Zap className="mr-2 h-5 w-5" /> Start optimizing
+                <Button 
+                  size="xl" 
+                  className="w-full sm:w-auto bg-gradient-to-r from-electric-purple to-electric-orange hover:from-electric-orange hover:to-electric-purple shadow-2xl hover:shadow-electric-purple/50 transition-all duration-300 text-white font-semibold px-8 py-4 animate-pulse-glow"
+                >
+                  <Zap className="mr-3 h-6 w-6" /> Start optimizing
                 </Button>
               </Link>
             )}
             <Link to="/about" className="w-full sm:w-auto">
-              <Button variant="pill" className="w-full sm:w-auto" size="xl">Learn more</Button>
+              <Button 
+                variant="outline" 
+                size="xl" 
+                className="w-full sm:w-auto border-2 border-electric-purple/30 hover:border-electric-purple hover:bg-electric-purple/10 backdrop-blur-sm px-8 py-4"
+              >
+                Learn more
+              </Button>
             </Link>
           </div>
         </div>
 
-        {/* App preview overlapping the fold */}
-        <div className="mx-auto mt-12 max-w-5xl">
+        {/* Enhanced app preview */}
+        <div className="mx-auto mt-20 max-w-6xl animate-fade-in">
           <AppPreviewFrame>
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4 mb-8">
               <KpiChip label="Spend" value="$12.3k" change={{ value: '2.1%', direction: 'down' }} />
               <KpiChip label="Clicks" value="48,921" change={{ value: '5.4%', direction: 'up' }} />
               <KpiChip label="ACOS" value="24.6%" change={{ value: '1.2%', direction: 'down' }} />
               <KpiChip label="ROAS" value="4.1x" change={{ value: '3.0%', direction: 'up' }} />
             </div>
-            <div className="mt-6 grid gap-6 lg:grid-cols-3">
-              <Card className="p-4 lg:col-span-2">
-                <div className="flex items-center gap-2 mb-3 text-sm text-muted-foreground">
-                  <CalendarDays className="h-4 w-4" /> Last 7 days
+            <div className="grid gap-6 lg:grid-cols-3">
+              <Card className="p-6 lg:col-span-2 bg-gradient-to-br from-card to-muted/50 border-electric-purple/10">
+                <div className="flex items-center gap-2 mb-4 text-sm text-muted-foreground">
+                  <CalendarDays className="h-4 w-4 text-electric-blue" /> 
+                  <span className="font-medium">Last 7 days</span>
                 </div>
-                <div className="h-48 rounded-lg bg-muted" aria-hidden />
+                <div className="h-48 rounded-xl bg-gradient-to-br from-electric-purple/5 to-electric-orange/5 border border-electric-purple/10 flex items-center justify-center" aria-hidden>
+                  <div className="text-muted-foreground text-sm">Performance Analytics Preview</div>
+                </div>
               </Card>
-              <Card className="p-4">
-                <div className="flex items-center gap-2 mb-3 text-sm text-muted-foreground">
-                  <BarChart3 className="h-4 w-4" /> Top keywords
+              <Card className="p-6 bg-gradient-to-br from-card to-muted/50 border-electric-orange/10">
+                <div className="flex items-center gap-2 mb-4 text-sm text-muted-foreground">
+                  <BarChart3 className="h-4 w-4 text-electric-orange" /> 
+                  <span className="font-medium">Top keywords</span>
                 </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center justify-between"><span>organic vitamin c</span><span className="font-medium">ROAS 6.2x</span></div>
-                  <div className="flex items-center justify-between"><span>kids gummies</span><span className="font-medium">ROAS 4.9x</span></div>
-                  <div className="flex items-center justify-between"><span>beauty serum</span><span className="font-medium">ROAS 3.8x</span></div>
+                <div className="space-y-3 text-sm">
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-electric-green/5">
+                    <span>organic vitamin c</span>
+                    <span className="font-semibold text-electric-green">ROAS 6.2x</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-electric-orange/5">
+                    <span>kids gummies</span>
+                    <span className="font-semibold text-electric-orange">ROAS 4.9x</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-electric-purple/5">
+                    <span>beauty serum</span>
+                    <span className="font-semibold text-electric-purple">ROAS 3.8x</span>
+                  </div>
                 </div>
               </Card>
             </div>
@@ -112,37 +157,64 @@ const PublicLanding = () => {
         </div>
       </HeroBackground>
 
-      {/* Value Section */}
-      <section className="container mx-auto px-4 py-20">
-        <div className="grid items-center gap-10 lg:grid-cols-2">
-          <div>
-            <h2 className="text-3xl sm:text-4xl font-semibold mb-6">Maximise ROAS, every day</h2>
-            <ul className="space-y-4 text-base">
-              <li className="flex items-start gap-3">
-                <CheckCircle2 className="mt-0.5 h-5 w-5 text-brand" />
-                <div>
-                  <div className="font-medium">Dynamic Bids</div>
-                  <p className="text-muted-foreground">Continuous bid adjustments based on performance signals.</p>
-                </div>
-              </li>
-              <li className="flex items-start gap-3">
-                <CheckCircle2 className="mt-0.5 h-5 w-5 text-brand" />
-                <div>
-                  <div className="font-medium">Keyword Harvesting</div>
-                  <p className="text-muted-foreground">Promote winners, pause waste, and mine search terms automatically.</p>
-                </div>
-              </li>
-              <li className="flex items-start gap-3">
-                <CheckCircle2 className="mt-0.5 h-5 w-5 text-brand" />
-                <div>
-                  <div className="font-medium">Budget Pacing</div>
-                  <p className="text-muted-foreground">Avoid mid-day drop-offs and overspend with smart pacing.</p>
-                </div>
-              </li>
-            </ul>
-          </div>
-          <div>
-            <DynamicGridCard />
+      {/* Enhanced Value Section */}
+      <section className="relative py-24 overflow-hidden">
+        {/* Background decorative elements */}
+        <div className="absolute top-16 right-10 w-24 h-24 rounded-full bg-electric-blue/10 animate-float-slow blur-2xl" aria-hidden="true" />
+        <div className="absolute bottom-20 left-16 w-32 h-32 rounded-lg bg-electric-purple/10 animate-float rotate-12 blur-2xl" aria-hidden="true" />
+        
+        <div className="container mx-auto px-4 relative">
+          <div className="grid items-center gap-16 lg:grid-cols-2">
+            <div className="space-y-8">
+              <div>
+                <h2 className="text-4xl sm:text-5xl font-bold mb-6 leading-tight">
+                  <span className="bg-gradient-to-r from-electric-purple to-electric-orange bg-clip-text text-transparent">
+                    Maximise ROAS,
+                  </span>
+                  <br />
+                  every single day
+                </h2>
+                <p className="text-lg text-muted-foreground">
+                  Our AI-powered optimization engine works 24/7 to ensure your campaigns perform at their peak.
+                </p>
+              </div>
+              
+              <ul className="space-y-6 text-base">
+                <li className="flex items-start gap-4 group">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-r from-electric-purple/20 to-electric-purple/10 flex items-center justify-center group-hover:from-electric-purple/40 group-hover:to-electric-purple/20 transition-all duration-300">
+                    <CheckCircle2 className="h-4 w-4 text-electric-purple" />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="font-semibold text-lg text-electric-purple">Dynamic Bids</div>
+                    <p className="text-muted-foreground leading-relaxed">Continuous bid adjustments based on performance signals and market conditions.</p>
+                  </div>
+                </li>
+                <li className="flex items-start gap-4 group">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-r from-electric-orange/20 to-electric-orange/10 flex items-center justify-center group-hover:from-electric-orange/40 group-hover:to-electric-orange/20 transition-all duration-300">
+                    <CheckCircle2 className="h-4 w-4 text-electric-orange" />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="font-semibold text-lg text-electric-orange">Keyword Harvesting</div>
+                    <p className="text-muted-foreground leading-relaxed">Automatically promote winning search terms while eliminating wasteful spend.</p>
+                  </div>
+                </li>
+                <li className="flex items-start gap-4 group">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-r from-electric-green/20 to-electric-green/10 flex items-center justify-center group-hover:from-electric-green/40 group-hover:to-electric-green/20 transition-all duration-300">
+                    <CheckCircle2 className="h-4 w-4 text-electric-green" />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="font-semibold text-lg text-electric-green">Budget Pacing</div>
+                    <p className="text-muted-foreground leading-relaxed">Smart budget distribution prevents mid-day drop-offs and overspend scenarios.</p>
+                  </div>
+                </li>
+              </ul>
+            </div>
+            <div className="relative">
+              {/* Floating accent shapes around the card */}
+              <div className="absolute -top-4 -right-4 w-8 h-8 rounded-full bg-electric-purple/30 animate-float blur-sm" aria-hidden="true" />
+              <div className="absolute -bottom-6 -left-6 w-6 h-6 rounded-sm bg-electric-orange/30 animate-float-slow rotate-45 blur-sm" aria-hidden="true" />
+              <DynamicGridCard />
+            </div>
           </div>
         </div>
       </section>
@@ -168,33 +240,64 @@ const PublicLanding = () => {
         </div>
       </section>
 
-      {/* Trust/CTA strip */}
-      <section className="border-t py-10">
-        <div className="container mx-auto px-4 flex flex-col items-center justify-between gap-4 text-center md:flex-row">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Shield className="h-5 w-5" /> Data encrypted, OAuth with Amazon
-          </div>
-          <div className="flex gap-3">
-            <Link to="/about"><Button variant="pill">Learn more</Button></Link>
-            {user ? (
-              <Link to="/dashboard"><Button variant="hero">Open dashboard</Button></Link>
-            ) : (
-              <Link to="/auth"><Button variant="hero">Join the beta</Button></Link>
-            )}
+      {/* Enhanced CTA Section */}
+      <section className="relative py-20 bg-gradient-to-r from-electric-purple/5 via-transparent to-electric-orange/5 border-t border-border/30">
+        {/* Background effects */}
+        <div className="absolute inset-0 bg-gradient-to-r from-electric-purple/5 to-electric-orange/5 blur-3xl" aria-hidden="true" />
+        
+        <div className="container mx-auto px-4 relative">
+          <div className="max-w-4xl mx-auto text-center">
+            <h3 className="text-2xl sm:text-3xl font-bold mb-6 bg-gradient-to-r from-electric-purple to-electric-orange bg-clip-text text-transparent">
+              Ready to transform your Amazon PPC?
+            </h3>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
+              <div className="flex items-center gap-3 text-muted-foreground">
+                <Shield className="h-5 w-5 text-electric-green" /> 
+                <span>Enterprise security & Amazon OAuth</span>
+              </div>
+              <div className="flex gap-4">
+                <Link to="/about">
+                  <Button variant="outline" className="border-electric-purple/30 hover:border-electric-purple hover:bg-electric-purple/10">
+                    Learn more
+                  </Button>
+                </Link>
+                {user ? (
+                  <Link to="/dashboard">
+                    <Button className="bg-gradient-to-r from-electric-purple to-electric-orange hover:shadow-xl text-white font-semibold">
+                      Open dashboard
+                    </Button>
+                  </Link>
+                ) : (
+                  <Link to="/auth">
+                    <Button className="bg-gradient-to-r from-electric-purple to-electric-orange hover:shadow-xl text-white font-semibold animate-pulse-glow">
+                      Join the beta
+                    </Button>
+                  </Link>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t">
-        <div className="container mx-auto px-4 py-6 flex items-center justify-between text-sm text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-brand text-white">
-              <Bot className="h-4 w-4" />
-            </span>
-            <span>PPC Pal</span>
+      {/* Enhanced Footer */}
+      <footer className="border-t border-border/30 bg-gradient-to-r from-background to-muted/20">
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
+            <div className="flex items-center gap-3">
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-r from-brand to-electric-green text-white shadow-lg">
+                <Bot className="h-5 w-5" />
+              </span>
+              <div>
+                <div className="font-semibold text-foreground text-base">PPC Pal</div>
+                <div className="text-xs">AI-Powered PPC Optimization</div>
+              </div>
+            </div>
+            <div className="text-center sm:text-right">
+              <div className="font-medium">© 2024 WISH AND WILLOW LTD</div>
+              <div className="text-xs">All rights reserved</div>
+            </div>
           </div>
-          <span>© 2024 WISH AND WILLOW LTD • All rights reserved</span>
         </div>
       </footer>
     </div>
