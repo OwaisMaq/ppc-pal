@@ -331,6 +331,31 @@ serve(async (req) => {
     const timeUnitOpt: 'SUMMARY' | 'DAILY' = (timeUnit === 'DAILY' ? 'DAILY' : 'SUMMARY')
     console.log('🚀 Starting sync for user:', user.id, 'connection:', connectionId, 'dateRangeDays:', dateRange, 'diagnosticMode:', diag)
     
+    // Create sync job for progress tracking
+    const { data: syncJob, error: syncJobError } = await supabase
+      .from('sync_jobs')
+      .insert({
+        connection_id: connectionId,
+        user_id: user.id,
+        status: 'running',
+        phase: 'starting',
+        progress_percent: 0,
+        sync_details: {
+          dateRange,
+          diagnosticMode: diag,
+          timeUnit: timeUnitOpt
+        }
+      })
+      .select('id')
+      .single()
+    
+    if (syncJobError) {
+      console.error('Failed to create sync job:', syncJobError)
+      // Continue without sync job tracking
+    }
+    
+    const syncJobId = syncJob?.id
+    
     // Get the connection details with enhanced logging
     const { data: connection, error: connectionError } = await supabase
       .from('amazon_connections')
@@ -456,6 +481,14 @@ serve(async (req) => {
 
     // PHASE 1: Sync entity structure (campaigns, ad groups, keywords)
      console.log('🚀 Starting comprehensive Amazon Ads data sync...')
+     
+     // Update sync job progress
+     if (syncJobId) {
+       await supabase.from('sync_jobs').update({
+         phase: 'syncing_entities',
+         progress_percent: 10
+       }).eq('id', syncJobId)
+     }
      
      // Fetch campaigns first
      console.log('📊 Fetching campaigns...')
@@ -715,6 +748,25 @@ serve(async (req) => {
         reporting_api_version: 'v3'
       })
       .eq('id', connectionId);
+
+    // Update sync job progress
+    if (syncJobId) {
+      await supabase.from('sync_jobs').update({
+        phase: 'syncing_performance',
+        progress_percent: 40,
+        sync_details: {
+          dateRange,
+          diagnosticMode: diag,
+          timeUnit: timeUnitOpt,
+          entityCounts: {
+            campaigns: campaignIds.length,
+            adGroups: adGroupIds.length,
+            keywords: keywordIds.length,
+            targets: targetIds.length
+          }
+        }
+      }).eq('id', syncJobId)
+    }
 
     // Initialize diagnostics
     const diagnostics: any = {
@@ -1637,6 +1689,28 @@ serve(async (req) => {
       )
     }
 
+    // Mark sync job as complete
+    if (syncJobId) {
+      await supabase.from('sync_jobs').update({
+        status: 'success',
+        phase: 'complete',
+        progress_percent: 100,
+        finished_at: new Date().toISOString(),
+        sync_details: {
+          dateRange,
+          diagnosticMode: diag,
+          timeUnit: timeUnitOpt,
+          entityCounts: {
+            campaigns: campaignIds.length,
+            adGroups: adGroupIds.length,
+            keywords: keywordIds.length,
+            targets: targetIds.length
+          },
+          metricsUpdated: totalMetricsUpdated
+        }
+      }).eq('id', syncJobId)
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -1662,6 +1736,17 @@ serve(async (req) => {
     if (message.includes('Connection is not active')) code = 'CONNECTION_INACTIVE'
     else if (message.includes('Token expired')) code = 'TOKEN_EXPIRED'
     else if (message.includes('Missing Amazon client secret')) code = 'MISSING_AMAZON_SECRET'
+
+    // Mark sync job as failed
+    if (syncJobId) {
+      await supabase.from('sync_jobs').update({
+        status: 'error',
+        phase: 'error',
+        progress_percent: 0,
+        finished_at: new Date().toISOString(),
+        error_details: { error: message, code }
+      }).eq('id', syncJobId)
+    }
 
     return new Response(
       JSON.stringify({ success: false, code, message, error: message }),

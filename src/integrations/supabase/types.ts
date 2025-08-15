@@ -1536,6 +1536,48 @@ export type Database = {
         }
         Relationships: []
       }
+      sync_jobs: {
+        Row: {
+          connection_id: string
+          created_at: string
+          error_details: Json | null
+          finished_at: string | null
+          id: string
+          phase: string | null
+          progress_percent: number | null
+          started_at: string
+          status: string
+          sync_details: Json | null
+          user_id: string
+        }
+        Insert: {
+          connection_id: string
+          created_at?: string
+          error_details?: Json | null
+          finished_at?: string | null
+          id?: string
+          phase?: string | null
+          progress_percent?: number | null
+          started_at?: string
+          status?: string
+          sync_details?: Json | null
+          user_id: string
+        }
+        Update: {
+          connection_id?: string
+          created_at?: string
+          error_details?: Json | null
+          finished_at?: string | null
+          id?: string
+          phase?: string | null
+          progress_percent?: number | null
+          started_at?: string
+          status?: string
+          sync_details?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       sync_performance_logs: {
         Row: {
           campaigns_processed: number | null
