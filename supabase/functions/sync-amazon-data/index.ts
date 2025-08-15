@@ -151,8 +151,8 @@ async function createReportRequest(
                       : reportType === 'keywords' ? 'keywordId'
                       : reportType === 'targets' ? 'targetId'
                       : 'campaignId'
-     
-     payload.filters = [{ field: filterField, values: entityIds }]
+      
+      payload.filters = [{ field: filterField, operator: 'IN', values: entityIds }]
    }
 
   // Add groupBy for campaign reports (required for v3 API) but not for keywords
@@ -537,7 +537,8 @@ serve(async (req) => {
           status: campaign.state || 'enabled',
           daily_budget: parseFloat(campaign.dailyBudget) || null,
           start_date: campaign.startDate || null,
-          end_date: campaign.endDate || null
+          end_date: campaign.endDate || null,
+          asin: null // Will be populated from advertised products report
         }, {
           onConflict: 'connection_id,amazon_campaign_id',
           ignoreDuplicates: false
@@ -700,13 +701,19 @@ serve(async (req) => {
             continue
           }
 
+          // Extract ASIN from target expression for product targeting
+          const expr = target.expression
+          const asinCandidate = Array.isArray(expr?.value) ? 
+            expr.value.find((v: any) => v?.type === 'ASIN')?.value : null
+
           await supabase
             .from('targets')
             .upsert({
               adgroup_id: storedAdGroup.id,
               amazon_target_id: target.targetId.toString(),
-              expression_type: target.expression?.type || 'auto',
-              expression_value: JSON.stringify(target.expression) || null,
+              type: target.expression?.type || 'auto',
+              expression: target.expression ?? null,
+              asin: asinCandidate ?? null,
               bid: parseFloat(target.bid) || null,
               status: target.state || 'enabled'
             }, {
@@ -716,6 +723,44 @@ serve(async (req) => {
         }
       } catch (error) {
         console.warn(`Failed to sync targets for ad group ${adGroupId}:`, error)
+      }
+    }
+
+    // PHASE 1B: Sync advertised products to populate ASINs
+    console.log('🛍️ Fetching advertised products for ASIN data...')
+    const allAdGroupIds = Array.from(adGroupMap.keys())
+    
+    if (allAdGroupIds.length > 0) {
+      try {
+        const advProdColumns = ['adId', 'adGroupId', 'campaignId', 'asin', 'impressions', 'clicks', 'spend', 'sales14d', 'purchases14d']
+        const reportId = await createReportRequest(
+          apiEndpoint, accessToken, clientId, connection.profile_id,
+          'advertisedProducts', advProdColumns, allAdGroupIds, 
+          { dateRangeDays: 30, timeUnit: 'DAILY' }
+        )
+        
+        const reportData = await pollReportStatus(apiEndpoint, accessToken, clientId, connection.profile_id, reportId)
+        const downloadedData = await downloadAndParseReport(reportData.location)
+        
+        // Update campaigns with ASIN data from advertised products
+        const campaignAsinUpdates = new Map<string, string>()
+        for (const row of downloadedData) {
+          if (row.asin && row.campaignId) {
+            campaignAsinUpdates.set(row.campaignId.toString(), row.asin)
+          }
+        }
+        
+        // Batch update campaigns with ASINs
+        for (const [amazonCampaignId, asin] of campaignAsinUpdates.entries()) {
+          await supabase.from('campaigns')
+            .update({ asin })
+            .eq('amazon_campaign_id', amazonCampaignId)
+            .eq('connection_id', connectionId)
+        }
+        
+        console.log(`✅ Updated ASINs for ${campaignAsinUpdates.size} campaigns from advertised products`)
+      } catch (error) {
+        console.warn('⚠️ Failed to fetch advertised products for ASIN data:', error)
       }
     }
 
