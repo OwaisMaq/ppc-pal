@@ -2027,6 +2027,10 @@ export type Database = {
         Args: { user_uuid: string }
         Returns: undefined
       }
+      rollup_campaign_aggregates_14d: {
+        Args: { p_connection_id: string }
+        Returns: undefined
+      }
       sync_amazon_data: {
         Args: { connection_uuid: string }
         Returns: undefined
