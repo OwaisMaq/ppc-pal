@@ -840,69 +840,71 @@ serve(async (req) => {
           const convRate7d = clicks > 0 ? (orders7d / clicks) * 100 : 0
           const convRate14d = clicks > 0 ? (orders14d / clicks) * 100 : 0
 
-          const { error: campErr } = await supabase
-            .from('campaigns')
-            .upsert({
-              connection_id: connectionId,
-              amazon_campaign_id: perf.campaignId.toString(),
-              // CRITICAL FIX: Write to correct database fields that UI expects
-              impressions, // Legacy/default metrics
-              clicks,
-              cost_legacy: spend, // Write spend to cost_legacy (what UI reads)
-              attributed_sales_legacy: sales14d, // Use 14d as primary sales
-              attributed_conversions_legacy: orders14d,
-              acos: acos14d,
-              roas: roas14d,
-              // 7d windowed metrics
-              attributed_sales_7d: sales7d,
-              attributed_conversions_7d: orders7d,
-              acos_7d: acos7d,
-              roas_7d: roas7d,
-              ctr_7d: ctr7d,
-              cpc_7d: cpc7d,
-              conversion_rate_7d: convRate7d,
-              clicks_7d: clicks,
-              impressions_7d: impressions,
-              cost_7d: spend,
-              // 14d windowed metrics
-              attributed_sales_14d: sales14d,
-              attributed_conversions_14d: orders14d,
-              acos_14d: acos14d,
-              roas_14d: roas14d,
-              ctr_14d: ctr14d,
-              cpc_14d: cpc14d,
-              conversion_rate_14d: convRate14d,
-              clicks_14d: clicks,
-              impressions_14d: impressions,
-              cost_14d: spend,
-              last_updated: new Date().toISOString()
-            }, { onConflict: 'connection_id, amazon_campaign_id' })
-          
-          if (campErr) {
-            diagnostics.writeErrors.push({ entity: 'campaign', id: perf.campaignId?.toString?.(), error: campErr.message })
+          // For DAILY syncs, only insert into performance history (don't overwrite campaign totals)
+          if (timeUnitOpt === 'DAILY' && anyPerf.date) {
+            const campaign = campaignMap.get(perf.campaignId.toString())
+            if (campaign) {
+              await supabase.from('campaign_performance_history').upsert({
+                campaign_id: campaign.id,
+                date: anyPerf.date,
+                attribution_window: '14d',
+                impressions,
+                clicks,
+                spend,
+                sales: sales14d,
+                orders: orders14d,
+                ctr: ctr14d,
+                cpc: cpc14d,
+                conversion_rate: convRate14d,
+                acos: acos14d,
+                roas: roas14d,
+              }, { onConflict: 'campaign_id,date,attribution_window' })
+              totalMetricsUpdated++
+            }
           } else {
-            totalMetricsUpdated++
+            // For SUMMARY syncs, update campaign totals directly
+            const { error: campErr } = await supabase
+              .from('campaigns')
+              .upsert({
+                connection_id: connectionId,
+                amazon_campaign_id: perf.campaignId.toString(),
+                // CRITICAL FIX: Write to correct database fields that UI expects
+                impressions, // Legacy/default metrics
+                clicks,
+                cost_legacy: spend, // Write spend to cost_legacy (what UI reads)
+                attributed_sales_legacy: sales14d, // Use 14d as primary sales
+                attributed_conversions_legacy: orders14d,
+                acos: acos14d,
+                roas: roas14d,
+                // 7d windowed metrics
+                attributed_sales_7d: sales7d,
+                attributed_conversions_7d: orders7d,
+                acos_7d: acos7d,
+                roas_7d: roas7d,
+                ctr_7d: ctr7d,
+                cpc_7d: cpc7d,
+                conversion_rate_7d: convRate7d,
+                clicks_7d: clicks,
+                impressions_7d: impressions,
+                cost_7d: spend,
+                // 14d windowed metrics
+                attributed_sales_14d: sales14d,
+                attributed_conversions_14d: orders14d,
+                acos_14d: acos14d,
+                roas_14d: roas14d,
+                ctr_14d: ctr14d,
+                cpc_14d: cpc14d,
+                conversion_rate_14d: convRate14d,
+                clicks_14d: clicks,
+                impressions_14d: impressions,
+                cost_14d: spend,
+                last_updated: new Date().toISOString()
+              }, { onConflict: 'connection_id, amazon_campaign_id' })
             
-            // If DAILY, also insert into performance history
-            if (timeUnitOpt === 'DAILY' && anyPerf.date) {
-              const campaign = campaignMap.get(perf.campaignId.toString())
-              if (campaign) {
-                await supabase.from('campaign_performance_history').upsert({
-                  campaign_id: campaign.id,
-                  date: anyPerf.date,
-                  attribution_window: '14d',
-                  impressions,
-                  clicks,
-                  spend,
-                  sales: sales14d,
-                  orders: orders14d,
-                  ctr: ctr14d,
-                  cpc: cpc14d,
-                  conversion_rate: convRate14d,
-                  acos: acos14d,
-                  roas: roas14d,
-                }, { onConflict: 'campaign_id,date,attribution_window' })
-              }
+            if (campErr) {
+              diagnostics.writeErrors.push({ entity: 'campaign', id: perf.campaignId?.toString?.(), error: campErr.message })
+            } else {
+              totalMetricsUpdated++
             }
           }
         }
@@ -1101,46 +1103,67 @@ serve(async (req) => {
             .single()
           
           if (adGroupRecord) {
-            const { error: agErr } = await supabase
-              .from('ad_groups')
-              .update({
+            // For DAILY syncs, only insert into performance history
+            if (timeUnitOpt === 'DAILY' && anyPerf.date) {
+              await supabase.from('adgroup_performance_history').upsert({
+                adgroup_id: adGroupRecord.id,
+                date: anyPerf.date,
+                attribution_window: '14d',
                 impressions,
                 clicks,
                 spend,
-                sales: sales14d, // Keep flat fields for backward compatibility
+                sales: sales14d,
                 orders: orders14d,
+                ctr: ctr7d,
+                cpc: cpc7d,
+                conversion_rate: convRate14d,
                 acos: acos14d,
                 roas: roas14d,
-                // 7d metrics
-                sales_7d: sales7d,
-                orders_7d: orders7d,
-                acos_7d: acos7d,
-                roas_7d: roas7d,
-                ctr_7d: ctr7d,
-                cpc_7d: cpc7d,
-                conversion_rate_7d: convRate7d,
-                clicks_7d: clicks,
-                impressions_7d: impressions,
-                spend_7d: spend,
-                // 14d metrics
-                sales_14d: sales14d,
-                orders_14d: orders14d,
-                acos_14d: acos14d,
-                roas_14d: roas14d,
-                ctr_14d: ctr7d,
-                cpc_14d: cpc7d,
-                conversion_rate_14d: convRate14d,
-                clicks_14d: clicks,
-                impressions_14d: impressions,
-                spend_14d: spend,
-                last_updated: new Date().toISOString()
-              })
-              .eq('id', adGroupRecord.id)
-            
-            if (agErr) {
-              diagnostics.writeErrors.push({ entity: 'ad_group', id: perf.adGroupId?.toString?.(), error: agErr.message })
-            } else {
+              }, { onConflict: 'adgroup_id,date,attribution_window' })
               totalMetricsUpdated++
+            } else {
+              // For SUMMARY syncs, update adgroup totals directly
+              const { error: agErr } = await supabase
+                .from('ad_groups')
+                .update({
+                  impressions,
+                  clicks,
+                  spend,
+                  sales: sales14d, // Keep flat fields for backward compatibility
+                  orders: orders14d,
+                  acos: acos14d,
+                  roas: roas14d,
+                  // 7d metrics
+                  sales_7d: sales7d,
+                  orders_7d: orders7d,
+                  acos_7d: acos7d,
+                  roas_7d: roas7d,
+                  ctr_7d: ctr7d,
+                  cpc_7d: cpc7d,
+                  conversion_rate_7d: convRate7d,
+                  clicks_7d: clicks,
+                  impressions_7d: impressions,
+                  spend_7d: spend,
+                  // 14d metrics
+                  sales_14d: sales14d,
+                  orders_14d: orders14d,
+                  acos_14d: acos14d,
+                  roas_14d: roas14d,
+                  ctr_14d: ctr7d,
+                  cpc_14d: cpc7d,
+                  conversion_rate_14d: convRate14d,
+                  clicks_14d: clicks,
+                  impressions_14d: impressions,
+                  spend_14d: spend,
+                  last_updated: new Date().toISOString()
+                })
+                .eq('id', adGroupRecord.id)
+              
+              if (agErr) {
+                diagnostics.writeErrors.push({ entity: 'ad_group', id: perf.adGroupId?.toString?.(), error: agErr.message })
+              } else {
+                totalMetricsUpdated++
+              }
             }
           }
         }
@@ -1470,74 +1493,102 @@ serve(async (req) => {
           const convRate7d = clicks > 0 ? (orders7d / clicks) * 100 : 0
           const convRate14d = clicks > 0 ? (orders14d / clicks) * 100 : 0
 
-          const { error: kwErr, data: kwUpd } = await supabase
-            .from('keywords')
-            .update({
-              impressions,
-              clicks,
-              spend,
-              sales: sales14d,
-              orders: orders14d,
-              acos: acos14d,
-              roas: roas14d,
-              ctr,
-              cpc,
-              conversion_rate: convRate14d,
-              // 7d
-              sales_7d: sales7d,
-              orders_7d: orders7d,
-              acos_7d: acos7d,
-              roas_7d: roas7d,
-              ctr_7d: ctr,
-              cpc_7d: cpc,
-              conversion_rate_7d: convRate7d,
-              clicks_7d: clicks,
-              impressions_7d: impressions,
-              spend_7d: spend,
-              // 14d
-              sales_14d: sales14d,
-              orders_14d: orders14d,
-              acos_14d: acos14d,
-              roas_14d: roas14d,
-              ctr_14d: ctr,
-              cpc_14d: cpc,
-              conversion_rate_14d: convRate14d,
-              clicks_14d: clicks,
-              impressions_14d: impressions,
-              spend_14d: spend,
-              last_updated: new Date().toISOString()
-            })
-            .eq('amazon_keyword_id', keywordId.toString())
-            .select('id')
-          
-          if (kwErr) {
-            diagnostics.writeErrors.push({ entity: 'keyword', id: keywordId?.toString?.(), error: kwErr.message })
-          } else if (kwUpd && kwUpd.length > 0) {
-            diagnostics.keyword.matchedRows++
-            totalMetricsUpdated++
+          // For DAILY syncs, only insert into performance history for existing keywords
+          if (timeUnitOpt === 'DAILY' && anyPerf.date) {
+            const { data: existingKeyword } = await supabase
+              .from('keywords')
+              .select('id')
+              .eq('amazon_keyword_id', keywordId.toString())
+              .single()
+            
+            if (existingKeyword) {
+              await supabase.from('keyword_performance_history').upsert({
+                keyword_id: existingKeyword.id,
+                date: anyPerf.date,
+                attribution_window: '14d',
+                impressions,
+                clicks,
+                spend,
+                sales: sales14d,
+                orders: orders14d,
+                ctr,
+                cpc,
+                conversion_rate: convRate14d,
+                acos: acos14d,
+                roas: roas14d,
+              }, { onConflict: 'keyword_id,date,attribution_window' })
+              totalMetricsUpdated++
+            }
           } else {
-            // Backfill missing keyword using adGroupId and keyword details from report
-            const agAmazonId = anyPerf.adGroupId?.toString?.()
-            if (agAmazonId) {
-              const { data: ag } = await supabase
-                .from('ad_groups')
-                .select('id')
-                .eq('amazon_adgroup_id', agAmazonId)
-                .maybeSingle()
-              if (ag?.id) {
-                  // Extract ASIN from keyword performance data
-                  const advertisedAsin = anyPerf.advertisedAsin || null
+            // For SUMMARY syncs, update keyword totals directly
+            const { error: kwErr, data: kwUpd } = await supabase
+              .from('keywords')
+              .update({
+                impressions,
+                clicks,
+                spend,
+                sales: sales14d,
+                orders: orders14d,
+                acos: acos14d,
+                roas: roas14d,
+                ctr,
+                cpc,
+                conversion_rate: convRate14d,
+                // 7d
+                sales_7d: sales7d,
+                orders_7d: orders7d,
+                acos_7d: acos7d,
+                roas_7d: roas7d,
+                ctr_7d: ctr,
+                cpc_7d: cpc,
+                conversion_rate_7d: convRate7d,
+                clicks_7d: clicks,
+                impressions_7d: impressions,
+                spend_7d: spend,
+                // 14d
+                sales_14d: sales14d,
+                orders_14d: orders14d,
+                acos_14d: acos14d,
+                roas_14d: roas14d,
+                ctr_14d: ctr,
+                cpc_14d: cpc,
+                conversion_rate_14d: convRate14d,
+                clicks_14d: clicks,
+                impressions_14d: impressions,
+                spend_14d: spend,
+                last_updated: new Date().toISOString()
+              })
+              .eq('amazon_keyword_id', keywordId.toString())
+              .select('id')
+            
+            if (kwErr) {
+              diagnostics.writeErrors.push({ entity: 'keyword', id: keywordId?.toString?.(), error: kwErr.message })
+            } else if (kwUpd && kwUpd.length > 0) {
+              diagnostics.keyword.matchedRows++
+              totalMetricsUpdated++
+            } else {
+              // Backfill missing keyword using adGroupId and keyword details from report
+              const agAmazonId = anyPerf.adGroupId?.toString?.()
+              if (agAmazonId) {
+                const { data: ag } = await supabase
+                  .from('ad_groups')
+                  .select('id')
+                  .eq('amazon_adgroup_id', agAmazonId)
+                  .maybeSingle()
+                if (ag?.id) {
+                    // Extract ASIN from keyword performance data
+                    const advertisedAsin = anyPerf.advertisedAsin || null
 
-                  const { error: upErr } = await supabase
-                    .from('keywords')
-                    .upsert({
-                      adgroup_id: ag.id,
-                      amazon_keyword_id: keywordId.toString(),
-                      keyword_text: anyPerf.keywordText || 'unknown',
-                      match_type: (anyPerf.matchType || 'exact').toLowerCase(),
-                      asin: advertisedAsin,
-                      status: 'enabled',
-                      impressions,
+                    const { error: upErr } = await supabase
+                      .from('keywords')
+                      .upsert({
+                        adgroup_id: ag.id,
+                        amazon_keyword_id: keywordId.toString(),
+                        keyword_text: anyPerf.keywordText || 'unknown',
+                        match_type: (anyPerf.matchType || 'exact').toLowerCase(),
+                        asin: advertisedAsin,
+                        status: 'enabled',
+                        impressions,
                       clicks,
                       spend,
                       sales: sales14d,
@@ -1733,6 +1784,23 @@ serve(async (req) => {
           metricsUpdated: totalMetricsUpdated
         }
       }).eq('id', syncJobId)
+    }
+
+    // If DAILY sync, roll up 14-day aggregates into campaigns table
+    if (timeUnitOpt === 'DAILY') {
+      console.log('Rolling up 14-day campaign aggregates...')
+      try {
+        const { error: rollupError } = await supabase.rpc('rollup_campaign_aggregates_14d', {
+          p_connection_id: connectionId
+        })
+        if (rollupError) {
+          console.error('Failed to roll up campaign aggregates:', rollupError)
+        } else {
+          console.log('Successfully rolled up campaign aggregates')
+        }
+      } catch (error) {
+        console.error('Error during campaign rollup:', error)
+      }
     }
 
     return new Response(
