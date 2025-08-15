@@ -1,6 +1,4 @@
 import DashboardShell from "@/components/DashboardShell";
-
-import OptimizationDashboard from "@/components/OptimizationDashboard";
 import SubscriptionStatus from "@/components/SubscriptionStatus";
 import AmazonDataDashboard from "@/components/AmazonDataDashboard";
 import ConsolidatedDataView from "@/components/ConsolidatedDataView";
@@ -154,7 +152,7 @@ const Dashboard = () => {
               PPC Automation Dashboard
             </h1>
             <p className="text-gray-600">
-              Connect your Amazon Advertising accounts and let AI optimize your campaigns automatically
+              Monitor and manage your Amazon Advertising campaigns
             </p>
           </div>
           
@@ -342,10 +340,6 @@ const Dashboard = () => {
                 <AmazonDataDashboard />
               </div>
 
-              {/* Optimization Dashboard - Full Width */}
-              <div className="lg:col-span-3">
-                <OptimizationDashboard />
-              </div>
             </>
           )}
         </div>

@@ -163,35 +163,3 @@ export interface Target {
   created_at: string;
 }
 
-export interface OptimizationResult {
-  id: string;
-  user_id: string;
-  connection_id: string;
-  optimization_type: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'failed';
-  total_keywords_analyzed: number;
-  total_recommendations: number;
-  estimated_impact_spend?: number;
-  estimated_impact_sales?: number;
-  results_data?: any;
-  error_message?: string;
-  started_at?: string;
-  completed_at?: string;
-  created_at: string;
-}
-
-export interface OptimizationRecommendation {
-  id: string;
-  optimization_result_id: string;
-  entity_type: 'keyword' | 'campaign' | 'adgroup';
-  entity_id: string;
-  recommendation_type: string;
-  current_value?: string;
-  recommended_value?: string;
-  reasoning: string;
-  impact_level: 'high' | 'medium' | 'low';
-  estimated_impact?: number;
-  applied: boolean;
-  applied_at?: string;
-  created_at: string;
-}

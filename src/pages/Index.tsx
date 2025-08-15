@@ -1,19 +1,13 @@
 
 import DashboardShell from "@/components/DashboardShell";
-import HeroSection from "@/components/HeroSection";
-import ProcessingProgress from "@/components/ProcessingProgress";
-import UploadSection from "@/components/UploadSection";
-import OptimizationSection from "@/components/OptimizationSection";
+
 import InfoCards from "@/components/InfoCards";
 import SubscriptionStatus from "@/components/SubscriptionStatus";
 import AmazonGuide from "@/components/AmazonGuide";
-import { useOptimization } from "@/hooks/useOptimization";
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Upload, Zap, Download, FileSpreadsheet, TrendingUp } from "lucide-react";
-import FileUpload from "@/components/FileUpload";
-import DataPreview from "@/components/DataPreview";
-import OptimizationResults from "@/components/OptimizationResults";
+import { Upload } from "lucide-react";
 
 export interface AdvertisingData {
   portfolios: any[];
@@ -23,17 +17,6 @@ export interface AdvertisingData {
 }
 
 const Index = () => {
-  const {
-    uploadedData,
-    optimizedData,
-    isProcessing,
-    progress,
-    currentStep,
-    handleFileUpload,
-    handleOptimize,
-    handleDownload
-  } = useOptimization();
-
   return (
     <DashboardShell>
       <div className="container mx-auto py-6 px-4">
@@ -42,22 +25,9 @@ const Index = () => {
             File Upload & Optimization
           </h1>
           <p className="text-gray-600">
-            Upload your Amazon advertising data files and optimize campaigns with AI
+            Upload your Amazon advertising data files for analysis
           </p>
         </div>
-        <HeroSection 
-          uploadedData={uploadedData}
-          optimizedData={optimizedData}
-          isProcessing={isProcessing}
-          onOptimize={handleOptimize}
-          onDownload={handleDownload}
-        />
-        
-        <ProcessingProgress 
-          isProcessing={isProcessing}
-          progress={progress}
-          currentStep={currentStep}
-        />
 
         {/* Info cards at the top - smaller and circular */}
         <div className="mb-6">
@@ -78,7 +48,7 @@ const Index = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-0">
-              <FileUpload onFileUpload={handleFileUpload} />
+              <p className="text-gray-600">Upload functionality has been moved to the dashboard. Please use the main dashboard for data management.</p>
             </CardContent>
           </Card>
 
@@ -87,104 +57,6 @@ const Index = () => {
 
           {/* Free Plan Section */}
           <SubscriptionStatus />
-        </div>
-
-        {/* Bottom row - Data preview and AI optimization */}
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Upload Data Preview */}
-          <div className="space-y-6">
-            {uploadedData && (
-              <Card>
-                <CardHeader className="pb-4">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <FileSpreadsheet className="h-5 w-5 text-green-600" />
-                    Data Preview
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <DataPreview data={uploadedData} />
-                </CardContent>
-              </Card>
-            )}
-          </div>
-
-          {/* AI Optimization */}
-          <div className="space-y-6">
-            {uploadedData && (
-              <Card>
-                <CardHeader className="pb-4">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <Zap className="h-5 w-5 text-yellow-600" />
-                    AI Optimization
-                  </CardTitle>
-                  <CardDescription className="text-sm">
-                    Let AI analyze and optimize your advertising data
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <Button 
-                    onClick={handleOptimize} 
-                    disabled={isProcessing}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                    size="lg"
-                  >
-                    {isProcessing ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        <Zap className="h-4 w-4 mr-2" />
-                        Optimize Data
-                      </>
-                    )}
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-
-          {/* Download Results */}
-          <div className="space-y-6">
-            {optimizedData && (
-              <>
-                <Card>
-                  <CardHeader className="pb-4">
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <TrendingUp className="h-5 w-5 text-green-600" />
-                      Optimization Results
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <OptimizationResults 
-                      originalData={uploadedData!}
-                      optimizedData={optimizedData}
-                    />
-                  </CardContent>
-                </Card>
-
-                <Card className="border-green-200 bg-green-50">
-                  <CardHeader className="pb-4">
-                    <CardTitle className="flex items-center gap-2 text-green-700 text-lg">
-                      <Download className="h-5 w-5" />
-                      Download Optimized Data
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <Button 
-                      onClick={handleDownload}
-                      className="w-full bg-green-600 hover:bg-green-700 text-white"
-                      size="lg"
-                    >
-                      <Download className="h-4 w-4 mr-2" />
-                      Download Excel Workbook
-                    </Button>
-                  </CardContent>
-                </Card>
-              </>
-            )}
-          </div>
         </div>
       </div>
     </DashboardShell>

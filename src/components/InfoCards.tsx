@@ -1,6 +1,6 @@
 
 import { Card, CardContent } from "@/components/ui/card";
-import { Upload, Zap, Download } from "lucide-react";
+import { Upload, BarChart3, Download } from "lucide-react";
 
 const InfoCards = () => {
   const cards = [
@@ -11,9 +11,9 @@ const InfoCards = () => {
       color: "text-blue-600"
     },
     {
-      icon: Zap,
-      title: "2. AI Optimization",
-      description: "AI analyzes and optimizes your campaigns and keywords",
+      icon: BarChart3,
+      title: "2. Performance Analysis",
+      description: "Analyze campaign performance and identify optimization opportunities",
       color: "text-yellow-600"
     },
     {
