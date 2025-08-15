@@ -51,10 +51,10 @@ const PublicLanding = () => {
       {/* Enhanced Hero */}
       <HeroBackground imageUrl="/lovable-uploads/4b093e39-3730-4f0a-974c-c04971fa5913.png">
         <div className="mx-auto max-w-4xl text-center relative z-10">
-          <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight mb-6">
+          <h1 className="text-5xl sm:text-6xl font-bold tracking-tight mb-6 md:text-8xl">
             PPC Re-imagined.
             <br />
-            <span className="text-4xl text-gray-400">Delegate your Amazon ads to AI</span>
+            <span className="text-gray-400 text-5xl">Delegate your Amazon ads to AI</span>
           </h1>
           <p className="mt-8 text-muted-foreground leading-relaxed max-w-2xl mx-auto text-lg">AI-driven bids | campaign management| keyword harvesting| day parting  </p>
           
@@ -133,17 +133,17 @@ const PublicLanding = () => {
       </HeroBackground>
 
       {/* Clean Value Section */}
-      <section className="py-24">
+      <section className="py-24 bg-black">
         <div className="container mx-auto px-4">
           <div className="grid items-center gap-16 lg:grid-cols-2">
-            <div className="space-y-8">
+            <div className="space-y-8 bg-transparent rounded-md">
               <div>
-                <h2 className="text-4xl sm:text-5xl font-bold mb-6 leading-tight">
+                <h2 className="text-4xl sm:text-5xl font-bold mb-6 leading-tight text-gray-300">
                   Maximise ROAS,
                   <br />
                   every single day
                 </h2>
-                <p className="text-lg text-muted-foreground">
+                <p className="text-lg text-gray-300">
                   Our AI-powered optimization engine works 24/7 to ensure your campaigns perform at their peak.
                 </p>
               </div>
@@ -172,8 +172,8 @@ const PublicLanding = () => {
                     <CheckCircle2 className="h-4 w-4 text-primary" />
                   </div>
                   <div className="space-y-1">
-                    <div className="font-semibold text-lg">Budget Pacing</div>
-                    <p className="text-muted-foreground leading-relaxed">Smart budget distribution prevents mid-day drop-offs and overspend scenarios.</p>
+                    <div className="font-semibold text-lg bg-transparent">Budget Pacing</div>
+                    <p className="leading-relaxed text-gray-300">Smart budget distribution prevents mid-day drop-offs and overspend scenarios.</p>
                   </div>
                 </li>
               </ul>
