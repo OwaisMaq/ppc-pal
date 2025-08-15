@@ -10,11 +10,11 @@ import KpiChip from "@/components/KpiChip";
 import DynamicGridCard from "@/components/DynamicGridCard";
 import FeatureTile from "@/components/FeatureTile";
 import TrustSection from "@/components/TrustSection";
-
-
 const PublicLanding = () => {
-  const { user, loading } = useAuth();
-
+  const {
+    user,
+    loading
+  } = useAuth();
   useEffect(() => {
     console.log('PublicLanding: Component mounted');
     console.log('PublicLanding: Current URL:', window.location.href);
@@ -23,9 +23,7 @@ const PublicLanding = () => {
     console.log('PublicLanding: This is a public page, no redirects should happen');
     document.title = 'PPC Pal — AI Amazon PPC Optimizer';
   }, [user, loading]);
-
-  return (
-    <div className="min-h-screen bg-background text-foreground">
+  return <div className="min-h-screen bg-background text-foreground">
       {/* Clean navbar */}
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
@@ -41,15 +39,11 @@ const PublicLanding = () => {
             <Link to="/contact" className="transition-colors hover:text-primary">Contact</Link>
           </nav>
           <div className="flex items-center gap-3">
-            {user ? (
-              <Link to="/dashboard">
+            {user ? <Link to="/dashboard">
                 <Button>Go to Dashboard</Button>
-              </Link>
-            ) : (
-              <Link to="/auth">
+              </Link> : <Link to="/auth">
                 <Button>Join the beta</Button>
-              </Link>
-            )}
+              </Link>}
           </div>
         </div>
       </header>
@@ -60,27 +54,20 @@ const PublicLanding = () => {
           <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight mb-6">
             PPC Re-imagined.
             <br />
-            <span className="text-muted-foreground">Cinematic simplicity.</span>
+            <span className="text-4xl text-gray-400">Delegate your Amazon ads to AI</span>
           </h1>
-          <p className="mt-8 text-xl text-muted-foreground leading-relaxed max-w-2xl mx-auto">
-            Maximise ROAS with AI-driven bids, keyword harvesting, and budget pacing. 
-            Clean visuals, less noise.
-          </p>
+          <p className="mt-8 text-muted-foreground leading-relaxed max-w-2xl mx-auto text-lg">AI-driven bids | campaign management| keyword harvesting| day parting  </p>
           
           <div className="mt-12 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            {user ? (
-              <Link to="/dashboard">
+            {user ? <Link to="/dashboard">
                 <Button size="lg" className="px-8 py-3">
                   <Zap className="mr-2 h-5 w-5" /> Go to Dashboard
                 </Button>
-              </Link>
-            ) : (
-              <Link to="/auth">
+              </Link> : <Link to="/auth">
                 <Button size="lg" className="px-8 py-3">
                   <Zap className="mr-2 h-5 w-5" /> Start optimizing
                 </Button>
-              </Link>
-            )}
+              </Link>}
             <Link to="/about">
               <Button variant="outline" size="lg" className="px-8 py-3">
                 Learn more
@@ -93,10 +80,22 @@ const PublicLanding = () => {
         <div className="mx-auto mt-20 max-w-6xl animate-fade-in">
           <AppPreviewFrame>
             <div className="flex flex-wrap items-center gap-3 sm:gap-4 mb-8">
-              <KpiChip label="Spend" value="$12.3k" change={{ value: '2.1%', direction: 'down' }} />
-              <KpiChip label="Clicks" value="48,921" change={{ value: '5.4%', direction: 'up' }} />
-              <KpiChip label="ACOS" value="24.6%" change={{ value: '1.2%', direction: 'down' }} />
-              <KpiChip label="ROAS" value="4.1x" change={{ value: '3.0%', direction: 'up' }} />
+              <KpiChip label="Spend" value="$12.3k" change={{
+              value: '2.1%',
+              direction: 'down'
+            }} />
+              <KpiChip label="Clicks" value="48,921" change={{
+              value: '5.4%',
+              direction: 'up'
+            }} />
+              <KpiChip label="ACOS" value="24.6%" change={{
+              value: '1.2%',
+              direction: 'down'
+            }} />
+              <KpiChip label="ROAS" value="4.1x" change={{
+              value: '3.0%',
+              direction: 'up'
+            }} />
             </div>
             <div className="grid gap-6 lg:grid-cols-3">
               <Card className="p-6 lg:col-span-2">
@@ -187,25 +186,7 @@ const PublicLanding = () => {
       </section>
 
       {/* Time Saver Section */}
-      <section className="container mx-auto px-4 pb-20">
-        <h2 className="text-3xl sm:text-4xl font-semibold mb-8">Your time’s valuable</h2>
-        <div className="grid gap-6 md:grid-cols-3">
-          <FeatureTile
-            title="Automatic Bid Adjustments"
-            subtitle="Always-on optimisation"
-            imageUrl="/lovable-uploads/47be75a0-13ac-45cd-bad8-df3a6e6237a7.png"
-          />
-          <FeatureTile
-            title="Keyword Harvesting"
-            subtitle="Mine winners, prune waste"
-            imageUrl="/lovable-uploads/bda7d203-91b5-4329-947b-2ce46773ed8e.png"
-          />
-          <FeatureTile
-            title="Budget Pacing Alerts"
-            subtitle="Stay within targets"
-          />
-        </div>
-      </section>
+      
 
       {/* Clean CTA Section */}
       <section className="py-20 border-t bg-muted/30">
@@ -223,15 +204,11 @@ const PublicLanding = () => {
                 <Link to="/about">
                   <Button variant="outline">Learn more</Button>
                 </Link>
-                {user ? (
-                  <Link to="/dashboard">
+                {user ? <Link to="/dashboard">
                     <Button>Open dashboard</Button>
-                  </Link>
-                ) : (
-                  <Link to="/auth">
+                  </Link> : <Link to="/auth">
                     <Button>Join the beta</Button>
-                  </Link>
-                )}
+                  </Link>}
               </div>
             </div>
           </div>
@@ -258,8 +235,6 @@ const PublicLanding = () => {
           </div>
         </div>
       </footer>
-    </div>
-  );
+    </div>;
 };
-
 export default PublicLanding;
