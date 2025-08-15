@@ -123,31 +123,31 @@ const PublicLanding = () => {
               <KpiChip label="ROAS" value="4.1x" change={{ value: '3.0%', direction: 'up' }} />
             </div>
             <div className="grid gap-6 lg:grid-cols-3">
-              <Card className="p-6 lg:col-span-2 bg-gradient-to-br from-card to-muted/50 border-electric-purple/10">
+              <Card className="p-6 lg:col-span-2">
                 <div className="flex items-center gap-2 mb-4 text-sm text-muted-foreground">
                   <CalendarDays className="h-4 w-4 text-electric-blue" /> 
                   <span className="font-medium">Last 7 days</span>
                 </div>
-                <div className="h-48 rounded-xl bg-gradient-to-br from-electric-purple/5 to-electric-orange/5 border border-electric-purple/10 flex items-center justify-center" aria-hidden>
+                <div className="h-48 rounded-2xl bg-gradient-to-br from-electric-purple/5 to-electric-orange/5 border border-electric-purple/10 flex items-center justify-center" aria-hidden>
                   <div className="text-muted-foreground text-sm">Performance Analytics Preview</div>
                 </div>
               </Card>
-              <Card className="p-6 bg-gradient-to-br from-card to-muted/50 border-electric-orange/10">
+              <Card className="p-6">
                 <div className="flex items-center gap-2 mb-4 text-sm text-muted-foreground">
                   <BarChart3 className="h-4 w-4 text-electric-orange" /> 
                   <span className="font-medium">Top keywords</span>
                 </div>
                 <div className="space-y-3 text-sm">
-                  <div className="flex items-center justify-between p-2 rounded-lg bg-electric-green/5">
-                    <span>organic vitamin c</span>
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-electric-green/5 border border-electric-green/10 transition-all hover:bg-electric-green/10">
+                    <span className="font-medium">organic vitamin c</span>
                     <span className="font-semibold text-electric-green">ROAS 6.2x</span>
                   </div>
-                  <div className="flex items-center justify-between p-2 rounded-lg bg-electric-orange/5">
-                    <span>kids gummies</span>
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-electric-orange/5 border border-electric-orange/10 transition-all hover:bg-electric-orange/10">
+                    <span className="font-medium">kids gummies</span>
                     <span className="font-semibold text-electric-orange">ROAS 4.9x</span>
                   </div>
-                  <div className="flex items-center justify-between p-2 rounded-lg bg-electric-purple/5">
-                    <span>beauty serum</span>
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-electric-purple/5 border border-electric-purple/10 transition-all hover:bg-electric-purple/10">
+                    <span className="font-medium">beauty serum</span>
                     <span className="font-semibold text-electric-purple">ROAS 3.8x</span>
                   </div>
                 </div>
