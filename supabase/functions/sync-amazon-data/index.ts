@@ -155,9 +155,7 @@ async function createReportRequest(
      payload.filters = [{ field: filterField, values: entityIds }]
    }
 
-  if (reportType === 'keywords') {
-    payload.configuration.groupBy = ['keyword']
-  }
+  // Remove groupBy for keywords - not required for v3 spKeywords and can cause 400s
 
   // Log minimal payload details for debugging without dumping all IDs
   try {
@@ -187,8 +185,8 @@ async function createReportRequest(
       try {
         const errorData = JSON.parse(errorText)
         const retryAfterMatch = errorData.details?.match(/(\d+) seconds/)
-        if (match) {
-          const retryAfter = parseInt(match[1])
+        if (retryAfterMatch) {
+          const retryAfter = parseInt(retryAfterMatch[1])
           throw new Error(`Rate limited, retry after ${retryAfter} seconds`)
         }
       } catch {}

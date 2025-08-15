@@ -8,9 +8,9 @@ export const useAmazonData = () => {
   const { user } = useAuth();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [adGroups, setAdGroups] = useState<AdGroup[]>([]);
-const [keywords, setKeywords] = useState<Keyword[]>([]);
-const [targets, setTargets] = useState<Target[]>([]);
-const [loading, setLoading] = useState(false);
+  const [keywords, setKeywords] = useState<Keyword[]>([]);
+  const [targets, setTargets] = useState<Target[]>([]);
+  const [loading, setLoading] = useState(false);
   const [lastSyncDiagnostics, setLastSyncDiagnostics] = useState<any | null>(null);
 
   useEffect(() => {
@@ -43,19 +43,30 @@ const [loading, setLoading] = useState(false);
     }
     
     try {
+      // Step 1: Get user's connection IDs
+      const { data: connections } = await supabase
+        .from('amazon_connections')
+        .select('id')
+        .eq('user_id', user.id);
+
+      const connectionIds = (connections || []).map(c => c.id);
+      
+      if (connectionIds.length === 0) {
+        setCampaigns([]);
+        return;
+      }
+
+      // Step 2: Get campaigns for these connections
       const { data, error } = await supabase
         .from('campaigns')
-        .select(`
-          *,
-          amazon_connections!campaigns_connection_id_fkey(user_id)
-        `)
-        .eq('amazon_connections.user_id', user.id)
+        .select('*')
+        .in('connection_id', connectionIds)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      setCampaigns((data as any) || []);
-      console.log('Fetched campaigns for user:', user.id, 'count:', (data as any)?.length || 0);
+      setCampaigns(data || []);
+      console.log('Fetched campaigns for user:', user.id, 'count:', data?.length || 0);
     } catch (error) {
       console.error('Error fetching campaigns:', error);
       throw error;
@@ -69,21 +80,43 @@ const [loading, setLoading] = useState(false);
     }
     
     try {
+      // Step 1: Get user's connection IDs
+      const { data: connections } = await supabase
+        .from('amazon_connections')
+        .select('id')
+        .eq('user_id', user.id);
+
+      const connectionIds = (connections || []).map(c => c.id);
+      
+      if (connectionIds.length === 0) {
+        setAdGroups([]);
+        return;
+      }
+
+      // Step 2: Get campaigns for these connections
+      const { data: campaigns } = await supabase
+        .from('campaigns')
+        .select('id')
+        .in('connection_id', connectionIds);
+
+      const campaignIds = (campaigns || []).map(c => c.id);
+      
+      if (campaignIds.length === 0) {
+        setAdGroups([]);
+        return;
+      }
+
+      // Step 3: Get ad groups for these campaigns
       const { data, error } = await supabase
         .from('ad_groups')
-        .select(`
-          *,
-          campaigns!ad_groups_campaign_id_fkey(
-            amazon_connections!campaigns_connection_id_fkey(user_id)
-          )
-        `)
-        .eq('campaigns.amazon_connections.user_id', user.id)
+        .select('*')
+        .in('campaign_id', campaignIds)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      setAdGroups((data as any) || []);
-      console.log('Fetched ad groups for user:', user.id, 'count:', (data as any)?.length || 0);
+      setAdGroups(data || []);
+      console.log('Fetched ad groups for user:', user.id, 'count:', data?.length || 0);
     } catch (error) {
       console.error('Error fetching ad groups:', error);
       throw error;
@@ -97,28 +130,62 @@ const [loading, setLoading] = useState(false);
     }
     
     try {
+      // Step 1: Get user's connection IDs
+      const { data: connections } = await supabase
+        .from('amazon_connections')
+        .select('id')
+        .eq('user_id', user.id);
+
+      const connectionIds = (connections || []).map(c => c.id);
+      
+      if (connectionIds.length === 0) {
+        setKeywords([]);
+        return;
+      }
+
+      // Step 2: Get campaigns for these connections
+      const { data: campaigns } = await supabase
+        .from('campaigns')
+        .select('id')
+        .in('connection_id', connectionIds);
+
+      const campaignIds = (campaigns || []).map(c => c.id);
+      
+      if (campaignIds.length === 0) {
+        setKeywords([]);
+        return;
+      }
+
+      // Step 3: Get ad groups for these campaigns
+      const { data: adGroups } = await supabase
+        .from('ad_groups')
+        .select('id')
+        .in('campaign_id', campaignIds);
+
+      const adGroupIds = (adGroups || []).map(ag => ag.id);
+      
+      if (adGroupIds.length === 0) {
+        setKeywords([]);
+        return;
+      }
+
+      // Step 4: Get keywords for these ad groups
       const { data, error } = await supabase
         .from('keywords')
-        .select(`
-          *,
-          ad_groups!keywords_adgroup_id_fkey(
-            campaigns!ad_groups_campaign_id_fkey(
-              amazon_connections!campaigns_connection_id_fkey(user_id)
-            )
-          )
-        `)
-        .eq('ad_groups.campaigns.amazon_connections.user_id', user.id)
+        .select('*')
+        .in('adgroup_id', adGroupIds)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      setKeywords((data as any) || []);
-      console.log('Fetched keywords for user:', user.id, 'count:', (data as any)?.length || 0);
+      setKeywords(data || []);
+      console.log('Fetched keywords for user:', user.id, 'count:', data?.length || 0);
     } catch (error) {
       console.error('Error fetching keywords:', error);
       throw error;
     }
   };
+
   const fetchTargets = async () => {
     if (!user?.id) {
       console.log('No user available for fetching targets');
@@ -126,23 +193,56 @@ const [loading, setLoading] = useState(false);
     }
     
     try {
+      // Step 1: Get user's connection IDs
+      const { data: connections } = await supabase
+        .from('amazon_connections')
+        .select('id')
+        .eq('user_id', user.id);
+
+      const connectionIds = (connections || []).map(c => c.id);
+      
+      if (connectionIds.length === 0) {
+        setTargets([]);
+        return;
+      }
+
+      // Step 2: Get campaigns for these connections
+      const { data: campaigns } = await supabase
+        .from('campaigns')
+        .select('id')
+        .in('connection_id', connectionIds);
+
+      const campaignIds = (campaigns || []).map(c => c.id);
+      
+      if (campaignIds.length === 0) {
+        setTargets([]);
+        return;
+      }
+
+      // Step 3: Get ad groups for these campaigns
+      const { data: adGroups } = await supabase
+        .from('ad_groups')
+        .select('id')
+        .in('campaign_id', campaignIds);
+
+      const adGroupIds = (adGroups || []).map(ag => ag.id);
+      
+      if (adGroupIds.length === 0) {
+        setTargets([]);
+        return;
+      }
+
+      // Step 4: Get targets for these ad groups
       const { data, error } = await supabase
         .from('targets')
-        .select(`
-          *,
-          ad_groups!targets_adgroup_id_fkey(
-            campaigns!ad_groups_campaign_id_fkey(
-              amazon_connections!campaigns_connection_id_fkey(user_id)
-            )
-          )
-        `)
-        .eq('ad_groups.campaigns.amazon_connections.user_id', user.id)
+        .select('*')
+        .in('adgroup_id', adGroupIds)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      setTargets((data as any) || []);
-      console.log('Fetched targets for user:', user.id, 'count:', (data as any)?.length || 0);
+      setTargets(data || []);
+      console.log('Fetched targets for user:', user.id, 'count:', data?.length || 0);
     } catch (error) {
       console.error('Error fetching targets:', error);
       throw error;
@@ -201,6 +301,11 @@ const [loading, setLoading] = useState(false);
       }
 
       setLastSyncDiagnostics(data?.diagnostics || null);
+
+      if (data?.diagnostics?.rollupError) {
+        console.error('Roll-up error:', data.diagnostics.rollupError);
+        toast.warning(`Data synced but roll-up failed: ${data.diagnostics.rollupError}`);
+      }
 
       if (data?.diagnostics?.writeErrors?.length) {
         const first = data.diagnostics.writeErrors[0];
