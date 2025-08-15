@@ -1795,11 +1795,14 @@ serve(async (req) => {
         })
         if (rollupError) {
           console.error('Failed to roll up campaign aggregates:', rollupError)
+          diagnostics.rollupError = rollupError.message ?? String(rollupError)
         } else {
           console.log('Successfully rolled up campaign aggregates')
+          diagnostics.rollupSuccess = true
         }
       } catch (error) {
         console.error('Error during campaign rollup:', error)
+        diagnostics.rollupError = (error as Error)?.message || String(error)
       }
     }
 
