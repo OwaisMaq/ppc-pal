@@ -126,8 +126,9 @@ const AmazonAccountSetup = () => {
                           size="sm"
                           onClick={() => syncConnection(connection.id)}
                           disabled={loading || connection.status !== 'active'}
+                          title={connection.status !== 'active' ? 'Connection must be active to sync' : 'Sync Amazon data'}
                         >
-                          <RefreshCw className="h-4 w-4" />
+                          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                         </Button>
                         <Button
                           variant="outline"

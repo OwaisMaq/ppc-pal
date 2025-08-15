@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useAmazonData } from "@/hooks/useAmazonData";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
+import { SyncStatusIndicator } from "@/components/SyncStatusIndicator";
 import { 
   ChevronDown, 
   ChevronRight, 
@@ -92,29 +93,23 @@ const ConsolidatedDataView = ({ selectedASIN }: ConsolidatedDataViewProps) => {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-blue-600" />
-              Consolidated Campaign View
-            </CardTitle>
-            <CardDescription>
-              Hierarchical view of campaigns, ad groups, keywords and targets
-            </CardDescription>
+    <div className="space-y-4">
+      <SyncStatusIndicator onSyncAll={handleSyncAll} loading={loading} />
+      
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-blue-600" />
+                Consolidated Campaign View
+              </CardTitle>
+              <CardDescription>
+                Hierarchical view of campaigns, ad groups, keywords and targets
+              </CardDescription>
+            </div>
           </div>
-          <Button
-            onClick={handleSyncAll}
-            disabled={loading}
-            variant="outline"
-            size="sm"
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Sync Data
-          </Button>
-        </div>
-      </CardHeader>
+        </CardHeader>
       <CardContent>
         {lastSyncDiagnostics && (
           <div className="mb-4 text-xs text-muted-foreground">
@@ -265,47 +260,47 @@ const ConsolidatedDataView = ({ selectedASIN }: ConsolidatedDataViewProps) => {
                                     adGroupKeywords
                                       .filter(keyword => !selectedASIN || (keyword as any).asin === selectedASIN)
                                       .map((keyword) => (
-                                      <div 
-                                        key={keyword.id} 
-                                        className="flex items-center justify-between p-2 border rounded-sm bg-background"
-                                      >
-                                        <div className="flex items-center gap-2">
-                                          <KeyRound className="h-3 w-3 text-orange-600" />
-                                          <div>
-                                            <span className="text-xs font-medium">{keyword.keyword_text}</span>
-                                             <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                               <Badge variant="outline" className="text-xs py-0 px-1">
-                                                 {keyword.match_type}
-                                               </Badge>
-                                               <Badge 
-                                                 variant={keyword.status === 'enabled' ? 'default' : 'secondary'}
-                                                 className="text-xs py-0 px-1"
-                                               >
-                                                 {keyword.status}
-                                               </Badge>
-                                               {(keyword as any).asin && (
-                                                 <Badge variant="secondary" className="text-xs py-0 px-1">
-                                                   ASIN: {(keyword as any).asin}
-                                                 </Badge>
-                                               )}
-                                               {keyword.bid && (
-                                                 <span>Bid: {formatCurrency(keyword.bid)}</span>
-                                               )}
-                                             </div>
-                                        </div>
-                                      </div>
-                                      <div className="text-right">
-                                        <div className="text-xs">
-                                          {formatCurrency((keyword as any).cost_legacy || (keyword as any).cost_14d || 0)}
-                                        </div>
-                                        <div className="text-xs text-muted-foreground">
-                                          {formatCurrency((keyword as any).attributed_sales_legacy || (keyword as any).attributed_sales_14d || 0)}
-                                        </div>
-                                        <div className="text-xs text-muted-foreground">
-                                          {formatNumber(keyword.clicks || 0)} clicks
-                                        </div>
-                                      </div>
-                                    </div>
+                                       <div 
+                                         key={keyword.id} 
+                                         className="flex items-center justify-between p-2 border rounded-sm bg-background"
+                                       >
+                                         <div className="flex items-center gap-2">
+                                           <KeyRound className="h-3 w-3 text-orange-600" />
+                                           <div>
+                                             <span className="text-xs font-medium">{keyword.keyword_text}</span>
+                                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                                <Badge variant="outline" className="text-xs py-0 px-1">
+                                                  {keyword.match_type}
+                                                </Badge>
+                                                <Badge 
+                                                  variant={keyword.status === 'enabled' ? 'default' : 'secondary'}
+                                                  className="text-xs py-0 px-1"
+                                                >
+                                                  {keyword.status}
+                                                </Badge>
+                                                {(keyword as any).asin && (
+                                                  <Badge variant="secondary" className="text-xs py-0 px-1">
+                                                    ASIN: {(keyword as any).asin}
+                                                  </Badge>
+                                                )}
+                                                {keyword.bid && (
+                                                  <span>Bid: {formatCurrency(keyword.bid)}</span>
+                                                )}
+                                              </div>
+                                           </div>
+                                         </div>
+                                         <div className="text-right">
+                                           <div className="text-xs">
+                                             {formatCurrency((keyword as any).cost_legacy || (keyword as any).cost_14d || 0)}
+                                           </div>
+                                           <div className="text-xs text-muted-foreground">
+                                             {formatCurrency((keyword as any).attributed_sales_legacy || (keyword as any).attributed_sales_14d || 0)}
+                                           </div>
+                                           <div className="text-xs text-muted-foreground">
+                                             {formatNumber(keyword.clicks || 0)} clicks
+                                           </div>
+                                         </div>
+                                       </div>
                                   ))
                                 )}
 
@@ -356,8 +351,9 @@ const ConsolidatedDataView = ({ selectedASIN }: ConsolidatedDataViewProps) => {
             })}
           </div>
         )}
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 

@@ -290,8 +290,9 @@ serve(async (req) => {
     const dateRange = Number(dateRangeDays) || 30  // Changed from 90 to 30 days to comply with Amazon API limits
     const diag = Boolean(diagnosticMode)
     const timeUnitOpt: 'SUMMARY' | 'DAILY' = (timeUnit === 'DAILY' ? 'DAILY' : 'SUMMARY')
-    console.log('Syncing data for connection:', connectionId, 'dateRangeDays:', dateRange, 'diagnosticMode:', diag)
-    // Get the connection details
+    console.log('🚀 Starting sync for user:', user.id, 'connection:', connectionId, 'dateRangeDays:', dateRange, 'diagnosticMode:', diag)
+    
+    // Get the connection details with enhanced logging
     const { data: connection, error: connectionError } = await supabase
       .from('amazon_connections')
       .select('*')
@@ -300,8 +301,21 @@ serve(async (req) => {
       .single()
 
     if (connectionError || !connection) {
-      throw new Error('Connection not found')
+      console.error('❌ Connection not found or unauthorized:', {
+        connectionId,
+        userId: user.id,
+        error: connectionError
+      });
+      throw new Error('Connection not found or unauthorized')
     }
+
+    console.log('✅ Connection validated:', {
+      profileId: connection.profile_id,
+      profileName: connection.profile_name,
+      status: connection.status,
+      lastSync: connection.last_sync_at,
+      marketplace: connection.marketplace_id
+    });
 
     const accessTokenDecrypted = await decryptText(connection.access_token)
     const refreshTokenDecrypted = await decryptText(connection.refresh_token)
@@ -559,41 +573,91 @@ serve(async (req) => {
     const targetIds: string[] = []
 
     for (const [adGroupId, storedAdGroup] of adGroupMap.entries()) {
-      const targetsResponse = await fetchWithRetry(`${apiEndpoint}/v2/sp/targets?adGroupIdFilter=${adGroupId}`, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Amazon-Advertising-API-ClientId': clientId,
-          'Amazon-Advertising-API-Scope': connection.profile_id,
-        },
-      })
-
-      if (targetsResponse.ok) {
-        const targetsData = await targetsResponse.json()
-        console.log(`  🎯 Ad Group ${adGroupId}: ${targetsData.length} targets`)
-        for (const t of targetsData) {
-          if (!t.targetId) continue
-          targetIds.push(t.targetId.toString())
-
-          await supabase
-            .from('targets')
-            .upsert({
-              adgroup_id: storedAdGroup.id,
-              amazon_target_id: t.targetId.toString(),
-              expression: t.expression ?? null,
-              type: t.expressionType ?? null,
-              bid: t.bid ?? null,
-              status: t.state ? t.state.toLowerCase() : 'enabled',
-            }, {
-              onConflict: 'adgroup_id, amazon_target_id'
-            })
+      // Try multiple potential endpoints for targets
+      let targetsResponse;
+      let targetsData = [];
+      
+      // Try the primary targets endpoint first
+      try {
+        targetsResponse = await fetchWithRetry(`${apiEndpoint}/v2/sp/targets?adGroupIdFilter=${adGroupId}`, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Amazon-Advertising-API-ClientId': clientId,
+            'Amazon-Advertising-API-Scope': connection.profile_id,
+          },
+        });
+        
+        if (targetsResponse.ok) {
+          targetsData = await targetsResponse.json();
+          console.log(`  🎯 Ad Group ${adGroupId}: ${targetsData.length} targets (primary endpoint)`);
+        } else {
+          const errTxt = await targetsResponse.text().catch(() => '');
+          console.warn(`⚠️ Primary targets endpoint failed for adGroup ${adGroupId}: ${targetsResponse.status} ${errTxt}`);
+          
+          // Try alternative endpoint without /sp/ prefix
+          console.log(`  🔄 Trying alternative targets endpoint for adGroup ${adGroupId}...`);
+          targetsResponse = await fetchWithRetry(`${apiEndpoint}/v2/targets?adGroupIdFilter=${adGroupId}`, {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Amazon-Advertising-API-ClientId': clientId,
+              'Amazon-Advertising-API-Scope': connection.profile_id,
+            },
+          });
+          
+          if (targetsResponse.ok) {
+            targetsData = await targetsResponse.json();
+            console.log(`  🎯 Ad Group ${adGroupId}: ${targetsData.length} targets (alternative endpoint)`);
+          } else {
+            const altErrTxt = await targetsResponse.text().catch(() => '');
+            console.error(`❌ Both targets endpoints failed for adGroup ${adGroupId}. Primary: ${targetsResponse.status}, Alternative: ${targetsResponse.status} ${altErrTxt}`);
+          }
         }
-      } else {
-        const errTxt = await targetsResponse.text().catch(() => '')
-        console.error(`❌ Targets API error for adGroup ${adGroupId}:`, targetsResponse.status, errTxt)
+      } catch (error) {
+        console.error(`❌ Network error fetching targets for adGroup ${adGroupId}:`, error);
+        continue;
+      }
+
+      // Process targets data
+      if (Array.isArray(targetsData)) {
+        for (const t of targetsData) {
+          if (!t.targetId) {
+            console.warn(`⚠️ Skipping target without targetId:`, t);
+            continue;
+          }
+          
+          targetIds.push(t.targetId.toString());
+
+          try {
+            await supabase
+              .from('targets')
+              .upsert({
+                adgroup_id: storedAdGroup.id,
+                amazon_target_id: t.targetId.toString(),
+                expression: t.expression ?? null,
+                type: t.expressionType ?? null,
+                bid: t.bid ?? null,
+                status: t.state ? t.state.toLowerCase() : 'enabled',
+              }, {
+                onConflict: 'adgroup_id, amazon_target_id'
+              });
+          } catch (upsertError) {
+            console.error(`❌ Failed to upsert target ${t.targetId}:`, upsertError);
+          }
+        }
       }
     }
 
     console.log(`📊 Entity sync complete: ${campaignIds.length} campaigns, ${adGroupIds.length} ad groups, ${keywordIds.length} keywords, ${targetIds.length} targets`)
+
+    // Update connection with entity counts
+    await supabase
+      .from('amazon_connections')
+      .update({ 
+        campaign_count: campaignIds.length,
+        last_sync_at: new Date().toISOString(),
+        reporting_api_version: 'v3'
+      })
+      .eq('id', connectionId);
 
     // Initialize diagnostics
     const diagnostics: any = {

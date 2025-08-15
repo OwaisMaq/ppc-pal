@@ -37,18 +37,25 @@ const [loading, setLoading] = useState(false);
   };
 
   const fetchCampaigns = async () => {
+    if (!user?.id) {
+      console.log('No user available for fetching campaigns');
+      return;
+    }
+    
     try {
       const { data, error } = await supabase
         .from('campaigns')
         .select(`
-          *
+          *,
+          amazon_connections!campaigns_connection_id_fkey(user_id)
         `)
+        .eq('amazon_connections.user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
       setCampaigns((data as any) || []);
-      console.log('Fetched campaigns:', (data as any)?.length || 0);
+      console.log('Fetched campaigns for user:', user.id, 'count:', (data as any)?.length || 0);
     } catch (error) {
       console.error('Error fetching campaigns:', error);
       throw error;
@@ -56,18 +63,27 @@ const [loading, setLoading] = useState(false);
   };
 
   const fetchAdGroups = async () => {
+    if (!user?.id) {
+      console.log('No user available for fetching ad groups');
+      return;
+    }
+    
     try {
       const { data, error } = await supabase
         .from('ad_groups')
         .select(`
-          *
+          *,
+          campaigns!ad_groups_campaign_id_fkey(
+            amazon_connections!campaigns_connection_id_fkey(user_id)
+          )
         `)
+        .eq('campaigns.amazon_connections.user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
       setAdGroups((data as any) || []);
-      console.log('Fetched ad groups:', (data as any)?.length || 0);
+      console.log('Fetched ad groups for user:', user.id, 'count:', (data as any)?.length || 0);
     } catch (error) {
       console.error('Error fetching ad groups:', error);
       throw error;
@@ -75,36 +91,58 @@ const [loading, setLoading] = useState(false);
   };
 
   const fetchKeywords = async () => {
+    if (!user?.id) {
+      console.log('No user available for fetching keywords');
+      return;
+    }
+    
     try {
       const { data, error } = await supabase
         .from('keywords')
         .select(`
-          *
+          *,
+          ad_groups!keywords_adgroup_id_fkey(
+            campaigns!ad_groups_campaign_id_fkey(
+              amazon_connections!campaigns_connection_id_fkey(user_id)
+            )
+          )
         `)
+        .eq('ad_groups.campaigns.amazon_connections.user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
       setKeywords((data as any) || []);
-      console.log('Fetched keywords:', (data as any)?.length || 0);
+      console.log('Fetched keywords for user:', user.id, 'count:', (data as any)?.length || 0);
     } catch (error) {
       console.error('Error fetching keywords:', error);
       throw error;
     }
   };
   const fetchTargets = async () => {
+    if (!user?.id) {
+      console.log('No user available for fetching targets');
+      return;
+    }
+    
     try {
       const { data, error } = await supabase
         .from('targets')
         .select(`
-          *
+          *,
+          ad_groups!targets_adgroup_id_fkey(
+            campaigns!ad_groups_campaign_id_fkey(
+              amazon_connections!campaigns_connection_id_fkey(user_id)
+            )
+          )
         `)
+        .eq('ad_groups.campaigns.amazon_connections.user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
       setTargets((data as any) || []);
-      console.log('Fetched targets:', (data as any)?.length || 0);
+      console.log('Fetched targets for user:', user.id, 'count:', (data as any)?.length || 0);
     } catch (error) {
       console.error('Error fetching targets:', error);
       throw error;
@@ -114,9 +152,25 @@ const [loading, setLoading] = useState(false);
   const syncAllData = async (connectionId: string, options?: { dateRangeDays?: number; diagnosticMode?: boolean }) => {
     setLoading(true);
     try {
+      console.log('Starting sync for connection:', connectionId, 'user:', user?.id);
+      
       const session = await supabase.auth.getSession();
       const token = session.data.session?.access_token;
       if (!token) throw new Error('No valid session found');
+
+      // Verify the connection belongs to the current user
+      const { data: connection, error: connError } = await supabase
+        .from('amazon_connections')
+        .select('id, status, profile_name, last_sync_at')
+        .eq('id', connectionId)
+        .eq('user_id', user?.id)
+        .single();
+
+      if (connError || !connection) {
+        throw new Error('Connection not found or not authorized');
+      }
+
+      console.log('Syncing connection:', connection.profile_name, 'status:', connection.status);
 
       const { data, error } = await supabase.functions.invoke('sync-amazon-data', {
         body: { connectionId, ...(options || {}) },
@@ -125,7 +179,12 @@ const [loading, setLoading] = useState(false);
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Sync edge function error:', error);
+        throw error;
+      }
+
+      console.log('Sync response:', data);
 
       if (data && data.success === false) {
         const counts = data.entitiesSynced ? ` (campaigns: ${data.entitiesSynced.campaigns || 0}, ad groups: ${data.entitiesSynced.adGroups || 0}, keywords: ${data.entitiesSynced.keywords || 0}, targets: ${data.entitiesSynced.targets || 0})` : '';
@@ -145,9 +204,12 @@ const [loading, setLoading] = useState(false);
 
       if (data?.diagnostics?.writeErrors?.length) {
         const first = data.diagnostics.writeErrors[0];
+        console.error('Write error details:', first);
         toast.error(`Write error on ${first.entity || 'unknown'} ${first.id || ''}: ${first.error}`);
       }
 
+      // Refresh data immediately and then again after 3 seconds to catch any delayed updates
+      fetchAllData();
       setTimeout(() => {
         fetchAllData();
       }, 3000);
