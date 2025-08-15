@@ -155,7 +155,10 @@ async function createReportRequest(
      payload.filters = [{ field: filterField, values: entityIds }]
    }
 
-  // Remove groupBy for keywords - not required for v3 spKeywords and can cause 400s
+  // Add groupBy for campaign reports (required for v3 API) but not for keywords
+  if (reportType === 'campaigns') {
+    payload.configuration.groupBy = ['campaign']
+  }
 
   // Log minimal payload details for debugging without dumping all IDs
   try {
@@ -552,11 +555,27 @@ serve(async (req) => {
     
     for (const [campaignId, storedCampaign] of campaignMap.entries()) {
       try {
-        const adGroupsData = await fetchAllPages(`${apiEndpoint}/v2/sp/adGroups?campaignIdFilter=${campaignId}`, {
-          'Authorization': `Bearer ${accessToken}`,
-          'Amazon-Advertising-API-ClientId': clientId,
-          'Amazon-Advertising-API-Scope': connection.profile_id,
-        })
+        // Try SP-specific endpoint first, fallback to generic if 404
+        let adGroupsData: any[] = []
+        
+        try {
+          adGroupsData = await fetchAllPages(`${apiEndpoint}/v2/sp/adGroups?campaignIdFilter=${campaignId}`, {
+            'Authorization': `Bearer ${accessToken}`,
+            'Amazon-Advertising-API-ClientId': clientId,
+            'Amazon-Advertising-API-Scope': connection.profile_id,
+          })
+        } catch (spError: any) {
+          if (spError.message?.includes('404')) {
+            console.log(`⚠️ SP adGroups endpoint failed with 404, trying generic endpoint for campaign ${campaignId}`)
+            adGroupsData = await fetchAllPages(`${apiEndpoint}/v2/adGroups?campaignIdFilter=${campaignId}`, {
+              'Authorization': `Bearer ${accessToken}`,
+              'Amazon-Advertising-API-ClientId': clientId,
+              'Amazon-Advertising-API-Scope': connection.profile_id,
+            })
+          } else {
+            throw spError
+          }
+        }
         
         for (const adGroup of adGroupsData) {
           if (!adGroup.adGroupId || !adGroup.name) {
@@ -598,11 +617,27 @@ serve(async (req) => {
       }
 
       try {
-        const keywordsData = await fetchAllPages(`${apiEndpoint}/v2/sp/keywords?adGroupIdFilter=${adGroupId}`, {
-          'Authorization': `Bearer ${accessToken}`,
-          'Amazon-Advertising-API-ClientId': clientId,
-          'Amazon-Advertising-API-Scope': connection.profile_id,
-        })
+        // Try SP-specific endpoint first, fallback to generic if 404
+        let keywordsData: any[] = []
+        
+        try {
+          keywordsData = await fetchAllPages(`${apiEndpoint}/v2/sp/keywords?adGroupIdFilter=${adGroupId}`, {
+            'Authorization': `Bearer ${accessToken}`,
+            'Amazon-Advertising-API-ClientId': clientId,
+            'Amazon-Advertising-API-Scope': connection.profile_id,
+          })
+        } catch (spError: any) {
+          if (spError.message?.includes('404')) {
+            console.log(`⚠️ SP keywords endpoint failed with 404, trying generic endpoint for adGroup ${adGroupId}`)
+            keywordsData = await fetchAllPages(`${apiEndpoint}/v2/keywords?adGroupIdFilter=${adGroupId}`, {
+              'Authorization': `Bearer ${accessToken}`,
+              'Amazon-Advertising-API-ClientId': clientId,
+              'Amazon-Advertising-API-Scope': connection.profile_id,
+            })
+          } else {
+            throw spError
+          }
+        }
         
         for (const keyword of keywordsData) {
           if (!keyword.keywordId || !keyword.keywordText) {
@@ -636,12 +671,27 @@ serve(async (req) => {
       }
       
       try {
-        // Use SP-specific endpoint with pagination - this should now work since we're using SP ad groups
-        const targetsData = await fetchAllPages(`${apiEndpoint}/v2/sp/targets?adGroupIdFilter=${adGroupId}`, {
-          'Authorization': `Bearer ${accessToken}`,
-          'Amazon-Advertising-API-ClientId': clientId,
-          'Amazon-Advertising-API-Scope': connection.profile_id,
-        })
+        // Try SP-specific endpoint first, fallback to generic if 404
+        let targetsData: any[] = []
+        
+        try {
+          targetsData = await fetchAllPages(`${apiEndpoint}/v2/sp/targets?adGroupIdFilter=${adGroupId}`, {
+            'Authorization': `Bearer ${accessToken}`,
+            'Amazon-Advertising-API-ClientId': clientId,
+            'Amazon-Advertising-API-Scope': connection.profile_id,
+          })
+        } catch (spError: any) {
+          if (spError.message?.includes('404')) {
+            console.log(`⚠️ SP targets endpoint failed with 404, trying generic endpoint for adGroup ${adGroupId}`)
+            targetsData = await fetchAllPages(`${apiEndpoint}/v2/targets?adGroupIdFilter=${adGroupId}`, {
+              'Authorization': `Bearer ${accessToken}`,
+              'Amazon-Advertising-API-ClientId': clientId,
+              'Amazon-Advertising-API-Scope': connection.profile_id,
+            })
+          } else {
+            throw spError
+          }
+        }
         
         // Process targets data
         for (const target of targetsData) {
