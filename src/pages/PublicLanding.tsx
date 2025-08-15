@@ -58,7 +58,7 @@ const PublicLanding = () => {
       <HeroBackground imageUrl="/lovable-uploads/4b093e39-3730-4f0a-974c-c04971fa5913.png">
         <div className="mx-auto max-w-4xl text-center relative z-10">
           <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight mb-6">
-            Smarter Amazon PPC.
+            PPC Re-imagined.
             <br />
             <span className="text-muted-foreground">Cinematic simplicity.</span>
           </h1>
