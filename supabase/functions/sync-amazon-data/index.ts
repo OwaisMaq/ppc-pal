@@ -733,15 +733,15 @@ serve(async (req) => {
     
     if (allAdGroupIds.length > 0) {
       try {
-        const advProdColumns = ['adId', 'adGroupId', 'campaignId', 'asin', 'impressions', 'clicks', 'spend', 'sales14d', 'purchases14d']
+        const advProdColumns = ['adId', 'adGroupId', 'campaignId', 'asin', 'impressions', 'clicks', 'cost', 'attributedSales14d', 'attributedConversions14d']
         const reportId = await createReportRequest(
           apiEndpoint, accessToken, clientId, connection.profile_id,
           'advertisedProducts', advProdColumns, allAdGroupIds, 
           { dateRangeDays: 30, timeUnit: 'DAILY' }
         )
         
-        const reportData = await pollReportStatus(apiEndpoint, accessToken, clientId, connection.profile_id, reportId)
-        const downloadedData = await downloadAndParseReport(reportData.location)
+        const report = await pollReportStatus(apiEndpoint, accessToken, clientId, connection.profile_id, reportId)
+        const downloadedData = await downloadAndParseReport(report.url)
         
         // Update campaigns with ASIN data from advertised products
         const campaignAsinUpdates = new Map<string, string>()
@@ -818,17 +818,17 @@ serve(async (req) => {
     console.log('⚡ Starting performance data sync...')
     let totalMetricsUpdated = 0
 
-    // Define columns using correct Amazon API v3 column names - FIXED: removed advertisedAsin from campaign/adGroup reports
-    const campaignColumns = ['campaignId','impressions','clicks','cost','sales_14d','purchases_14d']
-    const adGroupColumns = ['adGroupId','campaignId','impressions','clicks','cost','sales_14d','purchases_14d']
-    const targetColumns = ['targetId','adGroupId','campaignId','impressions','clicks','cost','sales_14d','purchases_14d']
-    const keywordColumns = ['keywordId','adGroupId','campaignId','keywordText','matchType','impressions','clicks','cost','sales_14d','purchases_14d']
+    // Define columns using correct Amazon API v3 column names - FIXED: use attributedSales14d/attributedConversions14d for v3
+    const campaignColumns = ['campaignId','impressions','clicks','cost','attributedSales14d','attributedConversions14d']
+    const adGroupColumns = ['adGroupId','campaignId','impressions','clicks','cost','attributedSales14d','attributedConversions14d']
+    const targetColumns = ['targetId','adGroupId','campaignId','impressions','clicks','cost','attributedSales14d','attributedConversions14d']
+    const keywordColumns = ['keywordId','adGroupId','campaignId','keywordText','matchType','impressions','clicks','cost','attributedSales14d','attributedConversions14d']
 
     // Minimal columns fallback (in case of config errors)
-    const minCampaignColumns = ['campaignId','impressions','clicks','cost','sales_14d','purchases_14d']
-    const minAdGroupColumns = ['adGroupId','impressions','clicks','cost','sales_14d','purchases_14d']
-    const minTargetColumns = ['targetId','impressions','clicks','cost','sales_14d','purchases_14d']
-    const minKeywordColumns = ['keywordId','impressions','clicks','cost','sales_14d','purchases_14d']
+    const minCampaignColumns = ['campaignId','impressions','clicks','cost','attributedSales14d','attributedConversions14d']
+    const minAdGroupColumns = ['adGroupId','impressions','clicks','cost','attributedSales14d','attributedConversions14d']
+    const minTargetColumns = ['targetId','impressions','clicks','cost','attributedSales14d','attributedConversions14d']
+    const minKeywordColumns = ['keywordId','impressions','clicks','cost','attributedSales14d','attributedConversions14d']
 
     // Campaign Performance
     if (campaignIds.length > 0) {
@@ -855,8 +855,8 @@ serve(async (req) => {
             const impressions = parseInt(anyPerf.impressions) || 0
             const clicks = parseInt(anyPerf.clicks) || 0
             const spend = parseFloat(anyPerf.cost) || 0
-            const sales = parseFloat(anyPerf.sales_14d) || 0
-            const orders = parseInt(anyPerf.purchases_14d) || 0
+            const sales = parseFloat(anyPerf.attributedSales14d) || 0
+            const orders = parseInt(anyPerf.attributedConversions14d) || 0
 
             const acos = sales > 0 ? (spend / sales) * 100 : 0
             const roas = spend > 0 ? sales / spend : 0
@@ -943,8 +943,8 @@ serve(async (req) => {
                 const impressions = parseInt(anyPerf.impressions) || 0
                 const clicks = parseInt(anyPerf.clicks) || 0
                 const spend = parseFloat(anyPerf.cost) || 0
-                const sales = parseFloat(anyPerf.sales_14d) || 0
-                const orders = parseInt(anyPerf.purchases_14d) || 0
+                const sales = parseFloat(anyPerf.attributedSales14d) || 0
+                const orders = parseInt(anyPerf.attributedConversions14d) || 0
 
                 const acos = sales > 0 ? (spend / sales) * 100 : 0
                 const roas = spend > 0 ? sales / spend : 0
@@ -1003,8 +1003,8 @@ serve(async (req) => {
                     const impressions = parseInt(anyPerf.impressions) || 0
                     const clicks = parseInt(anyPerf.clicks) || 0
                     const spend = parseFloat(anyPerf.cost) || 0
-                    const sales = parseFloat(anyPerf.sales_14d) || 0
-                    const orders = parseInt(anyPerf.purchases_14d) || 0
+                    const sales = parseFloat(anyPerf.attributedSales14d) || 0
+                    const orders = parseInt(anyPerf.attributedConversions14d) || 0
 
                     const acos = sales > 0 ? (spend / sales) * 100 : 0
                     const roas = spend > 0 ? sales / spend : 0
@@ -1071,8 +1071,8 @@ serve(async (req) => {
             const impressions = parseInt(anyPerf.impressions) || 0
             const clicks = parseInt(anyPerf.clicks) || 0
             const spend = parseFloat(anyPerf.cost) || 0
-            const sales = parseFloat(anyPerf.sales_14d) || 0
-            const orders = parseInt(anyPerf.purchases_14d) || 0
+            const sales = parseFloat(anyPerf.attributedSales14d) || 0
+            const orders = parseInt(anyPerf.attributedConversions14d) || 0
 
             const acos = sales > 0 ? (spend / sales) * 100 : 0
             const roas = spend > 0 ? sales / spend : 0
@@ -1108,9 +1108,9 @@ serve(async (req) => {
                   .update({
                     impressions,
                     clicks,
-                    spend,
-                    sales,
-                    orders,
+                    cost_14d: spend,
+                    attributed_sales_14d: sales,
+                    attributed_conversions_14d: orders,
                     acos,
                     roas,
                     last_updated: new Date().toISOString()
@@ -1156,8 +1156,8 @@ serve(async (req) => {
                 const impressions = parseInt(anyPerf.impressions) || 0
                 const clicks = parseInt(anyPerf.clicks) || 0
                 const spend = parseFloat(anyPerf.cost) || 0
-                const sales = parseFloat(anyPerf.sales_14d) || 0
-                const orders = parseInt(anyPerf.purchases_14d) || 0
+                const sales = parseFloat(anyPerf.attributedSales14d) || 0
+                const orders = parseInt(anyPerf.attributedConversions14d) || 0
 
                 const acos = sales > 0 ? (spend / sales) * 100 : 0
                 const roas = spend > 0 ? sales / spend : 0
@@ -1214,8 +1214,8 @@ serve(async (req) => {
                     const impressions = parseInt(anyPerf.impressions) || 0
                     const clicks = parseInt(anyPerf.clicks) || 0
                     const spend = parseFloat(anyPerf.cost) || 0
-                    const sales = parseFloat(anyPerf.sales_14d) || 0
-                    const orders = parseInt(anyPerf.purchases_14d) || 0
+                    const sales = parseFloat(anyPerf.attributedSales14d) || 0
+                    const orders = parseInt(anyPerf.attributedConversions14d) || 0
 
                     const acos = sales > 0 ? (spend / sales) * 100 : 0
                     const roas = spend > 0 ? sales / spend : 0
@@ -1278,8 +1278,8 @@ serve(async (req) => {
             const impressions = parseInt(anyPerf.impressions) || 0
             const clicks = parseInt(anyPerf.clicks) || 0
             const spend = parseFloat(anyPerf.cost) || 0
-            const sales = parseFloat(anyPerf.sales_14d) || 0
-            const orders = parseInt(anyPerf.purchases_14d) || 0
+            const sales = parseFloat(anyPerf.attributedSales14d) || 0
+            const orders = parseInt(anyPerf.attributedConversions14d) || 0
 
             const acos = sales > 0 ? (spend / sales) * 100 : 0
             const roas = spend > 0 ? sales / spend : 0
@@ -1376,8 +1376,8 @@ serve(async (req) => {
             const impressions = parseInt(anyPerf.impressions) || 0
             const clicks = parseInt(anyPerf.clicks) || 0
             const spend = parseFloat(anyPerf.cost) || 0
-            const sales = parseFloat(anyPerf.sales_14d) || 0
-            const orders = parseInt(anyPerf.purchases_14d) || 0
+            const sales = parseFloat(anyPerf.attributedSales14d) || 0
+            const orders = parseInt(anyPerf.attributedConversions14d) || 0
 
             const acos = sales > 0 ? (spend / sales) * 100 : 0
             const roas = spend > 0 ? sales / spend : 0
@@ -1420,9 +1420,9 @@ serve(async (req) => {
                 .update({
                   impressions,
                   clicks,
-                  spend,
-                  sales,
-                  orders,
+                  cost_14d: spend,
+                  attributed_sales_14d: sales,
+                  attributed_conversions_14d: orders,
                   acos,
                   roas,
                   last_updated: new Date().toISOString()
