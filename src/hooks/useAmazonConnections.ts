@@ -237,7 +237,7 @@ export const useAmazonConnections = () => {
       const label = target?.profile_name || target?.profile_id || 'Selected profile';
 
       const { data, error } = await supabase.functions.invoke('sync-amazon-data', {
-        body: { connectionId },
+        body: { connectionId, timeUnit: 'DAILY', dateRangeDays: 30 },
         headers: {
           Authorization: `Bearer ${token}`,
         },
