@@ -259,7 +259,14 @@ async function downloadAndParseReport(url: string): Promise<PerformanceData[]> {
   const decompressedResponse = new Response(decompressedStream)
   const jsonText = await decompressedResponse.text()
   
-  return JSON.parse(jsonText)
+  // Handle both JSON array and NDJSON format
+  const trimmed = jsonText.trim()
+  if (trimmed.startsWith('[')) {
+    return JSON.parse(trimmed)
+  }
+  // Handle NDJSON (newline-delimited JSON)
+  const lines = trimmed.split('\n').filter(Boolean)
+  return lines.map(line => JSON.parse(line))
 }
 
 // Missing pagination function for v2 API endpoints
@@ -1292,9 +1299,9 @@ serve(async (req) => {
               .update({
                 impressions,
                 clicks,
-                spend,
-                sales,
-                orders,
+                cost_14d: spend,
+                attributed_sales_14d: sales,
+                attributed_conversions_14d: orders,
                 acos,
                 roas,
                 last_updated: new Date().toISOString()
@@ -1321,9 +1328,9 @@ serve(async (req) => {
                       id: ag.id,
                       impressions,
                       clicks,
-                      spend,
-                      sales,
-                      orders,
+                      cost_14d: spend,
+                      attributed_sales_14d: sales,
+                      attributed_conversions_14d: orders,
                       acos,
                       roas,
                       ctr,
