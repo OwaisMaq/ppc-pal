@@ -225,7 +225,7 @@ const DataManagement = () => {
                 </div>
                 <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                   <span className="font-medium">PPC Campaign Data</span>
-                  <span className="text-gray-600">2 years after last upload</span>
+                  <span className="text-gray-600">2 years after last sync</span>
                 </div>
                 <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                   <span className="font-medium">Usage Analytics</span>
@@ -259,7 +259,7 @@ const DataManagement = () => {
                   </p>
                   <ul className="list-disc ml-6 text-red-700 text-sm mt-2 space-y-1">
                     <li>Account profile and settings</li>
-                    <li>All uploaded PPC campaign data</li>
+                    <li>All synced PPC campaign data</li>
                     <li>Optimization history</li>
                     <li>Subscription information</li>
                     <li>Feedback and support communications</li>

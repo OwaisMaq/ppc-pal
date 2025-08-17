@@ -111,9 +111,9 @@ const About = () => {
                       1
                     </div>
                     <div>
-                      <h3 className="font-semibold text-gray-900 mb-2">Upload Campaign Data</h3>
+                      <h3 className="font-semibold text-gray-900 mb-2">Connect Amazon Account</h3>
                       <p className="text-gray-600">
-                        Export your Amazon PPC campaign data and upload it to our secure platform.
+                        Securely connect your Amazon Ads account to sync campaign data automatically.
                       </p>
                     </div>
                   </div>
@@ -135,21 +135,9 @@ const About = () => {
                       3
                     </div>
                     <div>
-                      <h3 className="font-semibold text-gray-900 mb-2">Get Recommendations</h3>
-                      <p className="text-gray-600">
-                        Receive detailed optimization recommendations with explanations and expected impact.
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-start gap-4">
-                    <div className="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-semibold text-sm">
-                      4
-                    </div>
-                    <div>
                       <h3 className="font-semibold text-gray-900 mb-2">Implement Changes</h3>
                       <p className="text-gray-600">
-                        Download optimized campaign files and upload them back to Amazon to implement changes.
+                        Use our recommendations to optimize campaigns directly in Amazon's interface.
                       </p>
                     </div>
                   </div>

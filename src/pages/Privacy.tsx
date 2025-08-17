@@ -34,7 +34,7 @@ const Privacy = () => {
                 <ul className="list-disc ml-6 mt-2 text-gray-700">
                   <li>Email address</li>
                   <li>Account preferences</li>
-                  <li>PPC campaign data you upload</li>
+                  <li>PPC campaign data from connected accounts</li>
                   <li>Feedback and support communications</li>
                 </ul>
               </div>
@@ -122,7 +122,7 @@ const Privacy = () => {
               </p>
               <ul className="list-disc ml-6 mt-2 text-gray-700 space-y-1">
                 <li>Account data: Until account deletion</li>
-                <li>PPC campaign data: 2 years after last upload</li>
+                <li>PPC campaign data: 2 years after last sync</li>
                 <li>Usage analytics: 2 years</li>
                 <li>Support communications: 3 years</li>
               </ul>

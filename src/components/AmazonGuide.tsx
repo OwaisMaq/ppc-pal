@@ -97,7 +97,7 @@ const AmazonGuide = () => {
               <div>
                 <h4 className="font-medium text-green-800 text-lg">Ready to optimize!</h4>
                 <p className="text-green-700 mt-1">
-                  Once you've downloaded your bulk template from Amazon, upload it above to get AI-powered optimization suggestions.
+                  Use the downloaded bulk template to make optimizations in Amazon's campaign manager or bulk editor.
                 </p>
               </div>
             </div>
