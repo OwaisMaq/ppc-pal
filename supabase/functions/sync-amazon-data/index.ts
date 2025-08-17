@@ -740,7 +740,7 @@ serve(async (req) => {
     
     if (allAdGroupIds.length > 0) {
       try {
-        const advProdColumns = ['adId', 'adGroupId', 'campaignId', 'asin', 'impressions', 'clicks', 'cost', 'attributedSales14d', 'attributedConversions14d']
+        const advProdColumns = ['adId', 'adGroupId', 'campaignId', 'asin', 'impressions', 'clicks', 'cost', 'sales14d', 'purchases14d']
         const reportId = await createReportRequest(
           apiEndpoint, accessToken, clientId, connection.profile_id,
           'advertisedProducts', advProdColumns, allAdGroupIds, 
@@ -858,6 +858,8 @@ serve(async (req) => {
             const campaignAmazonId = perf.campaignId.toString()
             const storedCampaign = campaignMap.get(campaignAmazonId)
             const anyPerf = perf as any
+            const impressions = parseInt(anyPerf.impressions) || 0
+            const clicks = parseInt(anyPerf.clicks) || 0
 
             const spend = parseFloat(anyPerf.cost ?? anyPerf.spend ?? '0') || 0
             const sales = parseFloat(anyPerf.sales14d ?? anyPerf.attributedSales14d ?? anyPerf.sales_14d ?? '0') || 0
