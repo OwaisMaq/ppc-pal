@@ -173,10 +173,10 @@ const ConsolidatedDataView = ({ selectedASIN }: ConsolidatedDataViewProps) => {
                       </div>
                       <div className="text-right">
                         <div className="text-sm font-medium">
-                          Spend: {formatCurrency((campaign as any).cost_legacy || (campaign as any).cost_14d || 0)}
+                          Spend: {formatCurrency((campaign as any).cost_legacy ?? (campaign as any).cost_14d ?? (campaign as any).spend ?? 0)}
                         </div>
                         <div className="text-sm text-muted-foreground">
-                          Sales: {formatCurrency((campaign as any).attributed_sales_legacy || (campaign as any).attributed_sales_14d || 0)}
+                          Sales: {formatCurrency((campaign as any).attributed_sales_legacy ?? (campaign as any).attributed_sales_14d ?? (campaign as any).sales ?? 0)}
                         </div>
                         <div className="text-xs text-muted-foreground">
                           {campaign.acos ? `ACoS: ${campaign.acos.toFixed(1)}%` : ''}

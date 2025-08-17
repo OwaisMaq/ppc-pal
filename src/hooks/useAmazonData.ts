@@ -328,8 +328,8 @@ export const useAmazonData = () => {
 
   const getDataSummary = () => {
     // FIXED: Use fallback selectors for existing metrics fields 
-    const totalSpend = campaigns.reduce((sum, campaign) => sum + (campaign.cost_legacy || campaign.cost_14d || 0), 0);
-    const totalSales = campaigns.reduce((sum, campaign) => sum + (campaign.attributed_sales_legacy || campaign.attributed_sales_14d || 0), 0);
+    const totalSpend = campaigns.reduce((sum, campaign) => sum + ((campaign as any).cost_legacy ?? (campaign as any).cost_14d ?? (campaign as any).spend ?? 0), 0);
+    const totalSales = campaigns.reduce((sum, campaign) => sum + ((campaign as any).attributed_sales_legacy ?? (campaign as any).attributed_sales_14d ?? (campaign as any).sales ?? 0), 0);
     // Use any available click/impression fields based on the DB schema
     const totalClicks = campaigns.reduce((sum, campaign) => sum + (campaign.clicks || 0), 0);
     const totalImpressions = campaigns.reduce((sum, campaign) => sum + (campaign.impressions || 0), 0);
