@@ -1086,11 +1086,11 @@ serve(async (req) => {
             const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0
             const conversionRate = clicks > 0 ? (orders / clicks) * 100 : 0
 
-            if (adGroupRecord) {
+            if (storedAdGroup) {
               if (timeUnitOpt === 'DAILY' && anyPerf.date) {
                 // Store in performance history table
                 await supabase.from('adgroup_performance_history').upsert({
-                  adgroup_id: adGroupRecord.id,
+                  adgroup_id: storedAdGroup.id,
                   date: anyPerf.date,
                   attribution_window: '14d',
                   impressions,
@@ -1122,11 +1122,11 @@ serve(async (req) => {
                     roas,
                     last_updated: new Date().toISOString()
                   })
-                  .eq('id', adGroupRecord.id)
+                  .eq('id', storedAdGroup.id)
 
                 if (agErr) {
-                  console.error(`Failed to update ad group ${adGroupRecord.id}:`, agErr)
-                  diagnostics.writeErrors.push({ entity: 'adGroup', id: adGroupRecord.id, error: agErr.message })
+                  console.error(`Failed to update ad group ${storedAdGroup.id}:`, agErr)
+                  diagnostics.writeErrors.push({ entity: 'adGroup', id: storedAdGroup.id, error: agErr.message })
                 } else {
                   totalMetricsUpdated++
                 }
@@ -1169,7 +1169,7 @@ serve(async (req) => {
                 const acos = sales > 0 ? (spend / sales) * 100 : 0
                 const roas = spend > 0 ? sales / spend : 0
 
-                if (agRecord?.id) {
+                if (storedAdGroup?.id) {
                   const { error: agErr } = await supabase
                     .from('ad_groups')
                     .update({
@@ -1181,12 +1181,12 @@ serve(async (req) => {
                       acos,
                       roas,
                       last_updated: new Date().toISOString()
-                    })
-                    .eq('id', agRecord.id)
+                     })
+                     .eq('id', storedAdGroup.id)
 
-                  if (agErr) {
-                    console.error(`Failed to update ad group ${agRecord.id} (minimal):`, agErr)
-                    diagnostics.writeErrors.push({ entity: 'adGroup', id: agRecord.id, error: agErr.message })
+                   if (agErr) {
+                     console.error(`Failed to update ad group ${storedAdGroup.id} (minimal):`, agErr)
+                     diagnostics.writeErrors.push({ entity: 'adGroup', id: storedAdGroup.id, error: agErr.message })
                   } else {
                     totalMetricsUpdated++
                   }
@@ -1216,34 +1216,34 @@ serve(async (req) => {
                   const adGroupAmazonId = perf.adGroupId.toString()
                   const storedAdGroup = adGroupMap.get(adGroupAmazonId)
 
-                  if (agRecord?.id) {
-                    const anyPerf = perf as any
-                    const impressions = parseInt(anyPerf.impressions) || 0
-                    const clicks = parseInt(anyPerf.clicks) || 0
-                    const spend = parseFloat(anyPerf.cost ?? anyPerf.spend ?? '0') || 0
-                    const sales = parseFloat(anyPerf.sales14d ?? anyPerf.attributedSales14d ?? anyPerf.sales_14d ?? '0') || 0
-                    const orders = parseInt(anyPerf.purchases14d ?? anyPerf.attributedConversions14d ?? anyPerf.purchases_14d ?? '0') || 0
+                   if (storedAdGroup?.id) {
+                     const anyPerf = perf as any
+                     const impressions = parseInt(anyPerf.impressions) || 0
+                     const clicks = parseInt(anyPerf.clicks) || 0
+                     const spend = parseFloat(anyPerf.cost ?? anyPerf.spend ?? '0') || 0
+                     const sales = parseFloat(anyPerf.sales14d ?? anyPerf.attributedSales14d ?? anyPerf.sales_14d ?? '0') || 0
+                     const orders = parseInt(anyPerf.purchases14d ?? anyPerf.attributedConversions14d ?? anyPerf.purchases_14d ?? '0') || 0
 
-                    const acos = sales > 0 ? (spend / sales) * 100 : 0
-                    const roas = spend > 0 ? sales / spend : 0
+                     const acos = sales > 0 ? (spend / sales) * 100 : 0
+                     const roas = spend > 0 ? sales / spend : 0
 
-                    const { error: agErr } = await supabase
-                      .from('ad_groups')
-                      .update({
-                        impressions,
-                        clicks,
-                        cost_14d: spend,
-                        attributed_sales_14d: sales,
-                        attributed_conversions_14d: orders,
-                        acos,
-                        roas,
-                        last_updated: new Date().toISOString()
-                      })
-                      .eq('id', agRecord.id)
+                     const { error: agErr } = await supabase
+                       .from('ad_groups')
+                       .update({
+                         impressions,
+                         clicks,
+                         cost_14d: spend,
+                         attributed_sales_14d: sales,
+                         attributed_conversions_14d: orders,
+                         acos,
+                         roas,
+                         last_updated: new Date().toISOString()
+                       })
+                       .eq('id', storedAdGroup.id)
 
-                    if (agErr) {
-                      console.error(`Failed to update ad group ${agRecord.id} (unfiltered):`, agErr)
-                      diagnostics.writeErrors.push({ entity: 'adGroup', id: agRecord.id, error: agErr.message })
+                     if (agErr) {
+                       console.error(`Failed to update ad group ${storedAdGroup.id} (unfiltered):`, agErr)
+                       diagnostics.writeErrors.push({ entity: 'adGroup', id: storedAdGroup.id, error: agErr.message })
                     } else {
                       totalMetricsUpdated++
                     }

@@ -509,6 +509,27 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "ams_subscriptions_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "amazon_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ams_subscriptions_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "amazon_connections_client"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ams_subscriptions_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "amazon_connections_safe"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "fk_ams_sub_conn"
             columns: ["connection_id"]
             isOneToOne: false

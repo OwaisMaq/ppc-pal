@@ -56,10 +56,10 @@ serve(async (req) => {
       });
     }
 
-    const { connectionId, datasetId, destinationArn, region } = body;
-    console.log("Extracted parameters:", { connectionId, datasetId, destinationArn, region });
+    const { connectionId, datasetId, destinationArn, region, action, subscriptionId, destinationType } = body;
+    console.log("Extracted parameters:", { connectionId, datasetId, destinationArn, region, action, subscriptionId, destinationType });
     
-    if (!connectionId || !datasetId || !destinationArn || !region) {
+    if (!connectionId || !datasetId) {
       console.error("Missing required parameters");
       return new Response("Missing required parameters", { 
         status: 400, 
@@ -67,7 +67,7 @@ serve(async (req) => {
       });
     }
 
-    // Authenticate user
+    // Authenticate user first
     console.log("Creating auth client...");
     const auth = createClient(SB_URL, SB_ANON, {
       global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
@@ -130,6 +130,111 @@ serve(async (req) => {
     }
     
     console.log("Connection verified for user");
+
+    // Handle archive action
+    if (action === "archive" && subscriptionId) {
+      console.log("Processing archive request for subscription:", subscriptionId);
+      try {
+        // Get fresh access token for archive
+        const refreshResult = await db.functions.invoke('refresh-amazon-token', {
+          body: { connectionId }
+        });
+        
+        if (refreshResult.error) {
+          console.error("Token refresh failed for archive:", refreshResult.error);
+          return new Response(`Token refresh failed: ${refreshResult.error.message}`, { 
+            status: 502, 
+            headers: corsHeaders 
+          });
+        }
+
+        const { data: freshConn, error: freshConnErr } = await db
+          .from("amazon_connections")
+          .select("access_token")
+          .eq("id", connectionId)
+          .single();
+          
+        if (freshConnErr || !freshConn?.access_token) {
+          console.error("Failed to get fresh access token for archive:", freshConnErr);
+          return new Response("Failed to get fresh access token", { 
+            status: 502, 
+            headers: corsHeaders 
+          });
+        }
+        
+        const access_token = freshConn.access_token;
+
+        // Get AMS base URL
+        const base =
+          region === "eu-west-1" ? "https://advertising-api-eu.amazon.com" :
+          region === "us-east-1" ? "https://advertising-api.amazon.com" :
+          region === "us-west-2" ? "https://advertising-api-fe.amazon.com" :
+          "https://advertising-api-eu.amazon.com"; // Default fallback
+          
+        console.log("Using AMS base URL for archive:", base);
+
+        // Archive the subscription in Amazon
+        const res = await fetch(`${base}/streams/subscriptions/${subscriptionId}`, {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${access_token}`,
+            "Amazon-Advertising-API-ClientId": AMZ_CLIENT_ID,
+            "Amazon-Advertising-API-Scope": String(conn.profile_id),
+          },
+        });
+        
+        console.log("Amazon archive response status:", res.status);
+        const responseText = await res.text();
+        console.log("Amazon archive response body:", responseText);
+        
+        // Update our database to mark as archived
+        const { error: dbError } = await db
+          .from("ams_subscriptions")
+          .update({ status: "archived", updated_at: new Date().toISOString() })
+          .eq("connection_id", connectionId)
+          .eq("dataset_id", datasetId)
+          .eq("subscription_id", subscriptionId);
+          
+        if (dbError) {
+          console.error("Failed to update subscription status:", dbError);
+        }
+        
+        if (!res.ok) {
+          console.error("Amazon subscription archive failed");
+          return new Response(`Amazon API error (${res.status}): ${responseText}`, { 
+            status: 502, 
+            headers: corsHeaders 
+          });
+        }
+
+        console.log("=== AMS subscription archived successfully ===");
+        return new Response(JSON.stringify({ success: true, archived: true }), { 
+          status: 200, 
+          headers: { 
+            "Content-Type": "application/json",
+            ...corsHeaders
+          } 
+        });
+        
+      } catch (e) {
+        console.error("Archive error:", e);
+        return new Response(`Archive failed: ${e?.message ?? String(e)}`, { 
+          status: 500, 
+          headers: corsHeaders 
+        });
+      }
+    }
+    
+    // For subscribe action, require additional parameters
+    if (!destinationArn || !region) {
+      console.error("Missing required parameters for subscription");
+      return new Response("Missing required parameters for subscription", { 
+        status: 400, 
+        headers: corsHeaders 
+      });
+    }
+
+    // For subscribe action, refresh token and get fresh access token
 
     // Refresh the Amazon token first to ensure we have a valid access token
     console.log("Refreshing Amazon token...");
@@ -206,6 +311,39 @@ serve(async (req) => {
         status: 502, 
         headers: corsHeaders 
       });
+    }
+
+    // Parse Amazon response to get subscription ID
+    let amazonResponse;
+    try {
+      amazonResponse = JSON.parse(responseText);
+    } catch (e) {
+      console.warn("Failed to parse Amazon response as JSON:", e);
+      amazonResponse = {};
+    }
+
+    // Persist subscription in our database
+    const { error: dbError } = await db
+      .from("ams_subscriptions")
+      .upsert({
+        connection_id: connectionId,
+        dataset_id: datasetId,
+        destination_type: destinationType || "firehose",
+        destination_arn: destinationArn,
+        region: region,
+        status: "active",
+        subscription_id: amazonResponse.subscriptionId || null,
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: "connection_id,dataset_id",
+        ignoreDuplicates: false
+      });
+      
+    if (dbError) {
+      console.error("Failed to persist subscription in database:", dbError);
+      // Don't fail the request since Amazon subscription was successful
+    } else {
+      console.log("Subscription persisted in database successfully");
     }
 
     console.log("=== AMS subscription created successfully ===");

@@ -50,6 +50,16 @@ export default function AmsSetup() {
   const toggleDataset = async (datasetId: AmsDataset, enabled: boolean) => {
     console.log('toggleDataset called:', { datasetId, enabled, selectedConnectionId, destinationArn });
     if (!selectedConnectionId) return;
+    
+    if (enabled && !destinationArn) {
+      toast({
+        title: "Missing Configuration",
+        description: "Please enter an AWS Destination ARN before enabling subscriptions",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     try {
       if (enabled) {
         await subscribe({
@@ -309,7 +319,7 @@ export default function AmsSetup() {
                   </div>
                   <Switch
                     checked={!!subs["sp-traffic"] && subs["sp-traffic"].status !== "archived"}
-                    disabled={processing || !destinationArn}
+                    disabled={processing}
                     onCheckedChange={(v) => toggleDataset("sp-traffic", v)}
                   />
                 </div>
@@ -339,7 +349,7 @@ export default function AmsSetup() {
                   </div>
                   <Switch
                     checked={!!subs["sp-conversion"] && subs["sp-conversion"].status !== "archived"}
-                    disabled={processing || !destinationArn}
+                    disabled={processing}
                     onCheckedChange={(v) => toggleDataset("sp-conversion", v)}
                   />
                 </div>
