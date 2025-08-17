@@ -331,7 +331,7 @@ const ConsolidatedDataView = ({ selectedASIN }: ConsolidatedDataViewProps) => {
                                         </div>
                                         <div className="text-right">
                                           <div className="text-xs">{formatCurrency(t.spend || 0)}</div>
-                                          <div className="text-xs text-muted-foreground">{formatCurrency(t.sales || 0)}</div>
+                                          <div className="text-xs text-muted-foreground">{formatCurrency((t as any).attributed_sales_legacy || (t as any).attributed_sales_14d || 0)}</div>
                                           <div className="text-xs text-muted-foreground">{formatNumber(t.clicks || 0)} clicks</div>
                                         </div>
                                       </div>
