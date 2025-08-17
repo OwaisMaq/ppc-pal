@@ -48,6 +48,19 @@ serve(async (req) => {
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const INGEST_TOKEN = Deno.env.get("AMS_INGEST_TOKEN"); // Optional security token
+
+  // Optional token validation for additional security
+  if (INGEST_TOKEN) {
+    const authHeader = req.headers.get("X-Ingest-Token");
+    if (authHeader !== INGEST_TOKEN) {
+      console.warn("AMS Ingest: Invalid or missing ingest token");
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }), 
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+  }
 
   // Service role client for database access (bypasses RLS)
   const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);

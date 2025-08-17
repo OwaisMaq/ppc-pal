@@ -156,9 +156,13 @@ async function createReportRequest(
       payload.filters = [{ field: filterField, operator: 'IN', values: entityIds }]
    }
 
-  // Add groupBy for campaign reports (required for v3 API) but not for keywords
+  // Add groupBy for v3 API reports that require it
   if (reportType === 'campaigns') {
     payload.configuration.groupBy = ['campaign']
+  } else if (reportType === 'adGroups') {
+    payload.configuration.groupBy = ['adGroup'] 
+  } else if (reportType === 'advertisedProducts') {
+    payload.configuration.groupBy = ['advertiser']
   }
 
   // Log minimal payload details for debugging without dumping all IDs

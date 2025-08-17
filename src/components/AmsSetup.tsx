@@ -142,6 +142,50 @@ export default function AmsSetup() {
     }
   };
 
+  const handleTestDelivery = async () => {
+    if (!selectedConnectionId) return;
+    setIsProcessing(true);
+    try {
+      // Send synthetic test data to ams-ingest
+      const testTrafficData = [{
+        connection_id: selectedConnectionId,
+        profile_id: 'test-profile',
+        hour_start: new Date().toISOString(),
+        campaign_id: 'test-campaign-123',
+        ad_group_id: 'test-adgroup-456',
+        impressions: 100,
+        clicks: 5,
+        cost: 2.50
+      }];
+
+      const { error: ingestError } = await supabase.functions.invoke('ams-ingest', {
+        body: {
+          dataset: 'sp-traffic',
+          messages: testTrafficData,
+          connection_id: selectedConnectionId
+        }
+      });
+
+      if (ingestError) throw ingestError;
+
+      // Process the test data
+      await processStreamData(selectedConnectionId);
+
+      toast({
+        title: "Test delivery successful",
+        description: "Synthetic data delivered and processed successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Test delivery failed", 
+        description: error.message || "Failed to test data delivery",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const processing = loading || loadingConnections;
   
   // Debug logging
@@ -261,6 +305,18 @@ export default function AmsSetup() {
                   )}
                   Process Now
                 </Button>
+                <Button 
+                  variant="outline"
+                  onClick={handleTestDelivery}
+                  disabled={!selectedConnectionId || isProcessing}
+                >
+                  {isProcessing ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Network className="h-4 w-4 mr-2" />
+                  )}
+                  Test Delivery
+                </Button>
               </div>
             </div>
 
@@ -305,6 +361,12 @@ export default function AmsSetup() {
               />
             )}
 
+            {!destinationArn && (
+              <p className="text-sm text-muted-foreground mb-4">
+                ⚠️ Enter your AWS Destination ARN above to enable data streaming toggles
+              </p>
+            )}
+
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="flex flex-col space-y-3 rounded-md border p-4 transition-colors hover:bg-muted/50">
                 <div className="flex items-center justify-between">
@@ -319,7 +381,7 @@ export default function AmsSetup() {
                   </div>
                   <Switch
                     checked={!!subs["sp-traffic"] && subs["sp-traffic"].status !== "archived"}
-                    disabled={processing}
+                    disabled={processing || !destinationArn}
                     onCheckedChange={(v) => toggleDataset("sp-traffic", v)}
                   />
                 </div>
@@ -349,7 +411,7 @@ export default function AmsSetup() {
                   </div>
                   <Switch
                     checked={!!subs["sp-conversion"] && subs["sp-conversion"].status !== "archived"}
-                    disabled={processing}
+                    disabled={processing || !destinationArn}
                     onCheckedChange={(v) => toggleDataset("sp-conversion", v)}
                   />
                 </div>
