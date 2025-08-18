@@ -216,6 +216,9 @@ export type Database = {
           reporting_api_version: string | null
           setup_required_reason: string | null
           status: Database["public"]["Enums"]["api_connection_status"]
+          streams_configured: boolean | null
+          streams_destination_arn: string | null
+          streams_region: string | null
           supported_attribution_models: string[] | null
           token_expires_at: string
           updated_at: string
@@ -238,6 +241,9 @@ export type Database = {
           reporting_api_version?: string | null
           setup_required_reason?: string | null
           status?: Database["public"]["Enums"]["api_connection_status"]
+          streams_configured?: boolean | null
+          streams_destination_arn?: string | null
+          streams_region?: string | null
           supported_attribution_models?: string[] | null
           token_expires_at: string
           updated_at?: string
@@ -260,6 +266,9 @@ export type Database = {
           reporting_api_version?: string | null
           setup_required_reason?: string | null
           status?: Database["public"]["Enums"]["api_connection_status"]
+          streams_configured?: boolean | null
+          streams_destination_arn?: string | null
+          streams_region?: string | null
           supported_attribution_models?: string[] | null
           token_expires_at?: string
           updated_at?: string

@@ -83,12 +83,31 @@ export const useAmsMetrics = (connectionId?: string, from?: Date, to?: Date) => 
 
       if (conversionError) throw conversionError;
 
+      // Fetch entity-level data (campaigns from aggregated tables) first
+      const { data: campaigns, error: campaignError } = await supabase
+        .from("campaigns")
+        .select("*")
+        .eq("connection_id", connectionId)
+        .order("cost_14d", { ascending: false, nullsFirst: false })
+        .limit(100);
+
+      if (campaignError) throw campaignError;
+
       // Calculate aggregated metrics
-      const totalImpressions = (trafficData || []).reduce((sum, row) => sum + (row.impressions || 0), 0);
-      const totalClicks = (trafficData || []).reduce((sum, row) => sum + (row.clicks || 0), 0);
-      const totalSpend = (trafficData || []).reduce((sum, row) => sum + Number(row.cost || 0), 0);
-      const totalOrders = (conversionData || []).reduce((sum, row) => sum + (row.attributed_conversions || 0), 0);
-      const totalSales = (conversionData || []).reduce((sum, row) => sum + Number(row.attributed_sales || 0), 0);
+      let totalImpressions = (trafficData || []).reduce((sum, row) => sum + (row.impressions || 0), 0);
+      let totalClicks = (trafficData || []).reduce((sum, row) => sum + (row.clicks || 0), 0);
+      let totalSpend = (trafficData || []).reduce((sum, row) => sum + Number(row.cost || 0), 0);
+      let totalOrders = (conversionData || []).reduce((sum, row) => sum + (row.attributed_conversions || 0), 0);
+      let totalSales = (conversionData || []).reduce((sum, row) => sum + Number(row.attributed_sales || 0), 0);
+
+      // Fallback to campaign aggregates if AMS stream tables are empty
+      if ((trafficData || []).length === 0 && (conversionData || []).length === 0 && campaigns && campaigns.length > 0) {
+        totalImpressions = campaigns.reduce((sum, c) => sum + (c.impressions || 0), 0);
+        totalClicks = campaigns.reduce((sum, c) => sum + (c.clicks || 0), 0);
+        totalSpend = campaigns.reduce((sum, c) => sum + Number(c.cost_14d ?? c.cost_legacy ?? 0), 0);
+        totalOrders = campaigns.reduce((sum, c) => sum + (c.attributed_conversions_14d ?? c.attributed_conversions_legacy ?? 0), 0);
+        totalSales = campaigns.reduce((sum, c) => sum + Number(c.attributed_sales_14d ?? c.attributed_sales_legacy ?? 0), 0);
+      }
 
       const acos = totalSales > 0 ? (totalSpend / totalSales) * 100 : 0;
       const roas = totalSpend > 0 ? totalSales / totalSpend : 0;
@@ -96,15 +115,6 @@ export const useAmsMetrics = (connectionId?: string, from?: Date, to?: Date) => 
       const cpc = totalClicks > 0 ? totalSpend / totalClicks : 0;
       const conversionRate = totalClicks > 0 ? (totalOrders / totalClicks) * 100 : 0;
 
-      // Fetch entity-level data (campaigns from aggregated tables)
-      const { data: campaigns, error: campaignError } = await supabase
-        .from("campaigns")
-        .select("*")
-        .eq("connection_id", connectionId)
-        .order("cost_legacy", { ascending: false })
-        .limit(100);
-
-      if (campaignError) throw campaignError;
 
       // Get message stats for freshness indicators
       const { data: recentMessages } = await supabase
@@ -138,9 +148,9 @@ export const useAmsMetrics = (connectionId?: string, from?: Date, to?: Date) => 
       });
 
       const campaignData: AmsEntityData[] = (campaigns || []).map(campaign => {
-        const spend = campaign.cost_legacy || campaign.cost_14d || 0;
-        const orders = campaign.attributed_conversions_legacy || campaign.attributed_conversions_14d || 0;
-        const sales = campaign.attributed_sales_legacy || campaign.attributed_sales_14d || 0;
+        const spend = campaign.cost_14d ?? campaign.cost_legacy ?? 0;
+        const orders = campaign.attributed_conversions_14d ?? campaign.attributed_conversions_legacy ?? 0;
+        const sales = campaign.attributed_sales_14d ?? campaign.attributed_sales_legacy ?? 0;
         
         return {
           id: campaign.id,

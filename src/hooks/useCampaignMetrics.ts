@@ -61,19 +61,19 @@ export const useCampaignMetrics = (connectionId?: string) => {
           acos, roas
         `)
         .eq("connection_id", connectionId)
-        .order("cost_legacy", { ascending: false })
+        .order("cost_14d", { ascending: false, nullsFirst: false })
         .limit(500);
 
       if (campaignError) {
         throw campaignError;
       }
 
-      // Add legacy field compatibility
+      // Prefer v3 columns over legacy fields
       const campaignsWithLegacyFields = (campaignData || []).map(campaign => ({
         ...campaign,
-        spend: campaign.cost_legacy || campaign.cost_14d || 0,
-        sales: campaign.attributed_sales_legacy || campaign.attributed_sales_14d || 0,
-        orders: campaign.attributed_conversions_legacy || campaign.attributed_conversions_14d || 0,
+        spend: campaign.cost_14d ?? campaign.cost_legacy ?? 0,
+        sales: campaign.attributed_sales_14d ?? campaign.attributed_sales_legacy ?? 0,
+        orders: campaign.attributed_conversions_14d ?? campaign.attributed_conversions_legacy ?? 0,
       }));
 
       setCampaigns(campaignsWithLegacyFields);

@@ -27,6 +27,8 @@ export default function AmsSetup() {
   const [subs, setSubs] = useState<Record<string, any>>({});
   const [isProcessing, setIsProcessing] = useState(false);
   const { metrics } = useAmsMetrics(selectedConnectionId || undefined);
+  
+  const arnValid = /^arn:aws:[a-z0-9-]+:.+$/i.test(destinationArn);
   const { toast } = useToast();
 
   const activeConnections = useMemo(() => connections.filter(c => c.status === "active"), [connections]);
@@ -62,6 +64,24 @@ export default function AmsSetup() {
     
     try {
       if (enabled) {
+        // Save destination settings before subscribing
+        const { error: updateError } = await supabase
+          .from('amazon_connections')
+          .update({ 
+            streams_destination_arn: destinationArn, 
+            streams_region: region 
+          })
+          .eq('id', selectedConnectionId);
+          
+        if (updateError) {
+          toast({
+            title: "Failed to save settings",
+            description: updateError.message,
+            variant: "destructive",
+          });
+          return;
+        }
+
         await subscribe({
           connectionId: selectedConnectionId,
           datasetId,
@@ -361,9 +381,9 @@ export default function AmsSetup() {
               />
             )}
 
-            {!destinationArn && (
+            {!arnValid && (
               <p className="text-sm text-muted-foreground mb-4">
-                ⚠️ Enter your AWS Destination ARN above to enable data streaming toggles
+                ⚠️ Enter a valid AWS Destination ARN (Kinesis Firehose/SQS) above to enable data streaming toggles
               </p>
             )}
 
@@ -381,7 +401,7 @@ export default function AmsSetup() {
                   </div>
                   <Switch
                     checked={!!subs["sp-traffic"] && subs["sp-traffic"].status !== "archived"}
-                    disabled={processing || !destinationArn}
+                    disabled={processing || !arnValid}
                     onCheckedChange={(v) => toggleDataset("sp-traffic", v)}
                   />
                 </div>
@@ -411,7 +431,7 @@ export default function AmsSetup() {
                   </div>
                   <Switch
                     checked={!!subs["sp-conversion"] && subs["sp-conversion"].status !== "archived"}
-                    disabled={processing || !destinationArn}
+                    disabled={processing || !arnValid}
                     onCheckedChange={(v) => toggleDataset("sp-conversion", v)}
                   />
                 </div>

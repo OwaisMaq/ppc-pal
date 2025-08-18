@@ -56,14 +56,43 @@ serve(async (req) => {
       });
     }
 
+    // Check required environment variables
+    const requiredEnvs = {
+      SUPABASE_URL: SB_URL,
+      SUPABASE_ANON_KEY: SB_ANON,
+      SUPABASE_SERVICE_ROLE_KEY: SB_SERVICE,
+      AMAZON_CLIENT_ID: Deno.env.get('AMAZON_CLIENT_ID'),
+      AMAZON_CLIENT_SECRET: Deno.env.get('AMAZON_CLIENT_SECRET')
+    };
+
+    const missingEnvs = Object.entries(requiredEnvs)
+      .filter(([_, value]) => !value)
+      .map(([key, _]) => key);
+
+    if (missingEnvs.length > 0) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: `Missing environment variables: ${missingEnvs.join(', ')}` 
+        }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
     const { connectionId, datasetId, destinationArn, region, action, subscriptionId, destinationType } = body;
     console.log("Extracted parameters:", { connectionId, datasetId, destinationArn, region, action, subscriptionId, destinationType });
     
     if (!connectionId || !datasetId) {
       console.error("Missing required parameters");
-      return new Response("Missing required parameters", { 
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: "Missing required parameters" 
+      }), { 
         status: 400, 
-        headers: corsHeaders 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       });
     }
 
@@ -208,29 +237,33 @@ serve(async (req) => {
         }
 
         console.log("=== AMS subscription archived successfully ===");
-        return new Response(JSON.stringify({ success: true, archived: true }), { 
-          status: 200, 
-          headers: { 
-            "Content-Type": "application/json",
-            ...corsHeaders
-          } 
-        });
-        
-      } catch (e) {
-        console.error("Archive error:", e);
-        return new Response(`Archive failed: ${e?.message ?? String(e)}`, { 
-          status: 500, 
-          headers: corsHeaders 
-        });
-      }
+      return new Response(JSON.stringify({ 
+        success: true, 
+        message: 'Subscription archived successfully' 
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+      
+    } catch (e) {
+      console.error("Archive error:", e);
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: `Archive failed: ${e?.message ?? String(e)}` 
+      }), { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
     }
-    
-    // For subscribe action, require additional parameters
+  } else if (action === 'subscribe') {
+    // Handle subscribe action
     if (!destinationArn || !region) {
-      console.error("Missing required parameters for subscription");
-      return new Response("Missing required parameters for subscription", { 
-        status: 400, 
-        headers: corsHeaders 
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'destinationArn and region are required for subscribe action' 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
@@ -347,13 +380,24 @@ serve(async (req) => {
     }
 
     console.log("=== AMS subscription created successfully ===");
-    return new Response(responseText, { 
-      status: 200, 
-      headers: { 
-        "Content-Type": "application/json",
-        ...corsHeaders
-      } 
+    return new Response(JSON.stringify({ 
+      success: true, 
+      subscriptionId: amazonResponse.subscriptionId, 
+      datasetId 
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
+  } else {
+    // Invalid action
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: 'Unsupported action' 
+    }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
     
   } catch (e) {
     console.error("=== Unexpected error in AMS Subscribe function ===");

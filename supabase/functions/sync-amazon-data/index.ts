@@ -1649,6 +1649,12 @@ serve(async (req) => {
         },
         metricsUpdated: totalMetricsUpdated,
         apiVersion: 'v3',
+        usedReportingV3: true,
+        columnsUsed: {
+          campaign: ['impressions', 'clicks', 'cost', 'sales14d', 'purchases14d'],
+          adGroup: ['impressions', 'clicks', 'cost', 'sales14d', 'purchases14d'], 
+          advertisedProducts: ['impressions', 'clicks', 'cost', 'sales14d', 'purchases14d']
+        },
         diagnostics
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
