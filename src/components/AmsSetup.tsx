@@ -21,14 +21,9 @@ export default function AmsSetup() {
   const { connections, loading: loadingConnections, refreshConnections } = useAmazonConnections();
   const { loading, list, subscribe, archive, processStreamData } = useAMS();
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
-  const [destinationArn, setDestinationArn] = useState("");
-  const [region, setRegion] = useState(DEFAULT_REGION);
-  const [destinationType, setDestinationType] = useState("firehose");
   const [subs, setSubs] = useState<Record<string, any>>({});
   const [isProcessing, setIsProcessing] = useState(false);
   const { metrics } = useAmsMetrics(selectedConnectionId || undefined);
-  
-  const arnValid = /^arn:aws:[a-z0-9-]+:.+$/i.test(destinationArn);
   const { toast } = useToast();
 
   const activeConnections = useMemo(() => connections.filter(c => c.status === "active"), [connections]);
@@ -50,44 +45,15 @@ export default function AmsSetup() {
   }, [selectedConnectionId, list]);
 
   const toggleDataset = async (datasetId: AmsDataset, enabled: boolean) => {
-    console.log('toggleDataset called:', { datasetId, enabled, selectedConnectionId, destinationArn });
+    console.log('toggleDataset called:', { datasetId, enabled, selectedConnectionId });
     if (!selectedConnectionId) return;
-    
-    if (enabled && !destinationArn) {
-      toast({
-        title: "Missing Configuration",
-        description: "Please enter an AWS Destination ARN before enabling subscriptions",
-        variant: "destructive",
-      });
-      return;
-    }
     
     try {
       if (enabled) {
-        // Save destination settings before subscribing
-        const { error: updateError } = await supabase
-          .from('amazon_connections')
-          .update({ 
-            streams_destination_arn: destinationArn, 
-            streams_region: region 
-          })
-          .eq('id', selectedConnectionId);
-          
-        if (updateError) {
-          toast({
-            title: "Failed to save settings",
-            description: updateError.message,
-            variant: "destructive",
-          });
-          return;
-        }
-
+        // Use managed SQS - no ARN required
         await subscribe({
           connectionId: selectedConnectionId,
-          datasetId,
-          destinationType: destinationType as any,
-          destinationArn,
-          region,
+          datasetId
         });
         toast({
           title: "Subscription activated",
@@ -207,18 +173,6 @@ export default function AmsSetup() {
   };
 
   const processing = loading || loadingConnections;
-  
-  // Debug logging
-  console.log('AmsSetup Debug:', {
-    destinationArn,
-    region,
-    destinationType,
-    processing,
-    loading,
-    loadingConnections,
-    selectedConnectionId,
-    activeConnectionsCount: activeConnections.length
-  });
 
   return (
     <Card className="mt-6">
@@ -340,39 +294,6 @@ export default function AmsSetup() {
               </div>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-4">
-              <div>
-                <Label>Destination type</Label>
-                <Select value={destinationType} onValueChange={setDestinationType}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="firehose">Kinesis Firehose</SelectItem>
-                    <SelectItem value="sqs">SQS</SelectItem>
-                    <SelectItem value="kinesis">Kinesis</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="md:col-span-2">
-                <Label>AWS Destination ARN</Label>
-                <Input placeholder="arn:aws:firehose:eu-west-1:123456789012:deliverystream/your-stream" value={destinationArn} onChange={(e) => setDestinationArn(e.target.value)} />
-              </div>
-              <div>
-                <Label>Region</Label>
-                <Select value={region} onValueChange={setRegion}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="eu-west-1">eu-west-1 (Ireland)</SelectItem>
-                    <SelectItem value="eu-central-1">eu-central-1 (Frankfurt)</SelectItem>
-                    <SelectItem value="eu-west-2">eu-west-2 (London)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
             {/* Data Freshness Indicator */}
             {selectedConnectionId && (
               <DataFreshnessIndicator 
@@ -381,11 +302,19 @@ export default function AmsSetup() {
               />
             )}
 
-            {!arnValid && (
-              <p className="text-sm text-muted-foreground mb-4">
-                ⚠️ Enter a valid AWS Destination ARN (Kinesis Firehose/SQS) above to enable data streaming toggles
-              </p>
-            )}
+            <div className="rounded-md border border-blue-200 bg-blue-50 p-4 mb-4">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0">
+                  <Server className="h-5 w-5 text-blue-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-sm font-medium text-blue-800">Managed SQS Streaming</h3>
+                  <p className="text-sm text-blue-700 mt-1">
+                    Real-time data streams are delivered to our managed SQS queues automatically. Simply toggle the datasets below to start receiving data.
+                  </p>
+                </div>
+              </div>
+            </div>
 
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="flex flex-col space-y-3 rounded-md border p-4 transition-colors hover:bg-muted/50">
@@ -401,7 +330,7 @@ export default function AmsSetup() {
                   </div>
                   <Switch
                     checked={!!subs["sp-traffic"] && subs["sp-traffic"].status !== "archived"}
-                    disabled={processing || !arnValid}
+                    disabled={processing}
                     onCheckedChange={(v) => toggleDataset("sp-traffic", v)}
                   />
                 </div>
@@ -431,7 +360,7 @@ export default function AmsSetup() {
                   </div>
                   <Switch
                     checked={!!subs["sp-conversion"] && subs["sp-conversion"].status !== "archived"}
-                    disabled={processing || !arnValid}
+                    disabled={processing}
                     onCheckedChange={(v) => toggleDataset("sp-conversion", v)}
                   />
                 </div>

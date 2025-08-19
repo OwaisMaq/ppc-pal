@@ -40,9 +40,9 @@ export const useAMS = () => {
   const subscribe = useCallback(async (params: {
     connectionId: string;
     datasetId: AmsDataset;
-    destinationType: AmsDestinationType;
-    destinationArn: string;
-    region: string;
+    destinationType?: AmsDestinationType;
+    destinationArn?: string;
+    region?: string;
   }) => {
     console.log('useAMS.subscribe called with:', params);
     setLoading(true);
@@ -51,7 +51,7 @@ export const useAMS = () => {
         body: { action: "subscribe", ...params },
       });
       if (error) throw error as any;
-      toast({ title: "Subscribed", description: `${params.datasetId} enabled` });
+      toast({ title: "Subscribed", description: `${params.datasetId} stream enabled` });
       return data;
     } catch (e: any) {
       toast({ title: "Subscription failed", description: e.message || "Unknown error", variant: "destructive" });

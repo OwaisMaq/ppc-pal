@@ -96,6 +96,29 @@ serve(async (req) => {
       });
     }
 
+    // Helper function to get region and SQS ARN based on advertising API endpoint
+    const getRegionAndArn = (apiEndpoint: string) => {
+      if (apiEndpoint?.includes('advertising-api-eu')) {
+        return { 
+          region: 'eu-west-1', 
+          arn: Deno.env.get('AMS_SQS_ARN_EU'),
+          baseUrl: 'https://advertising-api-eu.amazon.com' 
+        };
+      } else if (apiEndpoint?.includes('advertising-api-fe')) {
+        return { 
+          region: 'us-west-2', 
+          arn: Deno.env.get('AMS_SQS_ARN_FE'),
+          baseUrl: 'https://advertising-api-fe.amazon.com' 
+        };
+      } else {
+        return { 
+          region: 'us-east-1', 
+          arn: Deno.env.get('AMS_SQS_ARN_NA'),
+          baseUrl: 'https://advertising-api.amazon.com' 
+        };
+      }
+    };
+
     // Authenticate user first
     console.log("Creating auth client...");
     const auth = createClient(SB_URL, SB_ANON, {
@@ -130,7 +153,7 @@ serve(async (req) => {
     console.log("Querying connection...");
     const { data: conn, error: connErr } = await db
       .from("amazon_connections")
-      .select("id,user_id,profile_id")
+      .select("id,user_id,profile_id,advertising_api_endpoint")
       .eq("id", connectionId)
       .single();
       
@@ -256,18 +279,28 @@ serve(async (req) => {
       });
     }
   } else if (action === 'subscribe') {
-    // Handle subscribe action
-    if (!destinationArn || !region) {
+    // Handle subscribe action - use managed SQS ARNs by default
+    
+    // Get region and ARN based on connection's advertising API endpoint
+    const { region: managedRegion, arn: managedArn, baseUrl } = getRegionAndArn(conn.advertising_api_endpoint);
+    
+    // Use provided values or fall back to managed ones
+    const finalDestinationType = destinationType || "sqs";
+    const finalRegion = region || managedRegion;
+    const finalDestinationArn = destinationArn || managedArn;
+    
+    console.log("Using configuration:", { finalDestinationType, finalRegion, finalDestinationArn });
+    
+    if (!finalDestinationArn) {
+      console.error("No destination ARN available for region:", finalRegion);
       return new Response(JSON.stringify({ 
         success: false, 
-        error: 'destinationArn and region are required for subscribe action' 
+        error: `No managed SQS ARN configured for region: ${finalRegion}` 
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
-
-    // For subscribe action, refresh token and get fresh access token
 
     // Refresh the Amazon token first to ensure we have a valid access token
     console.log("Refreshing Amazon token...");
@@ -301,29 +334,14 @@ serve(async (req) => {
     
     const access_token = freshConn.access_token;
     console.log("Fresh access token obtained");
-
-    // Get AMS base URL
-    const base =
-      region === "eu-west-1" ? "https://advertising-api-eu.amazon.com" :
-      region === "us-east-1" ? "https://advertising-api.amazon.com" :
-      region === "us-west-2" ? "https://advertising-api-fe.amazon.com" :
-      null;
-      
-    if (!base) {
-      console.error("Unsupported region:", region);
-      return new Response(`Unsupported region: ${region}`, { 
-        status: 400, 
-        headers: corsHeaders 
-      });
-    }
     
-    console.log("Using AMS base URL:", base);
+    console.log("Using AMS base URL:", baseUrl);
 
     // Create subscription
-    const subscriptionPayload = { datasetId, destinationArn, compression: "GZIP" };
+    const subscriptionPayload = { datasetId, destinationArn: finalDestinationArn, compression: "GZIP" };
     console.log("Creating AMS subscription with payload:", subscriptionPayload);
     
-    const res = await fetch(`${base}/streams/subscriptions`, {
+    const res = await fetch(`${baseUrl}/streams/subscriptions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${access_token}`,
@@ -361,9 +379,9 @@ serve(async (req) => {
       .upsert({
         connection_id: connectionId,
         dataset_id: datasetId,
-        destination_type: destinationType || "firehose",
-        destination_arn: destinationArn,
-        region: region,
+        destination_type: finalDestinationType,
+        destination_arn: finalDestinationArn,
+        region: finalRegion,
         status: "active",
         subscription_id: amazonResponse.subscriptionId || null,
         updated_at: new Date().toISOString()
