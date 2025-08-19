@@ -267,30 +267,6 @@ export default function AmsSetup() {
                   ) : null}
                   Refresh Token
                 </Button>
-                <Button 
-                  variant="default" 
-                  onClick={handleProcessStreamData}
-                  disabled={!selectedConnectionId || isProcessing}
-                >
-                  {isProcessing ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Zap className="h-4 w-4 mr-2" />
-                  )}
-                  Process Now
-                </Button>
-                <Button 
-                  variant="outline"
-                  onClick={handleTestDelivery}
-                  disabled={!selectedConnectionId || isProcessing}
-                >
-                  {isProcessing ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Network className="h-4 w-4 mr-2" />
-                  )}
-                  Test Delivery
-                </Button>
               </div>
             </div>
 
@@ -308,9 +284,9 @@ export default function AmsSetup() {
                   <Server className="h-5 w-5 text-blue-600" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-sm font-medium text-blue-800">Managed SQS Streaming</h3>
+                  <h3 className="text-sm font-medium text-blue-800">Automated Real-time Streaming</h3>
                   <p className="text-sm text-blue-700 mt-1">
-                    Real-time data streams are delivered to our managed SQS queues automatically. Simply toggle the datasets below to start receiving data.
+                    Real-time data streams are automatically activated when you connect your Amazon account. Data is processed and synced automatically every hour.
                   </p>
                 </div>
               </div>

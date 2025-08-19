@@ -207,46 +207,60 @@ export const useAmazonConnections = () => {
       const profileCount = data?.profileCount || 0;
       const syncStarted = data?.syncStarted || false;
       
-      // Auto-activate AMS for the new connection
-      if (data?.connectionId) {
-        console.log('Auto-activating AMS for connection:', data.connectionId);
-        try {
-          // Enable both sp-traffic and sp-conversion datasets with managed SQS
-          await Promise.all([
-            supabase.functions.invoke("ams-subscribe", {
-              body: { 
-                action: "subscribe", 
-                connectionId: data.connectionId, 
-                datasetId: "sp-traffic"
-              },
-              headers: {
-                Authorization: `Bearer ${session.data.session.access_token}`,
-              }
-            }),
-            supabase.functions.invoke("ams-subscribe", {
-              body: { 
-                action: "subscribe", 
-                connectionId: data.connectionId, 
-                datasetId: "sp-conversion"
-              },
-              headers: {
-                Authorization: `Bearer ${session.data.session.access_token}`,
-              }
-            })
-          ]);
-          
-          console.log('AMS auto-activation completed for both datasets');
-          toast.success(`Amazon account connected! Found ${profileCount} profile(s), started data sync, and activated real-time streaming.`);
-          
-        } catch (amsError) {
-          console.warn('AMS auto-activation failed (non-critical):', amsError);
-          if (syncStarted) {
-            toast.success(`Amazon account connected! Found ${profileCount} profile(s) and started syncing data automatically.`);
-          } else {
-            toast.success(`Amazon account connected successfully! Found ${profileCount} advertising profile(s).`);
+        // Auto-activate AMS for the new connection
+        if (data?.connectionId) {
+          console.log('Auto-activating AMS for connection:', data.connectionId);
+          try {
+            // Enable both sp-traffic and sp-conversion datasets with managed SQS
+            await Promise.all([
+              supabase.functions.invoke("ams-subscribe", {
+                body: { 
+                  action: "subscribe", 
+                  connectionId: data.connectionId, 
+                  datasetId: "sp-traffic"
+                },
+                headers: {
+                  Authorization: `Bearer ${session.data.session.access_token}`,
+                }
+              }),
+              supabase.functions.invoke("ams-subscribe", {
+                body: { 
+                  action: "subscribe", 
+                  connectionId: data.connectionId, 
+                  datasetId: "sp-conversion"
+                },
+                headers: {
+                  Authorization: `Bearer ${session.data.session.access_token}`,
+                }
+              })
+            ]);
+            
+            console.log('AMS auto-activation completed, now processing stream data...');
+            
+            // Automatically process stream data after AMS setup
+            try {
+              await supabase.functions.invoke("ams-aggregate", {
+                body: { connectionId: data.connectionId },
+                headers: {
+                  Authorization: `Bearer ${session.data.session.access_token}`,
+                }
+              });
+              console.log('AMS stream data processing completed');
+            } catch (processError) {
+              console.warn('Stream data processing failed (non-critical):', processError);
+            }
+            
+            toast.success(`Amazon account connected! Found ${profileCount} profile(s), started data sync, and activated real-time streaming.`);
+            
+          } catch (amsError) {
+            console.warn('AMS auto-activation failed (non-critical):', amsError);
+            if (syncStarted) {
+              toast.success(`Amazon account connected! Found ${profileCount} profile(s) and started syncing data automatically.`);
+            } else {
+              toast.success(`Amazon account connected successfully! Found ${profileCount} advertising profile(s).`);
+            }
           }
-        }
-      } else {
+        } else {
         if (syncStarted) {
           toast.success(`Amazon account connected! Found ${profileCount} profile(s) and started syncing data automatically.`);
         } else {
