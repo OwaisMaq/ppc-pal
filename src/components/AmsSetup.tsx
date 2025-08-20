@@ -286,14 +286,14 @@ export default function AmsSetup() {
                 <div className="flex-1">
                   <h3 className="text-sm font-medium text-blue-800">Automated Real-time Streaming</h3>
                   <p className="text-sm text-blue-700 mt-1">
-                    Real-time data streams are automatically activated when you connect your Amazon account. Data is processed and synced automatically every hour.
+                    Real-time data streams are automatically activated when you connect your Amazon account. Both traffic and conversion data are streamed and processed automatically every hour.
                   </p>
                 </div>
               </div>
             </div>
 
             <div className="grid sm:grid-cols-2 gap-4">
-              <div className="flex flex-col space-y-3 rounded-md border p-4 transition-colors hover:bg-muted/50">
+              <div className="flex flex-col space-y-3 rounded-md border p-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-medium flex items-center gap-2">
@@ -304,11 +304,9 @@ export default function AmsSetup() {
                     </p>
                     <p className="text-sm text-muted-foreground">Impressions, clicks, cost (hourly)</p>
                   </div>
-                  <Switch
-                    checked={!!subs["sp-traffic"] && subs["sp-traffic"].status !== "archived"}
-                    disabled={processing}
-                    onCheckedChange={(v) => toggleDataset("sp-traffic", v)}
-                  />
+                  <Badge variant={subs["sp-traffic"]?.status === "active" ? "default" : "secondary"}>
+                    {subs["sp-traffic"]?.status === "active" ? "Active" : "Inactive"}
+                  </Badge>
                 </div>
                 {subs["sp-traffic"] && (
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -323,7 +321,7 @@ export default function AmsSetup() {
                   </div>
                 )}
               </div>
-              <div className="flex flex-col space-y-3 rounded-md border p-4 transition-colors hover:bg-muted/50">
+              <div className="flex flex-col space-y-3 rounded-md border p-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-medium flex items-center gap-2">
@@ -334,19 +332,14 @@ export default function AmsSetup() {
                     </p>
                     <p className="text-sm text-muted-foreground">Attributed conversions and sales (hourly)</p>
                   </div>
-                  <Switch
-                    checked={!!subs["sp-conversion"] && subs["sp-conversion"].status !== "archived"}
-                    disabled={processing}
-                    onCheckedChange={(v) => toggleDataset("sp-conversion", v)}
-                  />
+                  <Badge variant={subs["sp-conversion"]?.status === "active" ? "default" : "secondary"}>
+                    {subs["sp-conversion"]?.status === "active" ? "Active" : "Inactive"}
+                  </Badge>
                 </div>
                 {subs["sp-conversion"] && (
-                  <div className="flex items-center gap-2 text-xs">
-                    <Badge variant={subs["sp-conversion"].status === "active" ? "default" : "secondary"} className="text-xs">
-                      {subs["sp-conversion"].status === "active" ? "Streaming" : "Inactive"}
-                    </Badge>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     {subs["sp-conversion"].last_delivery_at && (
-                      <span className="text-muted-foreground ml-2">
+                      <span>
                         Last delivery: {formatDistanceToNow(new Date(subs["sp-conversion"].last_delivery_at), { addSuffix: true })}
                       </span>
                     )}
