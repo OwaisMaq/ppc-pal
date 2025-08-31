@@ -10,6 +10,7 @@ import Dashboard from "@/pages/Dashboard";
 import Feedback from "@/pages/Feedback";
 import DataManagement from "@/pages/DataManagement";
 import PerformanceDashboard from "@/pages/PerformanceDashboard";
+import AutomationPage from "@/pages/AutomationPage";
 import Privacy from "@/pages/Privacy";
 import PublicLanding from "@/pages/PublicLanding";
 import About from "@/pages/About";
@@ -71,6 +72,11 @@ const App = () => {
                 <Route path="/performance" element={
                   <ProtectedRoute>
                     <PerformanceDashboard />
+                  </ProtectedRoute>
+                } />
+                <Route path="/automation" element={
+                  <ProtectedRoute>
+                    <AutomationPage />
                   </ProtectedRoute>
                 } />
                 

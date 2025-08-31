@@ -70,3 +70,15 @@ verify_jwt = true
 
 [functions.dashboard]
 verify_jwt = false
+
+[functions.rules-engine-runner]
+verify_jwt = false
+
+[functions.actions-worker]
+verify_jwt = false
+
+[functions.rules-api]
+verify_jwt = false
+
+[functions.notify-worker]
+verify_jwt = false
