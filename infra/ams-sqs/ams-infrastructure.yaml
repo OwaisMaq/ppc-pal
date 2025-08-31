@@ -1,0 +1,202 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Amazon Marketing Stream SQS Pipeline Infrastructure'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+    Description: Deployment environment
+  
+  SupabaseIngestUrl:
+    Type: String
+    Description: 'Supabase function URL for AMS ingest (e.g., https://[project-id].supabase.co/functions/v1/ams-ingest)'
+    # TODO: Replace with your actual Supabase function URL
+  
+  SupabaseIngestSecret:
+    Type: String
+    NoEcho: true
+    Description: 'HMAC secret for signing requests to Supabase'
+    # TODO: Generate a secure random secret and store it in both AWS and Supabase
+
+Resources:
+  # Dead Letter Queue for failed messages
+  AmsEventsDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub 'ams-events-dlq-${Environment}'
+      MessageRetentionPeriod: 1209600  # 14 days
+      VisibilityTimeoutSeconds: 60
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Component
+          Value: AMS
+
+  # Main SQS Queue for AMS events
+  AmsEventsQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub 'ams-events-queue-${Environment}'
+      MessageRetentionPeriod: 345600   # 4 days
+      VisibilityTimeoutSeconds: 300    # 5 minutes (6x Lambda timeout)
+      ReceiveMessageWaitTimeSeconds: 20 # Long polling
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt AmsEventsDLQ.Arn
+        maxReceiveCount: 5
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Component
+          Value: AMS
+
+  # IAM Role for Lambda function
+  AmsLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'ams-lambda-role-${Environment}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: SQSAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource: !GetAtt AmsEventsQueue.Arn
+
+  # Lambda function for processing SQS messages
+  AmsIngestLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'ams-ingest-lambda-${Environment}'
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Role: !GetAtt AmsLambdaExecutionRole.Arn
+      Timeout: 60
+      MemorySize: 256
+      ReservedConcurrencyLimit: 10  # Prevent runaway costs
+      Environment:
+        Variables:
+          SUPABASE_INGEST_URL: !Ref SupabaseIngestUrl
+          SUPABASE_INGEST_SECRET: !Ref SupabaseIngestSecret
+          NODE_ENV: production
+      Code:
+        ZipFile: |
+          // Placeholder code - replace with actual implementation
+          exports.handler = async (event) => {
+            console.log('AMS Lambda triggered with event:', JSON.stringify(event, null, 2));
+            return { statusCode: 200, body: 'OK' };
+          };
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Component
+          Value: AMS
+
+  # SQS trigger for Lambda
+  AmsLambdaTrigger:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      EventSourceArn: !GetAtt AmsEventsQueue.Arn
+      FunctionName: !Ref AmsIngestLambda
+      BatchSize: 10
+      MaximumBatchingWindowInSeconds: 5
+      Enabled: true
+
+  # CloudWatch Log Group for Lambda
+  AmsLambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/ams-ingest-lambda-${Environment}'
+      RetentionInDays: 14
+
+  # CloudWatch Alarm: Queue backlog
+  QueueBacklogAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'AMS-Queue-Backlog-${Environment}'
+      AlarmDescription: 'AMS queue has old messages indicating processing backlog'
+      MetricName: ApproximateAgeOfOldestMessage
+      Namespace: AWS/SQS
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 300  # 5 minutes
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt AmsEventsQueue.QueueName
+      TreatMissingData: notBreaching
+
+  # CloudWatch Alarm: Lambda errors
+  LambdaErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'AMS-Lambda-Errors-${Environment}'
+      AlarmDescription: 'AMS Lambda function has errors'
+      MetricName: Errors
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref AmsIngestLambda
+      TreatMissingData: notBreaching
+
+  # CloudWatch Alarm: DLQ messages
+  DLQMessagesAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'AMS-DLQ-Messages-${Environment}'
+      AlarmDescription: 'Messages in AMS dead letter queue'
+      MetricName: ApproximateNumberOfVisibleMessages
+      Namespace: AWS/SQS
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt AmsEventsDLQ.QueueName
+      TreatMissingData: notBreaching
+
+Outputs:
+  QueueArn:
+    Description: 'AMS Events Queue ARN'
+    Value: !GetAtt AmsEventsQueue.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-QueueArn'
+  
+  QueueUrl:
+    Description: 'AMS Events Queue URL'
+    Value: !Ref AmsEventsQueue
+    Export:
+      Name: !Sub '${AWS::StackName}-QueueUrl'
+  
+  LambdaFunctionName:
+    Description: 'AMS Lambda Function Name'
+    Value: !Ref AmsIngestLambda
+    Export:
+      Name: !Sub '${AWS::StackName}-LambdaName'
+  
+  DLQArn:
+    Description: 'Dead Letter Queue ARN'
+    Value: !GetAtt AmsEventsDLQ.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-DLQArn'

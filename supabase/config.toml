@@ -58,3 +58,12 @@ verify_jwt = false
 
 [functions.entities-sync-runner]
 verify_jwt = true
+
+[functions.ams-compact-hourly]
+verify_jwt = false
+
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.check-entitlement]
+verify_jwt = true
