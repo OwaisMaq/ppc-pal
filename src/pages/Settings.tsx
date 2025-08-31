@@ -2,9 +2,10 @@ import DashboardShell from "@/components/DashboardShell";
 import AmazonAccountSetup from "@/components/AmazonAccountSetup";
 import AmsSetup from "@/components/AmsSetup";
 import { ASINLabelManager } from "@/components/ASINLabelManager";
+import { NotificationSettings } from "@/components/NotificationSettings";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Settings as SettingsIcon, Info, Tag } from "lucide-react";
+import { RefreshCw, Settings as SettingsIcon, Info, Tag, Bell } from "lucide-react";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { useEffect } from "react";
 
@@ -85,6 +86,15 @@ const Settings = () => {
               <h2 className="text-xl font-semibold">ASIN Labels</h2>
             </div>
             <ASINLabelManager />
+          </div>
+
+          {/* Notification Settings Section */}
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <Bell className="h-5 w-5 text-brand-primary" />
+              <h2 className="text-xl font-semibold">Notifications</h2>
+            </div>
+            <NotificationSettings />
           </div>
         </div>
       </div>
