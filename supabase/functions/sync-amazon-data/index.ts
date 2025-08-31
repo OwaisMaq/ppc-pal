@@ -1398,7 +1398,34 @@ serve(async (req) => {
             const conversionRate = clicks > 0 ? (orders / clicks) * 100 : 0
 
             if (timeUnitOpt === 'DAILY' && anyPerf.date) {
-              // Store in performance history table
+              // Upsert canonical search term facts for dashboard
+              try {
+                const campaignIdStr = (anyPerf.campaignId ?? perf.campaignId)?.toString();
+                const adGroupIdStr = (anyPerf.adGroupId ?? perf.adGroupId)?.toString();
+                if (campaignIdStr && adGroupIdStr) {
+                  await supabase.from('fact_search_term_daily').upsert({
+                    date: anyPerf.date,
+                    profile_id: connection.profile_id,
+                    campaign_id: campaignIdStr,
+                    ad_group_id: adGroupIdStr,
+                    search_term: anyPerf.keywordText || anyPerf.searchTerm || '',
+                    match_type: anyPerf.matchType || 'unknown',
+                    clicks,
+                    impressions,
+                    cost_micros: Math.round(spend * 1e6),
+                    attributed_conversions_7d: orders,
+                    attributed_sales_7d_micros: Math.round(sales * 1e6)
+                  }, {
+                    onConflict: 'date,profile_id,campaign_id,ad_group_id,search_term,match_type',
+                    ignoreDuplicates: false
+                  });
+                  totalMetricsUpdated++;
+                }
+              } catch (e) {
+                console.log('fact_search_term_daily upsert failed:', (e as Error).message);
+              }
+
+              // Store in performance history table (kept for backward compatibility)
               const { data: existingKeyword } = await supabase
                 .from('keywords')
                 .select('id')

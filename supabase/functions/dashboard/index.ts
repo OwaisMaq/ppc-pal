@@ -222,23 +222,22 @@ Deno.serve(async (req) => {
     // Handle different endpoints
     switch (path) {
       case 'kpis': {
+        // Aggregate KPIs from canonical fact tables (search terms)
         const { data, error } = await supabase
-          .from(`v_${level}_daily`)
-          .select('*')
+          .from('fact_search_term_daily')
+          .select('clicks, impressions, cost_micros, attributed_conversions_7d, attributed_sales_7d_micros')
           .eq('profile_id', profileId)
           .gte('date', from)
           .lte('date', to);
           
         if (error) throw error;
         
-        // Aggregate KPIs
-        const totals = data.reduce((acc: any, row: any) => {
-          const metrics = calculateMetrics(row);
+        const totals = (data || []).reduce((acc: any, row: any) => {
           acc.cost_micros += row.cost_micros || 0;
-          acc.sales_7d_micros += row.sales_7d_micros || 0;
+          acc.sales_7d_micros += row.attributed_sales_7d_micros || 0;
           acc.clicks += row.clicks || 0;
           acc.impressions += row.impressions || 0;
-          acc.conv_7d += row.conv_7d || 0;
+          acc.conv_7d += row.attributed_conversions_7d || 0;
           return acc;
         }, { cost_micros: 0, sales_7d_micros: 0, clicks: 0, impressions: 0, conv_7d: 0 });
         
@@ -257,37 +256,25 @@ Deno.serve(async (req) => {
       }
       
       case 'table': {
-        let query = supabase
-          .from(`v_${level}_daily`)
-          .select('*')
+        // Pull from canonical fact table and group by requested level
+        const { data, error } = await supabase
+          .from('fact_search_term_daily')
+          .select('date, campaign_id, ad_group_id, clicks, impressions, cost_micros, attributed_conversions_7d, attributed_sales_7d_micros')
           .eq('profile_id', profileId)
           .gte('date', from)
           .lte('date', to);
-          
-        if (entityId) {
-          const entityIdCol = level === 'campaign' ? 'campaign_id' : 
-                             level === 'ad_group' ? 'ad_group_id' : 'target_id';
-          query = query.eq(entityIdCol, entityId);
-        }
         
-        const { data, error } = await query
-          .order(sort, { ascending: false })
-          .limit(limit);
-          
         if (error) throw error;
         
-        // Group by entity and calculate metrics
-        const grouped = data.reduce((acc: any, row: any) => {
-          const key = level === 'campaign' ? row.campaign_id :
-                     level === 'ad_group' ? row.ad_group_id : row.target_id;
-          const name = level === 'campaign' ? row.campaign_name :
-                      level === 'ad_group' ? row.ad_group_name : 
-                      `${row.match_type}: ${JSON.stringify(row.expression)}`;
-          
-          if (!acc[key]) {
-            acc[key] = {
+        // Group by entity
+        const grouped: Record<string, any> = {};
+        for (const row of data || []) {
+          const key = level === 'campaign' ? row.campaign_id : row.ad_group_id;
+          if (!key) continue;
+          if (!grouped[key]) {
+            grouped[key] = {
               id: key,
-              name,
+              name: key,
               cost_micros: 0,
               sales_7d_micros: 0,
               clicks: 0,
@@ -295,20 +282,38 @@ Deno.serve(async (req) => {
               conv_7d: 0
             };
           }
-          
-          acc[key].cost_micros += row.cost_micros || 0;
-          acc[key].sales_7d_micros += row.sales_7d_micros || 0;
-          acc[key].clicks += row.clicks || 0;
-          acc[key].impressions += row.impressions || 0;
-          acc[key].conv_7d += row.conv_7d || 0;
-          
-          return acc;
-        }, {});
-        
-        const rows = Object.values(grouped).map((item: any) => ({
-          ...item,
-          ...calculateMetrics(item)
-        }));
+          grouped[key].cost_micros += row.cost_micros || 0;
+          grouped[key].sales_7d_micros += row.attributed_sales_7d_micros || 0;
+          grouped[key].clicks += row.clicks || 0;
+          grouped[key].impressions += row.impressions || 0;
+          grouped[key].conv_7d += row.attributed_conversions_7d || 0;
+        }
+
+        // Resolve names from entity tables
+        const keys = Object.keys(grouped);
+        if (keys.length > 0) {
+          if (level === 'campaign') {
+            const { data: entities } = await supabase
+              .from('entity_campaigns')
+              .select('campaign_id, name')
+              .in('campaign_id', keys);
+            const nameMap = Object.fromEntries((entities || []).map((e: any) => [e.campaign_id, e.name]));
+            for (const k of keys) grouped[k].name = nameMap[k] || k;
+          } else if (level === 'ad_group') {
+            const { data: entities } = await supabase
+              .from('entity_ad_groups')
+              .select('ad_group_id, name')
+              .in('ad_group_id', keys);
+            const nameMap = Object.fromEntries((entities || []).map((e: any) => [e.ad_group_id, e.name]));
+            for (const k of keys) grouped[k].name = nameMap[k] || k;
+          }
+        }
+
+        // Sort and limit
+        const rows = Object.values(grouped)
+          .map((item: any) => ({ ...item, ...calculateMetrics(item) }))
+          .sort((a: any, b: any) => (b[sort] ?? 0) - (a[sort] ?? 0))
+          .slice(0, limit);
         
         return new Response(
           JSON.stringify({ rows, duration_ms: duration }),
@@ -323,39 +328,35 @@ Deno.serve(async (req) => {
       }
       
       case 'timeseries': {
+        if (!entityId) {
+          return new Response(
+            JSON.stringify({ error: 'entityId is required for timeseries' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'x-request-id': requestId } }
+          );
+        }
+        const idCol = level === 'campaign' ? 'campaign_id' : 'ad_group_id';
         const { data, error } = await supabase
-          .from(`v_${level}_daily`)
-          .select('*')
+          .from('fact_search_term_daily')
+          .select('date, clicks, impressions, cost_micros, attributed_sales_7d_micros')
           .eq('profile_id', profileId)
+          .eq(idCol, entityId)
           .gte('date', from)
           .lte('date', to)
-          .eq(level === 'campaign' ? 'campaign_id' : 
-              level === 'ad_group' ? 'ad_group_id' : 'target_id', entityId)
           .order('date');
-          
         if (error) throw error;
-        
-        // Group by date
-        const timeseries = data.reduce((acc: any, row: any) => {
+
+        const timeseries: Record<string, any> = {};
+        for (const row of data || []) {
           const dateKey = row.date;
-          if (!acc[dateKey]) {
-            acc[dateKey] = {
-              date: dateKey,
-              cost_micros: 0,
-              sales_7d_micros: 0,
-              clicks: 0,
-              impressions: 0
-            };
+          if (!timeseries[dateKey]) {
+            timeseries[dateKey] = { date: dateKey, cost_micros: 0, sales_7d_micros: 0, clicks: 0, impressions: 0 };
           }
-          
-          acc[dateKey].cost_micros += row.cost_micros || 0;
-          acc[dateKey].sales_7d_micros += row.sales_7d_micros || 0;
-          acc[dateKey].clicks += row.clicks || 0;
-          acc[dateKey].impressions += row.impressions || 0;
-          
-          return acc;
-        }, {});
-        
+          timeseries[dateKey].cost_micros += row.cost_micros || 0;
+          timeseries[dateKey].sales_7d_micros += row.attributed_sales_7d_micros || 0;
+          timeseries[dateKey].clicks += row.clicks || 0;
+          timeseries[dateKey].impressions += row.impressions || 0;
+        }
+
         const points = Object.values(timeseries).map((item: any) => ({
           date: item.date,
           spend: item.cost_micros / 1e6,
@@ -363,7 +364,7 @@ Deno.serve(async (req) => {
           clicks: item.clicks,
           impressions: item.impressions
         }));
-        
+
         return new Response(
           JSON.stringify({ points, duration_ms: duration }),
           { 

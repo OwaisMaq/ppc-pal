@@ -314,7 +314,6 @@ serve(async (req) => {
         }
 
         // Store tokens securely in private schema
-        const expiresAt = new Date(Date.now() + (tokenData.expires_in * 1000));
         const { error: tokenError } = await supabase
           .rpc('private.store_tokens', {
             p_user_id: user.id,
@@ -352,6 +351,10 @@ serve(async (req) => {
                 dateRangeDays: 30,
                 timeUnit: 'DAILY',
                 diagnosticMode: false
+              },
+              headers: {
+                // Forward the user's auth so the sync function can authorize
+                Authorization: authHeader!
               }
             }).then(result => {
               console.log(`✅ Auto-sync triggered for connection ${connection.id}:`, result)
@@ -360,7 +363,7 @@ serve(async (req) => {
             })
           }
         } catch (error) {
-          console.log('Failed to trigger auto-sync for profile:', profile.profileId, error.message)
+          console.log('Failed to trigger auto-sync for profile:', profile.profileId, (error as Error).message)
         }
       }
       
