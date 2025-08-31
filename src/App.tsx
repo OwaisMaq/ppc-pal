@@ -20,6 +20,9 @@ import NotFound from "@/pages/NotFound";
 import AmazonCallback from "@/pages/AmazonCallback";
 import CookieConsent from "@/components/CookieConsent";
 import Settings from "@/pages/Settings";
+import { SearchStudio } from "@/pages/SearchStudio";
+import { TargetStudio } from "@/pages/TargetStudio";
+import { PlaybooksPage } from "@/pages/PlaybooksPage";
 
 
 import { DateRangeProvider } from "@/context/DateRangeContext";
@@ -77,6 +80,21 @@ const App = () => {
                 <Route path="/automation" element={
                   <ProtectedRoute>
                     <AutomationPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="/search-studio" element={
+                  <ProtectedRoute>
+                    <SearchStudio />
+                  </ProtectedRoute>
+                } />
+                <Route path="/target-studio" element={
+                  <ProtectedRoute>
+                    <TargetStudio />
+                  </ProtectedRoute>
+                } />
+                <Route path="/playbooks" element={
+                  <ProtectedRoute>
+                    <PlaybooksPage />
                   </ProtectedRoute>
                 } />
                 
