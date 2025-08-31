@@ -61,6 +61,35 @@ export type Database = {
           },
         ]
       }
+      ad_creatives: {
+        Row: {
+          ad_id: string
+          asset_id: string
+          profile_id: string
+          role: string | null
+        }
+        Insert: {
+          ad_id: string
+          asset_id: string
+          profile_id: string
+          role?: string | null
+        }
+        Update: {
+          ad_id?: string
+          asset_id?: string
+          profile_id?: string
+          role?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_creatives_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "creative_assets"
+            referencedColumns: ["asset_id"]
+          },
+        ]
+      }
       ad_groups: {
         Row: {
           acos: number | null
@@ -922,6 +951,83 @@ export type Database = {
         }
         Relationships: []
       }
+      attribution_results: {
+        Row: {
+          ad_group_id: string
+          campaign_id: string
+          conversions_weighted: number
+          level: string
+          profile_id: string
+          run_id: string
+          sales_weighted_micros: number
+          target_id: string
+        }
+        Insert: {
+          ad_group_id?: string
+          campaign_id?: string
+          conversions_weighted: number
+          level: string
+          profile_id: string
+          run_id: string
+          sales_weighted_micros: number
+          target_id?: string
+        }
+        Update: {
+          ad_group_id?: string
+          campaign_id?: string
+          conversions_weighted?: number
+          level?: string
+          profile_id?: string
+          run_id?: string
+          sales_weighted_micros?: number
+          target_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attribution_results_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "attribution_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      attribution_runs: {
+        Row: {
+          created_at: string | null
+          date_from: string
+          date_to: string
+          error: string | null
+          id: string
+          model: string
+          params: Json | null
+          profile_id: string
+          status: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          date_from: string
+          date_to: string
+          error?: string | null
+          id?: string
+          model: string
+          params?: Json | null
+          profile_id: string
+          status?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          date_from?: string
+          date_to?: string
+          error?: string | null
+          id?: string
+          model?: string
+          params?: Json | null
+          profile_id?: string
+          status?: string | null
+        }
+        Relationships: []
+      }
       automation_rule_runs: {
         Row: {
           actions_enqueued: number | null
@@ -1493,6 +1599,132 @@ export type Database = {
           updated_at?: string
           user_id?: string
           validation_type?: string
+        }
+        Relationships: []
+      }
+      conversion_paths_daily: {
+        Row: {
+          clicks: number | null
+          conversions: number | null
+          created_at: string | null
+          date: string
+          marketplace: string | null
+          path_fingerprint: string
+          path_json: Json
+          profile_id: string
+          sales_micros: number | null
+          source: string
+          touch_count: number | null
+          views: number | null
+        }
+        Insert: {
+          clicks?: number | null
+          conversions?: number | null
+          created_at?: string | null
+          date: string
+          marketplace?: string | null
+          path_fingerprint: string
+          path_json: Json
+          profile_id: string
+          sales_micros?: number | null
+          source: string
+          touch_count?: number | null
+          views?: number | null
+        }
+        Update: {
+          clicks?: number | null
+          conversions?: number | null
+          created_at?: string | null
+          date?: string
+          marketplace?: string | null
+          path_fingerprint?: string
+          path_json?: Json
+          profile_id?: string
+          sales_micros?: number | null
+          source?: string
+          touch_count?: number | null
+          views?: number | null
+        }
+        Relationships: []
+      }
+      creative_assets: {
+        Row: {
+          asset_id: string
+          asset_type: string
+          created_at: string | null
+          metadata: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          asset_id: string
+          asset_type: string
+          created_at?: string | null
+          metadata?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          asset_id?: string
+          asset_type?: string
+          created_at?: string | null
+          metadata?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      creative_performance_daily: {
+        Row: {
+          ad_group_id: string | null
+          ad_id: string
+          asset_id: string
+          campaign_id: string | null
+          clicks: number | null
+          conversions_7d: number | null
+          cost_micros: number | null
+          date: string
+          impressions: number | null
+          profile_id: string
+          sales_7d_micros: number | null
+          video_completes: number | null
+          video_q25: number | null
+          video_q50: number | null
+          video_q75: number | null
+          video_starts: number | null
+        }
+        Insert: {
+          ad_group_id?: string | null
+          ad_id: string
+          asset_id?: string
+          campaign_id?: string | null
+          clicks?: number | null
+          conversions_7d?: number | null
+          cost_micros?: number | null
+          date: string
+          impressions?: number | null
+          profile_id: string
+          sales_7d_micros?: number | null
+          video_completes?: number | null
+          video_q25?: number | null
+          video_q50?: number | null
+          video_q75?: number | null
+          video_starts?: number | null
+        }
+        Update: {
+          ad_group_id?: string | null
+          ad_id?: string
+          asset_id?: string
+          campaign_id?: string | null
+          clicks?: number | null
+          conversions_7d?: number | null
+          cost_micros?: number | null
+          date?: string
+          impressions?: number | null
+          profile_id?: string
+          sales_7d_micros?: number | null
+          video_completes?: number | null
+          video_q25?: number | null
+          video_q50?: number | null
+          video_q75?: number | null
+          video_starts?: number | null
         }
         Relationships: []
       }
@@ -3246,6 +3478,33 @@ export type Database = {
           },
         ]
       }
+      time_lag_daily: {
+        Row: {
+          bucket: string
+          conversions: number | null
+          date: string
+          profile_id: string
+          sales_micros: number | null
+          source: string
+        }
+        Insert: {
+          bucket: string
+          conversions?: number | null
+          date: string
+          profile_id: string
+          sales_micros?: number | null
+          source: string
+        }
+        Update: {
+          bucket?: string
+          conversions?: number | null
+          date?: string
+          profile_id?: string
+          sales_micros?: number | null
+          source?: string
+        }
+        Relationships: []
+      }
       usage_limits: {
         Row: {
           created_at: string
@@ -3512,6 +3771,15 @@ export type Database = {
         }
         Relationships: []
       }
+      v_attribution_campaign: {
+        Row: {
+          campaign_id: string | null
+          conv_attr: number | null
+          profile_id: string | null
+          sales_attr_micros: number | null
+        }
+        Relationships: []
+      }
       v_campaign_daily: {
         Row: {
           campaign_id: string | null
@@ -3544,6 +3812,24 @@ export type Database = {
           spend_eur: number | null
           spend_gbp: number | null
           spend_usd: number | null
+        }
+        Relationships: []
+      }
+      v_creative_kpis: {
+        Row: {
+          ad_id: string | null
+          asset_id: string | null
+          clicks: number | null
+          conv: number | null
+          cost_micros: number | null
+          impr: number | null
+          profile_id: string | null
+          sales_micros: number | null
+          vcomp: number | null
+          vq25: number | null
+          vq50: number | null
+          vq75: number | null
+          vstarts: number | null
         }
         Relationships: []
       }
@@ -3620,6 +3906,10 @@ export type Database = {
           p_scope: string
           p_time_window: string
         }
+        Returns: string
+      }
+      generate_path_fingerprint: {
+        Args: { path_json: Json }
         Returns: string
       }
       get_ams_data_freshness: {
