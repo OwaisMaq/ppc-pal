@@ -2229,6 +2229,10 @@ export type Database = {
         Args: { p_connection_id: string }
         Returns: undefined
       }
+      set_config: {
+        Args: { is_local?: boolean; key: string; value: string }
+        Returns: undefined
+      }
       sync_amazon_data: {
         Args: { connection_uuid: string }
         Returns: undefined
