@@ -291,25 +291,39 @@ serve(async (req) => {
         
         console.log('Storing UK connection for profile:', profile.profileId)
         
+        // Store connection data (without tokens)
         const connectionData = {
           user_id: user.id,
           profile_id: profile.profileId.toString(),
           profile_name: profile.accountInfo?.name || `Profile ${profile.profileId}`,
           marketplace_id: 'GB',
-          access_token: await encryptText(tokenData.access_token),
-          refresh_token: await encryptText(tokenData.refresh_token),
           token_expires_at: expiresAt.toISOString(),
           status: 'active' as const,
           advertising_api_endpoint: profile.advertisingApiEndpoint || 'https://advertising-api.amazon.com',
         };
         
-        const { error: insertError } = await supabase
+        const { data: connection, error: insertError } = await supabase
           .from('amazon_connections')
-          .upsert(connectionData, { onConflict: 'user_id, profile_id' });
+          .upsert(connectionData, { onConflict: 'user_id, profile_id' })
+          .select('id')
+          .single();
 
         if (insertError) {
-          console.error('Error storing UK connection for profile:', profile.profileId, insertError.message)
+          console.error('Error storing connection for profile:', profile.profileId, insertError.message)
           throw insertError
+        }
+
+        // Store tokens securely in private schema
+        const { error: tokenError } = await supabase
+          .rpc('private.store_tokens', {
+            p_connection_id: connection.id,
+            p_access_token: tokenData.access_token,
+            p_refresh_token: tokenData.refresh_token
+          });
+
+        if (tokenError) {
+          console.error('Error storing tokens for profile:', profile.profileId, tokenError.message)
+          throw tokenError
         }
       }
 

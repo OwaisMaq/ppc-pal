@@ -71,7 +71,7 @@ serve(async (req) => {
     // Get the connection details (using service role)
     const { data: connection, error: connectionError } = await supabase
       .from('amazon_connections')
-      .select('*')
+      .select('id, user_id, profile_id, status')
       .eq('id', connectionId)
       .eq('user_id', user.id)
       .single()
@@ -80,16 +80,21 @@ serve(async (req) => {
       throw new Error('Connection not found')
     }
 
-let refreshToken: string;
-    try {
-      refreshToken = await decryptText(connection.refresh_token);
-    } catch (_e) {
+    // Get tokens from secure storage
+    const { data: tokens, error: tokenError } = await supabase
+      .rpc('private.get_tokens', {
+        p_connection_id: connectionId
+      })
+
+    if (tokenError || !tokens) {
       await supabase
         .from('amazon_connections')
-        .update({ status: 'expired', setup_required_reason: 'Token decryption failed - please reconnect' })
+        .update({ status: 'expired', setup_required_reason: 'Token retrieval failed - please reconnect' })
         .eq('id', connectionId);
-      throw new Error('Failed to decrypt refresh token');
+      throw new Error('Failed to retrieve tokens');
     }
+
+    const refreshToken = tokens.refresh_token;
 
     const clientId = Deno.env.get('AMAZON_CLIENT_ID')
     const clientSecret = Deno.env.get('AMAZON_CLIENT_SECRET')
@@ -136,15 +141,10 @@ let refreshToken: string;
     // Calculate new expiry time (Amazon tokens typically last 1 hour)
     const expiresAt = new Date(Date.now() + (tokenData.expires_in * 1000))
 
-    // Update the connection with new tokens (encrypt at rest)
-    const newAccessEnc = await encryptText(tokenData.access_token)
-    const newRefreshEnc = await encryptText(tokenData.refresh_token || connection.refresh_token)
-
-    const { error: updateError } = await supabase
+    // Update connection metadata
+    const { error: connectionUpdateError } = await supabase
       .from('amazon_connections')
       .update({
-        access_token: newAccessEnc,
-        refresh_token: newRefreshEnc, // Keep old (encrypted) if new one not provided
         token_expires_at: expiresAt.toISOString(),
         status: 'active',
         setup_required_reason: null,
@@ -152,9 +152,22 @@ let refreshToken: string;
       })
       .eq('id', connectionId)
 
+    if (connectionUpdateError) {
+      console.error('Failed to update connection metadata:', connectionUpdateError)
+      throw new Error('Failed to update connection metadata')
+    }
+
+    // Update tokens in secure storage
+    const { error: updateError } = await supabase
+      .rpc('private.store_tokens', {
+        p_connection_id: connectionId,
+        p_access_token: tokenData.access_token,
+        p_refresh_token: tokenData.refresh_token || tokens.refresh_token
+      })
+
     if (updateError) {
-      console.error('Failed to update connection:', updateError)
-      throw new Error('Failed to update connection with new tokens')
+      console.error('Failed to update tokens:', updateError)
+      throw new Error('Failed to update tokens')
     }
 
     console.log('Connection updated with new tokens')
