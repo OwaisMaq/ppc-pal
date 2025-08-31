@@ -963,6 +963,27 @@ export type Database = {
         }
         Relationships: []
       }
+      brand_terms: {
+        Row: {
+          created_at: string | null
+          id: string
+          profile_id: string
+          term: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          profile_id: string
+          term: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          profile_id?: string
+          term?: string
+        }
+        Relationships: []
+      }
       campaign_budget_usage: {
         Row: {
           budget_amount: number | null
@@ -2118,6 +2139,45 @@ export type Database = {
         }
         Relationships: []
       }
+      negatives_snapshot: {
+        Row: {
+          ad_group_id: string | null
+          campaign_id: string | null
+          id: string
+          last_seen_at: string | null
+          match_type: string | null
+          negative_type: string
+          profile_id: string
+          scope: string
+          state: string | null
+          value: string
+        }
+        Insert: {
+          ad_group_id?: string | null
+          campaign_id?: string | null
+          id?: string
+          last_seen_at?: string | null
+          match_type?: string | null
+          negative_type: string
+          profile_id: string
+          scope: string
+          state?: string | null
+          value: string
+        }
+        Update: {
+          ad_group_id?: string | null
+          campaign_id?: string | null
+          id?: string
+          last_seen_at?: string | null
+          match_type?: string | null
+          negative_type?: string
+          profile_id?: string
+          scope?: string
+          state?: string | null
+          value?: string
+        }
+        Relationships: []
+      }
       optimization_recommendations: {
         Row: {
           applied: boolean | null
@@ -2373,6 +2433,39 @@ export type Database = {
           status?: string
           updated_at?: string
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      st_ignore_list: {
+        Row: {
+          ad_group_id: string | null
+          campaign_id: string | null
+          created_at: string | null
+          id: string
+          profile_id: string
+          reason: string | null
+          scope: string
+          search_term: string
+        }
+        Insert: {
+          ad_group_id?: string | null
+          campaign_id?: string | null
+          created_at?: string | null
+          id?: string
+          profile_id: string
+          reason?: string | null
+          scope?: string
+          search_term: string
+        }
+        Update: {
+          ad_group_id?: string | null
+          campaign_id?: string | null
+          created_at?: string | null
+          id?: string
+          profile_id?: string
+          reason?: string | null
+          scope?: string
+          search_term?: string
         }
         Relationships: []
       }
