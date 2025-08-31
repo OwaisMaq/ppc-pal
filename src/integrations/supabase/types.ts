@@ -989,6 +989,45 @@ export type Database = {
         }
         Relationships: []
       }
+      dim_ad_group: {
+        Row: {
+          ad_group_id: string
+          campaign_id: string
+          name: string | null
+          profile_id: string
+        }
+        Insert: {
+          ad_group_id: string
+          campaign_id: string
+          name?: string | null
+          profile_id: string
+        }
+        Update: {
+          ad_group_id?: string
+          campaign_id?: string
+          name?: string | null
+          profile_id?: string
+        }
+        Relationships: []
+      }
+      dim_campaign: {
+        Row: {
+          campaign_id: string
+          name: string | null
+          profile_id: string
+        }
+        Insert: {
+          campaign_id: string
+          name?: string | null
+          profile_id: string
+        }
+        Update: {
+          campaign_id?: string
+          name?: string | null
+          profile_id?: string
+        }
+        Relationships: []
+      }
       documentation_sources: {
         Row: {
           analysis_results: Json | null
@@ -1091,6 +1130,93 @@ export type Database = {
           sources_updated?: number | null
           started_at?: string
           status?: string
+        }
+        Relationships: []
+      }
+      fact_placement_daily: {
+        Row: {
+          ad_group_id: string
+          attributed_conversions_7d: number | null
+          attributed_sales_7d_micros: number | null
+          campaign_id: string
+          clicks: number | null
+          cost_micros: number | null
+          date: string
+          impressions: number | null
+          placement: string
+          profile_id: string
+        }
+        Insert: {
+          ad_group_id: string
+          attributed_conversions_7d?: number | null
+          attributed_sales_7d_micros?: number | null
+          campaign_id: string
+          clicks?: number | null
+          cost_micros?: number | null
+          date: string
+          impressions?: number | null
+          placement: string
+          profile_id: string
+        }
+        Update: {
+          ad_group_id?: string
+          attributed_conversions_7d?: number | null
+          attributed_sales_7d_micros?: number | null
+          campaign_id?: string
+          clicks?: number | null
+          cost_micros?: number | null
+          date?: string
+          impressions?: number | null
+          placement?: string
+          profile_id?: string
+        }
+        Relationships: []
+      }
+      fact_search_term_daily: {
+        Row: {
+          ad_group_id: string
+          attributed_conversions_1d: number | null
+          attributed_conversions_7d: number | null
+          attributed_sales_7d_micros: number | null
+          campaign_id: string
+          clicks: number | null
+          cost_micros: number | null
+          date: string
+          impressions: number | null
+          keyword_text: string | null
+          match_type: string
+          profile_id: string
+          search_term: string
+        }
+        Insert: {
+          ad_group_id: string
+          attributed_conversions_1d?: number | null
+          attributed_conversions_7d?: number | null
+          attributed_sales_7d_micros?: number | null
+          campaign_id: string
+          clicks?: number | null
+          cost_micros?: number | null
+          date: string
+          impressions?: number | null
+          keyword_text?: string | null
+          match_type: string
+          profile_id: string
+          search_term: string
+        }
+        Update: {
+          ad_group_id?: string
+          attributed_conversions_1d?: number | null
+          attributed_conversions_7d?: number | null
+          attributed_sales_7d_micros?: number | null
+          campaign_id?: string
+          clicks?: number | null
+          cost_micros?: number | null
+          date?: string
+          impressions?: number | null
+          keyword_text?: string | null
+          match_type?: string
+          profile_id?: string
+          search_term?: string
         }
         Relationships: []
       }
@@ -1479,6 +1605,48 @@ export type Database = {
           email?: string | null
           id?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      report_jobs: {
+        Row: {
+          created_at: string | null
+          download_url: string | null
+          end_date: string
+          error: string | null
+          id: string
+          profile_id: string
+          report_type: string
+          rows_processed: number | null
+          start_date: string
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          download_url?: string | null
+          end_date: string
+          error?: string | null
+          id?: string
+          profile_id: string
+          report_type: string
+          rows_processed?: number | null
+          start_date: string
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          download_url?: string | null
+          end_date?: string
+          error?: string | null
+          id?: string
+          profile_id?: string
+          report_type?: string
+          rows_processed?: number | null
+          start_date?: string
+          status?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
