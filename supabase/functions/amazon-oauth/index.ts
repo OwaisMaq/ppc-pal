@@ -314,11 +314,14 @@ serve(async (req) => {
         }
 
         // Store tokens securely in private schema
+        const expiresAt = new Date(Date.now() + (tokenData.expires_in * 1000));
         const { error: tokenError } = await supabase
           .rpc('private.store_tokens', {
-            p_connection_id: connection.id,
+            p_user_id: user.id,
+            p_profile_id: profile.profileId,
             p_access_token: tokenData.access_token,
-            p_refresh_token: tokenData.refresh_token
+            p_refresh_token: tokenData.refresh_token,
+            p_expires_at: expiresAt.toISOString()
           });
 
         if (tokenError) {

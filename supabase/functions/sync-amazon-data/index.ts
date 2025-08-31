@@ -339,6 +339,8 @@ serve(async (req) => {
     const timeUnitOpt: 'SUMMARY' | 'DAILY' = (timeUnit === 'SUMMARY' ? 'SUMMARY' : 'DAILY')
     console.log('🚀 Starting sync for user:', user.id, 'connection:', connectionId, 'dateRangeDays:', dateRange, 'diagnosticMode:', diag)
     
+    let syncJobId: string | undefined;
+    
     // Create sync job for progress tracking
     const { data: syncJob, error: syncJobError } = await supabase
       .from('sync_jobs')
@@ -362,7 +364,7 @@ serve(async (req) => {
       console.error('Failed to create sync job:', syncJobError)
     }
 
-    const syncJobId = syncJob?.id
+    syncJobId = syncJob?.id
 
     // PHASE 1: Validate connection and refresh token if needed
     console.log('🔐 Validating Amazon connection...')
@@ -1668,8 +1670,8 @@ serve(async (req) => {
     else if (message.includes('Token expired')) code = 'TOKEN_EXPIRED'
     else if (message.includes('Missing Amazon client secret')) code = 'MISSING_AMAZON_SECRET'
 
-    // Mark sync job as failed
-    if (syncJobId) {
+    // Mark sync job as failed  
+    if (typeof syncJobId !== 'undefined' && syncJobId) {
       await supabase.from('sync_jobs').update({
         status: 'error',
         phase: 'error',

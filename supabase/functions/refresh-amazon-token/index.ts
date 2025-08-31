@@ -159,10 +159,12 @@ serve(async (req) => {
 
     // Update tokens in secure storage
     const { error: updateError } = await supabase
-      .rpc('store_tokens', {
+      .rpc('private.store_tokens', {
+        p_user_id: user.id,
         p_profile_id: connection.profile_id,
         p_access_token: tokenData.access_token,
-        p_refresh_token: tokenData.refresh_token || tokens.refresh_token
+        p_refresh_token: tokenData.refresh_token || tokens.refresh_token,
+        p_expires_at: expiresAt.toISOString()
       })
 
     if (updateError) {
