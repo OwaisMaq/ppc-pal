@@ -82,8 +82,8 @@ serve(async (req) => {
 
     // Get tokens from secure storage
     const { data: tokens, error: tokenError } = await supabase
-      .rpc('private.get_tokens', {
-        p_connection_id: connectionId
+      .rpc('get_tokens', {
+        p_profile_id: connection.profile_id
       })
 
     if (tokenError || !tokens) {
@@ -159,8 +159,8 @@ serve(async (req) => {
 
     // Update tokens in secure storage
     const { error: updateError } = await supabase
-      .rpc('private.store_tokens', {
-        p_connection_id: connectionId,
+      .rpc('store_tokens', {
+        p_profile_id: connection.profile_id,
         p_access_token: tokenData.access_token,
         p_refresh_token: tokenData.refresh_token || tokens.refresh_token
       })
