@@ -1127,6 +1127,165 @@ export type Database = {
         }
         Relationships: []
       }
+      entity_ad_groups: {
+        Row: {
+          ad_group_id: string
+          campaign_id: string
+          created_at: string | null
+          default_bid_micros: number | null
+          last_updated_time: string | null
+          name: string | null
+          profile_id: string
+          state: string | null
+          synced_at: string | null
+        }
+        Insert: {
+          ad_group_id: string
+          campaign_id: string
+          created_at?: string | null
+          default_bid_micros?: number | null
+          last_updated_time?: string | null
+          name?: string | null
+          profile_id: string
+          state?: string | null
+          synced_at?: string | null
+        }
+        Update: {
+          ad_group_id?: string
+          campaign_id?: string
+          created_at?: string | null
+          default_bid_micros?: number | null
+          last_updated_time?: string | null
+          name?: string | null
+          profile_id?: string
+          state?: string | null
+          synced_at?: string | null
+        }
+        Relationships: []
+      }
+      entity_ads: {
+        Row: {
+          ad_group_id: string
+          ad_id: string
+          campaign_id: string
+          created_at: string | null
+          creative: Json | null
+          last_updated_time: string | null
+          profile_id: string
+          state: string | null
+          synced_at: string | null
+        }
+        Insert: {
+          ad_group_id: string
+          ad_id: string
+          campaign_id: string
+          created_at?: string | null
+          creative?: Json | null
+          last_updated_time?: string | null
+          profile_id: string
+          state?: string | null
+          synced_at?: string | null
+        }
+        Update: {
+          ad_group_id?: string
+          ad_id?: string
+          campaign_id?: string
+          created_at?: string | null
+          creative?: Json | null
+          last_updated_time?: string | null
+          profile_id?: string
+          state?: string | null
+          synced_at?: string | null
+        }
+        Relationships: []
+      }
+      entity_campaigns: {
+        Row: {
+          bidding: Json | null
+          campaign_id: string
+          campaign_type: string | null
+          computed_status: string | null
+          created_at: string | null
+          daily_budget_micros: number | null
+          last_updated_time: string | null
+          name: string | null
+          profile_id: string
+          serving_status: string | null
+          state: string | null
+          synced_at: string | null
+        }
+        Insert: {
+          bidding?: Json | null
+          campaign_id: string
+          campaign_type?: string | null
+          computed_status?: string | null
+          created_at?: string | null
+          daily_budget_micros?: number | null
+          last_updated_time?: string | null
+          name?: string | null
+          profile_id: string
+          serving_status?: string | null
+          state?: string | null
+          synced_at?: string | null
+        }
+        Update: {
+          bidding?: Json | null
+          campaign_id?: string
+          campaign_type?: string | null
+          computed_status?: string | null
+          created_at?: string | null
+          daily_budget_micros?: number | null
+          last_updated_time?: string | null
+          name?: string | null
+          profile_id?: string
+          serving_status?: string | null
+          state?: string | null
+          synced_at?: string | null
+        }
+        Relationships: []
+      }
+      entity_targets: {
+        Row: {
+          ad_group_id: string
+          bid_micros: number | null
+          campaign_id: string
+          created_at: string | null
+          expression: Json | null
+          last_updated_time: string | null
+          match_type: string | null
+          profile_id: string
+          state: string | null
+          synced_at: string | null
+          target_id: string
+        }
+        Insert: {
+          ad_group_id: string
+          bid_micros?: number | null
+          campaign_id: string
+          created_at?: string | null
+          expression?: Json | null
+          last_updated_time?: string | null
+          match_type?: string | null
+          profile_id: string
+          state?: string | null
+          synced_at?: string | null
+          target_id: string
+        }
+        Update: {
+          ad_group_id?: string
+          bid_micros?: number | null
+          campaign_id?: string
+          created_at?: string | null
+          expression?: Json | null
+          last_updated_time?: string | null
+          match_type?: string | null
+          profile_id?: string
+          state?: string | null
+          synced_at?: string | null
+          target_id?: string
+        }
+        Relationships: []
+      }
       fact_placement_daily: {
         Row: {
           ad_group_id: string
@@ -1836,6 +1995,81 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      sync_runs: {
+        Row: {
+          created_at: string | null
+          entity_type: string
+          error: string | null
+          finished_at: string | null
+          id: string
+          items_upserted: number | null
+          mode: string
+          pages_fetched: number | null
+          profile_id: string
+          request_id: string | null
+          started_at: string | null
+          status: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          entity_type: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          items_upserted?: number | null
+          mode: string
+          pages_fetched?: number | null
+          profile_id: string
+          request_id?: string | null
+          started_at?: string | null
+          status?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          entity_type?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          items_upserted?: number | null
+          mode?: string
+          pages_fetched?: number | null
+          profile_id?: string
+          request_id?: string | null
+          started_at?: string | null
+          status?: string | null
+        }
+        Relationships: []
+      }
+      sync_state: {
+        Row: {
+          created_at: string | null
+          entity_type: string
+          high_watermark: string | null
+          last_full_sync_at: string | null
+          last_incremental_sync_at: string | null
+          profile_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          entity_type: string
+          high_watermark?: string | null
+          last_full_sync_at?: string | null
+          last_incremental_sync_at?: string | null
+          profile_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          entity_type?: string
+          high_watermark?: string | null
+          last_full_sync_at?: string | null
+          last_incremental_sync_at?: string | null
+          profile_id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       targets: {
         Row: {
