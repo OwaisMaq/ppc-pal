@@ -14,6 +14,53 @@ export type Database = {
   }
   public: {
     Tables: {
+      action_queue: {
+        Row: {
+          action_type: string
+          applied_at: string | null
+          created_at: string | null
+          error: string | null
+          id: string
+          idempotency_key: string
+          payload: Json
+          profile_id: string
+          rule_id: string
+          status: string
+        }
+        Insert: {
+          action_type: string
+          applied_at?: string | null
+          created_at?: string | null
+          error?: string | null
+          id?: string
+          idempotency_key: string
+          payload: Json
+          profile_id: string
+          rule_id: string
+          status?: string
+        }
+        Update: {
+          action_type?: string
+          applied_at?: string | null
+          created_at?: string | null
+          error?: string | null
+          id?: string
+          idempotency_key?: string
+          payload?: Json
+          profile_id?: string
+          rule_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "action_queue_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "automation_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ad_groups: {
         Row: {
           acos: number | null
@@ -194,6 +241,62 @@ export type Database = {
             columns: ["adgroup_id"]
             isOneToOne: false
             referencedRelation: "ad_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      alerts: {
+        Row: {
+          acknowledged_at: string | null
+          created_at: string | null
+          data: Json | null
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          level: string
+          message: string
+          notified_at: string | null
+          profile_id: string
+          rule_id: string
+          state: string
+          title: string
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          created_at?: string | null
+          data?: Json | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          level?: string
+          message: string
+          notified_at?: string | null
+          profile_id: string
+          rule_id: string
+          state?: string
+          title: string
+        }
+        Update: {
+          acknowledged_at?: string | null
+          created_at?: string | null
+          data?: Json | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          level?: string
+          message?: string
+          notified_at?: string | null
+          profile_id?: string
+          rule_id?: string
+          state?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alerts_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "automation_rules"
             referencedColumns: ["id"]
           },
         ]
@@ -722,6 +825,101 @@ export type Database = {
           id?: string
           label?: string
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      automation_rule_runs: {
+        Row: {
+          actions_enqueued: number | null
+          alerts_created: number | null
+          error: string | null
+          evaluated: number | null
+          finished_at: string | null
+          id: string
+          profile_id: string
+          rule_id: string
+          started_at: string | null
+          status: string | null
+        }
+        Insert: {
+          actions_enqueued?: number | null
+          alerts_created?: number | null
+          error?: string | null
+          evaluated?: number | null
+          finished_at?: string | null
+          id?: string
+          profile_id: string
+          rule_id: string
+          started_at?: string | null
+          status?: string | null
+        }
+        Update: {
+          actions_enqueued?: number | null
+          alerts_created?: number | null
+          error?: string | null
+          evaluated?: number | null
+          finished_at?: string | null
+          id?: string
+          profile_id?: string
+          rule_id?: string
+          started_at?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_rule_runs_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "automation_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      automation_rules: {
+        Row: {
+          action: Json
+          created_at: string | null
+          enabled: boolean
+          id: string
+          mode: string
+          name: string
+          params: Json
+          profile_id: string
+          rule_type: string
+          severity: string
+          throttle: Json | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          action: Json
+          created_at?: string | null
+          enabled?: boolean
+          id?: string
+          mode?: string
+          name: string
+          params: Json
+          profile_id: string
+          rule_type: string
+          severity?: string
+          throttle?: Json | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: Json
+          created_at?: string | null
+          enabled?: boolean
+          id?: string
+          mode?: string
+          name?: string
+          params?: Json
+          profile_id?: string
+          rule_type?: string
+          severity?: string
+          throttle?: Json | null
+          updated_at?: string | null
           user_id?: string
         }
         Relationships: []
@@ -2585,6 +2783,33 @@ export type Database = {
           period_end?: string
           period_start?: string
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_preferences: {
+        Row: {
+          created_at: string | null
+          email_alerts: boolean | null
+          notification_frequency: string | null
+          slack_webhook_url: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          email_alerts?: boolean | null
+          notification_frequency?: string | null
+          slack_webhook_url?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          email_alerts?: boolean | null
+          notification_frequency?: string | null
+          slack_webhook_url?: string | null
+          updated_at?: string | null
           user_id?: string
         }
         Relationships: []
