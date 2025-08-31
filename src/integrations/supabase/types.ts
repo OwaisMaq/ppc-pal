@@ -3287,6 +3287,26 @@ export type Database = {
         }
         Relationships: []
       }
+      v_campaign_daily_fx: {
+        Row: {
+          campaign_id: string | null
+          clicks: number | null
+          conv_7d: number | null
+          cost_micros: number | null
+          date: string | null
+          impressions: number | null
+          profile_currency: string | null
+          profile_id: string | null
+          sales_7d_micros: number | null
+          sales_eur: number | null
+          sales_gbp: number | null
+          sales_usd: number | null
+          spend_eur: number | null
+          spend_gbp: number | null
+          spend_usd: number | null
+        }
+        Relationships: []
+      }
       v_studio_search_terms: {
         Row: {
           acos_14d: number | null
@@ -3354,6 +3374,27 @@ export type Database = {
           last_conversion_message: string
           last_traffic_message: string
           messages_24h: number
+        }[]
+      }
+      get_campaign_rollup_kpis: {
+        Args: {
+          p_base_currency?: string
+          p_from_date: string
+          p_profile_ids: string[]
+          p_to_date: string
+        }
+        Returns: {
+          avg_acos: number
+          avg_cpc: number
+          avg_ctr: number
+          avg_cvr: number
+          avg_roas: number
+          base_currency: string
+          total_clicks: number
+          total_conversions: number
+          total_impressions: number
+          total_sales: number
+          total_spend: number
         }[]
       }
       grant_admin_role_by_email: {
