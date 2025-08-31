@@ -467,6 +467,36 @@ export type Database = {
           },
         ]
       }
+      ams_staging: {
+        Row: {
+          dataset: string
+          event_time: string
+          id: number
+          payload: Json
+          profile_id: string
+          received_at: string | null
+          record_id: string
+        }
+        Insert: {
+          dataset: string
+          event_time: string
+          id?: number
+          payload: Json
+          profile_id: string
+          received_at?: string | null
+          record_id: string
+        }
+        Update: {
+          dataset?: string
+          event_time?: string
+          id?: number
+          payload?: Json
+          profile_id?: string
+          received_at?: string | null
+          record_id?: string
+        }
+        Relationships: []
+      }
       ams_subscriptions: {
         Row: {
           connection_id: string
@@ -554,6 +584,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ams_subscriptions_v2: {
+        Row: {
+          created_at: string | null
+          dataset_id: string
+          destination_arn: string | null
+          destination_type: string | null
+          error: string | null
+          id: string
+          last_delivery_at: string | null
+          profile_id: string
+          region: string | null
+          status: string
+          subscription_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          dataset_id: string
+          destination_arn?: string | null
+          destination_type?: string | null
+          error?: string | null
+          id?: string
+          last_delivery_at?: string | null
+          profile_id: string
+          region?: string | null
+          status?: string
+          subscription_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          dataset_id?: string
+          destination_arn?: string | null
+          destination_type?: string | null
+          error?: string | null
+          id?: string
+          last_delivery_at?: string | null
+          profile_id?: string
+          region?: string | null
+          status?: string
+          subscription_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       api_analysis_results: {
         Row: {
@@ -647,6 +722,45 @@ export type Database = {
           id?: string
           label?: string
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      billing_subscriptions: {
+        Row: {
+          cancel_at_period_end: boolean | null
+          created_at: string | null
+          current_period_end: string | null
+          plan: string
+          status: string
+          stripe_customer_id: string
+          stripe_subscription_id: string | null
+          trial_end: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          cancel_at_period_end?: boolean | null
+          created_at?: string | null
+          current_period_end?: string | null
+          plan?: string
+          status?: string
+          stripe_customer_id: string
+          stripe_subscription_id?: string | null
+          trial_end?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          cancel_at_period_end?: boolean | null
+          created_at?: string | null
+          current_period_end?: string | null
+          plan?: string
+          status?: string
+          stripe_customer_id?: string
+          stripe_subscription_id?: string | null
+          trial_end?: string | null
+          updated_at?: string | null
           user_id?: string
         }
         Relationships: []
@@ -1286,6 +1400,39 @@ export type Database = {
         }
         Relationships: []
       }
+      fact_budget_usage: {
+        Row: {
+          budget_micros: number | null
+          campaign_id: string
+          created_at: string | null
+          minute: string
+          pace: number | null
+          profile_id: string
+          spend_micros: number | null
+          status: string | null
+        }
+        Insert: {
+          budget_micros?: number | null
+          campaign_id: string
+          created_at?: string | null
+          minute: string
+          pace?: number | null
+          profile_id: string
+          spend_micros?: number | null
+          status?: string | null
+        }
+        Update: {
+          budget_micros?: number | null
+          campaign_id?: string
+          created_at?: string | null
+          minute?: string
+          pace?: number | null
+          profile_id?: string
+          spend_micros?: number | null
+          status?: string | null
+        }
+        Relationships: []
+      }
       fact_placement_daily: {
         Row: {
           ad_group_id: string
@@ -1322,6 +1469,102 @@ export type Database = {
           impressions?: number | null
           placement?: string
           profile_id?: string
+        }
+        Relationships: []
+      }
+      fact_sb_hourly: {
+        Row: {
+          ad_group_id: string
+          attributed_conversions_1d: number | null
+          attributed_conversions_7d: number | null
+          attributed_sales_1d_micros: number | null
+          attributed_sales_7d_micros: number | null
+          campaign_id: string
+          clicks: number | null
+          cost_micros: number | null
+          created_at: string | null
+          hour: string
+          impressions: number | null
+          profile_id: string
+          target_id: string
+        }
+        Insert: {
+          ad_group_id: string
+          attributed_conversions_1d?: number | null
+          attributed_conversions_7d?: number | null
+          attributed_sales_1d_micros?: number | null
+          attributed_sales_7d_micros?: number | null
+          campaign_id: string
+          clicks?: number | null
+          cost_micros?: number | null
+          created_at?: string | null
+          hour: string
+          impressions?: number | null
+          profile_id: string
+          target_id?: string
+        }
+        Update: {
+          ad_group_id?: string
+          attributed_conversions_1d?: number | null
+          attributed_conversions_7d?: number | null
+          attributed_sales_1d_micros?: number | null
+          attributed_sales_7d_micros?: number | null
+          campaign_id?: string
+          clicks?: number | null
+          cost_micros?: number | null
+          created_at?: string | null
+          hour?: string
+          impressions?: number | null
+          profile_id?: string
+          target_id?: string
+        }
+        Relationships: []
+      }
+      fact_sd_hourly: {
+        Row: {
+          ad_group_id: string
+          attributed_conversions_1d: number | null
+          attributed_conversions_7d: number | null
+          attributed_sales_1d_micros: number | null
+          attributed_sales_7d_micros: number | null
+          campaign_id: string
+          clicks: number | null
+          cost_micros: number | null
+          created_at: string | null
+          hour: string
+          impressions: number | null
+          profile_id: string
+          target_id: string
+        }
+        Insert: {
+          ad_group_id: string
+          attributed_conversions_1d?: number | null
+          attributed_conversions_7d?: number | null
+          attributed_sales_1d_micros?: number | null
+          attributed_sales_7d_micros?: number | null
+          campaign_id: string
+          clicks?: number | null
+          cost_micros?: number | null
+          created_at?: string | null
+          hour: string
+          impressions?: number | null
+          profile_id: string
+          target_id?: string
+        }
+        Update: {
+          ad_group_id?: string
+          attributed_conversions_1d?: number | null
+          attributed_conversions_7d?: number | null
+          attributed_sales_1d_micros?: number | null
+          attributed_sales_7d_micros?: number | null
+          campaign_id?: string
+          clicks?: number | null
+          cost_micros?: number | null
+          created_at?: string | null
+          hour?: string
+          impressions?: number | null
+          profile_id?: string
+          target_id?: string
         }
         Relationships: []
       }
@@ -1370,6 +1613,54 @@ export type Database = {
           match_type?: string
           profile_id?: string
           search_term?: string
+        }
+        Relationships: []
+      }
+      fact_sp_hourly: {
+        Row: {
+          ad_group_id: string
+          attributed_conversions_1d: number | null
+          attributed_conversions_7d: number | null
+          attributed_sales_1d_micros: number | null
+          attributed_sales_7d_micros: number | null
+          campaign_id: string
+          clicks: number | null
+          cost_micros: number | null
+          created_at: string | null
+          hour: string
+          impressions: number | null
+          profile_id: string
+          target_id: string
+        }
+        Insert: {
+          ad_group_id: string
+          attributed_conversions_1d?: number | null
+          attributed_conversions_7d?: number | null
+          attributed_sales_1d_micros?: number | null
+          attributed_sales_7d_micros?: number | null
+          campaign_id: string
+          clicks?: number | null
+          cost_micros?: number | null
+          created_at?: string | null
+          hour: string
+          impressions?: number | null
+          profile_id: string
+          target_id?: string
+        }
+        Update: {
+          ad_group_id?: string
+          attributed_conversions_1d?: number | null
+          attributed_conversions_7d?: number | null
+          attributed_sales_1d_micros?: number | null
+          attributed_sales_7d_micros?: number | null
+          campaign_id?: string
+          clicks?: number | null
+          cost_micros?: number | null
+          created_at?: string | null
+          hour?: string
+          impressions?: number | null
+          profile_id?: string
+          target_id?: string
         }
         Relationships: []
       }
@@ -1611,6 +1902,24 @@ export type Database = {
           },
         ]
       }
+      meta_kv: {
+        Row: {
+          k: string
+          updated_at: string | null
+          v: Json | null
+        }
+        Insert: {
+          k: string
+          updated_at?: string | null
+          v?: Json | null
+        }
+        Update: {
+          k?: string
+          updated_at?: string | null
+          v?: Json | null
+        }
+        Relationships: []
+      }
       optimization_recommendations: {
         Row: {
           applied: boolean | null
@@ -1739,6 +2048,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      plan_entitlements: {
+        Row: {
+          created_at: string | null
+          features: Json
+          limits: Json
+          plan: string
+        }
+        Insert: {
+          created_at?: string | null
+          features: Json
+          limits: Json
+          plan: string
+        }
+        Update: {
+          created_at?: string | null
+          features?: Json
+          limits?: Json
+          plan?: string
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
