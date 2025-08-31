@@ -67,3 +67,6 @@ verify_jwt = false
 
 [functions.check-entitlement]
 verify_jwt = true
+
+[functions.dashboard]
+verify_jwt = false

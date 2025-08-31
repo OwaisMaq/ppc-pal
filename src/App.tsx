@@ -9,7 +9,7 @@ import Auth from "@/pages/Auth";
 import Dashboard from "@/pages/Dashboard";
 import Feedback from "@/pages/Feedback";
 import DataManagement from "@/pages/DataManagement";
-
+import PerformanceDashboard from "@/pages/PerformanceDashboard";
 import Privacy from "@/pages/Privacy";
 import PublicLanding from "@/pages/PublicLanding";
 import About from "@/pages/About";
@@ -66,6 +66,11 @@ const App = () => {
                 <Route path="/settings" element={
                   <ProtectedRoute>
                     <Settings />
+                  </ProtectedRoute>
+                } />
+                <Route path="/performance" element={
+                  <ProtectedRoute>
+                    <PerformanceDashboard />
                   </ProtectedRoute>
                 } />
                 

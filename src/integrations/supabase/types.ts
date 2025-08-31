@@ -2741,6 +2741,53 @@ export type Database = {
         }
         Relationships: []
       }
+      v_ad_group_daily: {
+        Row: {
+          ad_group_id: string | null
+          ad_group_name: string | null
+          campaign_id: string | null
+          clicks: number | null
+          conv_7d: number | null
+          cost_micros: number | null
+          date: string | null
+          impressions: number | null
+          profile_id: string | null
+          sales_7d_micros: number | null
+        }
+        Relationships: []
+      }
+      v_campaign_daily: {
+        Row: {
+          campaign_id: string | null
+          campaign_name: string | null
+          campaign_type: string | null
+          clicks: number | null
+          conv_7d: number | null
+          cost_micros: number | null
+          date: string | null
+          impressions: number | null
+          profile_id: string | null
+          sales_7d_micros: number | null
+        }
+        Relationships: []
+      }
+      v_target_daily: {
+        Row: {
+          ad_group_id: string | null
+          campaign_id: string | null
+          clicks: number | null
+          conv_7d: number | null
+          cost_micros: number | null
+          date: string | null
+          expression: Json | null
+          impressions: number | null
+          match_type: string | null
+          profile_id: string | null
+          sales_7d_micros: number | null
+          target_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       calculate_campaign_changes: {
