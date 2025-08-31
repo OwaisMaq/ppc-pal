@@ -85,3 +85,12 @@ verify_jwt = false
 
 [functions.search-studio]
 verify_jwt = true
+
+[functions.target-studio]
+verify_jwt = true
+
+[functions.rollups]
+verify_jwt = true
+
+[functions.playbooks]
+verify_jwt = true

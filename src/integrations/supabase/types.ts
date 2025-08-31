@@ -1691,6 +1691,45 @@ export type Database = {
         }
         Relationships: []
       }
+      fact_purchased_product_daily: {
+        Row: {
+          ad_group_id: string
+          advertised_asin: string | null
+          campaign_id: string
+          date: string
+          id: string
+          profile_id: string
+          purchased_asin: string
+          sales_micros: number | null
+          target_id: string | null
+          units: number | null
+        }
+        Insert: {
+          ad_group_id: string
+          advertised_asin?: string | null
+          campaign_id: string
+          date: string
+          id?: string
+          profile_id: string
+          purchased_asin: string
+          sales_micros?: number | null
+          target_id?: string | null
+          units?: number | null
+        }
+        Update: {
+          ad_group_id?: string
+          advertised_asin?: string | null
+          campaign_id?: string
+          date?: string
+          id?: string
+          profile_id?: string
+          purchased_asin?: string
+          sales_micros?: number | null
+          target_id?: string | null
+          units?: number | null
+        }
+        Relationships: []
+      }
       fact_sb_hourly: {
         Row: {
           ad_group_id: string
@@ -1883,6 +1922,51 @@ export type Database = {
         }
         Relationships: []
       }
+      fact_target_daily: {
+        Row: {
+          ad_group_id: string
+          attributed_conversions_7d: number | null
+          attributed_sales_7d_micros: number | null
+          campaign_id: string
+          clicks: number | null
+          cost_micros: number | null
+          date: string
+          expression: Json | null
+          impressions: number | null
+          profile_id: string
+          target_id: string
+          target_type: string
+        }
+        Insert: {
+          ad_group_id: string
+          attributed_conversions_7d?: number | null
+          attributed_sales_7d_micros?: number | null
+          campaign_id: string
+          clicks?: number | null
+          cost_micros?: number | null
+          date: string
+          expression?: Json | null
+          impressions?: number | null
+          profile_id: string
+          target_id: string
+          target_type: string
+        }
+        Update: {
+          ad_group_id?: string
+          attributed_conversions_7d?: number | null
+          attributed_sales_7d_micros?: number | null
+          campaign_id?: string
+          clicks?: number | null
+          cost_micros?: number | null
+          date?: string
+          expression?: Json | null
+          impressions?: number | null
+          profile_id?: string
+          target_id?: string
+          target_type?: string
+        }
+        Relationships: []
+      }
       feedback: {
         Row: {
           created_at: string
@@ -1919,6 +2003,27 @@ export type Database = {
           updated_at?: string
           user_email?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      fx_rates_daily: {
+        Row: {
+          date: string
+          from_ccy: string
+          rate: number
+          to_ccy: string
+        }
+        Insert: {
+          date: string
+          from_ccy: string
+          rate: number
+          to_ccy: string
+        }
+        Update: {
+          date?: string
+          from_ccy?: string
+          rate?: number
+          to_ccy?: string
         }
         Relationships: []
       }
@@ -2325,6 +2430,99 @@ export type Database = {
           features?: Json
           limits?: Json
           plan?: string
+        }
+        Relationships: []
+      }
+      playbook_runs: {
+        Row: {
+          actions_enqueued: number | null
+          alerts_created: number | null
+          error: string | null
+          finished_at: string | null
+          id: string
+          playbook_id: string
+          profile_id: string
+          started_at: string | null
+          status: string | null
+          steps: Json | null
+        }
+        Insert: {
+          actions_enqueued?: number | null
+          alerts_created?: number | null
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          playbook_id: string
+          profile_id: string
+          started_at?: string | null
+          status?: string | null
+          steps?: Json | null
+        }
+        Update: {
+          actions_enqueued?: number | null
+          alerts_created?: number | null
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          playbook_id?: string
+          profile_id?: string
+          started_at?: string | null
+          status?: string | null
+          steps?: Json | null
+        }
+        Relationships: []
+      }
+      playbooks: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          enabled: boolean
+          id: string
+          mode: string
+          name: string
+          params: Json
+          template_key: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          enabled?: boolean
+          id?: string
+          mode?: string
+          name: string
+          params: Json
+          template_key: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          enabled?: boolean
+          id?: string
+          mode?: string
+          name?: string
+          params?: Json
+          template_key?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profile_currency: {
+        Row: {
+          currency: string
+          profile_id: string
+        }
+        Insert: {
+          currency: string
+          profile_id: string
+        }
+        Update: {
+          currency?: string
+          profile_id?: string
         }
         Relationships: []
       }
@@ -3144,6 +3342,10 @@ export type Database = {
       extract_asin_from_name: {
         Args: { campaign_name: string }
         Returns: string
+      }
+      fx_rate: {
+        Args: { p_date: string; p_from: string; p_to: string }
+        Returns: number
       }
       get_ams_data_freshness: {
         Args: { connection_uuid: string }
