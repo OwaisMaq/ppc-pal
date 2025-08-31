@@ -733,6 +733,99 @@ export type Database = {
         }
         Relationships: []
       }
+      anomalies: {
+        Row: {
+          baseline: number
+          created_at: string | null
+          direction: string
+          entity_id: string | null
+          fingerprint: string
+          id: string
+          metric: string
+          profile_id: string
+          scope: string
+          score: number
+          severity: string
+          state: string
+          time_window: string
+          ts: string
+          value: number
+        }
+        Insert: {
+          baseline: number
+          created_at?: string | null
+          direction: string
+          entity_id?: string | null
+          fingerprint: string
+          id?: string
+          metric: string
+          profile_id: string
+          scope: string
+          score: number
+          severity: string
+          state?: string
+          time_window: string
+          ts: string
+          value: number
+        }
+        Update: {
+          baseline?: number
+          created_at?: string | null
+          direction?: string
+          entity_id?: string | null
+          fingerprint?: string
+          id?: string
+          metric?: string
+          profile_id?: string
+          scope?: string
+          score?: number
+          severity?: string
+          state?: string
+          time_window?: string
+          ts?: string
+          value?: number
+        }
+        Relationships: []
+      }
+      anomaly_runs: {
+        Row: {
+          anomalies_found: number | null
+          checked: number | null
+          error: string | null
+          finished_at: string | null
+          id: string
+          profile_id: string
+          scope: string
+          started_at: string | null
+          status: string | null
+          time_window: string
+        }
+        Insert: {
+          anomalies_found?: number | null
+          checked?: number | null
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          profile_id: string
+          scope: string
+          started_at?: string | null
+          status?: string | null
+          time_window: string
+        }
+        Update: {
+          anomalies_found?: number | null
+          checked?: number | null
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          profile_id?: string
+          scope?: string
+          started_at?: string | null
+          status?: string | null
+          time_window?: string
+        }
+        Relationships: []
+      }
       api_analysis_results: {
         Row: {
           analysis_type: string
@@ -981,6 +1074,93 @@ export type Database = {
           id?: string
           profile_id?: string
           term?: string
+        }
+        Relationships: []
+      }
+      budget_pacing_runs: {
+        Row: {
+          campaigns_checked: number | null
+          error: string | null
+          finished_at: string | null
+          id: string
+          profile_id: string
+          recs_created: number | null
+          started_at: string | null
+          status: string | null
+        }
+        Insert: {
+          campaigns_checked?: number | null
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          profile_id: string
+          recs_created?: number | null
+          started_at?: string | null
+          status?: string | null
+        }
+        Update: {
+          campaigns_checked?: number | null
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          profile_id?: string
+          recs_created?: number | null
+          started_at?: string | null
+          status?: string | null
+        }
+        Relationships: []
+      }
+      budget_recommendations: {
+        Row: {
+          action: string
+          applied_at: string | null
+          campaign_id: string
+          created_at: string | null
+          current_budget_micros: number
+          day: string
+          forecast_eod_spend_micros: number
+          id: string
+          mode: string
+          pace_ratio: number
+          profile_id: string
+          reason: string | null
+          spend_so_far_micros: number
+          state: string
+          suggested_budget_micros: number | null
+        }
+        Insert: {
+          action: string
+          applied_at?: string | null
+          campaign_id: string
+          created_at?: string | null
+          current_budget_micros: number
+          day: string
+          forecast_eod_spend_micros: number
+          id?: string
+          mode?: string
+          pace_ratio: number
+          profile_id: string
+          reason?: string | null
+          spend_so_far_micros: number
+          state?: string
+          suggested_budget_micros?: number | null
+        }
+        Update: {
+          action?: string
+          applied_at?: string | null
+          campaign_id?: string
+          created_at?: string | null
+          current_budget_micros?: number
+          day?: string
+          forecast_eod_spend_micros?: number
+          id?: string
+          mode?: string
+          pace_ratio?: number
+          profile_id?: string
+          reason?: string | null
+          spend_so_far_micros?: number
+          state?: string
+          suggested_budget_micros?: number | null
         }
         Relationships: []
       }
@@ -2283,6 +2463,45 @@ export type Database = {
         }
         Relationships: []
       }
+      notifications_outbox: {
+        Row: {
+          body: string
+          channel: string
+          created_at: string | null
+          error: string | null
+          id: string
+          payload: Json | null
+          sent_at: string | null
+          status: string
+          subject: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          channel: string
+          created_at?: string | null
+          error?: string | null
+          id?: string
+          payload?: Json | null
+          sent_at?: string | null
+          status?: string
+          subject: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          channel?: string
+          created_at?: string | null
+          error?: string | null
+          id?: string
+          payload?: Json | null
+          sent_at?: string | null
+          status?: string
+          subject?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       optimization_recommendations: {
         Row: {
           applied: boolean | null
@@ -3105,6 +3324,27 @@ export type Database = {
         }
         Relationships: []
       }
+      user_prefs: {
+        Row: {
+          digest_frequency: string | null
+          email: string | null
+          slack_webhook: string | null
+          user_id: string
+        }
+        Insert: {
+          digest_frequency?: string | null
+          email?: string | null
+          slack_webhook?: string | null
+          user_id: string
+        }
+        Update: {
+          digest_frequency?: string | null
+          email?: string | null
+          slack_webhook?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -3351,6 +3591,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      calculate_robust_z_score: {
+        Args: { p_mad: number; p_median: number; p_value: number }
+        Returns: number
+      }
       can_user_optimize: {
         Args: { user_uuid: string }
         Returns: boolean
@@ -3367,6 +3611,17 @@ export type Database = {
         Args: { p_date: string; p_from: string; p_to: string }
         Returns: number
       }
+      generate_anomaly_fingerprint: {
+        Args: {
+          p_bucket: string
+          p_entity_id: string
+          p_metric: string
+          p_profile_id: string
+          p_scope: string
+          p_time_window: string
+        }
+        Returns: string
+      }
       get_ams_data_freshness: {
         Args: { connection_uuid: string }
         Returns: {
@@ -3375,6 +3630,10 @@ export type Database = {
           last_traffic_message: string
           messages_24h: number
         }[]
+      }
+      get_anomaly_severity: {
+        Args: { p_z_score: number }
+        Returns: string
       }
       get_campaign_rollup_kpis: {
         Args: {
