@@ -3089,6 +3089,27 @@ export type Database = {
         }
         Relationships: []
       }
+      v_studio_search_terms: {
+        Row: {
+          acos_14d: number | null
+          ad_group_id: string | null
+          campaign_id: string | null
+          clicks_14d: number | null
+          conv_14d: number | null
+          cost_14d_micros: number | null
+          ctr_14d: number | null
+          cvr_14d: number | null
+          impressions_14d: number | null
+          is_brand: boolean | null
+          is_ignored: boolean | null
+          profile_id: string | null
+          sales_14d: number | null
+          sales_14d_micros: number | null
+          search_term: string | null
+          spend_14d: number | null
+        }
+        Relationships: []
+      }
       v_target_daily: {
         Row: {
           ad_group_id: string | null
