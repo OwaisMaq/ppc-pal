@@ -415,15 +415,20 @@ serve(async (req) => {
           throw new Error('ENCRYPTION_KEY not configured');
         }
         
+        // Set the configuration parameter that will persist for this connection
         const { error: configError } = await supabase.rpc('set_config', {
           key: 'app.enc_key',
-          value: encryptionKey
+          value: encryptionKey,
+          is_local: false  // Set to false so it persists for the entire session
         });
         
         if (configError) {
           console.error('Failed to set encryption key:', configError);
-          throw new Error('Failed to set encryption key');
+          console.error('Config error details:', configError);
+          throw new Error(`Failed to set encryption key: ${configError.message}`);
         }
+        
+        console.log('Encryption key configured successfully for session');
 
         // Store tokens securely in private schema
         console.log('Storing tokens for profile:', profile.profileId);
