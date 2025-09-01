@@ -54,6 +54,16 @@ serve(async (req) => {
   try {
     console.log('Amazon OAuth function called with method:', req.method);
     
+    // Check environment variables
+    const encryptionKey = Deno.env.get('ENCRYPTION_KEY');
+    console.log('Environment check:', {
+      hasEncryptionKey: !!encryptionKey,
+      hasSupabaseUrl: !!Deno.env.get('SUPABASE_URL'),
+      hasServiceKey: !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+      hasAmazonClientId: !!Deno.env.get('AMAZON_CLIENT_ID'),
+      hasAmazonClientSecret: !!Deno.env.get('AMAZON_CLIENT_SECRET')
+    });
+    
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -314,12 +324,25 @@ serve(async (req) => {
         }
 
         // First set the encryption key for this session
-        await supabase.rpc('set_config', {
+        console.log('Setting encryption key for session...');
+        const encryptionKey = Deno.env.get('ENCRYPTION_KEY');
+        if (!encryptionKey) {
+          console.error('ENCRYPTION_KEY environment variable not set');
+          throw new Error('ENCRYPTION_KEY not configured');
+        }
+        
+        const { error: configError } = await supabase.rpc('set_config', {
           key: 'app.enc_key',
-          value: Deno.env.get('ENCRYPTION_KEY')
+          value: encryptionKey
         });
+        
+        if (configError) {
+          console.error('Failed to set encryption key:', configError);
+          throw new Error('Failed to set encryption key');
+        }
 
         // Store tokens securely in private schema
+        console.log('Storing tokens for profile:', profile.profileId);
         const { error: tokenError } = await supabase
           .rpc('private.store_tokens', {
             p_user_id: user.id,
@@ -330,9 +353,17 @@ serve(async (req) => {
           });
 
         if (tokenError) {
-          console.error('Error storing tokens for profile:', profile.profileId, tokenError.message)
+          console.error('Error storing tokens for profile:', profile.profileId, tokenError);
+          console.error('Full token error details:', {
+            message: tokenError.message,
+            details: tokenError.details,
+            hint: tokenError.hint,
+            code: tokenError.code
+          });
           throw tokenError
         }
+        
+        console.log('Successfully stored tokens for profile:', profile.profileId);
       }
 
       console.log('Successfully stored UK connections for user:', user.id)
