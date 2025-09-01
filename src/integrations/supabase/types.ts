@@ -4017,6 +4017,17 @@ export type Database = {
         Args: { is_local?: boolean; key: string; value: string }
         Returns: undefined
       }
+      store_tokens_with_key: {
+        Args: {
+          p_access_token: string
+          p_encryption_key: string
+          p_expires_at: string
+          p_profile_id: string
+          p_refresh_token: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
       sync_amazon_data: {
         Args: { connection_uuid: string }
         Returns: undefined

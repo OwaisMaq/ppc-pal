@@ -125,9 +125,11 @@ serve(async (req) => {
         throw new Error('Amazon Redirect URI not configured')
       }
 
-      // Generate secure state with crypto random values
+      // Generate secure state with crypto random values (URL-safe)
       const stateBytes = crypto.getRandomValues(new Uint8Array(16));
-      const stateParam = `${user.id}_${Date.now()}_${toBase64(stateBytes)}`;
+      const rawB64 = toBase64(stateBytes);
+      const b64url = rawB64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/,'');
+      const stateParam = `${user.id}_${Date.now()}_${b64url}`;
       const scope = 'advertising::campaign_management'
       
       // Store OAuth state server-side
@@ -165,7 +167,7 @@ serve(async (req) => {
 
     if (action === 'callback') {
       // Handle OAuth callback - look up state server-side
-      console.log('Processing OAuth callback, validating state:', state);
+      console.log('Processing OAuth callback, validating state (raw):', state);
       
       if (!state) {
         console.error('No state parameter provided in callback');
@@ -182,17 +184,23 @@ serve(async (req) => {
         );
       }
       
+      // Normalize state: some clients decode '+' as space
+      const normalizedState = String(state).replace(/\s/g, '+');
+      if (normalizedState !== state) {
+        console.log('Normalized state value:', normalizedState);
+      }
+      
       // Look up OAuth state
       const { data: oauthState, error: stateError } = await supabase
         .from('oauth_states')
         .select('*')
-        .eq('state', state)
+        .eq('state', normalizedState)
         .eq('provider', 'amazon')
         .gt('expires_at', new Date().toISOString())
         .single();
       
       if (stateError || !oauthState) {
-        console.error('Invalid or expired OAuth state:', state, stateError?.message);
+        console.error('Invalid or expired OAuth state. Raw:', state, 'Normalized:', normalizedState, stateError?.message);
         return new Response(
           JSON.stringify({ 
             success: false,
