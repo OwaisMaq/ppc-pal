@@ -107,19 +107,45 @@ serve(async (req) => {
       throw new Error('Invalid JSON body');
     }
 
-    const { action, redirectUri, code, state } = requestBody;
+    const { action, code, state } = requestBody;
     console.log('Amazon OAuth action:', action)
 
     if (action === 'initiate') {
       // Generate OAuth URL for Amazon Advertising API
       const clientId = Deno.env.get('AMAZON_CLIENT_ID')
+      const redirectUri = Deno.env.get('AMAZON_REDIRECT_URI')
+      
       if (!clientId) {
         console.error('Amazon Client ID not configured');
         throw new Error('Amazon Client ID not configured')
       }
+      
+      if (!redirectUri) {
+        console.error('Amazon Redirect URI not configured');
+        throw new Error('Amazon Redirect URI not configured')
+      }
 
-      const stateParam = `${user.id}_${Date.now()}`
+      // Generate secure state with crypto random values
+      const stateBytes = crypto.getRandomValues(new Uint8Array(16));
+      const stateParam = `${user.id}_${Date.now()}_${toBase64(stateBytes)}`;
       const scope = 'advertising::campaign_management'
+      
+      // Store OAuth state server-side
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+      const { error: stateError } = await supabase
+        .from('oauth_states')
+        .insert({
+          user_id: user.id,
+          provider: 'amazon',
+          state: stateParam,
+          redirect_uri: redirectUri,
+          expires_at: expiresAt.toISOString()
+        });
+      
+      if (stateError) {
+        console.error('Failed to store OAuth state:', stateError);
+        throw new Error('Failed to store OAuth state');
+      }
       
       const authUrl = `https://www.amazon.com/ap/oa?` +
         `client_id=${clientId}&` +
@@ -129,7 +155,7 @@ serve(async (req) => {
         `state=${stateParam}&` +
         `prompt=consent`; // Ensure user sees all permissions being requested
 
-      console.log('Generated auth URL for user:', user.id)
+      console.log('Generated auth URL and stored state for user:', user.id)
       
       return new Response(
         JSON.stringify({ authUrl }),
@@ -138,8 +164,50 @@ serve(async (req) => {
     }
 
     if (action === 'callback') {
-      // Handle OAuth callback
-      console.log('Processing OAuth callback for user:', user.id)
+      // Handle OAuth callback - look up state server-side
+      console.log('Processing OAuth callback, validating state:', state);
+      
+      if (!state) {
+        console.error('No state parameter provided in callback');
+        return new Response(
+          JSON.stringify({ 
+            success: false,
+            error: 'Missing state parameter',
+            stage: 'validation'
+          }),
+          { 
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+      
+      // Look up OAuth state
+      const { data: oauthState, error: stateError } = await supabase
+        .from('oauth_states')
+        .select('*')
+        .eq('state', state)
+        .eq('provider', 'amazon')
+        .gt('expires_at', new Date().toISOString())
+        .single();
+      
+      if (stateError || !oauthState) {
+        console.error('Invalid or expired OAuth state:', state, stateError?.message);
+        return new Response(
+          JSON.stringify({ 
+            success: false,
+            error: 'Invalid or expired OAuth state',
+            stage: 'state_validation',
+            details: stateError?.message || 'State not found or expired'
+          }),
+          { 
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+      
+      console.log('OAuth state validated for user:', oauthState.user_id);
       
       const clientId = Deno.env.get('AMAZON_CLIENT_ID')
       const clientSecret = Deno.env.get('AMAZON_CLIENT_SECRET')
@@ -149,9 +217,9 @@ serve(async (req) => {
         throw new Error('Amazon credentials not configured')
       }
 
-      console.log('Exchanging code for tokens...');
+      console.log('Exchanging code for tokens using stored redirect URI...');
       
-      // Exchange code for tokens
+      // Exchange code for tokens using the stored redirect URI
       const tokenResponse = await fetch('https://api.amazon.com/auth/o2/token', {
         method: 'POST',
         headers: {
@@ -162,7 +230,7 @@ serve(async (req) => {
           code,
           client_id: clientId,
           client_secret: clientSecret,
-          redirect_uri: redirectUri, // Use the dynamic redirect URI from the request
+          redirect_uri: oauthState.redirect_uri, // Use the stored redirect URI
         }),
       })
 
@@ -173,7 +241,11 @@ serve(async (req) => {
         console.error('Token exchange failed:', tokenResponse.status, errorData)
         return new Response(
           JSON.stringify({ 
-            error: `Token exchange failed: ${tokenResponse.status}`,
+            success: false,
+            error: `Token exchange failed`,
+            stage: 'token_exchange',
+            tokenStatus: tokenResponse.status,
+            tokenBodySnippet: errorData.substring(0, 200),
             details: errorData 
           }),
           { 
@@ -182,6 +254,18 @@ serve(async (req) => {
           }
         )
       }
+      
+      // Delete the OAuth state (single use)
+      await supabase
+        .from('oauth_states')
+        .delete()
+        .eq('id', oauthState.id);
+      
+      // Clean up expired states (housekeeping)
+      await supabase
+        .from('oauth_states')
+        .delete()
+        .lt('expires_at', new Date().toISOString());
 
       const tokenData = await tokenResponse.json()
       console.log('Token exchange successful, access token length:', tokenData.access_token?.length || 0)

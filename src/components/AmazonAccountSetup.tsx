@@ -11,8 +11,7 @@ const AmazonAccountSetup = () => {
   const { connections, loading, initiateConnection, syncConnection, deleteConnection, refreshConnection } = useAmazonConnections();
 
   const handleConnect = () => {
-    const redirectUri = `${window.location.origin}/auth/amazon/callback`;
-    initiateConnection(redirectUri);
+    initiateConnection();
   };
 
   const getStatusIcon = (status: string) => {

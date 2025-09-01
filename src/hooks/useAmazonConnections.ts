@@ -58,9 +58,9 @@ export const useAmazonConnections = () => {
     }
   };
 
-  const initiateConnection = async (redirectUri: string) => {
+  const initiateConnection = async () => {
     try {
-      console.log('Initiating Amazon connection with redirect URI:', redirectUri);
+      console.log('Initiating Amazon connection...');
       
       // Get current session
       const session = await supabase.auth.getSession();
@@ -81,7 +81,7 @@ export const useAmazonConnections = () => {
       // Call edge function to initiate Amazon OAuth
       console.log('Calling amazon-oauth edge function...');
       const { data, error } = await supabase.functions.invoke('amazon-oauth', {
-        body: { action: 'initiate', redirectUri },
+        body: { action: 'initiate' },
         headers: {
           Authorization: `Bearer ${session.data.session.access_token}`,
         },
@@ -163,12 +163,9 @@ export const useAmazonConnections = () => {
       
       console.log('Session for callback:', session.data.session ? 'Valid' : 'None');
 
-      // Generate the same redirect URI that was used for initiation
-      const redirectUri = `${window.location.origin}/auth/amazon/callback`;
-
       console.log('Calling amazon-oauth callback...');
       const { data, error } = await supabase.functions.invoke('amazon-oauth', {
-        body: { action: 'callback', code, state, redirectUri },
+        body: { action: 'callback', code, state },
         headers: {
           Authorization: `Bearer ${session.data.session.access_token}`,
         },
