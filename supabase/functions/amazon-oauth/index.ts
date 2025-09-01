@@ -379,6 +379,29 @@ serve(async (req) => {
         )
       }
 
+      // First set the encryption key for this session (do this once before processing profiles)
+      console.log('Setting encryption key for session...');
+      const encryptionKey = Deno.env.get('ENCRYPTION_KEY');
+      if (!encryptionKey) {
+        console.error('ENCRYPTION_KEY environment variable not set');
+        throw new Error('ENCRYPTION_KEY not configured');
+      }
+      
+      // Set the configuration parameter that will persist for this connection
+      const { error: configError } = await supabase.rpc('set_config', {
+        key: 'app.enc_key',
+        value: encryptionKey,
+        is_local: false  // Set to false so it persists for the entire session
+      });
+      
+      if (configError) {
+        console.error('Failed to set encryption key:', configError);
+        console.error('Config error details:', configError);
+        throw new Error(`Failed to set encryption key: ${configError.message}`);
+      }
+      
+      console.log('Encryption key configured successfully for session');
+
       // Store connection for each UK profile only
       for (const profile of ukProfiles) {
         const expiresAt = new Date(Date.now() + (tokenData.expires_in * 1000))
@@ -407,35 +430,12 @@ serve(async (req) => {
           throw insertError
         }
 
-        // First set the encryption key for this session
-        console.log('Setting encryption key for session...');
-        const encryptionKey = Deno.env.get('ENCRYPTION_KEY');
-        if (!encryptionKey) {
-          console.error('ENCRYPTION_KEY environment variable not set');
-          throw new Error('ENCRYPTION_KEY not configured');
-        }
-        
-        // Set the configuration parameter that will persist for this connection
-        const { error: configError } = await supabase.rpc('set_config', {
-          key: 'app.enc_key',
-          value: encryptionKey,
-          is_local: false  // Set to false so it persists for the entire session
-        });
-        
-        if (configError) {
-          console.error('Failed to set encryption key:', configError);
-          console.error('Config error details:', configError);
-          throw new Error(`Failed to set encryption key: ${configError.message}`);
-        }
-        
-        console.log('Encryption key configured successfully for session');
-
         // Store tokens securely in private schema
         console.log('Storing tokens for profile:', profile.profileId);
         const { error: tokenError } = await supabase
           .rpc('private.store_tokens', {
             p_user_id: user.id,
-            p_profile_id: profile.profileId,
+            p_profile_id: profile.profileId.toString(),
             p_access_token: tokenData.access_token,
             p_refresh_token: tokenData.refresh_token,
             p_expires_at: expiresAt.toISOString()
@@ -449,7 +449,7 @@ serve(async (req) => {
             hint: tokenError.hint,
             code: tokenError.code
           });
-          throw tokenError
+          throw tokenError;
         }
         
         console.log('Successfully stored tokens for profile:', profile.profileId);
