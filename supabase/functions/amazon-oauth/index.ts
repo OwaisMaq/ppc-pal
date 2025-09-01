@@ -387,20 +387,8 @@ serve(async (req) => {
         throw new Error('ENCRYPTION_KEY not configured');
       }
       
-      // Set the configuration parameter that will persist for this connection
-      const { error: configError } = await supabase.rpc('set_config', {
-        key: 'app.enc_key',
-        value: encryptionKey,
-        is_local: false  // Set to false so it persists for the entire session
-      });
-      
-      if (configError) {
-        console.error('Failed to set encryption key:', configError);
-        console.error('Config error details:', configError);
-        throw new Error(`Failed to set encryption key: ${configError.message}`);
-      }
-      
-      console.log('Encryption key configured successfully for session');
+      // Encryption key retrieved; will pass directly to DB function
+      console.log('Encryption key retrieved; passing directly to DB function');
 
       // Store connection for each UK profile only
       for (const profile of ukProfiles) {
@@ -433,12 +421,13 @@ serve(async (req) => {
         // Store tokens securely in private schema
         console.log('Storing tokens for profile:', profile.profileId);
         const { error: tokenError } = await supabase
-          .rpc('private.store_tokens', {
+          .rpc('store_tokens_with_key', {
             p_user_id: user.id,
             p_profile_id: profile.profileId.toString(),
             p_access_token: tokenData.access_token,
             p_refresh_token: tokenData.refresh_token,
-            p_expires_at: expiresAt.toISOString()
+            p_expires_at: expiresAt.toISOString(),
+            p_encryption_key: encryptionKey
           });
 
         if (tokenError) {
