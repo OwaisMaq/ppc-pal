@@ -3946,6 +3946,14 @@ export type Database = {
           total_spend: number
         }[]
       }
+      get_tokens: {
+        Args: { p_profile_id: string }
+        Returns: {
+          access_token: string
+          expires_at: string
+          refresh_token: string
+        }[]
+      }
       grant_admin_role_by_email: {
         Args: { user_email: string }
         Returns: undefined
@@ -3959,6 +3967,16 @@ export type Database = {
       }
       increment_optimization_usage: {
         Args: { user_uuid: string }
+        Returns: undefined
+      }
+      "private.store_tokens": {
+        Args: {
+          p_access_token: string
+          p_expires_at: string
+          p_profile_id: string
+          p_refresh_token: string
+          p_user_id: string
+        }
         Returns: undefined
       }
       rollup_campaign_aggregates_14d: {
