@@ -519,6 +519,12 @@ async function refreshTokens(supabase: any, profileId: string): Promise<any> {
 }
 
 async function getConnectionConfig(supabase: any, profileId: string): Promise<SyncConfig> {
+  // First set the encryption key for this session
+  await supabase.rpc('set_config', {
+    key: 'app.enc_key',
+    value: Deno.env.get('ENCRYPTION_KEY')
+  });
+
   // Get tokens from private storage
   const { data: tokens, error: tokensError } = await supabase.rpc('get_tokens', {
     p_profile_id: profileId

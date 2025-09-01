@@ -313,6 +313,12 @@ serve(async (req) => {
           throw insertError
         }
 
+        // First set the encryption key for this session
+        await supabase.rpc('set_config', {
+          key: 'app.enc_key',
+          value: Deno.env.get('ENCRYPTION_KEY')
+        });
+
         // Store tokens securely in private schema
         const { error: tokenError } = await supabase
           .rpc('private.store_tokens', {
