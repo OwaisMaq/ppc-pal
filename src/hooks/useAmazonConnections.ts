@@ -48,10 +48,10 @@ export const useAmazonConnections = () => {
       
       // Normalize and harden against unexpected values
       const array = Array.isArray(data) ? data : [];
-      const safe = array.filter((c: any) => c && c.id);
+      const safe = array.filter((c: any) => c && typeof c === 'object' && c.id);
       const normalized = safe.map((c: any) => ({
         ...c,
-        status: typeof c?.status === 'string' ? c.status.toLowerCase().trim() : c?.status,
+        status: typeof c?.status === 'string' ? c.status.toLowerCase().trim() : 'unknown',
       }));
 
       console.log('Fetched connections:', normalized);
