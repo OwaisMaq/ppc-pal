@@ -11,7 +11,11 @@ import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { useState } from "react";
 const Dashboard = () => {
   const { connections } = useAmazonConnections();
-  const hasActiveConnections = connections.some(c => c.status === 'active');
+  const hasActiveConnections = connections.some(c => {
+    const status = typeof c?.status === 'string' ? c.status.toLowerCase().trim() : String(c?.status ?? '');
+    const tokenOk = c?.token_expires_at ? new Date(c.token_expires_at) > new Date() : true;
+    return tokenOk && (status === 'active' || status === 'setup_required' || status === 'pending');
+  });
   const [selectedASIN, setSelectedASIN] = useState<string | null>(null);
   return (
     <DashboardShell>

@@ -26,7 +26,11 @@ export default function AmsSetup() {
   const { metrics } = useAmsMetrics(selectedConnectionId || undefined);
   const { toast } = useToast();
 
-  const activeConnections = useMemo(() => connections.filter(c => c.status === "active"), [connections]);
+  const activeConnections = useMemo(() => connections.filter(c => {
+    const status = typeof c?.status === 'string' ? c.status.toLowerCase().trim() : String(c?.status ?? '');
+    const tokenOk = c?.token_expires_at ? new Date(c.token_expires_at) > new Date() : true;
+    return tokenOk && (status === 'active' || status === 'setup_required' || status === 'pending');
+  }), [connections]);
 
   useEffect(() => {
     if (!selectedConnectionId && activeConnections[0]?.id) {

@@ -21,6 +21,17 @@ export const useAmazonConnections = () => {
     try {
       setLoading(true);
       console.log('Fetching Amazon connections...');
+      // Resolve a reliable user id (AuthContext may lag during OAuth callback)
+      let userId = user?.id as string | undefined;
+      if (!userId) {
+        const { data: u } = await supabase.auth.getUser();
+        userId = u?.user?.id;
+      }
+      if (!userId) {
+        console.warn('fetchConnections: No user id available yet; skipping fetch');
+        setConnections([]);
+        return;
+      }
       const { data, error } = await supabase
         .from('amazon_connections')
         .select(`
@@ -41,7 +52,7 @@ export const useAmazonConnections = () => {
           health_status,
           health_issues
         `)
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
