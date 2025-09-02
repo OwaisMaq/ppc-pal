@@ -46,10 +46,18 @@ export const useAmazonConnections = () => {
 
       if (error) throw error;
       
-      console.log('Fetched connections:', data);
-      console.log('Active connections:', (data as any[])?.filter((c: any) => c.status === 'active'));
+      // Normalize and harden against unexpected values
+      const array = Array.isArray(data) ? data : [];
+      const safe = array.filter((c: any) => c && c.id);
+      const normalized = safe.map((c: any) => ({
+        ...c,
+        status: typeof c?.status === 'string' ? c.status.toLowerCase().trim() : c?.status,
+      }));
+
+      console.log('Fetched connections:', normalized);
+      console.log('Active connections:', normalized.filter((c: any) => c?.status === 'active'));
       
-      setConnections((data as any) || []);
+      setConnections(normalized as any);
     } catch (error) {
       console.error('Error fetching connections:', error);
       toast.error('Failed to load Amazon connections');
