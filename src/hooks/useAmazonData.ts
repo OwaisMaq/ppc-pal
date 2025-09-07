@@ -12,6 +12,7 @@ export const useAmazonData = () => {
   const [targets, setTargets] = useState<Target[]>([]);
   const [loading, setLoading] = useState(false);
   const [lastSyncDiagnostics, setLastSyncDiagnostics] = useState<any | null>(null);
+  const [initialSyncAttempted, setInitialSyncAttempted] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -28,6 +29,39 @@ export const useAmazonData = () => {
         fetchKeywords(),
         fetchTargets()
       ]);
+
+      // One-time auto sync if user has a connection but no data yet
+      if (!initialSyncAttempted) {
+        try {
+          const { data: conns } = await supabase
+            .from('amazon_connections')
+            .select('id, status, token_expires_at')
+            .eq('user_id', user!.id)
+            .order('created_at', { ascending: false });
+
+          const usable = (conns || []).find((c: any) => {
+            const status = String(c?.status || '').toLowerCase().trim();
+            const tokenOk = c?.token_expires_at ? new Date(c.token_expires_at) > new Date() : true;
+            return status === 'active' || ((status === 'setup_required' || status === 'pending') && tokenOk);
+          });
+
+          if (usable && campaigns.length === 0) {
+            setInitialSyncAttempted(true);
+            const session = await supabase.auth.getSession();
+            const token = session.data.session?.access_token;
+            if (token) {
+              await supabase.functions.invoke('sync-amazon-data', {
+                body: { connectionId: usable.id, timeUnit: 'DAILY', dateRangeDays: 30 },
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              // Refetch after a short delay to allow writes
+              setTimeout(() => { fetchAllData(); }, 2000);
+            }
+          }
+        } catch (e) {
+          console.warn('Initial sync attempt skipped:', (e as any)?.message || e);
+        }
+      }
     } catch (error) {
       console.error('Error fetching Amazon data:', error);
       toast.error('Failed to load Amazon data');
