@@ -399,8 +399,14 @@ serve(async (req) => {
     }
     
     const clientId = Deno.env.get('AMAZON_CLIENT_ID')
+    const clientSecret = Deno.env.get('AMAZON_CLIENT_SECRET')
+    
     if (!clientId) {
       throw new Error('Missing Amazon client ID configuration')
+    }
+    
+    if (!clientSecret) {
+      throw new Error('Missing Amazon client secret configuration')
     }
 
     let accessToken = await decryptText(connection.access_token)
@@ -418,38 +424,22 @@ serve(async (req) => {
         ? '🔄 Token expired, refreshing...'
         : '🔄 Token expires very soon (<5m), refreshing...')
       
-      const clientSecret = Deno.env.get('AMAZON_CLIENT_SECRET')
-      if (!clientSecret) {
-        console.warn('Missing Amazon client secret for token refresh; proceeding with current token if still valid')
-        if (now.getTime() < expiresAt.getTime()) {
-          // proceed with current token
-        } else {
-          await supabase
-            .from('amazon_connections')
-            .update({ 
-              status: 'setup_required',
-              setup_required_reason: 'Missing Amazon client secret for token refresh'
-            })
-            .eq('id', connectionId)
-          throw new Error('Missing Amazon client secret')
-        }
-      } else {
-        // Refresh the token
-        try {
-          console.log('Attempting token refresh...')
-          
-          const refreshResponse = await fetch('https://api.amazon.com/auth/o2/token', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: new URLSearchParams({
-              grant_type: 'refresh_token',
-              refresh_token: await decryptText(connection.refresh_token),
-              client_id: clientId,
-              client_secret: clientSecret,
-            }),
-          })
+      // Refresh the token
+      try {
+        console.log('Attempting token refresh...')
+        
+        const refreshResponse = await fetch('https://api.amazon.com/auth/o2/token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            grant_type: 'refresh_token',
+            refresh_token: await decryptText(connection.refresh_token),
+            client_id: clientId,
+            client_secret: clientSecret,
+          }),
+        })
 
           if (refreshResponse.ok) {
             const tokenData = await refreshResponse.json()
