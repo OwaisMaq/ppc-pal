@@ -404,6 +404,7 @@ serve(async (req) => {
     }
 
     let accessToken = await decryptText(connection.access_token)
+    let tokenRefreshed = false
     const apiEndpoint = connection.advertising_api_endpoint || 'https://advertising-api-eu.amazon.com'
     
     // Check if token needs refresh (with 1 hour buffer)
@@ -524,11 +525,82 @@ serve(async (req) => {
        },
      })
      
-     if (!campaignsResponse.ok) {
-       const errorText = await campaignsResponse.text()
-       console.error('Failed to fetch campaigns:', campaignsResponse.status, errorText)
-       throw new Error(`Failed to fetch campaigns: ${campaignsResponse.status}`)
-     }
+      if (!campaignsResponse.ok) {
+        const errorText = await campaignsResponse.text()
+        console.error('Failed to fetch campaigns:', campaignsResponse.status, errorText)
+        
+        // If 401, try to refresh token and retry once
+        if (campaignsResponse.status === 401 && !tokenRefreshed) {
+          console.log('⚠️ 401 detected, attempting token refresh...')
+          
+          try {
+            const refreshResponse = await fetch('https://api.amazon.com/auth/o2/token', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+              },
+              body: new URLSearchParams({
+                grant_type: 'refresh_token',
+                refresh_token: await decryptText(connection.refresh_token),
+                client_id: clientId,
+                client_secret: clientSecret,
+              }),
+            })
+
+            if (refreshResponse.ok) {
+              const tokenData = await refreshResponse.json()
+              accessToken = tokenData.access_token
+              const expiresIn = tokenData.expires_in || 3600
+              const newExpiresAt = new Date(Date.now() + expiresIn * 1000)
+              
+              // Update token in database
+              await supabase.rpc('store_tokens_with_key', {
+                p_user_id: userId,
+                p_profile_id: connection.profile_id,
+                p_access_token: tokenData.access_token,
+                p_refresh_token: tokenData.refresh_token || await decryptText(connection.refresh_token),
+                p_expires_at: newExpiresAt.toISOString(),
+                p_encryption_key: encryptionKey
+              })
+              
+              await supabase
+                .from('amazon_connections')
+                .update({ 
+                  token_expires_at: newExpiresAt.toISOString(),
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', connectionId)
+              
+              console.log('✅ Token refreshed successfully, retrying campaigns fetch...')
+              tokenRefreshed = true
+              
+              // Retry the campaigns request with new token
+              campaignsResponse = await fetch(campaignsUrl, {
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Amazon-Advertising-API-ClientId': clientId,
+                  'Amazon-Advertising-API-Scope': connection.profile_id,
+                },
+              })
+              
+              if (!campaignsResponse.ok) {
+                const retryErrorText = await campaignsResponse.text()
+                console.error('Failed to fetch campaigns after token refresh:', campaignsResponse.status, retryErrorText)
+                throw new Error(`Failed to fetch campaigns after token refresh: ${campaignsResponse.status}`)
+              }
+            } else {
+              const refreshError = await refreshResponse.text()
+              console.error('Token refresh failed:', refreshResponse.status, refreshError)
+              throw new Error(`Token refresh failed: ${refreshResponse.status}`)
+            }
+          } catch (refreshError) {
+            console.error('Error during token refresh:', refreshError)
+            throw new Error(`Token refresh error: ${refreshError instanceof Error ? refreshError.message : 'Unknown error'}`)
+          }
+        } else {
+          throw new Error(`Failed to fetch campaigns: ${campaignsResponse.status}`)
+        }
+      }
      
      const campaignsData = await campaignsResponse.json()
      
