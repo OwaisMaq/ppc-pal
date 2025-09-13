@@ -80,24 +80,40 @@ serve(async (req) => {
       throw new Error('Connection not found')
     }
 
-    // First set the encryption key for this session
-    await supabase.rpc('set_config', {
-      key: 'app.enc_key',
-      value: Deno.env.get('ENCRYPTION_KEY')
-    });
+    // Get encryption key for token handling
+    const encryptionKey = Deno.env.get('ENCRYPTION_KEY')
+    if (!encryptionKey) {
+      throw new Error('ENCRYPTION_KEY not configured')
+    }
 
-    // Get tokens from secure storage
+    // Get tokens from secure storage using the RPC function
     const { data: tokens, error: tokenError } = await supabase
       .rpc('get_tokens', {
         p_profile_id: connection.profile_id
       })
 
-    if (tokenError || !tokens) {
+    if (tokenError) {
+      console.error('Token retrieval error:', tokenError)
       await supabase
         .from('amazon_connections')
-        .update({ status: 'expired', setup_required_reason: 'Token retrieval failed - please reconnect' })
-        .eq('id', connectionId);
-      throw new Error('Failed to retrieve tokens');
+        .update({ 
+          status: 'setup_required', 
+          setup_required_reason: 'Failed to retrieve tokens - please reconnect your Amazon account' 
+        })
+        .eq('id', connectionId)
+      throw new Error('Failed to retrieve stored tokens')
+    }
+
+    if (!tokens || !tokens.refresh_token) {
+      console.error('No refresh token found for profile:', connection.profile_id)
+      await supabase
+        .from('amazon_connections')
+        .update({ 
+          status: 'setup_required', 
+          setup_required_reason: 'No refresh token found - please reconnect your Amazon account' 
+        })
+        .eq('id', connectionId)
+      throw new Error('No refresh token available')
     }
 
     const refreshToken = tokens.refresh_token;
@@ -163,19 +179,20 @@ serve(async (req) => {
       throw new Error('Failed to update connection metadata')
     }
 
-    // Update tokens in secure storage
+    // Update tokens in secure storage using the correct RPC function
     const { error: updateError } = await supabase
-      .rpc('private.store_tokens', {
+      .rpc('store_tokens_with_key', {
         p_user_id: user.id,
         p_profile_id: connection.profile_id,
         p_access_token: tokenData.access_token,
         p_refresh_token: tokenData.refresh_token || tokens.refresh_token,
-        p_expires_at: expiresAt.toISOString()
+        p_expires_at: expiresAt.toISOString(),
+        p_encryption_key: encryptionKey
       })
 
     if (updateError) {
-      console.error('Failed to update tokens:', updateError)
-      throw new Error('Failed to update tokens')
+      console.error('Failed to update tokens in secure storage:', updateError)
+      throw new Error('Failed to store updated tokens')
     }
 
     console.log('Connection updated with new tokens')

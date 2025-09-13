@@ -543,15 +543,18 @@ serve(async (req) => {
               const expiresIn = tokenData.expires_in || 3600
               const newExpiresAt = new Date(Date.now() + expiresIn * 1000)
               
-              // Update token in database
-              await supabase.rpc('store_tokens_with_key', {
-                p_user_id: userId,
-                p_profile_id: connection.profile_id,
-                p_access_token: tokenData.access_token,
-                p_refresh_token: tokenData.refresh_token || await decryptText(connection.refresh_token),
-                p_expires_at: newExpiresAt.toISOString(),
-                p_encryption_key: encryptionKey
-              })
+              // Update token in database using store_tokens_with_key RPC
+              const encryptionKey = Deno.env.get('ENCRYPTION_KEY')
+              if (encryptionKey) {
+                await supabase.rpc('store_tokens_with_key', {
+                  p_user_id: user.id,
+                  p_profile_id: connection.profile_id,
+                  p_access_token: tokenData.access_token,
+                  p_refresh_token: tokenData.refresh_token || await decryptText(connection.refresh_token),
+                  p_expires_at: newExpiresAt.toISOString(),
+                  p_encryption_key: encryptionKey
+                })
+              }
               
               await supabase
                 .from('amazon_connections')
@@ -565,7 +568,7 @@ serve(async (req) => {
               tokenRefreshed = true
               
               // Retry the campaigns request with new token
-              campaignsResponse = await fetch(campaignsUrl, {
+              const retryCampaignsResponse = await fetch(`${apiEndpoint}/v2/campaigns`, {
                 headers: {
                   'Authorization': `Bearer ${accessToken}`,
                   'Amazon-Advertising-API-ClientId': clientId,
@@ -573,11 +576,14 @@ serve(async (req) => {
                 },
               })
               
-              if (!campaignsResponse.ok) {
-                const retryErrorText = await campaignsResponse.text()
-                console.error('Failed to fetch campaigns after token refresh:', campaignsResponse.status, retryErrorText)
-                throw new Error(`Failed to fetch campaigns after token refresh: ${campaignsResponse.status}`)
+              if (!retryCampaignsResponse.ok) {
+                const retryErrorText = await retryCampaignsResponse.text()
+                console.error('Failed to fetch campaigns after token refresh:', retryCampaignsResponse.status, retryErrorText)
+                throw new Error(`Failed to fetch campaigns after token refresh: ${retryCampaignsResponse.status}`)
               }
+              
+              // Update the original response for downstream processing
+              campaignsResponse = retryCampaignsResponse
             } else {
               const refreshError = await refreshResponse.text()
               console.error('Token refresh failed:', refreshResponse.status, refreshError)
@@ -1779,12 +1785,17 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('Sync error:', error)
+    console.error('🚨 Sync error:', error)
     const message = (error as Error)?.message || 'Unknown error'
     let code = 'SYNC_ERROR'
+    
+    // Categorize errors for better user feedback
     if (message.includes('Connection is not active')) code = 'CONNECTION_INACTIVE'
-    else if (message.includes('Token expired')) code = 'TOKEN_EXPIRED'
-    else if (message.includes('Missing Amazon client secret')) code = 'MISSING_AMAZON_SECRET'
+    else if (message.includes('Token expired') || message.includes('refresh failed')) code = 'TOKEN_EXPIRED'
+    else if (message.includes('Missing Amazon client secret') || message.includes('clientSecret is not defined')) code = 'MISSING_AMAZON_SECRET'
+    else if (message.includes('Connection not found')) code = 'CONNECTION_NOT_FOUND'
+    else if (message.includes('No authorization header')) code = 'NO_AUTH'
+    else if (message.includes('Invalid authorization')) code = 'INVALID_AUTH'
 
     // Mark sync job as failed  
     if (typeof syncJobId !== 'undefined' && syncJobId) {
@@ -1797,10 +1808,34 @@ serve(async (req) => {
       }).eq('id', syncJobId)
     }
 
+    // Update connection status if it's a token-related issue
+    if (code === 'TOKEN_EXPIRED' || code === 'MISSING_AMAZON_SECRET') {
+      try {
+        await supabase
+          .from('amazon_connections')
+          .update({ 
+            status: 'setup_required',
+            setup_required_reason: message.includes('clientSecret') 
+              ? 'Missing Amazon client secret configuration' 
+              : 'Token refresh failed - please reconnect your Amazon account'
+          })
+          .eq('id', connectionId)
+      } catch (updateError) {
+        console.error('Failed to update connection status:', updateError)
+      }
+    }
+
     return new Response(
-      JSON.stringify({ success: false, code, message, error: message }),
+      JSON.stringify({ 
+        success: false, 
+        code, 
+        message: message.includes('clientSecret') 
+          ? 'Amazon client secret configuration is missing. Please contact support.' 
+          : message,
+        error: message 
+      }),
       { 
-        status: 200,
+        status: code === 'NO_AUTH' || code === 'INVALID_AUTH' ? 401 : 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     )

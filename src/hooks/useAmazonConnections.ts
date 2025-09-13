@@ -353,15 +353,31 @@ export const useAmazonConnections = () => {
   const refreshConnection = async (connectionId: string) => {
     try {
       setLoading(true);
+      console.log('Refreshing connection:', connectionId);
       
-      const { error } = await supabase.functions.invoke('refresh-amazon-token', {
+      const session = await supabase.auth.getSession();
+      if (!session.data.session?.access_token) {
+        throw new Error('No valid session found');
+      }
+      
+      const { data, error } = await supabase.functions.invoke('refresh-amazon-token', {
         body: { connectionId },
         headers: {
-          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+          Authorization: `Bearer ${session.data.session.access_token}`,
         },
       });
 
-      if (error) throw error;
+      console.log('Refresh response:', { data, error });
+
+      if (error) {
+        console.error('Refresh function error:', error);
+        throw error;
+      }
+
+      if (data && data.success === false) {
+        console.error('Refresh failed:', data.error);
+        throw new Error(data.error || 'Token refresh failed');
+      }
 
       toast.success('Connection refreshed successfully!');
 
@@ -369,9 +385,18 @@ export const useAmazonConnections = () => {
       await fetchConnections();
       
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Refresh error:', error);
-      toast.error('Failed to refresh connection. Please try reconnecting.');
+      const message = error.message || 'Failed to refresh connection';
+      
+      if (message.includes('reconnect') || message.includes('setup_required')) {
+        toast.error('Connection expired. Please reconnect your Amazon account.');
+      } else {
+        toast.error(`Failed to refresh connection: ${message}`);
+      }
+      
+      // Refresh connections to show updated status
+      await fetchConnections();
       
       return false;
     } finally {
