@@ -3,6 +3,7 @@ import AmazonAccountSetup from "@/components/AmazonAccountSetup";
 import AmsSetup from "@/components/AmsSetup";
 import { ASINLabelManager } from "@/components/ASINLabelManager";
 import { NotificationSettings } from "@/components/NotificationSettings";
+import { ConnectionStatusAlert } from "@/components/ConnectionStatusAlert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Settings as SettingsIcon, Info, Tag, Bell } from "lucide-react";
@@ -10,7 +11,7 @@ import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { useEffect } from "react";
 
 const Settings = () => {
-  const { connections, refreshConnections, loading } = useAmazonConnections();
+  const { connections, refreshConnections, refreshConnection, initiateConnection, loading } = useAmazonConnections();
 
   useEffect(() => {
     document.title = "Settings - Amazon Connections | PPC Pal";
@@ -52,6 +53,21 @@ const Settings = () => {
             </div>
             <div className="grid lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 space-y-6">
+                {/* Connection Status Alerts */}
+                {connections.map(connection => (
+                  <ConnectionStatusAlert 
+                    key={connection.id}
+                    connection={connection}
+                    onRefresh={async () => {
+                      await refreshConnection(connection.id);
+                      await refreshConnections();
+                    }}
+                    onReconnect={async () => {
+                      await initiateConnection();
+                    }}
+                    loading={loading}
+                  />
+                ))}
                 <AmazonAccountSetup />
                 <AmsSetup />
               </div>

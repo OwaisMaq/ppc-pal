@@ -48,6 +48,29 @@ serve(async (req) => {
   }
 
   try {
+    // Check environment variables first
+    const clientId = Deno.env.get('AMAZON_CLIENT_ID')
+    const clientSecret = Deno.env.get('AMAZON_CLIENT_SECRET')
+    const encryptionKey = Deno.env.get('ENCRYPTION_KEY')
+    
+    console.log('Environment check:', {
+      hasClientId: !!clientId,
+      hasClientSecret: !!clientSecret,
+      hasEncryptionKey: !!encryptionKey
+    })
+    
+    if (!clientId) {
+      throw new Error('AMAZON_CLIENT_ID not configured')
+    }
+    
+    if (!clientSecret) {
+      throw new Error('AMAZON_CLIENT_SECRET not configured')
+    }
+    
+    if (!encryptionKey) {
+      throw new Error('ENCRYPTION_KEY not configured')
+    }
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -80,12 +103,6 @@ serve(async (req) => {
       throw new Error('Connection not found')
     }
 
-    // Get encryption key for token handling
-    const encryptionKey = Deno.env.get('ENCRYPTION_KEY')
-    if (!encryptionKey) {
-      throw new Error('ENCRYPTION_KEY not configured')
-    }
-
     // Get tokens from secure storage using the RPC function
     const { data: tokens, error: tokenError } = await supabase
       .rpc('get_tokens', {
@@ -97,7 +114,7 @@ serve(async (req) => {
       await supabase
         .from('amazon_connections')
         .update({ 
-          status: 'setup_required', 
+          status: 'setup_required',
           setup_required_reason: 'Failed to retrieve tokens - please reconnect your Amazon account' 
         })
         .eq('id', connectionId)
@@ -117,13 +134,6 @@ serve(async (req) => {
     }
 
     const refreshToken = tokens.refresh_token;
-
-    const clientId = Deno.env.get('AMAZON_CLIENT_ID')
-    const clientSecret = Deno.env.get('AMAZON_CLIENT_SECRET')
-    
-    if (!clientId || !clientSecret) {
-      throw new Error('Amazon credentials not configured')
-    }
 
     console.log('Attempting to refresh access token...')
     
