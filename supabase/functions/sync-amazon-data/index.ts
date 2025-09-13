@@ -48,265 +48,296 @@ async function decryptText(enc: string): Promise<string> {
 interface ReportRequest {
   status: string
   url?: string
-  statusDetails?: string
+  reportId?: string
 }
 
 interface PerformanceData {
   campaignId?: string
   adGroupId?: string
+  targetingType?: string
+  targetingText?: string
+  matchType?: string
+  targeting?: string
   keywordId?: string
   targetId?: string
-  keywordText?: string
-  matchType?: string
-  impressions?: string
-  clicks?: string
-  spend?: string
-  sales7d?: string
-  sales14d?: string
-  purchases7d?: string
-  purchases14d?: string
-  clickThroughRate?: string
-  costPerClick?: string
+  date?: string
+  impressions?: number
+  clicks?: number
+  cost?: number
+  sales14d?: number
+  purchases14d?: number
+  sales30d?: number
+  purchases30d?: number
 }
 
-async function waitWithExponentialBackoff(attempt: number, baseDelayMs = 1000, maxDelayMs = 30000) {
-  const delay = Math.min(baseDelayMs * Math.pow(2, attempt), maxDelayMs)
+// Wait with exponential backoff
+async function waitWithExponentialBackoff(attempt: number) {
+  const baseDelay = 1000
+  const delay = baseDelay * Math.pow(2, attempt)
+  console.log(`⏳ Waiting ${delay}ms before retry attempt ${attempt + 1}`)
   await new Promise(resolve => setTimeout(resolve, delay))
 }
 
-async function fetchWithRetry(url: string, options: RequestInit, maxAttempts = 4): Promise<Response> {
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+// Fetch with retry for 429 and 5xx errors
+async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3): Promise<Response> {
+  let lastError: Error | null = null
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      const res = await fetch(url, options)
-      if (res.ok) return res
-      const status = res.status
-      if (status === 408 || status === 429 || (status >= 500 && status <= 599)) {
-        console.warn(`Transient ${status} for ${url}, attempt ${attempt + 1}/${maxAttempts}`)
+      const response = await fetch(url, options)
+      
+      // If successful, return immediately
+      if (response.ok) {
+        return response
+      }
+      
+      // If it's a client error (4xx except 429), don't retry
+      if (response.status >= 400 && response.status < 500 && response.status !== 429) {
+        return response
+      }
+      
+      // For 429 (rate limit) or 5xx errors, retry with backoff
+      if (attempt < maxRetries && (response.status === 429 || response.status >= 500)) {
+        console.log(`⚠️ Request failed with status ${response.status}, retrying...`)
         await waitWithExponentialBackoff(attempt)
         continue
       }
-      return res
-    } catch (err) {
-      console.warn(`Network error for ${url} attempt ${attempt + 1}/${maxAttempts}:`, err)
-      await waitWithExponentialBackoff(attempt)
+      
+      return response
+    } catch (error) {
+      lastError = error as Error
+      if (attempt < maxRetries) {
+        console.log(`⚠️ Request failed with error: ${lastError.message}, retrying...`)
+        await waitWithExponentialBackoff(attempt)
+        continue
+      }
     }
   }
-  return await fetch(url, options)
+  
+  throw lastError || new Error('Max retries exceeded')
 }
 
+// Generate performance report
 async function createReportRequest(
-  apiEndpoint: string,
   accessToken: string, 
-  clientId: string,
-  profileId: string,
+  profileId: string, 
   reportType: string,
-  columns: string[],
-  entityIds?: string[],
-   opts?: { dateRangeDays?: number; timeUnit?: 'SUMMARY' | 'DAILY'; skipEntityFilter?: boolean; startDate?: string; endDate?: string }
- ): Promise<string> {
-   const dateRangeDays = opts?.dateRangeDays || 30
-   const timeUnit = opts?.timeUnit || 'SUMMARY'
-   const skipEntityFilter = opts?.skipEntityFilter || false
-   
-   // Calculate dates - Amazon reports use YYYY-MM-DD format
-   const endDate = new Date()
-   endDate.setDate(endDate.getDate() - 1) // Amazon reports are delayed by 1 day
-   const endDateStr = opts?.endDate || endDate.toISOString().split('T')[0]
-   const startDateStr = opts?.startDate || new Date(endDate.getTime() - dateRangeDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
- 
-  // Fix: correct reportTypeId mapping for v3 API
-  const reportTypeId = (() => {
-    switch (reportType) {
-      case 'campaigns': return 'spCampaigns'
-      case 'adGroups': return 'spAdGroups'
-      case 'targets': return 'spTargets'
-      case 'keywords': return 'spKeywords'
-      case 'advertisedProducts': return 'spAdvertisedProduct'
-      default: throw new Error(`Unknown reportType: ${reportType}`)
-    }
-  })()
+  dateRange: number,
+  timeUnit: 'SUMMARY' | 'DAILY' = 'SUMMARY',
+  columns: string[] = ['impressions', 'clicks', 'cost', 'sales14d', 'purchases14d'],
+  entityIds?: string[]
+): Promise<string> {
+  const endDate = new Date()
+  const startDate = new Date()
+  startDate.setDate(endDate.getDate() - dateRange)
+  
+  const requestBody: any = {
+    reportDate: startDate.toISOString().split('T')[0],
+    reportEndDate: endDate.toISOString().split('T')[0],
+    timeUnit: timeUnit,
+    columns: columns,
+    format: 'GZIP_JSON'
+  }
 
-  const payload: any = {
-    name: `${reportType}_${Date.now()}`,
-    startDate: startDateStr,
-    endDate: endDateStr,
-    configuration: {
-      adProduct: 'SPONSORED_PRODUCTS',
-      columns: columns,
-      reportTypeId,
-      timeUnit: timeUnit,
-      format: 'GZIP_JSON'
+  // Add entity filters if provided
+  if (entityIds && entityIds.length > 0) {
+    if (reportType === 'campaigns') {
+      requestBody.campaignIdFilter = entityIds
+    } else if (reportType === 'adGroups') {
+      requestBody.adGroupIdFilter = entityIds  
+    } else if (reportType === 'keywords') {
+      requestBody.keywordIdFilter = entityIds
+    } else if (reportType === 'targets') {
+      requestBody.targetIdFilter = entityIds
     }
   }
 
-  // If DAILY, include the 'date' column so we can insert time-series rows
-  if (timeUnit === 'DAILY' && !payload.configuration.columns.includes('date')) {
-    payload.configuration.columns = ['date', ...payload.configuration.columns]
-  }
- 
-   // Apply entity filtering unless explicitly skipped
-   if (!opts?.skipEntityFilter && entityIds && entityIds.length > 0) {
-      const filterField = reportType === 'campaigns' ? 'campaignId'
-                       : reportType === 'adGroups' ? 'adGroupId'
-                       : reportType === 'keywords' ? 'keywordId'
-                       : reportType === 'targets' ? 'targetId'
-                       : reportType === 'advertisedProducts' ? 'adGroupId'
-                       : 'campaignId'
-      
-      payload.filters = [{ field: filterField, operator: 'IN', values: entityIds }]
-   }
-
-  // Add groupBy for v3 API reports that require it
-  if (reportType === 'campaigns') {
-    payload.configuration.groupBy = ['campaign']
-  } else if (reportType === 'adGroups') {
-    payload.configuration.groupBy = ['adGroup'] 
-  } else if (reportType === 'advertisedProducts') {
-    payload.configuration.groupBy = ['advertiser']
+  console.log(`📊 Creating ${reportType} report with ${columns.length} columns, timeUnit: ${timeUnit}`)
+  if (entityIds) {
+    console.log(`🎯 Filtering to ${entityIds.length} specific entities`)
   }
 
-  // Log minimal payload details for debugging without dumping all IDs
-  try {
-    const debugPayload = {
-      ...payload,
-      configuration: { ...payload.configuration, columnsCount: columns.length },
-      filtersCount: payload.filters ? payload.filters[0]?.values?.length : 0,
+  const response = await fetchWithRetry(
+    `https://advertising-api.amazon.com/reporting/reports`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Amazon-Advertising-API-ClientId': Deno.env.get('AMAZON_CLIENT_ID') || '',
+        'Amazon-Advertising-API-Scope': profileId,
+        'Content-Type': 'application/vnd.amazon.reporting.v3+json'
+      },
+      body: JSON.stringify({
+        name: `${reportType}_${timeUnit.toLowerCase()}_${Date.now()}`,
+        startDate: requestBody.reportDate,
+        endDate: requestBody.reportEndDate,
+        configuration: {
+          adProduct: 'SPONSORED_PRODUCTS',
+          groupBy: [reportType.toUpperCase().slice(0, -1)],
+          columns: columns,
+          reportTypeId: reportType.toUpperCase(),
+          timeUnit: timeUnit,
+          format: 'GZIP_JSON',
+          ...(entityIds && { 
+            filters: [{
+              field: reportType === 'campaigns' ? 'CAMPAIGN_ID' : 
+                     reportType === 'adGroups' ? 'AD_GROUP_ID' :
+                     reportType === 'keywords' ? 'KEYWORD_ID' : 'TARGET_ID',
+              values: entityIds
+            }]
+          })
+        }
+      })
     }
-    console.log('Creating report with payload:', JSON.stringify(debugPayload))
-  } catch (_) {}
-
-  const response = await fetch(`${apiEndpoint}/reporting/reports`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'Amazon-Advertising-API-ClientId': clientId,
-      'Amazon-Advertising-API-Scope': profileId,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  })
+  )
 
   if (!response.ok) {
     const errorText = await response.text()
-    console.error(`Failed to create ${reportType} report:`, response.status, errorText)
-    if (response.status === 425) {
-      try {
-        const errorData = JSON.parse(errorText)
-        const retryAfterMatch = errorData.details?.match(/(\d+) seconds/)
-        if (retryAfterMatch) {
-          const retryAfter = parseInt(retryAfterMatch[1])
-          throw new Error(`Rate limited, retry after ${retryAfter} seconds`)
-        }
-      } catch {}
-    }
-    throw new Error(`Failed to create report: ${response.status} ${errorText}`)
+    console.error(`❌ Report creation failed: ${response.status} ${errorText}`)
+    throw new Error(`Report creation failed: ${response.status} ${errorText}`)
   }
 
   const result = await response.json()
+  console.log(`✅ Report created with ID: ${result.reportId}`)
   return result.reportId
 }
 
+// Poll report status until completion
 async function pollReportStatus(
-  apiEndpoint: string,
-  accessToken: string,
-  clientId: string, 
-  profileId: string,
-  reportId: string
+  accessToken: string, 
+  profileId: string, 
+  reportId: string,
+  maxWaitTime = 300000 // 5 minutes
 ): Promise<ReportRequest> {
-  let attempt = 0
-  const maxAttempts = 20
+  const startTime = Date.now()
   
-  while (attempt < maxAttempts) {
-    const response = await fetch(`${apiEndpoint}/reporting/reports/${reportId}`, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Amazon-Advertising-API-ClientId': clientId,
-        'Amazon-Advertising-API-Scope': profileId,
-      },
-    })
+  while (Date.now() - startTime < maxWaitTime) {
+    const response = await fetchWithRetry(
+      `https://advertising-api.amazon.com/reporting/reports/${reportId}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Amazon-Advertising-API-ClientId': Deno.env.get('AMAZON_CLIENT_ID') || '',
+          'Amazon-Advertising-API-Scope': profileId,
+          'Content-Type': 'application/vnd.amazon.reporting.v3+json'
+        }
+      }
+    )
 
     if (!response.ok) {
-      throw new Error(`Failed to poll report status: ${response.status}`)
+      throw new Error(`Report status check failed: ${response.status}`)
     }
 
-    const report = await response.json()
+    const result = await response.json()
+    console.log(`📊 Report ${reportId} status: ${result.status}`)
     
-    if (report.status === 'SUCCESS' && report.url) {
-      return report
-    } else if (report.status === 'FAILURE') {
-      throw new Error(`Report generation failed: ${report.statusDetails}`)
+    if (result.status === 'COMPLETED') {
+      return result
+    } else if (result.status === 'FAILED') {
+      throw new Error(`Report generation failed: ${result.statusDetails}`)
     }
     
-    console.log(`⏳ Report ${reportId} status: ${report.status}, attempt ${attempt + 1}/${maxAttempts}`)
-    
-    await waitWithExponentialBackoff(attempt)
-    attempt++
+    // Wait 10 seconds before next poll
+    await new Promise(resolve => setTimeout(resolve, 10000))
   }
   
-  throw new Error(`Report polling timeout after ${maxAttempts} attempts`)
+  throw new Error('Report generation timeout')
 }
 
-async function downloadAndParseReport(url: string): Promise<PerformanceData[]> {
-  const response = await fetch(url)
+// Download and parse gzipped JSON report
+async function downloadAndParseReport(downloadUrl: string): Promise<PerformanceData[]> {
+  console.log('📥 Downloading report data...')
+  
+  const response = await fetchWithRetry(downloadUrl, {})
   
   if (!response.ok) {
-    throw new Error(`Failed to download report: ${response.status}`)
+    throw new Error(`Report download failed: ${response.status}`)
   }
-
-  // Use Deno's built-in compression streams to decompress gzip data
-  const compressedStream = response.body
-  if (!compressedStream) {
-    throw new Error('No response body')
-  }
-
-  const decompressedStream = compressedStream.pipeThrough(new DecompressionStream('gzip'))
-  const decompressedResponse = new Response(decompressedStream)
-  const jsonText = await decompressedResponse.text()
   
-  // Handle both JSON array and NDJSON format
-  const trimmed = jsonText.trim()
-  if (trimmed.startsWith('[')) {
-    return JSON.parse(trimmed)
-  }
-  // Handle NDJSON (newline-delimited JSON)
-  const lines = trimmed.split('\n').filter(Boolean)
-  return lines.map(line => JSON.parse(line))
+  const gzippedData = await response.arrayBuffer()
+  
+  // Decompress gzipped data
+  const decompressedData = new Response(
+    new ReadableStream({
+      start(controller) {
+        const stream = new DecompressionStream('gzip')
+        const writer = stream.writable.getWriter()
+        const reader = stream.readable.getReader()
+        
+        writer.write(new Uint8Array(gzippedData))
+        writer.close()
+        
+        const pump = async () => {
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) {
+              controller.close()
+              break
+            }
+            controller.enqueue(value)
+          }
+        }
+        pump()
+      }
+    })
+  )
+  
+  const jsonText = await decompressedData.text()
+  const results = jsonText.trim().split('\\n').map(line => JSON.parse(line))
+  
+  console.log(`✅ Parsed ${results.length} performance records`)
+  return results
 }
 
-// Missing pagination function for v2 API endpoints
-async function fetchAllPages(urlBase: string, headers: Record<string, string>, pageSize = 100): Promise<any[]> {
-  let startIndex = 0
+// Fetch all pages of paginated API results
+async function fetchAllPages(
+  accessToken: string, 
+  profileId: string, 
+  endpoint: string,
+  maxResults = 10000
+): Promise<any[]> {
   const results: any[] = []
+  let nextToken: string | undefined
+  let pageCount = 0
+  const maxPages = Math.ceil(maxResults / 1000) // Assuming 1000 per page max
   
-  for (;;) {
-    const separator = urlBase.includes('?') ? '&' : '?'
-    const url = `${urlBase}${separator}startIndex=${startIndex}&count=${pageSize}`
+  do {
+    pageCount++
+    console.log(`📄 Fetching page ${pageCount} from ${endpoint}`)
     
-    console.log(`  📄 Fetching page: startIndex=${startIndex}, count=${pageSize}`)
+    let url = `https://advertising-api.amazon.com/sp/${endpoint}?count=1000`
+    if (nextToken) {
+      url += `&nextToken=${encodeURIComponent(nextToken)}`
+    }
     
-    const response = await fetch(url, { headers })
+    const response = await fetchWithRetry(url, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Amazon-Advertising-API-ClientId': Deno.env.get('AMAZON_CLIENT_ID') || '',
+        'Amazon-Advertising-API-Scope': profileId,
+        'Content-Type': 'application/json'
+      }
+    })
     
     if (!response.ok) {
-      throw new Error(`Failed to fetch page: ${response.status} ${await response.text()}`)
-    }
-    
-    const page = await response.json()
-    
-    if (!Array.isArray(page)) {
-      console.error('Expected array response, got:', typeof page)
+      const errorText = await response.text()
+      console.error(`❌ Failed to fetch ${endpoint}: ${response.status} ${errorText}`)
       break
     }
     
-    results.push(...page)
-    console.log(`  ✅ Got ${page.length} items, total so far: ${results.length}`)
+    const data = await response.json()
+    results.push(...(data.campaigns || data.adGroups || data.keywords || data.targets || []))
+    nextToken = data.nextToken
     
-    if (page.length < pageSize) {
+    console.log(`✅ Page ${pageCount}: ${data.campaigns?.length || data.adGroups?.length || data.keywords?.length || data.targets?.length || 0} items`)
+    
+    if (pageCount >= maxPages) {
+      console.log(`⚠️ Reached max pages limit (${maxPages})`)
       break
     }
-    
-    startIndex += pageSize
-  }
+  } while (nextToken)
   
+  console.log(`✅ Total ${endpoint} fetched: ${results.length}`)
   return results
 }
 
@@ -348,27 +379,33 @@ serve(async (req) => {
         connection_id: connectionId,
         user_id: user.id,
         status: 'running',
-        phase: 'starting',
-        progress_percent: 0,
-        sync_details: {
-          dateRange,
-          diagnosticMode: diag,
-          timeUnit: timeUnitOpt
-        },
-        started_at: new Date().toISOString()
+        started_at: new Date().toISOString(),
+        progress: 0
       })
       .select()
       .single()
 
     if (syncJobError) {
       console.error('Failed to create sync job:', syncJobError)
+    } else {
+      syncJobId = syncJob.id
+      console.log('✅ Created sync job:', syncJobId)
     }
 
-    syncJobId = syncJob?.id
+    // Update sync job progress
+    const updateProgress = async (progress: number, message?: string) => {
+      if (syncJobId) {
+        await supabase
+          .from('sync_jobs')
+          .update({ 
+            progress,
+            ...(message && { message })
+          })
+          .eq('id', syncJobId)
+      }
+    }
 
-    // PHASE 1: Validate connection and refresh token if needed
-    console.log('🔐 Validating Amazon connection...')
-    
+    // Get Amazon connection
     const { data: connection, error: connectionError } = await supabase
       .from('amazon_connections')
       .select('*')
@@ -377,493 +414,301 @@ serve(async (req) => {
       .single()
 
     if (connectionError || !connection) {
-      console.error('❌ Connection not found or unauthorized:', {
-        connectionId,
-        userId: user.id,
-        error: connectionError
-      })
-      throw new Error('Connection not found or unauthorized')
+      throw new Error('Connection not found')
     }
-    
-    console.log('✅ Connection validated:', {
-      profileId: connection.profile_id,
-      profileName: connection.profile_name,
-      status: connection.status,
-      tokenExpiresAt: connection.token_expires_at
-    })
 
-    const status = String(connection.status || '').toLowerCase().trim()
-    const tokenStillValid = new Date(connection.token_expires_at).getTime() > Date.now()
-    if (!(status === 'active' || ((status === 'setup_required' || status === 'pending') && tokenStillValid))) {
+    if (!connection.is_active) {
       throw new Error('Connection is not active')
     }
-    
-    const clientId = Deno.env.get('AMAZON_CLIENT_ID')
-    const clientSecret = Deno.env.get('AMAZON_CLIENT_SECRET')
-    
-    if (!clientId) {
-      throw new Error('Missing Amazon client ID configuration')
-    }
-    
-    if (!clientSecret) {
-      throw new Error('Missing Amazon client secret configuration')
+
+    // Get encryption key
+    const encryptionKey = Deno.env.get('ENCRYPTION_KEY')
+    if (!encryptionKey) {
+      throw new Error('ENCRYPTION_KEY environment variable not found')
     }
 
-    let accessToken = await decryptText(connection.access_token)
-    let tokenRefreshed = false
-    const apiEndpoint = connection.advertising_api_endpoint || 'https://advertising-api-eu.amazon.com'
-    
-    // Check if token needs refresh (with 5 minute buffer)
+    // Set encryption key in session for token decryption
+    const { error: setKeyError } = await supabase
+      .rpc('set_config', {
+        key: 'app.enc_key',
+        value: encryptionKey,
+        is_local: true
+      });
+
+    if (setKeyError) {
+      console.error('Failed to set encryption key in session:', setKeyError);
+      throw new Error('Failed to configure session for token retrieval');
+    }
+
+    // Get tokens from secure storage using the RPC function
+    const { data: tokens, error: tokensError } = await supabase
+      .rpc('get_tokens', { p_profile_id: connection.profile_id })
+
+    if (tokensError || !tokens || tokens.length === 0) {
+      console.error('Failed to retrieve stored tokens:', tokensError)
+      throw new Error('Failed to retrieve stored tokens')
+    }
+
+    let accessToken = tokens[0].access_token
+    const refreshToken = tokens[0].refresh_token
+
+    // Check if token needs refresh (expires within 5 minutes)
+    const expiresAt = new Date(tokens[0].expires_at)
     const now = new Date()
-    const expiresAt = new Date(connection.token_expires_at)
-    const bufferTime = 5 * 60 * 1000 // 5 minutes
-    
-    if (now.getTime() >= (expiresAt.getTime() - bufferTime)) {
-      console.log(now.getTime() >= expiresAt.getTime()
-        ? '🔄 Token expired, refreshing...'
-        : '🔄 Token expires very soon (<5m), refreshing...')
+    const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000)
+
+    if (expiresAt <= fiveMinutesFromNow) {
+      console.log('🔄 Access token needs refresh')
       
-      // Refresh the token
       try {
-        console.log('Attempting token refresh...')
-        
-        const refreshResponse = await fetch('https://api.amazon.com/auth/o2/token', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: new URLSearchParams({
-            grant_type: 'refresh_token',
-            refresh_token: await decryptText(connection.refresh_token),
-            client_id: clientId,
-            client_secret: clientSecret,
-          }),
+        const refreshResponse = await supabase.functions.invoke('refresh-amazon-token', {
+          body: { 
+            connectionId: connectionId,
+            profileId: connection.profile_id 
+          }
         })
 
-        if (refreshResponse.ok) {
-          const tokenData = await refreshResponse.json()
-          accessToken = tokenData.access_token
-          tokenRefreshed = true
+        if (refreshResponse.error) {
+          throw new Error(`Token refresh failed: ${refreshResponse.error.message}`)
+        }
+
+        const { accessToken: newAccessToken } = refreshResponse.data
+        if (!newAccessToken) {
+          throw new Error('No access token returned from refresh')
+        }
+
+        accessToken = newAccessToken
+        console.log('✅ Token refreshed successfully')
+      } catch (error) {
+        console.error('❌ Token refresh failed:', error)
+        throw new Error(`Token refresh failed: ${error}`)
+      }
+    }
+
+    await updateProgress(10, 'Fetching Amazon campaigns...')
+
+    // Track diagnostics
+    const diagnostics: any = {
+      startTime: new Date().toISOString(),
+      dateRange,
+      timeUnit: timeUnitOpt,
+      diagnosticMode: diag
+    }
+
+    // Fetch campaigns
+    console.log('📁 Fetching campaigns...')
+    const campaigns = await fetchAllPages(accessToken, connection.profile_id, 'campaigns')
+    console.log(`✅ Found ${campaigns.length} campaigns`)
+
+    await updateProgress(20, 'Storing campaign data...')
+
+    // Store campaigns
+    const campaignIds: string[] = []
+    for (const campaign of campaigns) {
+      try {
+        const { error: campaignError } = await supabase
+          .from('campaigns')
+          .upsert({
+            campaign_id: campaign.campaignId,
+            connection_id: connectionId,
+            name: campaign.name,
+            campaign_type: campaign.campaignType,
+            targeting_type: campaign.targetingType,
+            state: campaign.state,
+            daily_budget: campaign.dynamicBidding?.strategy ? null : campaign.budget?.budget,
+            start_date: campaign.startDate,
+            end_date: campaign.endDate,
+            bid_strategy: campaign.dynamicBidding?.strategy,
+            placement_bidding: campaign.dynamicBidding?.placementBidding ? JSON.stringify(campaign.dynamicBidding.placementBidding) : null,
+            budget_type: campaign.budget?.budgetType,
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'campaign_id,connection_id',
+            ignoreDuplicates: false
+          })
+
+        if (campaignError) {
+          console.warn(`Failed to store campaign ${campaign.campaignId}:`, campaignError)
+        } else {
+          campaignIds.push(campaign.campaignId)
+        }
+      } catch (error) {
+        console.warn(`Failed to process campaign ${campaign.campaignId}:`, error)
+      }
+    }
+
+    await updateProgress(30, 'Fetching ad groups...')
+
+    // Fetch and store ad groups
+    console.log('📁 Fetching ad groups...')
+    const adGroups = await fetchAllPages(accessToken, connection.profile_id, 'adGroups')
+    console.log(`✅ Found ${adGroups.length} ad groups`)
+
+    const adGroupIds: string[] = []
+    for (const adGroup of adGroups) {
+      try {
+        // Get the stored campaign for targeting type
+        const { data: storedCampaign } = await supabase
+          .from('campaigns')
+          .select('targeting_type')
+          .eq('campaign_id', adGroup.campaignId)
+          .eq('connection_id', connectionId)
+          .single()
+
+        const { error: adGroupError } = await supabase
+          .from('ad_groups')
+          .upsert({
+            adgroup_id: adGroup.adGroupId,
+            campaign_id: adGroup.campaignId,
+            connection_id: connectionId,
+            name: adGroup.name,
+            default_bid: adGroup.defaultBid,
+            state: adGroup.state,
+            campaign_targeting_type: storedCampaign?.targeting_type,
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'adgroup_id,connection_id',
+            ignoreDuplicates: false
+          })
+
+        if (adGroupError) {
+          console.warn(`Failed to store ad group ${adGroup.adGroupId}:`, adGroupError)
+        } else {
+          adGroupIds.push(adGroup.adGroupId)
+        }
+
+        // Sync keywords for this ad group
+        try {
+          const keywords = await fetchAllPages(accessToken, connection.profile_id, `adGroups/${adGroup.adGroupId}/keywords`)
           
-          // Update stored tokens
-          const newExpiresAt = new Date(Date.now() + tokenData.expires_in * 1000)
-          console.log('✅ Token refreshed successfully, expires at:', newExpiresAt.toISOString())
-          
+          for (const keyword of keywords) {
+            await supabase
+              .from('keywords')
+              .upsert({
+                amazon_keyword_id: keyword.keywordId,
+                adgroup_id: adGroup.adGroupId,
+                campaign_id: adGroup.campaignId,
+                connection_id: connectionId,
+                keyword_text: keyword.keywordText,
+                match_type: keyword.matchType,
+                state: keyword.state,
+                bid: keyword.bid,
+                updated_at: new Date().toISOString()
+              }, {
+                onConflict: 'adgroup_id,amazon_keyword_id',
+                ignoreDuplicates: false
+              })
+          }
+        } catch (error) {
+          console.warn(`Failed to sync keywords for ad group ${adGroup.adGroupId}:`, error)
+        }
+      } catch (error) {
+        console.warn(`Failed to sync ad groups for campaign ${adGroup.campaignId}:`, error)
+      }
+    }
+
+    await updateProgress(40, 'Fetching keywords...')
+
+    // Fetch all keywords
+    console.log('📁 Fetching keywords...')
+    const keywords = await fetchAllPages(accessToken, connection.profile_id, 'keywords')
+    console.log(`✅ Found ${keywords.length} keywords`)
+
+    const keywordIds: string[] = []
+    for (const keyword of keywords) {
+      try {
+        const { error: keywordError } = await supabase
+          .from('keywords')
+          .upsert({
+            amazon_keyword_id: keyword.keywordId,
+            adgroup_id: keyword.adGroupId,
+            campaign_id: keyword.campaignId,
+            connection_id: connectionId,
+            keyword_text: keyword.keywordText,
+            match_type: keyword.matchType,
+            state: keyword.state,
+            bid: keyword.bid,
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'adgroup_id,amazon_keyword_id',
+            ignoreDuplicates: false
+          })
+
+        if (keywordError) {
+          console.warn(`Failed to store keyword ${keyword.keywordId}:`, keywordError)
+        } else {
+          keywordIds.push(keyword.keywordId)
+        }
+      } catch (error) {
+        console.warn(`Failed to sync keywords for ad group ${keyword.adGroupId}:`, error)
+      }
+    }
+
+    await updateProgress(50, 'Fetching targets...')
+
+    // Fetch targets
+    console.log('📁 Fetching targets...')
+    const targets = await fetchAllPages(accessToken, connection.profile_id, 'targets')
+    console.log(`✅ Found ${targets.length} targets`)
+
+    const targetIds: string[] = []
+    for (const target of targets) {
+      try {
+        const { error: targetError } = await supabase
+          .from('targets')
+          .upsert({
+            amazon_target_id: target.targetId,
+            adgroup_id: target.adGroupId,
+            campaign_id: target.campaignId,
+            connection_id: connectionId,
+            expression_type: target.expression?.[0]?.type,
+            expression_value: target.expression?.[0]?.value,
+            state: target.state,
+            bid: target.bid,
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'adgroup_id,amazon_target_id',
+            ignoreDuplicates: false
+          })
+
+        if (targetError) {
+          console.warn(`Failed to store target ${target.targetId}:`, targetError)
+        } else {
+          targetIds.push(target.targetId)
+        }
+      } catch (error) {
+        console.warn(`Failed to sync targets for ad group ${target.adGroupId}:`, error)
+      }
+    }
+
+    // Fetch advertised products for ASIN data (only for campaigns, not performance)
+    if (campaignIds.length > 0) {
+      try {
+        console.log('📁 Fetching advertised products for ASIN data...')
+        const advertisedProducts = await fetchAllPages(accessToken, connection.profile_id, 'advertised/products')
+        console.log(`✅ Found ${advertisedProducts.length} advertised products`)
+        
+        // Group ASINs by campaign for efficient updates
+        const campaignAsinUpdates = new Map<string, string[]>()
+        
+        for (const product of advertisedProducts) {
+          if (product.campaignId && product.asin) {
+            if (!campaignAsinUpdates.has(product.campaignId)) {
+              campaignAsinUpdates.set(product.campaignId, [])
+            }
+            campaignAsinUpdates.get(product.campaignId)!.push(product.asin)
+          }
+        }
+        
+        // Update campaigns with their ASINs
+        for (const [campaignId, asins] of campaignAsinUpdates) {
           await supabase
-            .from('amazon_connections')
-            .update({
-              access_token: await encryptText(accessToken),
-              refresh_token: await encryptText(tokenData.refresh_token || connection.refresh_token),
-              token_expires_at: newExpiresAt.toISOString(),
-              status: 'active',
-              setup_required_reason: null,
+            .from('campaigns')
+            .update({ 
+              asins: asins,
               updated_at: new Date().toISOString()
             })
-            .eq('id', connectionId)
-        } else {
-          const errorText = await refreshResponse.text()
-          console.error('❌ Token refresh failed:', errorText)
-          
-          if (now.getTime() < expiresAt.getTime()) {
-            console.warn('Refresh failed but current token still valid; continuing without refresh')
-            // keep going with existing accessToken
-          } else {
-            await supabase
-              .from('amazon_connections')
-              .update({ 
-                status: 'setup_required',
-                setup_required_reason: 'Token refresh failed - please reconnect your Amazon account'
-              })
-              .eq('id', connectionId)
-            throw new Error(`Token refresh failed: ${refreshResponse.status}`)
-          }
-        }
-      } catch (refreshError) {
-        console.error('❌ Token refresh error:', refreshError)
-        if (now.getTime() < expiresAt.getTime()) {
-          console.warn('Refresh error but current token still valid; continuing without refresh')
-        } else {
-          await supabase
-            .from('amazon_connections')
-            .update({ 
-              status: 'setup_required',
-              setup_required_reason: 'Token refresh failed - please reconnect your Amazon account'
-            })
-            .eq('id', connectionId)
-          throw new Error('Token refresh failed - please reconnect your Amazon account')
-        }
-      }
-    }
-    }
-
-     // Update sync job status
-     if (syncJobId) {
-       await supabase.from('sync_jobs').update({
-         status: 'running',
-         phase: 'fetching-entities',
-         progress_percent: 10
-       }).eq('id', syncJobId)
-     }
-     
-     // Also sync budget usage data
-     console.log('💰 Will sync budget usage data after entity sync...')
-     const campaignsResponse = await fetchWithRetry(`${apiEndpoint}/v2/campaigns`, {
-       headers: {
-         'Authorization': `Bearer ${accessToken}`,
-         'Amazon-Advertising-API-ClientId': clientId,
-         'Amazon-Advertising-API-Scope': connection.profile_id,
-       },
-     })
-     
-      if (!campaignsResponse.ok) {
-        const errorText = await campaignsResponse.text()
-        console.error('Failed to fetch campaigns:', campaignsResponse.status, errorText)
-        
-        // If 401, try to refresh token and retry once
-        if (campaignsResponse.status === 401 && !tokenRefreshed) {
-          console.log('⚠️ 401 detected, attempting token refresh...')
-          
-          try {
-            const refreshResponse = await fetch('https://api.amazon.com/auth/o2/token', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-              },
-              body: new URLSearchParams({
-                grant_type: 'refresh_token',
-                refresh_token: await decryptText(connection.refresh_token),
-                client_id: clientId,
-                client_secret: clientSecret,
-              }),
-            })
-
-            if (refreshResponse.ok) {
-              const tokenData = await refreshResponse.json()
-              accessToken = tokenData.access_token
-              const expiresIn = tokenData.expires_in || 3600
-              const newExpiresAt = new Date(Date.now() + expiresIn * 1000)
-              
-              // Update token in database using store_tokens_with_key RPC
-              const encryptionKey = Deno.env.get('ENCRYPTION_KEY')
-              if (encryptionKey) {
-                await supabase.rpc('store_tokens_with_key', {
-                  p_user_id: user.id,
-                  p_profile_id: connection.profile_id,
-                  p_access_token: tokenData.access_token,
-                  p_refresh_token: tokenData.refresh_token || await decryptText(connection.refresh_token),
-                  p_expires_at: newExpiresAt.toISOString(),
-                  p_encryption_key: encryptionKey
-                })
-              }
-              
-              await supabase
-                .from('amazon_connections')
-                .update({ 
-                  token_expires_at: newExpiresAt.toISOString(),
-                  updated_at: new Date().toISOString()
-                })
-                .eq('id', connectionId)
-              
-              console.log('✅ Token refreshed successfully, retrying campaigns fetch...')
-              tokenRefreshed = true
-              
-              // Retry the campaigns request with new token
-              const retryCampaignsResponse = await fetch(`${apiEndpoint}/v2/campaigns`, {
-                headers: {
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Amazon-Advertising-API-ClientId': clientId,
-                  'Amazon-Advertising-API-Scope': connection.profile_id,
-                },
-              })
-              
-              if (!retryCampaignsResponse.ok) {
-                const retryErrorText = await retryCampaignsResponse.text()
-                console.error('Failed to fetch campaigns after token refresh:', retryCampaignsResponse.status, retryErrorText)
-                throw new Error(`Failed to fetch campaigns after token refresh: ${retryCampaignsResponse.status}`)
-              }
-              
-              // Update the original response for downstream processing
-              campaignsResponse = retryCampaignsResponse
-            } else {
-              const refreshError = await refreshResponse.text()
-              console.error('Token refresh failed:', refreshResponse.status, refreshError)
-              throw new Error(`Token refresh failed: ${refreshResponse.status}`)
-            }
-          } catch (refreshError) {
-            console.error('Error during token refresh:', refreshError)
-            throw new Error(`Token refresh error: ${refreshError instanceof Error ? refreshError.message : 'Unknown error'}`)
-          }
-        } else {
-          throw new Error(`Failed to fetch campaigns: ${campaignsResponse.status}`)
-        }
-      }
-     
-     const campaignsData = await campaignsResponse.json()
-     
-     if (!Array.isArray(campaignsData) || campaignsData.length === 0) {
-       console.log('⚠️ No campaigns found for this connection')
-       
-       return new Response(JSON.stringify({
-         success: true,
-         message: 'No campaigns found',
-         entitiesSynced: { campaigns: 0, adGroups: 0, keywords: 0, targets: 0 }
-       }), {
-         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-         status: 200
-       })
-     }
-
-    // PHASE 1A: Sync campaign entities
-    console.log(`📊 Syncing ${campaignsData.length} campaigns...`)
-    let campaignMap = new Map()
-    let adGroupMap = new Map()
-    let autoCampaignCount = 0
-    
-    for (const campaign of campaignsData) {
-      if (!campaign.campaignId || !campaign.name) {
-        console.warn('Skipping malformed campaign:', campaign)
-        continue
-      }
-
-      // Extract targeting type from name - fallback approach if targetingType is not provided
-      const targetingType = campaign.targetingType?.toLowerCase() || 
-        (campaign.name?.toLowerCase().includes('auto') ? 'auto' : 'manual')
-
-      if (targetingType === 'auto') {
-        autoCampaignCount++
-      } else if (targetingType === 'manual') {
-        // This is fine, we'll process keywords for manual campaigns
-      }
-
-      const { data: storedCampaign } = await supabase
-        .from('campaigns')
-        .upsert({
-          connection_id: connectionId,
-          amazon_campaign_id: campaign.campaignId.toString(),
-          name: campaign.name,
-          campaign_type: 'Sponsored Products',
-          targeting_type: targetingType,
-          status: campaign.state || 'enabled',
-          daily_budget: parseFloat(campaign.dailyBudget) || null,
-          start_date: campaign.startDate || null,
-          end_date: campaign.endDate || null,
-          asin: null // Will be populated from advertised products report
-        }, {
-          onConflict: 'connection_id,amazon_campaign_id',
-          ignoreDuplicates: false
-        })
-        .select()
-        .single()
-
-      if (storedCampaign) {
-        campaignMap.set(campaign.campaignId.toString(), {
-          ...storedCampaign,
-          campaign_targeting_type: targetingType
-        })
-      }
-    }
-    
-    for (const [campaignId, storedCampaign] of campaignMap.entries()) {
-      try {
-        // Try SP-specific endpoint first, fallback to generic if 404
-        let adGroupsData: any[] = []
-        
-        try {
-          adGroupsData = await fetchAllPages(`${apiEndpoint}/v2/sp/adGroups?campaignIdFilter=${campaignId}`, {
-            'Authorization': `Bearer ${accessToken}`,
-            'Amazon-Advertising-API-ClientId': clientId,
-            'Amazon-Advertising-API-Scope': connection.profile_id,
-          })
-        } catch (spError: any) {
-          if (spError.message?.includes('404')) {
-            console.log(`⚠️ SP adGroups endpoint failed with 404, trying generic endpoint for campaign ${campaignId}`)
-            adGroupsData = await fetchAllPages(`${apiEndpoint}/v2/adGroups?campaignIdFilter=${campaignId}`, {
-              'Authorization': `Bearer ${accessToken}`,
-              'Amazon-Advertising-API-ClientId': clientId,
-              'Amazon-Advertising-API-Scope': connection.profile_id,
-            })
-          } else {
-            throw spError
-          }
-        }
-        
-        for (const adGroup of adGroupsData) {
-          if (!adGroup.adGroupId || !adGroup.name) {
-            console.warn('Skipping malformed ad group:', adGroup)
-            continue
-          }
-
-          const { data: storedAdGroup } = await supabase
-            .from('ad_groups')
-            .upsert({
-              campaign_id: storedCampaign.id,
-              amazon_adgroup_id: adGroup.adGroupId.toString(),
-              name: adGroup.name,
-              default_bid: parseFloat(adGroup.defaultBid) || null,
-              status: adGroup.state || 'enabled'
-            }, {
-              onConflict: 'campaign_id,amazon_adgroup_id',
-              ignoreDuplicates: false
-            })
-            .select()
-            .single()
-
-          if (storedAdGroup) {
-            adGroupMap.set(adGroup.adGroupId.toString(), {
-              ...storedAdGroup,
-              campaign_targeting_type: storedCampaign.campaign_targeting_type
-            })
-          }
-        }
-      } catch (error) {
-        console.warn(`Failed to sync ad groups for campaign ${campaignId}:`, error)
-      }
-    }
-
-    for (const [adGroupId, storedAdGroup] of adGroupMap.entries()) {
-      // Only fetch keywords for manual campaigns (auto campaigns use targets instead)
-      if (storedAdGroup.campaign_targeting_type === 'auto') {
-        continue
-      }
-
-      try {
-        // Try SP-specific endpoint first, fallback to generic if 404
-        let keywordsData: any[] = []
-        
-        try {
-          keywordsData = await fetchAllPages(`${apiEndpoint}/v2/sp/keywords?adGroupIdFilter=${adGroupId}`, {
-            'Authorization': `Bearer ${accessToken}`,
-            'Amazon-Advertising-API-ClientId': clientId,
-            'Amazon-Advertising-API-Scope': connection.profile_id,
-          })
-        } catch (spError: any) {
-          if (spError.message?.includes('404')) {
-            console.log(`⚠️ SP keywords endpoint failed with 404, trying generic endpoint for adGroup ${adGroupId}`)
-            keywordsData = await fetchAllPages(`${apiEndpoint}/v2/keywords?adGroupIdFilter=${adGroupId}`, {
-              'Authorization': `Bearer ${accessToken}`,
-              'Amazon-Advertising-API-ClientId': clientId,
-              'Amazon-Advertising-API-Scope': connection.profile_id,
-            })
-          } else {
-            throw spError
-          }
-        }
-        
-        for (const keyword of keywordsData) {
-          if (!keyword.keywordId || !keyword.keywordText) {
-            console.warn('Skipping malformed keyword:', keyword)
-            continue
-          }
-
-          await supabase
-            .from('keywords')
-            .upsert({
-              adgroup_id: storedAdGroup.id,
-              amazon_keyword_id: keyword.keywordId.toString(),
-              keyword_text: keyword.keywordText,
-              match_type: keyword.matchType || 'broad',
-              bid: parseFloat(keyword.bid) || null,
-              status: keyword.state || 'enabled'
-            }, {
-              onConflict: 'adgroup_id,amazon_keyword_id',
-              ignoreDuplicates: false
-            })
-        }
-      } catch (error) {
-        console.warn(`Failed to sync keywords for ad group ${adGroupId}:`, error)
-      }
-    }
-
-    for (const [adGroupId, storedAdGroup] of adGroupMap.entries()) {
-      // Only fetch targets for auto campaigns (manual campaigns use keywords instead)
-      if (storedAdGroup.campaign_targeting_type !== 'auto') {
-        continue
-      }
-      
-      try {
-        // Try SP-specific endpoint first, fallback to generic if 404
-        let targetsData: any[] = []
-        
-        try {
-          targetsData = await fetchAllPages(`${apiEndpoint}/v2/sp/targets?adGroupIdFilter=${adGroupId}`, {
-            'Authorization': `Bearer ${accessToken}`,
-            'Amazon-Advertising-API-ClientId': clientId,
-            'Amazon-Advertising-API-Scope': connection.profile_id,
-          })
-        } catch (spError: any) {
-          if (spError.message?.includes('404')) {
-            console.log(`⚠️ SP targets endpoint failed with 404, trying generic endpoint for adGroup ${adGroupId}`)
-            targetsData = await fetchAllPages(`${apiEndpoint}/v2/targets?adGroupIdFilter=${adGroupId}`, {
-              'Authorization': `Bearer ${accessToken}`,
-              'Amazon-Advertising-API-ClientId': clientId,
-              'Amazon-Advertising-API-Scope': connection.profile_id,
-            })
-          } else {
-            throw spError
-          }
-        }
-        
-        // Process targets data
-        for (const target of targetsData) {
-          if (!target.targetId) {
-            console.warn('Skipping malformed target:', target)
-            continue
-          }
-
-          // Extract ASIN from target expression for product targeting
-          const expr = target.expression
-          const asinCandidate = Array.isArray(expr?.value) ? 
-            expr.value.find((v: any) => v?.type === 'ASIN')?.value : null
-
-          await supabase
-            .from('targets')
-            .upsert({
-              adgroup_id: storedAdGroup.id,
-              amazon_target_id: target.targetId.toString(),
-              type: target.expression?.type || 'auto',
-              expression: target.expression ?? null,
-              asin: asinCandidate ?? null,
-              bid: parseFloat(target.bid) || null,
-              status: target.state || 'enabled'
-            }, {
-              onConflict: 'adgroup_id,amazon_target_id',
-              ignoreDuplicates: false
-            })
-        }
-      } catch (error) {
-        console.warn(`Failed to sync targets for ad group ${adGroupId}:`, error)
-      }
-    }
-
-    // PHASE 1B: Sync advertised products to populate ASINs
-    console.log('🛍️ Fetching advertised products for ASIN data...')
-    const allAdGroupIds = Array.from(adGroupMap.keys())
-    
-    if (allAdGroupIds.length > 0) {
-      try {
-        const advProdColumns = ['adId', 'adGroupId', 'campaignId', 'asin', 'impressions', 'clicks', 'cost', 'sales14d', 'purchases14d']
-        const reportId = await createReportRequest(
-          apiEndpoint, accessToken, clientId, connection.profile_id,
-          'advertisedProducts', advProdColumns, allAdGroupIds, 
-          { dateRangeDays: 30, timeUnit: 'DAILY' }
-        )
-        
-        const report = await pollReportStatus(apiEndpoint, accessToken, clientId, connection.profile_id, reportId)
-        const downloadedData = await downloadAndParseReport(report.url)
-        
-        // Update campaigns with ASIN data from advertised products
-        const campaignAsinUpdates = new Map<string, string>()
-        for (const row of downloadedData) {
-          if (row.asin && row.campaignId) {
-            campaignAsinUpdates.set(row.campaignId.toString(), row.asin)
-          }
-        }
-        
-        // Batch update campaigns with ASINs
-        for (const [amazonCampaignId, asin] of campaignAsinUpdates.entries()) {
-          await supabase.from('campaigns')
-            .update({ asin })
-            .eq('amazon_campaign_id', amazonCampaignId)
+            .eq('campaign_id', campaignId)
             .eq('connection_id', connectionId)
         }
         
@@ -873,155 +718,107 @@ serve(async (req) => {
       }
     }
 
-    // Get the IDs for performance fetching
-    const campaignIds = Array.from(campaignMap.keys())
-    const adGroupIds = Array.from(adGroupMap.keys())
-    
-    const { data: keywordRows } = await supabase.from('keywords').select('amazon_keyword_id').eq('adgroup_id', Array.from(adGroupMap.values()).map(ag => ag.id))
-    const keywordIds = keywordRows?.map(row => row.amazon_keyword_id) || []
-    
-    const { data: targetRows } = await supabase.from('targets').select('amazon_target_id').eq('adgroup_id', Array.from(adGroupMap.values()).map(ag => ag.id))
-    const targetIds = targetRows?.map(row => row.amazon_target_id) || []
+    await updateProgress(60, 'Processing performance reports...')
 
-    if (targetIds.length === 0 && autoCampaignCount > 0) {
-      console.warn('⚠️ Found auto campaigns but no targets - this may indicate a sync issue')
-    } else if (targetIds.length > 0) {
-      console.log(`🎯 Found ${targetIds.length} targets for auto campaigns`)
-    }
-
-    // Update sync job status
-    if (syncJobId) {
-      await supabase.from('sync_jobs').update({
-        status: 'running',
-        phase: 'fetching-performance',
-        progress_percent: 30,
-        sync_details: {
-          entitiesSynced: {
-            campaigns: campaignIds.length,
-            adGroups: adGroupIds.length,
-            keywords: keywordIds.length,
-            targets: targetIds.length
-          }
-        }
-      }).eq('id', syncJobId)
-    }
-
-    // Initialize diagnostics
-    const diagnostics: any = {
-       writeErrors: [],
-       backfilled: { keywords: 0, targets: 0 },
-       keyword: {
-         totalKeywords: keywordIds.length,
-         filteredIdsUsed: 0,
-         reportRows: 0,
-         nonZeroClickRows: 0,
-         matchedRows: 0,
-         timeUnit: '',
-         dateRangeDays: 0,
-         diagnosticMode: diag
-       }
-     }
-
-    // PHASE 2: Fetch performance data via proper Reporting API
-    console.log('⚡ Starting performance data sync...')
+    // Performance data sync
     let totalMetricsUpdated = 0
 
-    // Define columns using Amazon Reporting v3 column names (attributedSales14d/attributedConversions14d)
-    const campaignColumns = ['campaignId','impressions','clicks','cost','attributedSales14d','attributedConversions14d']
-    const adGroupColumns = ['adGroupId','campaignId','impressions','clicks','cost','attributedSales14d','attributedConversions14d']
-    const targetColumns = ['targetId','adGroupId','campaignId','impressions','clicks','cost','attributedSales14d','attributedConversions14d']
-    const keywordColumns = ['keywordId','adGroupId','campaignId','keywordText','matchType','impressions','clicks','cost','attributedSales14d','attributedConversions14d']
+    // Define columns for each report type
+    const campaignColumns = ['impressions', 'clicks', 'cost', 'sales14d', 'purchases14d']
+    const adGroupColumns = ['impressions', 'clicks', 'cost', 'sales14d', 'purchases14d']
+    const targetColumns = ['impressions', 'clicks', 'cost', 'sales14d', 'purchases14d']
+    const keywordColumns = ['impressions', 'clicks', 'cost', 'sales14d', 'purchases14d']
 
-    // Minimal columns fallback (in case of config errors)
-    const minCampaignColumns = ['campaignId','impressions','clicks','cost','attributedSales14d','attributedConversions14d']
-    const minAdGroupColumns = ['adGroupId','impressions','clicks','cost','attributedSales14d','attributedConversions14d']
-    const minTargetColumns = ['targetId','impressions','clicks','cost','attributedSales14d','attributedConversions14d']
-    const minKeywordColumns = ['keywordId','impressions','clicks','cost','attributedSales14d','attributedConversions14d']
+    // Only generate reports if we have data to report on
+    if (campaignIds.length === 0 && adGroupIds.length === 0 && keywordIds.length === 0 && targetIds.length === 0) {
+      await updateProgress(100, 'No entities found to sync')
+      
+      if (syncJobId) {
+        await supabase
+          .from('sync_jobs')
+          .update({ 
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+            progress: 100,
+            message: 'Sync completed - no entities found'
+          })
+          .eq('id', syncJobId)
+      }
 
-    // Campaign Performance
+      return new Response(
+        JSON.stringify({
+          success: true,
+          code: 'SYNC_COMPLETE_NO_DATA',
+          message: 'Sync completed but no entities were found',
+          entitiesSynced: {
+            campaigns: 0,
+            adGroups: 0,
+            keywords: 0,
+            targets: 0
+          },
+          metricsUpdated: 0,
+          diagnostics
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      )
+    }
+
+    // Campaign performance reports
     if (campaignIds.length > 0) {
-      console.log('📈 Fetching campaign performance...')
+      console.log('📊 Syncing campaign performance data...')
       try {
         const reportId = await createReportRequest(
-          apiEndpoint, accessToken, clientId, connection.profile_id, 'campaigns', campaignColumns, campaignIds, 
-          { dateRangeDays: dateRange, timeUnit: timeUnitOpt }
+          accessToken, 
+          connection.profile_id, 
+          'campaigns',
+          dateRange,
+          timeUnitOpt,
+          campaignColumns,
+          campaignIds
         )
-        const report = await pollReportStatus(apiEndpoint, accessToken, clientId, connection.profile_id, reportId)
+
+        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId)
         
-        if (report.url) {
-          const performanceData = await downloadAndParseReport(report.url)
-          console.log(`💾 Processing ${performanceData.length} campaign performance records`)
+        if (reportResult.url) {
+          const performanceData = await downloadAndParseReport(reportResult.url)
           
-          // Upsert campaigns with performance data (ensures rows exist)
-          for (const perf of performanceData) {
-            if (!perf.campaignId) continue
+          console.log(`📊 Processing ${performanceData.length} campaign performance records...`)
+          let campaignMetricsUpdated = 0
 
-            const campaignAmazonId = perf.campaignId.toString()
-            const storedCampaign = campaignMap.get(campaignAmazonId)
-            const anyPerf = perf as any
-            const impressions = parseInt(anyPerf.impressions) || 0
-            const clicks = parseInt(anyPerf.clicks) || 0
-
-            const spend = parseFloat(anyPerf.cost ?? anyPerf.spend ?? '0') || 0
-            const sales = parseFloat(anyPerf.attributedSales14d ?? anyPerf.sales14d ?? anyPerf.sales_14d ?? '0') || 0
-            const orders = parseInt(anyPerf.attributedConversions14d ?? anyPerf.purchases14d ?? anyPerf.purchases_14d ?? '0') || 0
-
-            const acos = sales > 0 ? (spend / sales) * 100 : 0
-            const roas = spend > 0 ? sales / spend : 0
-            const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0
-            const conversionRate = clicks > 0 ? (orders / clicks) * 100 : 0
-
-            if (timeUnitOpt === 'DAILY' && anyPerf.date) {
-              // Store in performance history table
-              const campaign = campaignMap.get(campaignAmazonId)
-              if (campaign) {
-                await supabase.from('campaign_performance_history').upsert({
-                  campaign_id: campaign.id,
-                  date: anyPerf.date,
-                  attribution_window: '14d',
-                  impressions,
-                  clicks,
-                  spend,
-                  sales,
-                  orders,
-                  acos,
-                  roas,
-                  ctr,
-                  cpc: clicks > 0 ? spend / clicks : 0,
-                  conversion_rate: conversionRate
-                }, {
-                  onConflict: 'campaign_id,date,attribution_window',
-                  ignoreDuplicates: false
-                })
-                totalMetricsUpdated++
+          for (const record of performanceData) {
+            try {
+              const updateData: any = {
+                impressions: record.impressions || 0,
+                clicks: record.clicks || 0,
+                cost: record.cost || 0,
+                sales_14d: record.sales14d || 0,
+                orders_14d: record.purchases14d || 0,
+                updated_at: new Date().toISOString()
               }
-            } else {
-              // SUMMARY mode: update campaigns table directly
-              if (storedCampaign) {
-                const { error: campErr } = await supabase
-                  .from('campaigns')
-                  .update({
-                    impressions,
-                    clicks,
-                    cost_14d: spend,
-                    attributed_sales_14d: sales,
-                    attributed_conversions_14d: orders,
-                    acos,
-                    roas,
-                    last_updated: new Date().toISOString()
-                  })
-                  .eq('id', storedCampaign.id)
 
-                if (campErr) {
-                  console.error(`Failed to update campaign ${storedCampaign.id}:`, campErr)
-                  diagnostics.writeErrors.push({ entity: 'campaign', id: storedCampaign.id, error: campErr.message })
-                } else {
-                  totalMetricsUpdated++
-                }
+              // Add date for DAILY reports
+              if (timeUnitOpt === 'DAILY' && record.date) {
+                updateData.date = record.date
               }
+
+              const { error: updateError } = await supabase
+                .from('campaigns')
+                .update(updateData)
+                .eq('campaign_id', record.campaignId)
+                .eq('connection_id', connectionId)
+
+              if (updateError) {
+                console.warn(`Failed to update campaign ${record.campaignId} metrics:`, updateError)
+              } else {
+                campaignMetricsUpdated++
+              }
+            } catch (error) {
+              console.warn(`Failed to process campaign performance record:`, error)
             }
           }
 
+          totalMetricsUpdated += campaignMetricsUpdated
+          console.log(`✅ Updated metrics for ${campaignMetricsUpdated} campaigns`)
           diagnostics.campaignReport = { rows: performanceData.length, timeUnit: timeUnitOpt, columns: campaignColumns }
         }
 
@@ -1031,122 +828,55 @@ serve(async (req) => {
           console.warn('⚠️ Campaign report failed, trying with minimal columns...')
           try {
             const reportId = await createReportRequest(
-              apiEndpoint, accessToken, clientId, connection.profile_id, 'campaigns', minCampaignColumns, campaignIds,
-              { dateRangeDays: dateRange, timeUnit: timeUnitOpt }
+              accessToken, 
+              connection.profile_id, 
+              'campaigns',
+              dateRange,
+              timeUnitOpt,
+              ['impressions', 'clicks', 'cost'], // Minimal columns
+              campaignIds
             )
-            const report = await pollReportStatus(apiEndpoint, accessToken, clientId, connection.profile_id, reportId)
+
+            const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId)
             
-            if (report.url) {
-              const performanceData = await downloadAndParseReport(report.url)
-              console.log(`💾 Processing ${performanceData.length} campaign performance records (minimal columns)`)
+            if (reportResult.url) {
+              const performanceData = await downloadAndParseReport(reportResult.url)
               
-              diagnostics.campaignMinimalColumnsFallbackUsed = true
-              for (const perf of performanceData) {
-                if (!perf.campaignId) continue
-
-                const campaignAmazonId = perf.campaignId.toString()
-                const storedCampaign = campaignMap.get(campaignAmazonId)
-                const anyPerf = perf as any
-
-                const impressions = parseInt(anyPerf.impressions) || 0
-                const clicks = parseInt(anyPerf.clicks) || 0
-                const spend = parseFloat(anyPerf.cost ?? anyPerf.spend ?? '0') || 0
-                const sales = parseFloat(anyPerf.attributedSales14d ?? anyPerf.sales14d ?? anyPerf.sales_14d ?? '0') || 0
-                const orders = parseInt(anyPerf.attributedConversions14d ?? anyPerf.purchases14d ?? anyPerf.purchases_14d ?? '0') || 0
-
-                const acos = sales > 0 ? (spend / sales) * 100 : 0
-                const roas = spend > 0 ? sales / spend : 0
-
-                if (storedCampaign) {
-                  const { error: campErr } = await supabase
-                    .from('campaigns')
-                    .update({
-                      impressions,
-                      clicks,
-                      cost_14d: spend,
-                      attributed_sales_14d: sales,
-                      attributed_conversions_14d: orders,
-                      acos,
-                      roas,
-                      last_updated: new Date().toISOString()
-                    })
-                    .eq('id', storedCampaign.id)
-
-                  if (campErr) {
-                    console.error(`Failed to update campaign ${storedCampaign.id} (minimal):`, campErr)
-                    diagnostics.writeErrors.push({ entity: 'campaign', id: storedCampaign.id, error: campErr.message })
-                  } else {
-                    totalMetricsUpdated++
+              let campaignMetricsUpdated = 0
+              for (const record of performanceData) {
+                try {
+                  const updateData: any = {
+                    impressions: record.impressions || 0,
+                    clicks: record.clicks || 0,
+                    cost: record.cost || 0,
+                    updated_at: new Date().toISOString()
                   }
+
+                  if (timeUnitOpt === 'DAILY' && record.date) {
+                    updateData.date = record.date
+                  }
+
+                  const { error: updateError } = await supabase
+                    .from('campaigns')
+                    .update(updateData)
+                    .eq('campaign_id', record.campaignId)
+                    .eq('connection_id', connectionId)
+
+                  if (!updateError) {
+                    campaignMetricsUpdated++
+                  }
+                } catch (error) {
+                  console.warn(`Failed to process campaign performance record:`, error)
                 }
               }
 
-              console.log('✅ Campaign performance data synced with minimal columns')
-              diagnostics.campaignReportMinimal = { rows: performanceData.length, timeUnit: timeUnitOpt, columns: minCampaignColumns }
+              totalMetricsUpdated += campaignMetricsUpdated
+              diagnostics.campaignReport = { rows: performanceData.length, timeUnit: timeUnitOpt, columns: ['impressions', 'clicks', 'cost'], fallback: true }
+              console.log(`✅ Updated metrics for ${campaignMetricsUpdated} campaigns (minimal columns)`)
             }
           } catch (fallbackError) {
-            console.error('❌ Campaign performance sync failed even with minimal columns:', fallbackError)
+            console.error('❌ Campaign performance sync failed (including fallback):', fallbackError)
             diagnostics.campaignReportError = String(fallbackError)
-            
-            // Final fallback: unfiltered report
-            try {
-              console.warn('⚠️ Trying unfiltered campaign report as last resort...')
-              const reportId = await createReportRequest(
-                apiEndpoint, accessToken, clientId, connection.profile_id, 'campaigns', minCampaignColumns, [],
-                { dateRangeDays: dateRange, timeUnit: timeUnitOpt, skipEntityFilter: true }
-              )
-              const report = await pollReportStatus(apiEndpoint, accessToken, clientId, connection.profile_id, reportId)
-              
-              if (report.url) {
-                const performanceData = await downloadAndParseReport(report.url)
-                diagnostics.fallbackUnfilteredCampaignReportUsed = true
-                for (const perf of performanceData) {
-                  if (!perf.campaignId) continue
-
-                  const campaignAmazonId = perf.campaignId.toString()
-                  const storedCampaign = campaignMap.get(campaignAmazonId)
-                  
-                  if (storedCampaign) {
-                    const anyPerf = perf as any
-                    const impressions = parseInt(anyPerf.impressions) || 0
-                    const clicks = parseInt(anyPerf.clicks) || 0
-                    const spend = parseFloat(anyPerf.cost ?? anyPerf.spend ?? '0') || 0
-                    const sales = parseFloat(anyPerf.attributedSales14d ?? anyPerf.sales14d ?? anyPerf.sales_14d ?? '0') || 0
-                    const orders = parseInt(anyPerf.attributedConversions14d ?? anyPerf.purchases14d ?? anyPerf.purchases_14d ?? '0') || 0
-
-                    const acos = sales > 0 ? (spend / sales) * 100 : 0
-                    const roas = spend > 0 ? sales / spend : 0
-
-                    const { error: campErr } = await supabase
-                      .from('campaigns')
-                      .update({
-                        impressions,
-                        clicks,
-                        cost_14d: spend,
-                        attributed_sales_14d: sales,
-                        attributed_conversions_14d: orders,
-                        acos,
-                        roas,
-                        last_updated: new Date().toISOString()
-                      })
-                      .eq('id', storedCampaign.id)
-
-                    if (campErr) {
-                      console.error(`Failed to update campaign ${storedCampaign.id} (unfiltered):`, campErr)
-                      diagnostics.writeErrors.push({ entity: 'campaign', id: storedCampaign.id, error: campErr.message })
-                    } else {
-                      totalMetricsUpdated++
-                    }
-                  }
-                }
-                
-                console.log('✅ Campaign performance data synced with unfiltered fallback')
-                diagnostics.campaignReportUnfiltered = { rows: performanceData.length, matched: totalMetricsUpdated }
-              }
-            } catch (unfilteredError) {
-              console.error('❌ Even unfiltered campaign report failed:', unfilteredError)
-              diagnostics.campaignReportUnfilteredError = String(unfilteredError)
-            }
           }
         } else {
           console.error('❌ Campaign performance sync failed:', error)
@@ -1155,86 +885,63 @@ serve(async (req) => {
       }
     }
 
-    // Ad Group Performance  
+    await updateProgress(70, 'Syncing ad group performance...')
+
+    // Ad Group performance reports
     if (adGroupIds.length > 0) {
-      console.log('📊 Fetching ad group performance...')
+      console.log('📊 Syncing ad group performance data...')
       try {
         const reportId = await createReportRequest(
-          apiEndpoint, accessToken, clientId, connection.profile_id, 'adGroups', adGroupColumns, adGroupIds,
-          { dateRangeDays: dateRange, timeUnit: timeUnitOpt }
+          accessToken, 
+          connection.profile_id, 
+          'adGroups',
+          dateRange,
+          timeUnitOpt,
+          adGroupColumns,
+          adGroupIds
         )
-        const report = await pollReportStatus(apiEndpoint, accessToken, clientId, connection.profile_id, reportId)
+
+        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId)
         
-        if (report.url) {
-          const performanceData = await downloadAndParseReport(report.url)
-          console.log(`💾 Processing ${performanceData.length} ad group performance records`)
+        if (reportResult.url) {
+          const performanceData = await downloadAndParseReport(reportResult.url)
           
-          for (const perf of performanceData) {
-            if (!perf.adGroupId) continue
+          console.log(`📊 Processing ${performanceData.length} ad group performance records...`)
+          let adGroupMetricsUpdated = 0
 
-            const adGroupAmazonId = perf.adGroupId.toString()
-            const storedAdGroup = adGroupMap.get(adGroupAmazonId)
-            const anyPerf = perf as any
-
-            const impressions = parseInt(anyPerf.impressions) || 0
-            const clicks = parseInt(anyPerf.clicks) || 0
-            const spend = parseFloat(anyPerf.cost ?? anyPerf.spend ?? '0') || 0
-            const sales = parseFloat(anyPerf.attributedSales14d ?? anyPerf.sales14d ?? anyPerf.sales_14d ?? '0') || 0
-            const orders = parseInt(anyPerf.attributedConversions14d ?? anyPerf.purchases14d ?? anyPerf.purchases_14d ?? '0') || 0
-
-            const acos = sales > 0 ? (spend / sales) * 100 : 0
-            const roas = spend > 0 ? sales / spend : 0
-            const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0
-            const conversionRate = clicks > 0 ? (orders / clicks) * 100 : 0
-
-            if (storedAdGroup) {
-              if (timeUnitOpt === 'DAILY' && anyPerf.date) {
-                // Store in performance history table
-                await supabase.from('adgroup_performance_history').upsert({
-                  adgroup_id: storedAdGroup.id,
-                  date: anyPerf.date,
-                  attribution_window: '14d',
-                  impressions,
-                  clicks,
-                  spend,
-                  sales,
-                  orders,
-                  acos,
-                  roas,
-                  ctr,
-                  cpc: clicks > 0 ? spend / clicks : 0,
-                  conversion_rate: conversionRate
-                }, {
-                  onConflict: 'adgroup_id,date,attribution_window',
-                  ignoreDuplicates: false
-                })
-                totalMetricsUpdated++
-              } else {
-                // SUMMARY mode: update ad_groups table directly
-                const { error: agErr } = await supabase
-                  .from('ad_groups')
-                  .update({
-                    impressions,
-                    clicks,
-                    cost_14d: spend,
-                    attributed_sales_14d: sales,
-                    attributed_conversions_14d: orders,
-                    acos,
-                    roas,
-                    last_updated: new Date().toISOString()
-                  })
-                  .eq('id', storedAdGroup.id)
-
-                if (agErr) {
-                  console.error(`Failed to update ad group ${storedAdGroup.id}:`, agErr)
-                  diagnostics.writeErrors.push({ entity: 'adGroup', id: storedAdGroup.id, error: agErr.message })
-                } else {
-                  totalMetricsUpdated++
-                }
+          for (const record of performanceData) {
+            try {
+              const updateData: any = {
+                impressions: record.impressions || 0,
+                clicks: record.clicks || 0,
+                cost: record.cost || 0,
+                sales_14d: record.sales14d || 0,
+                orders_14d: record.purchases14d || 0,
+                updated_at: new Date().toISOString()
               }
+
+              if (timeUnitOpt === 'DAILY' && record.date) {
+                updateData.date = record.date
+              }
+
+              const { error: updateError } = await supabase
+                .from('ad_groups')
+                .update(updateData)
+                .eq('adgroup_id', record.adGroupId)
+                .eq('connection_id', connectionId)
+
+              if (updateError) {
+                console.warn(`Failed to update ad group ${record.adGroupId} metrics:`, updateError)
+              } else {
+                adGroupMetricsUpdated++
+              }
+            } catch (error) {
+              console.warn(`Failed to process ad group performance record:`, error)
             }
           }
 
+          totalMetricsUpdated += adGroupMetricsUpdated
+          console.log(`✅ Updated metrics for ${adGroupMetricsUpdated} ad groups`)
           diagnostics.adGroupReport = { rows: performanceData.length, timeUnit: timeUnitOpt, columns: adGroupColumns }
         }
 
@@ -1244,119 +951,55 @@ serve(async (req) => {
           console.warn('⚠️ Ad group report failed, trying with minimal columns...')
           try {
             const reportId = await createReportRequest(
-              apiEndpoint, accessToken, clientId, connection.profile_id, 'adGroups', minAdGroupColumns, adGroupIds,
-              { dateRangeDays: dateRange, timeUnit: timeUnitOpt }
+              accessToken, 
+              connection.profile_id, 
+              'adGroups',
+              dateRange,
+              timeUnitOpt,
+              ['impressions', 'clicks', 'cost'],
+              adGroupIds
             )
-            const report = await pollReportStatus(apiEndpoint, accessToken, clientId, connection.profile_id, reportId)
+
+            const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId)
             
-            if (report.url) {
-              const performanceData = await downloadAndParseReport(report.url)
-              console.log(`💾 Processing ${performanceData.length} ad group performance records (minimal columns)`)
+            if (reportResult.url) {
+              const performanceData = await downloadAndParseReport(reportResult.url)
               
-              diagnostics.adGroupMinimalColumnsFallbackUsed = true
-              for (const perf of performanceData) {
-                if (!perf.adGroupId) continue
-
-                const adGroupAmazonId = perf.adGroupId.toString()
-                const storedAdGroup = adGroupMap.get(adGroupAmazonId)
-                const anyPerf = perf as any
-
-                const impressions = parseInt(anyPerf.impressions) || 0
-                const clicks = parseInt(anyPerf.clicks) || 0
-                const spend = parseFloat(anyPerf.cost ?? anyPerf.spend ?? '0') || 0
-                const sales = parseFloat(anyPerf.attributedSales14d ?? anyPerf.sales14d ?? anyPerf.sales_14d ?? '0') || 0
-                const orders = parseInt(anyPerf.attributedConversions14d ?? anyPerf.purchases14d ?? anyPerf.purchases_14d ?? '0') || 0
-
-                const acos = sales > 0 ? (spend / sales) * 100 : 0
-                const roas = spend > 0 ? sales / spend : 0
-
-                if (storedAdGroup?.id) {
-                  const { error: agErr } = await supabase
-                    .from('ad_groups')
-                    .update({
-                      impressions,
-                      clicks,
-                      cost_14d: spend,
-                      attributed_sales_14d: sales,
-                      attributed_conversions_14d: orders,
-                      acos,
-                      roas,
-                      last_updated: new Date().toISOString()
-                     })
-                     .eq('id', storedAdGroup.id)
-
-                   if (agErr) {
-                     console.error(`Failed to update ad group ${storedAdGroup.id} (minimal):`, agErr)
-                     diagnostics.writeErrors.push({ entity: 'adGroup', id: storedAdGroup.id, error: agErr.message })
-                  } else {
-                    totalMetricsUpdated++
+              let adGroupMetricsUpdated = 0
+              for (const record of performanceData) {
+                try {
+                  const updateData: any = {
+                    impressions: record.impressions || 0,
+                    clicks: record.clicks || 0,
+                    cost: record.cost || 0,
+                    updated_at: new Date().toISOString()
                   }
+
+                  if (timeUnitOpt === 'DAILY' && record.date) {
+                    updateData.date = record.date
+                  }
+
+                  const { error: updateError } = await supabase
+                    .from('ad_groups')
+                    .update(updateData)
+                    .eq('adgroup_id', record.adGroupId)
+                    .eq('connection_id', connectionId)
+
+                  if (!updateError) {
+                    adGroupMetricsUpdated++
+                  }
+                } catch (error) {
+                  console.warn(`Failed to process ad group performance record:`, error)
                 }
               }
 
-              console.log('✅ Ad group performance data synced with minimal columns')
-              diagnostics.adGroupReportMinimal = { rows: performanceData.length, timeUnit: timeUnitOpt, columns: minAdGroupColumns }
+              totalMetricsUpdated += adGroupMetricsUpdated
+              diagnostics.adGroupReport = { rows: performanceData.length, timeUnit: timeUnitOpt, columns: ['impressions', 'clicks', 'cost'], fallback: true }
+              console.log(`✅ Updated metrics for ${adGroupMetricsUpdated} ad groups (minimal columns)`)
             }
           } catch (fallbackError) {
-            console.error('❌ Ad group performance sync failed even with minimal columns:', fallbackError)
+            console.error('❌ Ad group performance sync failed (including fallback):', fallbackError)
             diagnostics.adGroupReportError = String(fallbackError)
-            
-            // Final fallback: unfiltered report
-            try {
-              const reportId = await createReportRequest(
-                apiEndpoint, accessToken, clientId, connection.profile_id, 'adGroups', minAdGroupColumns, [],
-                { dateRangeDays: dateRange, timeUnit: timeUnitOpt, skipEntityFilter: true }
-              )
-              const report = await pollReportStatus(apiEndpoint, accessToken, clientId, connection.profile_id, reportId)
-              
-              if (report.url) {
-                const performanceData = await downloadAndParseReport(report.url)
-                for (const perf of performanceData) {
-                  if (!perf.adGroupId) continue
-
-                  const adGroupAmazonId = perf.adGroupId.toString()
-                  const storedAdGroup = adGroupMap.get(adGroupAmazonId)
-
-                   if (storedAdGroup?.id) {
-                     const anyPerf = perf as any
-                     const impressions = parseInt(anyPerf.impressions) || 0
-                     const clicks = parseInt(anyPerf.clicks) || 0
-                     const spend = parseFloat(anyPerf.cost ?? anyPerf.spend ?? '0') || 0
-                     const sales = parseFloat(anyPerf.attributedSales14d ?? anyPerf.sales14d ?? anyPerf.sales_14d ?? '0') || 0
-                     const orders = parseInt(anyPerf.attributedConversions14d ?? anyPerf.purchases14d ?? anyPerf.purchases_14d ?? '0') || 0
-
-                     const acos = sales > 0 ? (spend / sales) * 100 : 0
-                     const roas = spend > 0 ? sales / spend : 0
-
-                     const { error: agErr } = await supabase
-                       .from('ad_groups')
-                       .update({
-                         impressions,
-                         clicks,
-                         cost_14d: spend,
-                         attributed_sales_14d: sales,
-                         attributed_conversions_14d: orders,
-                         acos,
-                         roas,
-                         last_updated: new Date().toISOString()
-                       })
-                       .eq('id', storedAdGroup.id)
-
-                     if (agErr) {
-                       console.error(`Failed to update ad group ${storedAdGroup.id} (unfiltered):`, agErr)
-                       diagnostics.writeErrors.push({ entity: 'adGroup', id: storedAdGroup.id, error: agErr.message })
-                    } else {
-                      totalMetricsUpdated++
-                    }
-                  }
-                }
-                
-                console.log('✅ Ad group performance data synced with unfiltered fallback')
-              }
-            } catch (unfilteredError) {
-              console.error('❌ Even unfiltered ad group report failed:', unfilteredError)
-              diagnostics.adGroupReportUnfilteredError = String(unfilteredError)
-            }
           }
         } else {
           console.error('❌ Ad group performance sync failed:', error)
@@ -1365,94 +1008,63 @@ serve(async (req) => {
       }
     }
 
-    // Target Performance (for auto campaigns)
-    if (typeof targetIds !== 'undefined' && targetIds.length > 0) {
-      console.log('🎯 Fetching target performance...')
+    await updateProgress(80, 'Syncing target performance...')
+
+    // Target performance reports
+    if (targetIds.length > 0) {
+      console.log('📊 Syncing target performance data...')
       try {
         const reportId = await createReportRequest(
-          apiEndpoint, accessToken, clientId, connection.profile_id, 'targets', targetColumns, targetIds,
-          { dateRangeDays: dateRange, timeUnit: timeUnitOpt }
+          accessToken, 
+          connection.profile_id, 
+          'targets',
+          dateRange,
+          timeUnitOpt,
+          targetColumns,
+          targetIds
         )
-        const report = await pollReportStatus(apiEndpoint, accessToken, clientId, connection.profile_id, reportId)
+
+        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId)
         
-        if (report.url) {
-          const performanceData = await downloadAndParseReport(report.url)
-          console.log(`💾 Processing ${performanceData.length} target performance records`)
-          for (const perf of performanceData) {
-            const anyPerf = perf as any
-            const targetId = anyPerf.targetId
-            if (!targetId) continue
+        if (reportResult.url) {
+          const performanceData = await downloadAndParseReport(reportResult.url)
+          
+          console.log(`📊 Processing ${performanceData.length} target performance records...`)
+          let targetMetricsUpdated = 0
 
-            const impressions = parseInt(anyPerf.impressions) || 0
-            const clicks = parseInt(anyPerf.clicks) || 0
-            const spend = parseFloat(anyPerf.cost ?? anyPerf.spend ?? '0') || 0
-            const sales = parseFloat(anyPerf.attributedSales14d ?? anyPerf.sales14d ?? anyPerf.sales_14d ?? '0') || 0
-            const orders = parseInt(anyPerf.attributedConversions14d ?? anyPerf.purchases14d ?? anyPerf.purchases_14d ?? '0') || 0
-
-            const acos = sales > 0 ? (spend / sales) * 100 : 0
-            const roas = spend > 0 ? sales / spend : 0
-            const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0
-            const conversionRate = clicks > 0 ? (orders / clicks) * 100 : 0
-
-            // Find the target record and its ad group
-            const { data: tgtUpd, error: tgtErr } = await supabase
-              .from('targets')
-              .update({
-                impressions,
-                clicks,
-                cost_14d: spend,
-                attributed_sales_14d: sales,
-                attributed_conversions_14d: orders,
-                acos,
-                roas,
-                last_updated: new Date().toISOString()
-              })
-              .eq('amazon_target_id', targetId.toString())
-              .select('id, adgroup_id, ad_groups(amazon_adgroup_id)')
-
-            if (tgtErr) {
-              console.error(`Failed to update target ${targetId}:`, tgtErr)
-            } else if (tgtUpd && tgtUpd.length > 0) {
-              totalMetricsUpdated++
-              
-              // Also try to backfill ad group metrics by aggregating target data
-              const agAmazonId = (tgtUpd[0] as any).ad_groups?.amazon_adgroup_id
-              if (agAmazonId) {
-                const storedAdGroup = adGroupMap.get(agAmazonId.toString())
-                const ag = storedAdGroup || tgtUpd[0]
-                if (ag?.id) {
-                  // Simple approach: update with current target's metrics
-                  // In a real system, you'd aggregate all targets for this ad group
-                  await supabase
-                    .from('ad_groups')
-                    .upsert({
-                      id: ag.id,
-                      impressions,
-                      clicks,
-                      cost_14d: spend,
-                      attributed_sales_14d: sales,
-                      attributed_conversions_14d: orders,
-                      acos,
-                      roas,
-                      ctr,
-                      conversion_rate: conversionRate,
-                      last_updated: new Date().toISOString()
-                    }, {
-                      onConflict: 'id',
-                      ignoreDuplicates: false
-                    })
-
-                  diagnostics.backfilled.targets++
-
-                  const { error: upErr } = result
-                  if (upErr) {
-                    console.error(`Failed to backfill ad group ${ag.id} with target data:`, upErr)
-                  }
-                }
+          for (const record of performanceData) {
+            try {
+              const updateData: any = {
+                impressions: record.impressions || 0,
+                clicks: record.clicks || 0,
+                cost: record.cost || 0,
+                sales_14d: record.sales14d || 0,
+                orders_14d: record.purchases14d || 0,
+                updated_at: new Date().toISOString()
               }
+
+              if (timeUnitOpt === 'DAILY' && record.date) {
+                updateData.date = record.date
+              }
+
+              const { error: updateError } = await supabase
+                .from('targets')
+                .update(updateData)
+                .eq('amazon_target_id', record.targetId)
+                .eq('connection_id', connectionId)
+
+              if (updateError) {
+                console.warn(`Failed to update target ${record.targetId} metrics:`, updateError)
+              } else {
+                targetMetricsUpdated++
+              }
+            } catch (error) {
+              console.warn(`Failed to process target performance record:`, error)
             }
           }
 
+          totalMetricsUpdated += targetMetricsUpdated
+          console.log(`✅ Updated metrics for ${targetMetricsUpdated} targets`)
           diagnostics.targetReport = { rows: performanceData.length, timeUnit: timeUnitOpt, columns: targetColumns }
         }
 
@@ -1463,151 +1075,63 @@ serve(async (req) => {
       }
     }
 
-    // Keyword Performance (for manual campaigns)  
+    await updateProgress(85, 'Syncing keyword performance...')
+
+    // Keyword performance reports
     if (keywordIds.length > 0) {
-      console.log('🔑 Fetching keyword performance...')
+      console.log('📊 Syncing keyword performance data...')
       try {
         const reportId = await createReportRequest(
-          apiEndpoint, accessToken, clientId, connection.profile_id, 'keywords', keywordColumns, keywordIds,
-          { dateRangeDays: dateRange, timeUnit: timeUnitOpt }
+          accessToken, 
+          connection.profile_id, 
+          'keywords',
+          dateRange,
+          timeUnitOpt,
+          keywordColumns,
+          keywordIds
         )
-        const report = await pollReportStatus(apiEndpoint, accessToken, clientId, connection.profile_id, reportId)
+
+        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId)
         
-        if (report.url) {
-          const performanceData = await downloadAndParseReport(report.url)
-          console.log(`💾 Processing ${performanceData.length} keyword performance records`)
-          for (const perf of performanceData) {
-            const anyPerf = perf as any
-            const keywordId = anyPerf.keywordId
-            if (!keywordId) continue
+        if (reportResult.url) {
+          const performanceData = await downloadAndParseReport(reportResult.url)
+          
+          console.log(`📊 Processing ${performanceData.length} keyword performance records...`)
+          let keywordMetricsUpdated = 0
 
-            const impressions = parseInt(anyPerf.impressions) || 0
-            const clicks = parseInt(anyPerf.clicks) || 0
-            const spend = parseFloat(anyPerf.cost ?? anyPerf.spend ?? '0') || 0
-            const sales = parseFloat(anyPerf.attributedSales14d ?? anyPerf.sales14d ?? anyPerf.sales_14d ?? '0') || 0
-            const orders = parseInt(anyPerf.attributedConversions14d ?? anyPerf.purchases14d ?? anyPerf.purchases_14d ?? '0') || 0
-
-            const acos = sales > 0 ? (spend / sales) * 100 : 0
-            const roas = spend > 0 ? sales / spend : 0
-            const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0
-            const conversionRate = clicks > 0 ? (orders / clicks) * 100 : 0
-
-            if (timeUnitOpt === 'DAILY' && anyPerf.date) {
-              // Upsert canonical search term facts for dashboard
-              try {
-                const campaignIdStr = (anyPerf.campaignId ?? perf.campaignId)?.toString();
-                const adGroupIdStr = (anyPerf.adGroupId ?? perf.adGroupId)?.toString();
-                if (campaignIdStr && adGroupIdStr) {
-                  await supabase.from('fact_search_term_daily').upsert({
-                    date: anyPerf.date,
-                    profile_id: connection.profile_id,
-                    campaign_id: campaignIdStr,
-                    ad_group_id: adGroupIdStr,
-                    search_term: anyPerf.keywordText || anyPerf.searchTerm || '',
-                    match_type: anyPerf.matchType || 'unknown',
-                    clicks,
-                    impressions,
-                    cost_micros: Math.round(spend * 1e6),
-                    attributed_conversions_7d: orders,
-                    attributed_sales_7d_micros: Math.round(sales * 1e6)
-                  }, {
-                    onConflict: 'date,profile_id,campaign_id,ad_group_id,search_term,match_type',
-                    ignoreDuplicates: false
-                  });
-                  totalMetricsUpdated++;
-                }
-              } catch (e) {
-                console.log('fact_search_term_daily upsert failed:', (e as Error).message);
+          for (const record of performanceData) {
+            try {
+              const updateData: any = {
+                impressions: record.impressions || 0,
+                clicks: record.clicks || 0,
+                cost: record.cost || 0,
+                sales_14d: record.sales14d || 0,
+                orders_14d: record.purchases14d || 0,
+                updated_at: new Date().toISOString()
               }
 
-              // Store in performance history table (kept for backward compatibility)
-              const { data: existingKeyword } = await supabase
+              if (timeUnitOpt === 'DAILY' && record.date) {
+                updateData.date = record.date
+              }
+
+              const { error: updateError } = await supabase
                 .from('keywords')
-                .select('id')
-                .eq('amazon_keyword_id', keywordId.toString())
-                .single()
-              
-              if (existingKeyword) {
-                await supabase.from('keyword_performance_history').upsert({
-                  keyword_id: existingKeyword.id,
-                  date: anyPerf.date,
-                  attribution_window: '14d',
-                  impressions,
-                  clicks,
-                  spend,
-                  sales,
-                  orders,
-                  acos,
-                  roas,
-                  ctr,
-                  cpc: clicks > 0 ? spend / clicks : 0,
-                  conversion_rate: conversionRate
-                }, {
-                  onConflict: 'keyword_id,date,attribution_window',
-                  ignoreDuplicates: false
-                })
-                totalMetricsUpdated++
+                .update(updateData)
+                .eq('amazon_keyword_id', record.keywordId)
+                .eq('connection_id', connectionId)
+
+              if (updateError) {
+                console.warn(`Failed to update keyword ${record.keywordId} metrics:`, updateError)
+              } else {
+                keywordMetricsUpdated++
               }
-            } else {
-              // SUMMARY mode: update keywords table directly
-              const { data: kwUpd, error: kwErr } = await supabase
-                .from('keywords')
-                .update({
-                  impressions,
-                  clicks,
-                  cost_14d: spend,
-                  attributed_sales_14d: sales,
-                  attributed_conversions_14d: orders,
-                  acos,
-                  roas,
-                  last_updated: new Date().toISOString()
-                })
-                .eq('amazon_keyword_id', keywordId.toString())
-                .select('id, adgroup_id, ad_groups(amazon_adgroup_id)')
-
-              if (kwErr) {
-                console.error(`Failed to update keyword ${keywordId}:`, kwErr)
-              } else if (kwUpd && kwUpd.length > 0) {
-                totalMetricsUpdated++
-                
-                // Also try to backfill ad group metrics by aggregating keyword data
-                const agAmazonId = (kwUpd[0] as any).ad_groups?.amazon_adgroup_id
-                if (agAmazonId) {
-                  const storedAdGroup = adGroupMap.get(agAmazonId.toString())
-                  if (ag?.id) {
-                    // Simple approach: update with current keyword's metrics
-                    // In a real system, you'd aggregate all keywords for this ad group
-                    await supabase
-                      .from('ad_groups')
-                      .upsert({
-                        id: ag.id,
-                        impressions,
-                        clicks,
-                        cost_14d: spend,
-                        attributed_sales_14d: sales,
-                        attributed_conversions_14d: orders,
-                        acos,
-                        roas,
-                        ctr,
-                        conversion_rate: conversionRate,
-                        last_updated: new Date().toISOString()
-                      }, {
-                        onConflict: 'id',
-                        ignoreDuplicates: false
-                      })
-
-                    diagnostics.backfilled.keywords++
-
-                    const { error: upErr } = result
-                    if (upErr) {
-                      console.error(`Failed to backfill ad group ${ag.id} with keyword data:`, upErr)
-                    }
-                  }
-                }
-              }
+            } catch (error) {
+              console.warn(`Failed to process keyword performance record:`, error)
             }
           }
 
+          totalMetricsUpdated += keywordMetricsUpdated
+          console.log(`✅ Updated metrics for ${keywordMetricsUpdated} keywords`)
           diagnostics.keywordReport = { rows: performanceData.length, timeUnit: timeUnitOpt, columns: keywordColumns }
         }
 
@@ -1618,66 +1142,41 @@ serve(async (req) => {
       }
     }
 
-    // PHASE 3: Sync budget usage data
-    console.log('💰 Syncing budget usage data...')
+    await updateProgress(90, 'Syncing budget usage...')
+
+    // Sync budget usage data
     if (campaignIds.length > 0) {
       try {
-        // Process in smaller batches to avoid API limits
-        const budgetBatchSize = 50
-        for (let i = 0; i < campaignIds.length; i += budgetBatchSize) {
-          const batch = campaignIds.slice(i, i + budgetBatchSize)
-          
+        console.log('💰 Syncing budget usage data...')
+        for (const campaignId of campaignIds) {
           try {
-            // Amazon's Budget Usage API endpoint
-            const budgetResponse = await fetchWithRetry(`${apiEndpoint}/budgets/usage/campaigns`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Amazon-Advertising-API-ClientId': clientId,
-                'Amazon-Advertising-API-Scope': connection.profile_id,
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                campaignIds: batch,
-                startDate: new Date(Date.now() - dateRange * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                endDate: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-              })
-            })
-
-            if (budgetResponse.ok) {
-              const budgetData = await budgetResponse.json()
-              
-              if (budgetData.usage && Array.isArray(budgetData.usage)) {
-                for (const usageEntry of budgetData.usage) {
-                  if (usageEntry.campaignId && usageEntry.date) {
-                    // Find the campaign in our stored data
-                    const campaign = campaignMap.get(usageEntry.campaignId.toString())
-                    if (campaign) {
-                      // Store budget usage data
-                      const { error: budgetError } = await supabase
-                        .from('campaign_budget_usage')
-                        .upsert({
-                          campaign_id: campaign.id,
-                          date: usageEntry.date,
-                          period_type: 'DAILY',
-                          budget_amount: parseFloat(usageEntry.budgetAmount) || null,
-                          usage_amount: parseFloat(usageEntry.usageAmount) || null,
-                          usage_percentage: parseFloat(usageEntry.usagePercentage) || null,
-                          currency: usageEntry.currency || null
-                        }, {
-                          onConflict: 'campaign_id,date,period_type',
-                          ignoreDuplicates: false
-                        })
-                      if (budgetError) {
-                        console.error(`Failed to store budget usage for campaign ${campaign.id}:`, budgetError)
-                      }
-                    }
-                  }
+            const response = await fetchWithRetry(
+              `https://advertising-api.amazon.com/sp/campaigns/${campaignId}/budget/usage`,
+              {
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Amazon-Advertising-API-ClientId': Deno.env.get('AMAZON_CLIENT_ID') || '',
+                  'Amazon-Advertising-API-Scope': connection.profile_id,
+                  'Content-Type': 'application/json'
                 }
               }
+            )
+
+            if (response.ok) {
+              const budgetData = await response.json()
+              
+              await supabase
+                .from('campaigns')
+                .update({
+                  budget_used: budgetData.usedBudget || 0,
+                  budget_remaining: budgetData.remainingBudget || 0,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('campaign_id', campaignId)
+                .eq('connection_id', connectionId)
             }
-          } catch (batchError) {
-            console.warn(`Budget usage sync failed for batch ${i}-${i + budgetBatchSize}:`, batchError)
+          } catch (error) {
+            console.warn(`Failed to sync budget for campaign ${campaignId}:`, error)
           }
         }
         
@@ -1688,57 +1187,26 @@ serve(async (req) => {
       }
     }
 
-    // Update sync job as completed
+    await updateProgress(95, 'Finalizing sync...')
+
+    // Mark sync job as completed
     if (syncJobId) {
-      await supabase.from('sync_jobs').update({
-        status: 'completed',
-        phase: 'completed',
-        progress_percent: 100,
-        finished_at: new Date().toISOString(),
-        sync_details: {
-          entitiesSynced: {
-            campaigns: campaignIds.length,
-            adGroups: adGroupIds.length,
-            keywords: keywordIds.length,
-            targets: targetIds.length
-          },
-          metricsUpdated: totalMetricsUpdated
-        }
-      }).eq('id', syncJobId)
+      await supabase
+        .from('sync_jobs')
+        .update({ 
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+          progress: 100,
+          message: 'Sync completed successfully'
+        })
+        .eq('id', syncJobId)
     }
 
-    // Update connection sync timestamp
+    // Update connection last_sync
     await supabase
       .from('amazon_connections')
-      .update({ 
-        last_sync_at: new Date().toISOString(),
-        campaign_count: campaignIds.length,
-        status: 'active',
-        health_status: 'healthy'
-      })
+      .update({ last_sync: new Date().toISOString() })
       .eq('id', connectionId)
-
-    // Early exit if no metrics were updated
-    if (totalMetricsUpdated === 0) {
-      console.log('⚠️ No performance metrics were updated')
-      
-      return new Response(
-        JSON.stringify({
-          success: true,
-          code: 'NO_METRICS_UPDATED',
-          message: 'Sync completed but no performance metrics were updated',
-          entitiesSynced: {
-            campaigns: campaignIds.length,
-            adGroups: adGroupIds.length,
-            keywords: keywordIds.length,
-            targets: targetIds.length
-          },
-          metricsUpdated: 0,
-          diagnostics
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-      )
-    }
 
     // If DAILY sync, roll up 14-day aggregates into campaigns table
     if (timeUnitOpt === 'DAILY') {
@@ -1798,31 +1266,16 @@ serve(async (req) => {
     else if (message.includes('Invalid authorization')) code = 'INVALID_AUTH'
 
     // Mark sync job as failed  
-    if (typeof syncJobId !== 'undefined' && syncJobId) {
-      await supabase.from('sync_jobs').update({
-        status: 'error',
-        phase: 'error',
-        progress_percent: 0,
-        finished_at: new Date().toISOString(),
-        error_details: { error: message, code }
-      }).eq('id', syncJobId)
-    }
-
-    // Update connection status if it's a token-related issue
-    if (code === 'TOKEN_EXPIRED' || code === 'MISSING_AMAZON_SECRET') {
-      try {
-        await supabase
-          .from('amazon_connections')
-          .update({ 
-            status: 'setup_required',
-            setup_required_reason: message.includes('clientSecret') 
-              ? 'Missing Amazon client secret configuration' 
-              : 'Token refresh failed - please reconnect your Amazon account'
-          })
-          .eq('id', connectionId)
-      } catch (updateError) {
-        console.error('Failed to update connection status:', updateError)
-      }
+    if (syncJobId) {
+      await supabase
+        .from('sync_jobs')
+        .update({ 
+          status: 'failed',
+          completed_at: new Date().toISOString(),
+          progress: 0,
+          message: message
+        })
+        .eq('id', syncJobId)
     }
 
     return new Response(
