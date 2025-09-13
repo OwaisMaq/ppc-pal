@@ -1782,7 +1782,7 @@ serve(async (req) => {
         diagnostics
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-    )
+    );
 
   } catch (error) {
     console.error('🚨 Sync error:', error)
