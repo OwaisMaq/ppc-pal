@@ -413,10 +413,9 @@ serve(async (req) => {
     let tokenRefreshed = false
     const apiEndpoint = connection.advertising_api_endpoint || 'https://advertising-api-eu.amazon.com'
     
-    // Check if token needs refresh (with 1 hour buffer)
+    // Check if token needs refresh (with 5 minute buffer)
     const now = new Date()
     const expiresAt = new Date(connection.token_expires_at)
-    // Be conservative: only refresh if token is expired or within 5 minutes of expiry
     const bufferTime = 5 * 60 * 1000 // 5 minutes
     
     if (now.getTime() >= (expiresAt.getTime() - bufferTime)) {
@@ -441,47 +440,33 @@ serve(async (req) => {
           }),
         })
 
-          if (refreshResponse.ok) {
-            const tokenData = await refreshResponse.json()
-            accessToken = tokenData.access_token
-            
-            // Update stored tokens
-            const newExpiresAt = new Date(Date.now() + tokenData.expires_in * 1000)
-            console.log('✅ Token refreshed successfully, expires at:', newExpiresAt.toISOString())
-            
-            await supabase
-              .from('amazon_connections')
-              .update({
-                access_token: await encryptText(accessToken),
-                refresh_token: await encryptText(tokenData.refresh_token || connection.refresh_token),
-                token_expires_at: newExpiresAt.toISOString(),
-                status: 'active',
-                setup_required_reason: null,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', connectionId)
-          } else {
-            const errorText = await refreshResponse.text()
-            console.error('❌ Token refresh failed:', errorText)
-            
-            if (now.getTime() < expiresAt.getTime()) {
-              console.warn('Refresh failed but current token still valid; continuing without refresh')
-              // keep going with existing accessToken
-            } else {
-              await supabase
-                .from('amazon_connections')
-                .update({ 
-                  status: 'setup_required',
-                  setup_required_reason: 'Token refresh failed - please reconnect your Amazon account'
-                })
-                .eq('id', connectionId)
-              throw new Error(`Token refresh failed: ${refreshResponse.status}`)
-            }
-          }
-        } catch (refreshError) {
-          console.error('❌ Token refresh error:', refreshError)
+        if (refreshResponse.ok) {
+          const tokenData = await refreshResponse.json()
+          accessToken = tokenData.access_token
+          tokenRefreshed = true
+          
+          // Update stored tokens
+          const newExpiresAt = new Date(Date.now() + tokenData.expires_in * 1000)
+          console.log('✅ Token refreshed successfully, expires at:', newExpiresAt.toISOString())
+          
+          await supabase
+            .from('amazon_connections')
+            .update({
+              access_token: await encryptText(accessToken),
+              refresh_token: await encryptText(tokenData.refresh_token || connection.refresh_token),
+              token_expires_at: newExpiresAt.toISOString(),
+              status: 'active',
+              setup_required_reason: null,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', connectionId)
+        } else {
+          const errorText = await refreshResponse.text()
+          console.error('❌ Token refresh failed:', errorText)
+          
           if (now.getTime() < expiresAt.getTime()) {
-            console.warn('Refresh error but current token still valid; continuing without refresh')
+            console.warn('Refresh failed but current token still valid; continuing without refresh')
+            // keep going with existing accessToken
           } else {
             await supabase
               .from('amazon_connections')
@@ -490,10 +475,25 @@ serve(async (req) => {
                 setup_required_reason: 'Token refresh failed - please reconnect your Amazon account'
               })
               .eq('id', connectionId)
-            throw new Error('Token refresh failed - please reconnect your Amazon account')
+            throw new Error(`Token refresh failed: ${refreshResponse.status}`)
           }
         }
+      } catch (refreshError) {
+        console.error('❌ Token refresh error:', refreshError)
+        if (now.getTime() < expiresAt.getTime()) {
+          console.warn('Refresh error but current token still valid; continuing without refresh')
+        } else {
+          await supabase
+            .from('amazon_connections')
+            .update({ 
+              status: 'setup_required',
+              setup_required_reason: 'Token refresh failed - please reconnect your Amazon account'
+            })
+            .eq('id', connectionId)
+          throw new Error('Token refresh failed - please reconnect your Amazon account')
+        }
       }
+    }
     }
 
      // Update sync job status
