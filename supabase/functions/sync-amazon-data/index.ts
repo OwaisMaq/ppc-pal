@@ -60,12 +60,16 @@ interface PerformanceData {
   targeting?: string
   keywordId?: string
   targetId?: string
+  searchTerm?: string
+  keywordText?: string
   date?: string
   impressions?: number
   clicks?: number
   cost?: number
   sales_7d?: number
   purchases_7d?: number
+  sales_1d?: number
+  purchases_1d?: number
   sales30d?: number
   purchases30d?: number
 }
