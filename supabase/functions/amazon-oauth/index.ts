@@ -467,7 +467,25 @@ serve(async (req) => {
             .single()
           
           if (connection?.id) {
-            // Trigger sync in the background - don't await to avoid timeout
+            // First trigger entity sync for campaign/ad group names
+            console.log(`🏷️ Triggering entity sync for profile ${profile.profileId}...`)
+            supabase.functions.invoke('entities-sync-runner', {
+              body: { 
+                profileId: profile.profileId.toString(),
+                entity: 'all',
+                mode: 'incremental'
+              },
+              headers: {
+                Authorization: authHeader!
+              }
+            }).then(result => {
+              console.log(`✅ Entity sync triggered for profile ${profile.profileId}:`, result)
+            }).catch(error => {
+              console.log(`⚠️ Entity sync failed for profile ${profile.profileId}:`, error)
+            })
+            
+            // Then trigger data sync for 30-day backfill - don't await to avoid timeout
+            console.log(`📊 Triggering data sync for connection ${connection.id}...`)
             supabase.functions.invoke('sync-amazon-data', {
               body: { 
                 connectionId: connection.id,

@@ -214,6 +214,32 @@ async function createReportRequest(
   if (!response.ok) {
     const errorText = await response.text()
     console.error(`❌ Report creation failed: ${response.status} ${errorText}`)
+    
+    // Enhanced error logging for debugging
+    const errorDetails = {
+      stage: 'create',
+      status: response.status,
+      statusText: response.statusText,
+      bodySnippet: errorText.substring(0, 200),
+      endpoint: apiEndpoint,
+      reportType: reportType,
+      profileId: profileId,
+      requestBody: JSON.stringify({
+        name: `${reportType}_${timeUnit.toLowerCase()}_${Date.now()}`,
+        startDate: requestBody.reportDate,
+        endDate: requestBody.reportEndDate,
+        configuration: {
+          adProduct: 'SPONSORED_PRODUCTS',
+          groupBy: [mapping.groupBy],
+          columns: columns,
+          reportTypeId: mapping.reportTypeId,
+          timeUnit: timeUnit,
+          format: 'GZIP_JSON'
+        }
+      }).substring(0, 300)
+    }
+    
+    console.error('📊 Report creation error details:', errorDetails)
     throw new Error(`Report creation failed: ${response.status} ${errorText}`)
   }
 
@@ -819,7 +845,7 @@ serve(async (req) => {
     const adGroupColumns = ['impressions', 'clicks', 'cost', 'purchases_7d', 'sales_7d']  
     const targetColumns = ['impressions', 'clicks', 'cost', 'purchases_7d', 'sales_7d']
     const keywordColumns = ['impressions', 'clicks', 'cost', 'purchases_7d', 'sales_7d']
-    const searchTermColumns = ['impressions', 'clicks', 'cost', 'purchases_7d', 'sales_7d']
+    const searchTermColumns = ['date','campaignId','adGroupId','keywordId','searchTerm','clicks','impressions','cost','attributedConversions7d','attributedSales7d']
 
     // Only generate reports if we have data to report on
     if (campaignIds.length === 0 && adGroupIds.length === 0 && keywordIds.length === 0 && targetIds.length === 0) {
@@ -1292,7 +1318,7 @@ serve(async (req) => {
           'searchTerms',
           dateRange,
           timeUnitOpt,
-          searchTermColumns,
+          ['date','campaignId','adGroupId','keywordId','searchTerm','clicks','impressions','cost','attributedConversions7d','attributedSales7d'],
           campaignIds,
           apiEndpoint
         )
@@ -1309,26 +1335,31 @@ serve(async (req) => {
             try {
               // Insert search terms directly into fact_search_term_daily table
               if (timeUnitOpt === 'DAILY' && record.date) {
-                await supabase
+                const { error: insertError } = await supabase
                   .from('fact_search_term_daily')
-                  .insert({
+                  .upsert({
                     profile_id: connection.profile_id,
                     campaign_id: record.campaignId,
                     ad_group_id: record.adGroupId,
-                    keyword_id: record.keywordId,
-                    keyword_text: record.keywordText || record.targeting,
-                    search_term: record.searchTerm,
+                    keyword_id: record.keywordId || '',
+                    keyword_text: record.keywordText || record.targeting || '',
+                    search_term: record.searchTerm || '',
                     date: record.date,
                     impressions: record.impressions || 0,
                     clicks: record.clicks || 0,
-                    cost_micros: (record.cost || 0) * 1e6,
-                    attributed_conversions_7d: record.purchases_7d || 0,
-                    attributed_sales_7d_micros: (record.sales_7d || 0) * 1e6,
-                    attributed_conversions_1d: record.purchases_1d || 0,
+                    cost_micros: Math.round((record.cost || 0) * 1000000),
+                    attributed_conversions_7d: record.attributedConversions7d || 0,
+                    attributed_sales_7d_micros: Math.round((record.attributedSales7d || 0) * 1000000),
+                    attributed_conversions_1d: record.attributedConversions1d || 0,
                     match_type: record.matchType || 'BROAD',
-                    targeting: record.targeting
+                    targeting: record.targeting || ''
+                  }, {
+                    onConflict: 'profile_id,campaign_id,ad_group_id,keyword_id,search_term,date'
                   })
-                  .onConflict('profile_id,campaign_id,ad_group_id,keyword_id,search_term,date')
+                
+                if (insertError) {
+                  console.warn(`Failed to upsert search term data:`, insertError)
+                }
                 
                 searchTermMetricsUpdated++
               }
@@ -1339,7 +1370,7 @@ serve(async (req) => {
 
           totalMetricsUpdated += searchTermMetricsUpdated
           console.log(`✅ Updated metrics for ${searchTermMetricsUpdated} search terms`)
-          diagnostics.searchTermReport = { rows: performanceData.length, timeUnit: timeUnitOpt, columns: searchTermColumns }
+          diagnostics.searchTermReport = { rows: performanceData.length, timeUnit: timeUnitOpt, columns: ['date','campaignId','adGroupId','keywordId','searchTerm','clicks','impressions','cost','attributedConversions7d','attributedSales7d'] }
         }
 
         console.log('✅ Search terms performance data synced successfully')
