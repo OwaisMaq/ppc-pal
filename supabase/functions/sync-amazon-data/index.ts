@@ -886,9 +886,9 @@ serve(async (req) => {
               } else {
                 campaignMetricsUpdated++
                 
-                // Also insert into AMS streaming tables for dashboard consumption
+                // Also insert into fact tables for daily data
                 if (timeUnitOpt === 'DAILY' && record.date) {
-                  // Insert traffic data
+                  // Insert into AMS streaming tables for real-time dashboard
                   await supabase
                     .from('ams_messages_sp_traffic')
                     .insert({
@@ -1045,9 +1045,9 @@ serve(async (req) => {
               } else {
                 adGroupMetricsUpdated++
                 
-                // Also insert into AMS streaming tables for dashboard consumption
+                // Also insert into fact tables for daily data  
                 if (timeUnitOpt === 'DAILY' && record.date) {
-                  // Insert traffic data
+                  // Insert into AMS streaming tables for real-time dashboard
                   await supabase
                     .from('ams_messages_sp_traffic')
                     .insert({
@@ -1206,9 +1206,9 @@ serve(async (req) => {
               } else {
                 targetMetricsUpdated++
                 
-                // Also insert into AMS streaming tables for dashboard consumption
+                // Also insert into fact tables for daily data
                 if (timeUnitOpt === 'DAILY' && record.date) {
-                  // Insert traffic data
+                  // Insert into AMS streaming tables for real-time dashboard
                   await supabase
                     .from('ams_messages_sp_traffic')
                     .insert({
@@ -1261,7 +1261,110 @@ serve(async (req) => {
       }
     }
 
-    await updateProgress(85, 'Syncing keyword performance...')
+    await updateProgress(85, 'Syncing search terms for dashboard...')
+
+    // Search Terms performance reports - critical for dashboard and Search Studio
+    if (campaignIds.length > 0) {
+      console.log('🔍 Syncing search terms performance data...')
+      try {
+        const reportId = await createReportRequest(
+          accessToken, 
+          connection.profile_id, 
+          'searchTerms',
+          dateRange,
+          timeUnitOpt,
+          searchTermColumns,
+          campaignIds,
+          apiEndpoint
+        )
+
+        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 300000, apiEndpoint)
+        
+        if (reportResult.url) {
+          const performanceData = await downloadAndParseReport(reportResult.url)
+          
+          console.log(`🔍 Processing ${performanceData.length} search term performance records...`)
+          let searchTermMetricsUpdated = 0
+
+          for (const record of performanceData) {
+            try {
+              // Insert search terms directly into fact_search_term_daily table
+              if (timeUnitOpt === 'DAILY' && record.date) {
+                await supabase
+                  .from('fact_search_term_daily')
+                  .insert({
+                    profile_id: connection.profile_id,
+                    campaign_id: record.campaignId,
+                    ad_group_id: record.adGroupId,
+                    keyword_id: record.keywordId,
+                    search_term: record.searchTerm,
+                    date: record.date,
+                    impressions: record.impressions || 0,
+                    clicks: record.clicks || 0,
+                    cost_micros: (record.cost || 0) * 1e6,
+                    attributed_conversions_7d: record.purchases_7d || 0,
+                    attributed_sales_7d_micros: (record.sales_7d || 0) * 1e6,
+                    attributed_conversions_1d: record.purchases_1d || 0,
+                    match_type: record.matchType,
+                    targeting: record.targeting
+                  })
+                  .onConflict('profile_id,campaign_id,ad_group_id,keyword_id,search_term,date')
+                
+                searchTermMetricsUpdated++
+
+                // Also insert into AMS streaming tables for real-time dashboard
+                await supabase
+                  .from('ams_messages_sp_traffic')
+                  .insert({
+                    profile_id: connection.profile_id,
+                    campaign_id: record.campaignId,
+                    ad_group_id: record.adGroupId,
+                    keyword_id: record.keywordId,
+                    hour_start: new Date(record.date + 'T12:00:00Z'), // Use noon for daily data
+                    impressions: record.impressions || 0,
+                    clicks: record.clicks || 0,
+                    cost: record.cost || 0,
+                    connection_id: connectionId,
+                    payload: { searchTerm: record.searchTerm }
+                  })
+                  .onConflict('profile_id,campaign_id,ad_group_id,keyword_id,hour_start')
+
+                // Insert conversion data
+                if (record.sales_7d || record.purchases_7d) {
+                  await supabase
+                    .from('ams_messages_sp_conversion')
+                    .insert({
+                      profile_id: connection.profile_id,
+                      campaign_id: record.campaignId,
+                      ad_group_id: record.adGroupId,
+                      keyword_id: record.keywordId,
+                      hour_start: new Date(record.date + 'T12:00:00Z'),
+                      attributed_sales: record.sales_7d || 0,
+                      attributed_conversions: record.purchases_7d || 0,
+                      connection_id: connectionId,
+                      payload: { searchTerm: record.searchTerm }
+                    })
+                    .onConflict('profile_id,campaign_id,ad_group_id,keyword_id,hour_start')
+                }
+              }
+            } catch (error) {
+              console.warn(`Failed to process search term performance record:`, error)
+            }
+          }
+
+          totalMetricsUpdated += searchTermMetricsUpdated
+          console.log(`✅ Updated metrics for ${searchTermMetricsUpdated} search terms`)
+          diagnostics.searchTermReport = { rows: performanceData.length, timeUnit: timeUnitOpt, columns: searchTermColumns }
+        }
+
+        console.log('✅ Search terms performance data synced successfully')
+      } catch (error) {
+        console.error('❌ Search terms performance sync failed:', error)
+        diagnostics.searchTermReportError = String(error)
+      }
+    }
+
+    await updateProgress(87, 'Syncing keyword performance...')
 
     // Keyword performance reports
     if (keywordIds.length > 0) {
@@ -1274,10 +1377,11 @@ serve(async (req) => {
           dateRange,
           timeUnitOpt,
           keywordColumns,
-          keywordIds
+          keywordIds,
+          apiEndpoint
         )
 
-        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId)
+        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 300000, apiEndpoint)
         
         if (reportResult.url) {
           const performanceData = await downloadAndParseReport(reportResult.url)
@@ -1291,8 +1395,8 @@ serve(async (req) => {
                 impressions: record.impressions || 0,
                 clicks: record.clicks || 0,
                 cost: record.cost || 0,
-                sales_14d: record.sales14d || 0,
-                orders_14d: record.purchases14d || 0,
+                sales_7d: record.sales_7d || 0,
+                orders_7d: record.purchases_7d || 0,
                 updated_at: new Date().toISOString()
               }
 
