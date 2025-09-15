@@ -346,6 +346,8 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let syncJobId: string | undefined;
+
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -370,8 +372,17 @@ serve(async (req) => {
     const timeUnitOpt: 'SUMMARY' | 'DAILY' = (timeUnit === 'SUMMARY' ? 'SUMMARY' : 'DAILY')
     console.log('🚀 Starting sync for user:', user.id, 'connection:', connectionId, 'dateRangeDays:', dateRange, 'diagnosticMode:', diag)
     
-    let syncJobId: string | undefined;
-    
+    // Clean up any existing running sync jobs for this connection
+    await supabase
+      .from('sync_jobs')
+      .update({ 
+        status: 'failed',
+        finished_at: new Date().toISOString(),
+        error_details: { error: 'Cancelled by new sync request', code: 'CANCELLED' }
+      })
+      .eq('connection_id', connectionId)
+      .eq('status', 'running')
+
     // Create sync job for progress tracking
     const { data: syncJob, error: syncJobError } = await supabase
       .from('sync_jobs')
@@ -387,6 +398,7 @@ serve(async (req) => {
 
     if (syncJobError) {
       console.error('Failed to create sync job:', syncJobError)
+      throw new Error('Failed to create sync job: ' + syncJobError.message)
     } else {
       syncJobId = syncJob.id
       console.log('✅ Created sync job:', syncJobId)
@@ -443,8 +455,25 @@ serve(async (req) => {
     }
 
     // Get tokens from secure storage using the RPC function
-    const { data: tokens, error: tokensError } = await supabase
-      .rpc('get_tokens', { p_profile_id: connection.profile_id })
+    let tokensResult;
+    try {
+      tokensResult = await supabase.rpc('get_tokens', { p_profile_id: connection.profile_id });
+    } catch (error) {
+      console.error('RPC get_tokens failed:', error);
+      
+      // Update connection with error status
+      await supabase
+        .from('amazon_connections')
+        .update({ 
+          setup_required_reason: 'Failed to retrieve tokens - please reconnect your Amazon account',
+          health_status: 'error'
+        })
+        .eq('id', connectionId)
+        
+      throw new Error('Failed to retrieve stored tokens - connection needs to be re-established');
+    }
+
+    const { data: tokens, error: tokensError } = tokensResult;
 
     if (tokensError || !tokens || tokens.length === 0) {
       console.error('Failed to retrieve stored tokens:', tokensError)
@@ -458,7 +487,7 @@ serve(async (req) => {
         })
         .eq('id', connectionId)
         
-      throw new Error('Failed to retrieve stored tokens')
+      throw new Error('Failed to retrieve stored tokens - connection needs to be re-established')
     }
 
     let accessToken = tokens[0].access_token
