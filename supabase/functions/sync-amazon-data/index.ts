@@ -323,6 +323,14 @@ async function fetchAllPages(
   let pageCount = 0
   const maxPages = Math.ceil(maxResults / 1000) // Assuming 1000 per page max
   
+  // Validate the API endpoint before starting
+  if (!apiEndpoint.includes('advertising-api')) {
+    console.warn(`⚠️  Invalid API endpoint format: ${apiEndpoint}, falling back to default`)
+    apiEndpoint = 'https://advertising-api.amazon.com'
+  }
+  
+  console.log(`🌍 Fetching ${endpoint} from regional endpoint: ${apiEndpoint}`)
+  
   do {
     pageCount++
     console.log(`📄 Fetching page ${pageCount} from ${endpoint}`)
@@ -344,6 +352,8 @@ async function fetchAllPages(
     if (!response.ok) {
       const errorText = await response.text()
       console.error(`❌ Failed to fetch ${endpoint}: ${response.status} ${errorText}`)
+      console.error(`🔗 Request URL: ${url}`)
+      console.error(`🌍 API Endpoint: ${apiEndpoint}`)
       break
     }
     
@@ -359,7 +369,7 @@ async function fetchAllPages(
     }
   } while (nextToken)
   
-  console.log(`✅ Total ${endpoint} fetched: ${results.length}`)
+  console.log(`✅ Total ${endpoint} fetched: ${results.length} from ${apiEndpoint}`)
   return results
 }
 
@@ -567,9 +577,14 @@ serve(async (req) => {
       diagnosticMode: diag
     }
 
-    // Get API endpoint
+    // Get API endpoint with detailed logging
     const apiEndpoint = connection.advertising_api_endpoint || 'https://advertising-api.amazon.com'
-    console.log(`🌍 Using API endpoint: ${apiEndpoint}`)
+    console.log(`🌍 Using API endpoint: ${apiEndpoint} for profile: ${connection.profile_id}`)
+    console.log(`📍 Marketplace: ${connection.marketplace_id || 'unknown'}`)
+    
+    if (!connection.advertising_api_endpoint) {
+      console.warn(`⚠️  No advertising_api_endpoint set for profile ${connection.profile_id}, using default NA endpoint`)
+    }
     
     // Fetch campaigns
     console.log('📁 Fetching campaigns...')

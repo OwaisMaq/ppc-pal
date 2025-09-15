@@ -283,8 +283,8 @@ serve(async (req) => {
       
       const regionalEndpoints = [
         'https://advertising-api.amazon.com',     // North America
-        'https://advertising-api-eu.amazon.com', // Europe
-        'https://advertising-api-fe.amazon.com'  // Far East
+        'https://advertising-api.eu.amazon.com', // Europe (FIXED - was advertising-api-eu)
+        'https://advertising-api.fe.amazon.com'  // Far East (FIXED - was advertising-api-fe)
       ];
       
       let profileResponse;
