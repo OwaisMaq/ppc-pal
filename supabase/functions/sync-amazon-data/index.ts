@@ -64,8 +64,8 @@ interface PerformanceData {
   impressions?: number
   clicks?: number
   cost?: number
-  sales14d?: number
-  purchases14d?: number
+  sales7d?: number
+  purchases7d?: number
   sales30d?: number
   purchases30d?: number
 }
@@ -125,7 +125,8 @@ async function createReportRequest(
   dateRange: number,
   timeUnit: 'SUMMARY' | 'DAILY' = 'SUMMARY',
   columns: string[] = ['impressions', 'clicks', 'cost', 'sales14d', 'purchases14d'],
-  entityIds?: string[]
+  entityIds?: string[],
+  apiEndpoint: string = 'https://advertising-api.amazon.com'
 ): Promise<string> {
   const endDate = new Date()
   const startDate = new Date()
@@ -158,7 +159,7 @@ async function createReportRequest(
   }
 
   const response = await fetchWithRetry(
-    `https://advertising-api.amazon.com/reporting/reports`,
+    `${apiEndpoint}/reporting/reports`,
     {
       method: 'POST',
       headers: {
@@ -207,13 +208,14 @@ async function pollReportStatus(
   accessToken: string, 
   profileId: string, 
   reportId: string,
-  maxWaitTime = 300000 // 5 minutes
+  maxWaitTime = 300000, // 5 minutes
+  apiEndpoint: string = 'https://advertising-api.amazon.com'
 ): Promise<ReportRequest> {
   const startTime = Date.now()
   
   while (Date.now() - startTime < maxWaitTime) {
     const response = await fetchWithRetry(
-      `https://advertising-api.amazon.com/reporting/reports/${reportId}`,
+      `${apiEndpoint}/reporting/reports/${reportId}`,
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -294,7 +296,8 @@ async function fetchAllPages(
   accessToken: string, 
   profileId: string, 
   endpoint: string,
-  maxResults = 10000
+  maxResults = 10000,
+  apiEndpoint: string = 'https://advertising-api.amazon.com'
 ): Promise<any[]> {
   const results: any[] = []
   let nextToken: string | undefined
@@ -305,7 +308,7 @@ async function fetchAllPages(
     pageCount++
     console.log(`📄 Fetching page ${pageCount} from ${endpoint}`)
     
-    let url = `https://advertising-api.amazon.com/sp/${endpoint}?count=1000`
+    let url = `${apiEndpoint}/sp/${endpoint}?count=1000`
     if (nextToken) {
       url += `&nextToken=${encodeURIComponent(nextToken)}`
     }
@@ -545,9 +548,13 @@ serve(async (req) => {
       diagnosticMode: diag
     }
 
+    // Get API endpoint
+    const apiEndpoint = connection.advertising_api_endpoint || 'https://advertising-api.amazon.com'
+    console.log(`🌍 Using API endpoint: ${apiEndpoint}`)
+    
     // Fetch campaigns
     console.log('📁 Fetching campaigns...')
-    const campaigns = await fetchAllPages(accessToken, connection.profile_id, 'campaigns')
+    const campaigns = await fetchAllPages(accessToken, connection.profile_id, 'campaigns', 10000, apiEndpoint)
     console.log(`✅ Found ${campaigns.length} campaigns`)
 
     await updateProgress(20, 'Storing campaign data...')
@@ -591,7 +598,7 @@ serve(async (req) => {
 
     // Fetch and store ad groups
     console.log('📁 Fetching ad groups...')
-    const adGroups = await fetchAllPages(accessToken, connection.profile_id, 'adGroups')
+    const adGroups = await fetchAllPages(accessToken, connection.profile_id, 'adGroups', 10000, apiEndpoint)
     console.log(`✅ Found ${adGroups.length} ad groups`)
 
     const adGroupIds: string[] = []
@@ -629,7 +636,7 @@ serve(async (req) => {
 
         // Sync keywords for this ad group
         try {
-          const keywords = await fetchAllPages(accessToken, connection.profile_id, `adGroups/${adGroup.adGroupId}/keywords`)
+          const keywords = await fetchAllPages(accessToken, connection.profile_id, `adGroups/${adGroup.adGroupId}/keywords`, 10000, apiEndpoint)
           
           for (const keyword of keywords) {
             await supabase
@@ -661,7 +668,7 @@ serve(async (req) => {
 
     // Fetch all keywords
     console.log('📁 Fetching keywords...')
-    const keywords = await fetchAllPages(accessToken, connection.profile_id, 'keywords')
+    const keywords = await fetchAllPages(accessToken, connection.profile_id, 'keywords', 10000, apiEndpoint)
     console.log(`✅ Found ${keywords.length} keywords`)
 
     const keywordIds: string[] = []
@@ -698,7 +705,7 @@ serve(async (req) => {
 
     // Fetch targets
     console.log('📁 Fetching targets...')
-    const targets = await fetchAllPages(accessToken, connection.profile_id, 'targets')
+    const targets = await fetchAllPages(accessToken, connection.profile_id, 'targets', 10000, apiEndpoint)
     console.log(`✅ Found ${targets.length} targets`)
 
     const targetIds: string[] = []
@@ -735,7 +742,7 @@ serve(async (req) => {
     if (campaignIds.length > 0) {
       try {
         console.log('📁 Fetching advertised products for ASIN data...')
-        const advertisedProducts = await fetchAllPages(accessToken, connection.profile_id, 'advertised/products')
+        const advertisedProducts = await fetchAllPages(accessToken, connection.profile_id, 'advertised/products', 10000, apiEndpoint)
         console.log(`✅ Found ${advertisedProducts.length} advertised products`)
         
         // Group ASINs by campaign for efficient updates
@@ -773,11 +780,11 @@ serve(async (req) => {
     // Performance data sync
     let totalMetricsUpdated = 0
 
-    // Define columns for each report type
-    const campaignColumns = ['impressions', 'clicks', 'cost', 'sales14d', 'purchases14d']
-    const adGroupColumns = ['impressions', 'clicks', 'cost', 'sales14d', 'purchases14d']
-    const targetColumns = ['impressions', 'clicks', 'cost', 'sales14d', 'purchases14d']
-    const keywordColumns = ['impressions', 'clicks', 'cost', 'sales14d', 'purchases14d']
+    // Define columns for each report type - use 7d metrics to match dashboard expectations
+    const campaignColumns = ['impressions', 'clicks', 'cost', 'sales7d', 'purchases7d']
+    const adGroupColumns = ['impressions', 'clicks', 'cost', 'sales7d', 'purchases7d']
+    const targetColumns = ['impressions', 'clicks', 'cost', 'sales7d', 'purchases7d']
+    const keywordColumns = ['impressions', 'clicks', 'cost', 'sales7d', 'purchases7d']
 
     // Only generate reports if we have data to report on
     if (campaignIds.length === 0 && adGroupIds.length === 0 && keywordIds.length === 0 && targetIds.length === 0) {
@@ -824,10 +831,11 @@ serve(async (req) => {
           dateRange,
           timeUnitOpt,
           campaignColumns,
-          campaignIds
+          campaignIds,
+          apiEndpoint
         )
 
-        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId)
+        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 300000, apiEndpoint)
         
         if (reportResult.url) {
           const performanceData = await downloadAndParseReport(reportResult.url)
@@ -841,8 +849,8 @@ serve(async (req) => {
                 impressions: record.impressions || 0,
                 clicks: record.clicks || 0,
                 cost: record.cost || 0,
-                sales_14d: record.sales14d || 0,
-                orders_14d: record.purchases14d || 0,
+                sales_7d: record.sales7d || 0,
+                orders_7d: record.purchases7d || 0,
                 updated_at: new Date().toISOString()
               }
 
@@ -861,6 +869,40 @@ serve(async (req) => {
                 console.warn(`Failed to update campaign ${record.campaignId} metrics:`, updateError)
               } else {
                 campaignMetricsUpdated++
+                
+                // Also insert into AMS streaming tables for dashboard consumption
+                if (timeUnitOpt === 'DAILY' && record.date) {
+                  // Insert traffic data
+                  await supabase
+                    .from('ams_messages_sp_traffic')
+                    .insert({
+                      profile_id: connection.profile_id,
+                      campaign_id: record.campaignId,
+                      hour_start: new Date(record.date + 'T12:00:00Z'), // Use noon for daily data
+                      impressions: record.impressions || 0,
+                      clicks: record.clicks || 0,
+                      cost: record.cost || 0,
+                      connection_id: connectionId,
+                      payload: {}
+                    })
+                    .onConflict('profile_id,campaign_id,hour_start')
+
+                  // Insert conversion data
+                  if (record.sales7d || record.purchases7d) {
+                    await supabase
+                      .from('ams_messages_sp_conversion')
+                      .insert({
+                        profile_id: connection.profile_id,
+                        campaign_id: record.campaignId,
+                        hour_start: new Date(record.date + 'T12:00:00Z'),
+                        attributed_sales: record.sales7d || 0,
+                        attributed_conversions: record.purchases7d || 0,
+                        connection_id: connectionId,
+                        payload: {}
+                      })
+                      .onConflict('profile_id,campaign_id,hour_start')
+                  }
+                }
               }
             } catch (error) {
               console.warn(`Failed to process campaign performance record:`, error)
@@ -877,17 +919,18 @@ serve(async (req) => {
         if (error instanceof Error && error.message.includes('400')) {
           console.warn('⚠️ Campaign report failed, trying with minimal columns...')
           try {
-            const reportId = await createReportRequest(
-              accessToken, 
-              connection.profile_id, 
-              'campaigns',
-              dateRange,
-              timeUnitOpt,
-              ['impressions', 'clicks', 'cost'], // Minimal columns
-              campaignIds
-            )
+              const reportId = await createReportRequest(
+                accessToken, 
+                connection.profile_id, 
+                'campaigns',
+                dateRange,
+                timeUnitOpt,
+                ['impressions', 'clicks', 'cost'], // Minimal columns
+                campaignIds,
+                apiEndpoint
+              )
 
-            const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId)
+              const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 300000, apiEndpoint)
             
             if (reportResult.url) {
               const performanceData = await downloadAndParseReport(reportResult.url)
@@ -948,10 +991,11 @@ serve(async (req) => {
           dateRange,
           timeUnitOpt,
           adGroupColumns,
-          adGroupIds
+          adGroupIds,
+          apiEndpoint
         )
 
-        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId)
+        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 300000, apiEndpoint)
         
         if (reportResult.url) {
           const performanceData = await downloadAndParseReport(reportResult.url)
@@ -965,8 +1009,8 @@ serve(async (req) => {
                 impressions: record.impressions || 0,
                 clicks: record.clicks || 0,
                 cost: record.cost || 0,
-                sales_14d: record.sales14d || 0,
-                orders_14d: record.purchases14d || 0,
+                sales_7d: record.sales7d || 0,
+                orders_7d: record.purchases7d || 0,
                 updated_at: new Date().toISOString()
               }
 
@@ -984,6 +1028,42 @@ serve(async (req) => {
                 console.warn(`Failed to update ad group ${record.adGroupId} metrics:`, updateError)
               } else {
                 adGroupMetricsUpdated++
+                
+                // Also insert into AMS streaming tables for dashboard consumption
+                if (timeUnitOpt === 'DAILY' && record.date) {
+                  // Insert traffic data
+                  await supabase
+                    .from('ams_messages_sp_traffic')
+                    .insert({
+                      profile_id: connection.profile_id,
+                      campaign_id: record.campaignId,
+                      ad_group_id: record.adGroupId,
+                      hour_start: new Date(record.date + 'T12:00:00Z'), // Use noon for daily data
+                      impressions: record.impressions || 0,
+                      clicks: record.clicks || 0,
+                      cost: record.cost || 0,
+                      connection_id: connectionId,
+                      payload: {}
+                    })
+                    .onConflict('profile_id,campaign_id,ad_group_id,hour_start')
+
+                  // Insert conversion data
+                  if (record.sales7d || record.purchases7d) {
+                    await supabase
+                      .from('ams_messages_sp_conversion')
+                      .insert({
+                        profile_id: connection.profile_id,
+                        campaign_id: record.campaignId,
+                        ad_group_id: record.adGroupId,
+                        hour_start: new Date(record.date + 'T12:00:00Z'),
+                        attributed_sales: record.sales7d || 0,
+                        attributed_conversions: record.purchases7d || 0,
+                        connection_id: connectionId,
+                        payload: {}
+                      })
+                      .onConflict('profile_id,campaign_id,ad_group_id,hour_start')
+                  }
+                }
               }
             } catch (error) {
               console.warn(`Failed to process ad group performance record:`, error)
@@ -1007,10 +1087,11 @@ serve(async (req) => {
               dateRange,
               timeUnitOpt,
               ['impressions', 'clicks', 'cost'],
-              adGroupIds
+              adGroupIds,
+              apiEndpoint
             )
 
-            const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId)
+            const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 300000, apiEndpoint)
             
             if (reportResult.url) {
               const performanceData = await downloadAndParseReport(reportResult.url)
@@ -1071,10 +1152,11 @@ serve(async (req) => {
           dateRange,
           timeUnitOpt,
           targetColumns,
-          targetIds
+          targetIds,
+          apiEndpoint
         )
 
-        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId)
+        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 300000, apiEndpoint)
         
         if (reportResult.url) {
           const performanceData = await downloadAndParseReport(reportResult.url)
@@ -1088,8 +1170,8 @@ serve(async (req) => {
                 impressions: record.impressions || 0,
                 clicks: record.clicks || 0,
                 cost: record.cost || 0,
-                sales_14d: record.sales14d || 0,
-                orders_14d: record.purchases14d || 0,
+                sales_7d: record.sales7d || 0,
+                orders_7d: record.purchases7d || 0,
                 updated_at: new Date().toISOString()
               }
 
@@ -1107,6 +1189,44 @@ serve(async (req) => {
                 console.warn(`Failed to update target ${record.targetId} metrics:`, updateError)
               } else {
                 targetMetricsUpdated++
+                
+                // Also insert into AMS streaming tables for dashboard consumption
+                if (timeUnitOpt === 'DAILY' && record.date) {
+                  // Insert traffic data
+                  await supabase
+                    .from('ams_messages_sp_traffic')
+                    .insert({
+                      profile_id: connection.profile_id,
+                      campaign_id: record.campaignId,
+                      ad_group_id: record.adGroupId,
+                      target_id: record.targetId,
+                      hour_start: new Date(record.date + 'T12:00:00Z'), // Use noon for daily data
+                      impressions: record.impressions || 0,
+                      clicks: record.clicks || 0,
+                      cost: record.cost || 0,
+                      connection_id: connectionId,
+                      payload: {}
+                    })
+                    .onConflict('profile_id,campaign_id,ad_group_id,target_id,hour_start')
+
+                  // Insert conversion data
+                  if (record.sales7d || record.purchases7d) {
+                    await supabase
+                      .from('ams_messages_sp_conversion')
+                      .insert({
+                        profile_id: connection.profile_id,
+                        campaign_id: record.campaignId,
+                        ad_group_id: record.adGroupId,
+                        target_id: record.targetId,
+                        hour_start: new Date(record.date + 'T12:00:00Z'),
+                        attributed_sales: record.sales7d || 0,
+                        attributed_conversions: record.purchases7d || 0,
+                        connection_id: connectionId,
+                        payload: {}
+                      })
+                      .onConflict('profile_id,campaign_id,ad_group_id,target_id,hour_start')
+                  }
+                }
               }
             } catch (error) {
               console.warn(`Failed to process target performance record:`, error)
@@ -1201,7 +1321,7 @@ serve(async (req) => {
         for (const campaignId of campaignIds) {
           try {
             const response = await fetchWithRetry(
-              `https://advertising-api.amazon.com/sp/campaigns/${campaignId}/budget/usage`,
+              `${apiEndpoint}/sp/campaigns/${campaignId}/budget/usage`,
               {
                 headers: {
                   'Authorization': `Bearer ${accessToken}`,
@@ -1297,9 +1417,9 @@ serve(async (req) => {
         apiVersion: 'v3',
         usedReportingV3: true,
         columnsUsed: {
-          campaign: ['impressions', 'clicks', 'cost', 'sales14d', 'purchases14d'],
-          adGroup: ['impressions', 'clicks', 'cost', 'sales14d', 'purchases14d'], 
-          advertisedProducts: ['impressions', 'clicks', 'cost', 'sales14d', 'purchases14d']
+          campaign: ['impressions', 'clicks', 'cost', 'sales7d', 'purchases7d'],
+          adGroup: ['impressions', 'clicks', 'cost', 'sales7d', 'purchases7d'], 
+          advertisedProducts: ['impressions', 'clicks', 'cost', 'sales7d', 'purchases7d']
         },
         diagnostics
       }),
