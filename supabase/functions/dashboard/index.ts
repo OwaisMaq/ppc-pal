@@ -222,25 +222,42 @@ Deno.serve(async (req) => {
     // Handle different endpoints
     switch (path) {
       case 'kpis': {
-        // Aggregate KPIs from canonical fact tables (search terms)
-        const { data, error } = await supabase
-          .from('fact_search_term_daily')
-          .select('clicks, impressions, cost_micros, attributed_conversions_7d, attributed_sales_7d_micros')
+        // Get traffic data from AMS stream
+        const { data: trafficData, error: trafficError } = await supabase
+          .from('ams_messages_sp_traffic')
+          .select('clicks, impressions, cost')
           .eq('profile_id', profileId)
-          .gte('date', from)
-          .lte('date', to);
+          .gte('hour_start', from)
+          .lte('hour_start', to);
           
-        if (error) throw error;
+        if (trafficError) throw trafficError;
         
-        const totals = (data || []).reduce((acc: any, row: any) => {
-          acc.cost_micros += row.cost_micros || 0;
-          acc.sales_7d_micros += row.attributed_sales_7d_micros || 0;
+        // Get conversion data from AMS stream
+        const { data: conversionData, error: conversionError } = await supabase
+          .from('ams_messages_sp_conversion')
+          .select('attributed_conversions, attributed_sales')
+          .eq('profile_id', profileId)
+          .gte('hour_start', from)
+          .lte('hour_start', to);
+          
+        if (conversionError) throw conversionError;
+        
+        // Aggregate traffic metrics
+        const trafficTotals = (trafficData || []).reduce((acc: any, row: any) => {
+          acc.cost_micros += (row.cost || 0) * 1e6;
           acc.clicks += row.clicks || 0;
           acc.impressions += row.impressions || 0;
-          acc.conv_7d += row.attributed_conversions_7d || 0;
           return acc;
-        }, { cost_micros: 0, sales_7d_micros: 0, clicks: 0, impressions: 0, conv_7d: 0 });
+        }, { cost_micros: 0, clicks: 0, impressions: 0 });
         
+        // Aggregate conversion metrics
+        const conversionTotals = (conversionData || []).reduce((acc: any, row: any) => {
+          acc.sales_7d_micros += (row.attributed_sales || 0) * 1e6;
+          acc.conv_7d += row.attributed_conversions || 0;
+          return acc;
+        }, { sales_7d_micros: 0, conv_7d: 0 });
+        
+        const totals = { ...trafficTotals, ...conversionTotals };
         const kpis = calculateMetrics(totals);
         
         return new Response(
@@ -256,19 +273,29 @@ Deno.serve(async (req) => {
       }
       
       case 'table': {
-        // Pull from canonical fact table and group by requested level
-        const { data, error } = await supabase
-          .from('fact_search_term_daily')
-          .select('date, campaign_id, ad_group_id, clicks, impressions, cost_micros, attributed_conversions_7d, attributed_sales_7d_micros')
+        // Get traffic data grouped by entity
+        const { data: trafficData, error: trafficError } = await supabase
+          .from('ams_messages_sp_traffic')
+          .select('campaign_id, ad_group_id, clicks, impressions, cost')
           .eq('profile_id', profileId)
-          .gte('date', from)
-          .lte('date', to);
+          .gte('hour_start', from)
+          .lte('hour_start', to);
         
-        if (error) throw error;
+        if (trafficError) throw trafficError;
         
-        // Group by entity
+        // Get conversion data grouped by entity
+        const { data: conversionData, error: conversionError } = await supabase
+          .from('ams_messages_sp_conversion')
+          .select('campaign_id, ad_group_id, attributed_conversions, attributed_sales')
+          .eq('profile_id', profileId)
+          .gte('hour_start', from)
+          .lte('hour_start', to);
+          
+        if (conversionError) throw conversionError;
+        
+        // Group traffic by entity
         const grouped: Record<string, any> = {};
-        for (const row of data || []) {
+        for (const row of trafficData || []) {
           const key = level === 'campaign' ? row.campaign_id : row.ad_group_id;
           if (!key) continue;
           if (!grouped[key]) {
@@ -282,11 +309,17 @@ Deno.serve(async (req) => {
               conv_7d: 0
             };
           }
-          grouped[key].cost_micros += row.cost_micros || 0;
-          grouped[key].sales_7d_micros += row.attributed_sales_7d_micros || 0;
+          grouped[key].cost_micros += (row.cost || 0) * 1e6;
           grouped[key].clicks += row.clicks || 0;
           grouped[key].impressions += row.impressions || 0;
-          grouped[key].conv_7d += row.attributed_conversions_7d || 0;
+        }
+        
+        // Add conversion data to grouped entities
+        for (const row of conversionData || []) {
+          const key = level === 'campaign' ? row.campaign_id : row.ad_group_id;
+          if (!key || !grouped[key]) continue;
+          grouped[key].sales_7d_micros += (row.attributed_sales || 0) * 1e6;
+          grouped[key].conv_7d += row.attributed_conversions || 0;
         }
 
         // Resolve names from entity tables
@@ -335,26 +368,49 @@ Deno.serve(async (req) => {
           );
         }
         const idCol = level === 'campaign' ? 'campaign_id' : 'ad_group_id';
-        const { data, error } = await supabase
-          .from('fact_search_term_daily')
-          .select('date, clicks, impressions, cost_micros, attributed_sales_7d_micros')
+        
+        // Get traffic data for the specific entity
+        const { data: trafficData, error: trafficError } = await supabase
+          .from('ams_messages_sp_traffic')
+          .select('hour_start, clicks, impressions, cost')
           .eq('profile_id', profileId)
           .eq(idCol, entityId)
-          .gte('date', from)
-          .lte('date', to)
-          .order('date');
-        if (error) throw error;
+          .gte('hour_start', from)
+          .lte('hour_start', to)
+          .order('hour_start');
+          
+        if (trafficError) throw trafficError;
+        
+        // Get conversion data for the specific entity
+        const { data: conversionData, error: conversionError } = await supabase
+          .from('ams_messages_sp_conversion')
+          .select('hour_start, attributed_conversions, attributed_sales')
+          .eq('profile_id', profileId)
+          .eq(idCol, entityId)
+          .gte('hour_start', from)
+          .lte('hour_start', to);
+          
+        if (conversionError) throw conversionError;
 
+        // Group by date (not hour)
         const timeseries: Record<string, any> = {};
-        for (const row of data || []) {
-          const dateKey = row.date;
+        
+        for (const row of trafficData || []) {
+          const dateKey = new Date(row.hour_start).toISOString().split('T')[0];
           if (!timeseries[dateKey]) {
             timeseries[dateKey] = { date: dateKey, cost_micros: 0, sales_7d_micros: 0, clicks: 0, impressions: 0 };
           }
-          timeseries[dateKey].cost_micros += row.cost_micros || 0;
-          timeseries[dateKey].sales_7d_micros += row.attributed_sales_7d_micros || 0;
+          timeseries[dateKey].cost_micros += (row.cost || 0) * 1e6;
           timeseries[dateKey].clicks += row.clicks || 0;
           timeseries[dateKey].impressions += row.impressions || 0;
+        }
+        
+        for (const row of conversionData || []) {
+          const dateKey = new Date(row.hour_start).toISOString().split('T')[0];
+          if (!timeseries[dateKey]) {
+            timeseries[dateKey] = { date: dateKey, cost_micros: 0, sales_7d_micros: 0, clicks: 0, impressions: 0 };
+          }
+          timeseries[dateKey].sales_7d_micros += (row.attributed_sales || 0) * 1e6;
         }
 
         const points = Object.values(timeseries).map((item: any) => ({
