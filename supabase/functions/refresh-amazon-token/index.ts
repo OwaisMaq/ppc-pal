@@ -193,6 +193,7 @@ serve(async (req) => {
         token_expires_at: expiresAt.toISOString(),
         status: 'active',
         setup_required_reason: null,
+        health_status: 'healthy',
         updated_at: new Date().toISOString()
       })
       .eq('id', connectionId)

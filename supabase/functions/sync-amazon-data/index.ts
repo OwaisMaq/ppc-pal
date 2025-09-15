@@ -380,7 +380,7 @@ serve(async (req) => {
         user_id: user.id,
         status: 'running',
         started_at: new Date().toISOString(),
-        progress: 0
+        progress_percent: 0
       })
       .select()
       .single()
@@ -393,13 +393,13 @@ serve(async (req) => {
     }
 
     // Update sync job progress
-    const updateProgress = async (progress: number, message?: string) => {
+    const updateProgress = async (progress: number, phase?: string) => {
       if (syncJobId) {
         await supabase
           .from('sync_jobs')
           .update({ 
-            progress,
-            ...(message && { message })
+            progress_percent: progress,
+            ...(phase && { phase })
           })
           .eq('id', syncJobId)
       }
@@ -417,8 +417,8 @@ serve(async (req) => {
       throw new Error('Connection not found')
     }
 
-    if (!connection.is_active) {
-      throw new Error('Connection is not active')
+    if (connection.status !== 'active' && connection.status !== 'setup_required') {
+      throw new Error(`Connection is not active (status: ${connection.status})`)
     }
 
     // Get encryption key
@@ -479,6 +479,18 @@ serve(async (req) => {
 
         accessToken = newAccessToken
         console.log('✅ Token refreshed successfully')
+        
+        // Update connection status to active if it was setup_required
+        if (connection.status === 'setup_required') {
+          await supabase
+            .from('amazon_connections')
+            .update({ 
+              status: 'active',
+              setup_required_reason: null,
+              health_status: 'healthy' 
+            })
+            .eq('id', connectionId)
+        }
       } catch (error) {
         console.error('❌ Token refresh failed:', error)
         throw new Error(`Token refresh failed: ${error}`)
@@ -738,9 +750,9 @@ serve(async (req) => {
           .from('sync_jobs')
           .update({ 
             status: 'completed',
-            completed_at: new Date().toISOString(),
-            progress: 100,
-            message: 'Sync completed - no entities found'
+            finished_at: new Date().toISOString(),
+            progress_percent: 100,
+            phase: 'Sync completed - no entities found'
           })
           .eq('id', syncJobId)
       }
@@ -1195,9 +1207,9 @@ serve(async (req) => {
         .from('sync_jobs')
         .update({ 
           status: 'completed',
-          completed_at: new Date().toISOString(),
-          progress: 100,
-          message: 'Sync completed successfully'
+          finished_at: new Date().toISOString(),
+          progress_percent: 100,
+          phase: 'Sync completed successfully'
         })
         .eq('id', syncJobId)
     }
@@ -1271,9 +1283,10 @@ serve(async (req) => {
         .from('sync_jobs')
         .update({ 
           status: 'failed',
-          completed_at: new Date().toISOString(),
-          progress: 0,
-          message: message
+          finished_at: new Date().toISOString(),
+          progress_percent: 0,
+          phase: message,
+          error_details: { error: message, code }
         })
         .eq('id', syncJobId)
     }
