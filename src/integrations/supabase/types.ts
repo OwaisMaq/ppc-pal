@@ -2249,10 +2249,12 @@ export type Database = {
           cost_micros: number | null
           date: string
           impressions: number | null
+          keyword_id: string | null
           keyword_text: string | null
           match_type: string
           profile_id: string
           search_term: string
+          targeting: string | null
         }
         Insert: {
           ad_group_id: string
@@ -2264,10 +2266,12 @@ export type Database = {
           cost_micros?: number | null
           date: string
           impressions?: number | null
+          keyword_id?: string | null
           keyword_text?: string | null
           match_type: string
           profile_id: string
           search_term: string
+          targeting?: string | null
         }
         Update: {
           ad_group_id?: string
@@ -2279,10 +2283,12 @@ export type Database = {
           cost_micros?: number | null
           date?: string
           impressions?: number | null
+          keyword_id?: string | null
           keyword_text?: string | null
           match_type?: string
           profile_id?: string
           search_term?: string
+          targeting?: string | null
         }
         Relationships: []
       }
@@ -3876,6 +3882,7 @@ export type Database = {
           impressions_14d: number | null
           is_brand: boolean | null
           is_ignored: boolean | null
+          keyword_id: string | null
           profile_id: string | null
           sales_14d: number | null
           sales_14d_micros: number | null

@@ -1297,6 +1297,7 @@ serve(async (req) => {
                     campaign_id: record.campaignId,
                     ad_group_id: record.adGroupId,
                     keyword_id: record.keywordId,
+                    keyword_text: record.keywordText || record.targeting,
                     search_term: record.searchTerm,
                     date: record.date,
                     impressions: record.impressions || 0,
@@ -1305,47 +1306,12 @@ serve(async (req) => {
                     attributed_conversions_7d: record.purchases_7d || 0,
                     attributed_sales_7d_micros: (record.sales_7d || 0) * 1e6,
                     attributed_conversions_1d: record.purchases_1d || 0,
-                    match_type: record.matchType,
+                    match_type: record.matchType || 'BROAD',
                     targeting: record.targeting
                   })
                   .onConflict('profile_id,campaign_id,ad_group_id,keyword_id,search_term,date')
                 
                 searchTermMetricsUpdated++
-
-                // Also insert into AMS streaming tables for real-time dashboard
-                await supabase
-                  .from('ams_messages_sp_traffic')
-                  .insert({
-                    profile_id: connection.profile_id,
-                    campaign_id: record.campaignId,
-                    ad_group_id: record.adGroupId,
-                    keyword_id: record.keywordId,
-                    hour_start: new Date(record.date + 'T12:00:00Z'), // Use noon for daily data
-                    impressions: record.impressions || 0,
-                    clicks: record.clicks || 0,
-                    cost: record.cost || 0,
-                    connection_id: connectionId,
-                    payload: { searchTerm: record.searchTerm }
-                  })
-                  .onConflict('profile_id,campaign_id,ad_group_id,keyword_id,hour_start')
-
-                // Insert conversion data
-                if (record.sales_7d || record.purchases_7d) {
-                  await supabase
-                    .from('ams_messages_sp_conversion')
-                    .insert({
-                      profile_id: connection.profile_id,
-                      campaign_id: record.campaignId,
-                      ad_group_id: record.adGroupId,
-                      keyword_id: record.keywordId,
-                      hour_start: new Date(record.date + 'T12:00:00Z'),
-                      attributed_sales: record.sales_7d || 0,
-                      attributed_conversions: record.purchases_7d || 0,
-                      connection_id: connectionId,
-                      payload: { searchTerm: record.searchTerm }
-                    })
-                    .onConflict('profile_id,campaign_id,ad_group_id,keyword_id,hour_start')
-                }
               }
             } catch (error) {
               console.warn(`Failed to process search term performance record:`, error)
