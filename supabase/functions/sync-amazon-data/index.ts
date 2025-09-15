@@ -387,9 +387,23 @@ serve(async (req) => {
     syncJobId = newJobId
     console.log('✅ Created sync job:', syncJobId)
 
-    // Update sync job progress
+    // Update sync job progress with timeout check
     const updateProgress = async (progress: number, phase?: string) => {
       if (syncJobId) {
+        // Check if sync has been running too long (30 minutes)
+        const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString()
+        
+        const { data: currentJob } = await supabase
+          .from('sync_jobs')
+          .select('started_at, status')
+          .eq('id', syncJobId)
+          .single()
+          
+        if (currentJob && currentJob.started_at < thirtyMinutesAgo && currentJob.status === 'running') {
+          console.warn('⏰ Sync job has exceeded 30 minute timeout')
+          throw new Error('Sync job timeout - process took too long')
+        }
+        
         await supabase
           .from('sync_jobs')
           .update({ 
