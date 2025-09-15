@@ -3915,6 +3915,10 @@ export type Database = {
         Args: { user_uuid: string }
         Returns: boolean
       }
+      cleanup_and_create_sync_job: {
+        Args: { p_connection_id: string; p_user_id: string }
+        Returns: string
+      }
       create_optimization_batch: {
         Args: { connection_uuid: string; user_uuid: string }
         Returns: string

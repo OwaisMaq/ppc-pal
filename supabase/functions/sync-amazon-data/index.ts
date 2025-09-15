@@ -372,37 +372,20 @@ serve(async (req) => {
     const timeUnitOpt: 'SUMMARY' | 'DAILY' = (timeUnit === 'SUMMARY' ? 'SUMMARY' : 'DAILY')
     console.log('🚀 Starting sync for user:', user.id, 'connection:', connectionId, 'dateRangeDays:', dateRange, 'diagnosticMode:', diag)
     
-    // Clean up any existing running sync jobs for this connection
-    await supabase
-      .from('sync_jobs')
-      .update({ 
-        status: 'failed',
-        finished_at: new Date().toISOString(),
-        error_details: { error: 'Cancelled by new sync request', code: 'CANCELLED' }
+    // Use helper function to clean up existing jobs and create new one
+    const { data: newJobId, error: jobError } = await supabase
+      .rpc('cleanup_and_create_sync_job', {
+        p_connection_id: connectionId,
+        p_user_id: user.id
       })
-      .eq('connection_id', connectionId)
-      .eq('status', 'running')
 
-    // Create sync job for progress tracking
-    const { data: syncJob, error: syncJobError } = await supabase
-      .from('sync_jobs')
-      .insert({
-        connection_id: connectionId,
-        user_id: user.id,
-        status: 'running',
-        started_at: new Date().toISOString(),
-        progress_percent: 0
-      })
-      .select()
-      .single()
-
-    if (syncJobError) {
-      console.error('Failed to create sync job:', syncJobError)
-      throw new Error('Failed to create sync job: ' + syncJobError.message)
-    } else {
-      syncJobId = syncJob.id
-      console.log('✅ Created sync job:', syncJobId)
+    if (jobError || !newJobId) {
+      console.error('Failed to create sync job:', jobError)
+      throw new Error('Failed to create sync job: ' + (jobError?.message || 'Unknown error'))
     }
+    
+    syncJobId = newJobId
+    console.log('✅ Created sync job:', syncJobId)
 
     // Update sync job progress
     const updateProgress = async (progress: number, phase?: string) => {
