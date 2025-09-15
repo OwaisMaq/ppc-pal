@@ -64,8 +64,8 @@ interface PerformanceData {
   impressions?: number
   clicks?: number
   cost?: number
-  sales7d?: number
-  purchases7d?: number
+  sales_7d?: number
+  purchases_7d?: number
   sales30d?: number
   purchases30d?: number
 }
@@ -124,7 +124,7 @@ async function createReportRequest(
   reportType: string,
   dateRange: number,
   timeUnit: 'SUMMARY' | 'DAILY' = 'SUMMARY',
-  columns: string[] = ['impressions', 'clicks', 'cost', 'sales14d', 'purchases14d'],
+  columns: string[] = ['impressions', 'clicks', 'cost', 'sales_7d', 'purchases_7d'],
   entityIds?: string[],
   apiEndpoint: string = 'https://advertising-api.amazon.com'
 ): Promise<string> {
@@ -153,6 +153,20 @@ async function createReportRequest(
     }
   }
 
+  // Map report types to correct v3 reportTypeId and groupBy values
+  const reportTypeMapping: Record<string, { reportTypeId: string, groupBy: string }> = {
+    'campaigns': { reportTypeId: 'spCampaigns', groupBy: 'campaign' },
+    'adGroups': { reportTypeId: 'spAdGroups', groupBy: 'adGroup' },
+    'keywords': { reportTypeId: 'spKeywords', groupBy: 'keyword' },
+    'targets': { reportTypeId: 'spTargets', groupBy: 'target' },
+    'searchTerms': { reportTypeId: 'spSearchTerms', groupBy: 'searchTerm' }
+  }
+
+  const mapping = reportTypeMapping[reportType]
+  if (!mapping) {
+    throw new Error(`Unsupported report type: ${reportType}`)
+  }
+
   console.log(`📊 Creating ${reportType} report with ${columns.length} columns, timeUnit: ${timeUnit}`)
   if (entityIds) {
     console.log(`🎯 Filtering to ${entityIds.length} specific entities`)
@@ -174,16 +188,17 @@ async function createReportRequest(
         endDate: requestBody.reportEndDate,
         configuration: {
           adProduct: 'SPONSORED_PRODUCTS',
-          groupBy: [reportType.toUpperCase().slice(0, -1)],
+          groupBy: [mapping.groupBy],
           columns: columns,
-          reportTypeId: reportType.toUpperCase(),
+          reportTypeId: mapping.reportTypeId,
           timeUnit: timeUnit,
           format: 'GZIP_JSON',
           ...(entityIds && { 
             filters: [{
               field: reportType === 'campaigns' ? 'CAMPAIGN_ID' : 
                      reportType === 'adGroups' ? 'AD_GROUP_ID' :
-                     reportType === 'keywords' ? 'KEYWORD_ID' : 'TARGET_ID',
+                     reportType === 'keywords' ? 'KEYWORD_ID' : 
+                     reportType === 'targets' ? 'TARGET_ID' : 'SEARCH_TERM',
               values: entityIds
             }]
           })
@@ -780,11 +795,12 @@ serve(async (req) => {
     // Performance data sync
     let totalMetricsUpdated = 0
 
-    // Define columns for each report type - use 7d metrics to match dashboard expectations
-    const campaignColumns = ['impressions', 'clicks', 'cost', 'sales7d', 'purchases7d']
-    const adGroupColumns = ['impressions', 'clicks', 'cost', 'sales7d', 'purchases7d']
-    const targetColumns = ['impressions', 'clicks', 'cost', 'sales7d', 'purchases7d']
-    const keywordColumns = ['impressions', 'clicks', 'cost', 'sales7d', 'purchases7d']
+    // Define columns for each report type - use proper v3 snake_case format
+    const campaignColumns = ['impressions', 'clicks', 'cost', 'purchases_7d', 'sales_7d']
+    const adGroupColumns = ['impressions', 'clicks', 'cost', 'purchases_7d', 'sales_7d']  
+    const targetColumns = ['impressions', 'clicks', 'cost', 'purchases_7d', 'sales_7d']
+    const keywordColumns = ['impressions', 'clicks', 'cost', 'purchases_7d', 'sales_7d']
+    const searchTermColumns = ['impressions', 'clicks', 'cost', 'purchases_7d', 'sales_7d']
 
     // Only generate reports if we have data to report on
     if (campaignIds.length === 0 && adGroupIds.length === 0 && keywordIds.length === 0 && targetIds.length === 0) {
@@ -849,8 +865,8 @@ serve(async (req) => {
                 impressions: record.impressions || 0,
                 clicks: record.clicks || 0,
                 cost: record.cost || 0,
-                sales_7d: record.sales7d || 0,
-                orders_7d: record.purchases7d || 0,
+                sales_7d: record.sales_7d || 0,
+                orders_7d: record.purchases_7d || 0,
                 updated_at: new Date().toISOString()
               }
 
@@ -888,15 +904,15 @@ serve(async (req) => {
                     .onConflict('profile_id,campaign_id,hour_start')
 
                   // Insert conversion data
-                  if (record.sales7d || record.purchases7d) {
+                  if (record.sales_7d || record.purchases_7d) {
                     await supabase
                       .from('ams_messages_sp_conversion')
                       .insert({
                         profile_id: connection.profile_id,
                         campaign_id: record.campaignId,
                         hour_start: new Date(record.date + 'T12:00:00Z'),
-                        attributed_sales: record.sales7d || 0,
-                        attributed_conversions: record.purchases7d || 0,
+                        attributed_sales: record.sales_7d || 0,
+                        attributed_conversions: record.purchases_7d || 0,
                         connection_id: connectionId,
                         payload: {}
                       })
@@ -1009,8 +1025,8 @@ serve(async (req) => {
                 impressions: record.impressions || 0,
                 clicks: record.clicks || 0,
                 cost: record.cost || 0,
-                sales_7d: record.sales7d || 0,
-                orders_7d: record.purchases7d || 0,
+                sales_7d: record.sales_7d || 0,
+                orders_7d: record.purchases_7d || 0,
                 updated_at: new Date().toISOString()
               }
 
@@ -1048,7 +1064,7 @@ serve(async (req) => {
                     .onConflict('profile_id,campaign_id,ad_group_id,hour_start')
 
                   // Insert conversion data
-                  if (record.sales7d || record.purchases7d) {
+                  if (record.sales_7d || record.purchases_7d) {
                     await supabase
                       .from('ams_messages_sp_conversion')
                       .insert({
@@ -1056,8 +1072,8 @@ serve(async (req) => {
                         campaign_id: record.campaignId,
                         ad_group_id: record.adGroupId,
                         hour_start: new Date(record.date + 'T12:00:00Z'),
-                        attributed_sales: record.sales7d || 0,
-                        attributed_conversions: record.purchases7d || 0,
+                        attributed_sales: record.sales_7d || 0,
+                        attributed_conversions: record.purchases_7d || 0,
                         connection_id: connectionId,
                         payload: {}
                       })
@@ -1170,8 +1186,8 @@ serve(async (req) => {
                 impressions: record.impressions || 0,
                 clicks: record.clicks || 0,
                 cost: record.cost || 0,
-                sales_7d: record.sales7d || 0,
-                orders_7d: record.purchases7d || 0,
+                sales_7d: record.sales_7d || 0,
+                orders_7d: record.purchases_7d || 0,
                 updated_at: new Date().toISOString()
               }
 
@@ -1210,7 +1226,7 @@ serve(async (req) => {
                     .onConflict('profile_id,campaign_id,ad_group_id,target_id,hour_start')
 
                   // Insert conversion data
-                  if (record.sales7d || record.purchases7d) {
+                  if (record.sales_7d || record.purchases_7d) {
                     await supabase
                       .from('ams_messages_sp_conversion')
                       .insert({
@@ -1219,8 +1235,8 @@ serve(async (req) => {
                         ad_group_id: record.adGroupId,
                         target_id: record.targetId,
                         hour_start: new Date(record.date + 'T12:00:00Z'),
-                        attributed_sales: record.sales7d || 0,
-                        attributed_conversions: record.purchases7d || 0,
+                        attributed_sales: record.sales_7d || 0,
+                        attributed_conversions: record.purchases_7d || 0,
                         connection_id: connectionId,
                         payload: {}
                       })
@@ -1417,9 +1433,10 @@ serve(async (req) => {
         apiVersion: 'v3',
         usedReportingV3: true,
         columnsUsed: {
-          campaign: ['impressions', 'clicks', 'cost', 'sales7d', 'purchases7d'],
-          adGroup: ['impressions', 'clicks', 'cost', 'sales7d', 'purchases7d'], 
-          advertisedProducts: ['impressions', 'clicks', 'cost', 'sales7d', 'purchases7d']
+          campaign: ['impressions', 'clicks', 'cost', 'purchases_7d', 'sales_7d'],
+          adGroup: ['impressions', 'clicks', 'cost', 'purchases_7d', 'sales_7d'], 
+          target: ['impressions', 'clicks', 'cost', 'purchases_7d', 'sales_7d'],
+          searchTerm: ['impressions', 'clicks', 'cost', 'purchases_7d', 'sales_7d']
         },
         diagnostics
       }),
