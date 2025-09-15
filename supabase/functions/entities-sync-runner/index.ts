@@ -126,11 +126,20 @@ class EntitySyncer {
 
   private deriveBaseUrl(endpoint: string): string {
     // Extract region from endpoint and construct base URL
+    if (!endpoint) {
+      console.warn('No advertising API endpoint provided, using default');
+      return 'https://advertising-api.amazon.com'; // Default to North America
+    }
+    
     const urlParts = endpoint.split('.');
     if (urlParts.length >= 2) {
       const region = urlParts[1]; // e.g., 'eu' from 'advertising-api.eu.amazon.com'
-      return `https://advertising-api.${region}.amazon.com`;
+      const baseUrl = `https://advertising-api.${region}.amazon.com`;
+      console.log(`Using regional API endpoint: ${baseUrl}`);
+      return baseUrl;
     }
+    
+    console.warn(`Failed to parse region from endpoint: ${endpoint}, using default`);
     return 'https://advertising-api.amazon.com'; // fallback
   }
 
@@ -534,10 +543,10 @@ async function getConnectionConfig(supabase: any, profileId: string): Promise<Sy
     throw new Error(`Failed to get tokens for profile ${profileId}: ${tokensError?.message || 'No tokens found'}`);
   }
 
-  // Get connection details
+  // Get connection details including regional endpoint
   const { data: connection, error: connectionError } = await supabase
     .from('amazon_connections')
-    .select('advertising_api_endpoint')
+    .select('advertising_api_endpoint, marketplace_id')
     .eq('profile_id', profileId)
     .single();
 
@@ -547,6 +556,8 @@ async function getConnectionConfig(supabase: any, profileId: string): Promise<Sy
 
   const syncer = new EntitySyncer(supabase);
   const baseUrl = syncer.deriveBaseUrl(connection.advertising_api_endpoint);
+  
+  console.log(`Profile ${profileId} using endpoint: ${baseUrl} for marketplace: ${connection.marketplace_id}`);
   
   const clientId = Deno.env.get('AMAZON_CLIENT_ID');
   if (!clientId) {

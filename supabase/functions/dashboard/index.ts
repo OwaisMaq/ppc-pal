@@ -89,6 +89,38 @@ async function checkEntitlements(supabase: any, userId: string, level: string): 
   }
 }
 
+// Background entity sync trigger
+async function triggerEntitySync(supabase: any, profileId: string, entityType: string): Promise<void> {
+  try {
+    // Check if sync is already in progress
+    const { data: recentRun } = await supabase
+      .from('sync_runs')
+      .select('id, status, started_at')
+      .eq('profile_id', profileId)
+      .eq('entity_type', entityType)
+      .gte('started_at', new Date(Date.now() - 5 * 60 * 1000).toISOString()) // Last 5 minutes
+      .eq('status', 'running')
+      .maybeSingle();
+    
+    if (recentRun) {
+      console.log(`Entity sync already in progress for ${profileId}:${entityType}`);
+      return;
+    }
+    
+    // Trigger entity sync in background
+    console.log(`Triggering background entity sync for ${profileId}:${entityType}`);
+    const { error } = await supabase.functions.invoke('entities-sync-runner', {
+      body: { profileId, entity: entityType, mode: 'incremental' }
+    });
+    
+    if (error) {
+      console.warn(`Failed to trigger entity sync for ${profileId}:${entityType}:`, error.message);
+    }
+  } catch (error) {
+    console.warn(`Error triggering entity sync for ${profileId}:${entityType}:`, error);
+  }
+}
+
 Deno.serve(async (req) => {
   const requestId = crypto.randomUUID();
   const startTime = Date.now();
@@ -322,23 +354,49 @@ Deno.serve(async (req) => {
           grouped[key].conv_7d += row.attributed_conversions || 0;
         }
 
-        // Resolve names from entity tables
+        // Resolve names from entity tables with fallbacks
         const keys = Object.keys(grouped);
+        let entitiesFound = false;
+        
         if (keys.length > 0) {
           if (level === 'campaign') {
-            const { data: entities } = await supabase
+            const { data: entities, error: entityError } = await supabase
               .from('entity_campaigns')
               .select('campaign_id, name')
+              .eq('profile_id', profileId)
               .in('campaign_id', keys);
-            const nameMap = Object.fromEntries((entities || []).map((e: any) => [e.campaign_id, e.name]));
-            for (const k of keys) grouped[k].name = nameMap[k] || k;
+            
+            if (!entityError && entities && entities.length > 0) {
+              entitiesFound = true;
+              const nameMap = Object.fromEntries(entities.map((e: any) => [e.campaign_id, e.name]));
+              for (const k of keys) {
+                grouped[k].name = nameMap[k] || `Campaign ${k}`;
+              }
+            } else {
+              // Trigger entity sync in background if no entities found
+              console.log(`No campaign entities found for profile ${profileId}, triggering sync`);
+              triggerEntitySync(supabase, profileId, 'campaigns').catch(console.error);
+              for (const k of keys) grouped[k].name = `Campaign ${k}`;
+            }
           } else if (level === 'ad_group') {
-            const { data: entities } = await supabase
+            const { data: entities, error: entityError } = await supabase
               .from('entity_ad_groups')
               .select('ad_group_id, name')
+              .eq('profile_id', profileId)
               .in('ad_group_id', keys);
-            const nameMap = Object.fromEntries((entities || []).map((e: any) => [e.ad_group_id, e.name]));
-            for (const k of keys) grouped[k].name = nameMap[k] || k;
+            
+            if (!entityError && entities && entities.length > 0) {
+              entitiesFound = true; 
+              const nameMap = Object.fromEntries(entities.map((e: any) => [e.ad_group_id, e.name]));
+              for (const k of keys) {
+                grouped[k].name = nameMap[k] || `Ad Group ${k}`;
+              }
+            } else {
+              // Trigger entity sync in background if no entities found
+              console.log(`No ad group entities found for profile ${profileId}, triggering sync`);
+              triggerEntitySync(supabase, profileId, 'ad_groups').catch(console.error);
+              for (const k of keys) grouped[k].name = `Ad Group ${k}`;
+            }
           }
         }
 
