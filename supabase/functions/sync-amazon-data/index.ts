@@ -417,6 +417,8 @@ serve(async (req) => {
       throw new Error('Connection not found')
     }
 
+    // Check connection status - allow active connections even with setup_required_reason
+    // since tokens might still be valid
     if (connection.status !== 'active' && connection.status !== 'setup_required') {
       throw new Error(`Connection is not active (status: ${connection.status})`)
     }
@@ -446,6 +448,16 @@ serve(async (req) => {
 
     if (tokensError || !tokens || tokens.length === 0) {
       console.error('Failed to retrieve stored tokens:', tokensError)
+      
+      // Update connection with error status
+      await supabase
+        .from('amazon_connections')
+        .update({ 
+          setup_required_reason: 'Failed to retrieve tokens - please reconnect your Amazon account',
+          health_status: 'error'
+        })
+        .eq('id', connectionId)
+        
       throw new Error('Failed to retrieve stored tokens')
     }
 
@@ -1217,7 +1229,11 @@ serve(async (req) => {
     // Update connection last_sync
     await supabase
       .from('amazon_connections')
-      .update({ last_sync: new Date().toISOString() })
+      .update({ 
+        last_sync_at: new Date().toISOString(),
+        setup_required_reason: null,
+        health_status: 'healthy'
+      })
       .eq('id', connectionId)
 
     // If DAILY sync, roll up 14-day aggregates into campaigns table
