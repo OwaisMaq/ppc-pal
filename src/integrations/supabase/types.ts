@@ -4028,6 +4028,13 @@ export type Database = {
         Args: { p_connection_id: string }
         Returns: undefined
       }
+      secure_profile_access_check: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          email: string
+          id: string
+        }[]
+      }
       set_config: {
         Args: { is_local?: boolean; key: string; value: string }
         Returns: undefined
