@@ -69,16 +69,16 @@ verify_jwt = false
 verify_jwt = true
 
 [functions.dashboard]
-verify_jwt = false
+verify_jwt = true
 
 [functions.rules-engine-runner]
-verify_jwt = false
+verify_jwt = true
 
 [functions.actions-worker]
-verify_jwt = false
+verify_jwt = true
 
 [functions.rules-api]
-verify_jwt = false
+verify_jwt = true
 
 [functions.notify-worker]
 verify_jwt = false

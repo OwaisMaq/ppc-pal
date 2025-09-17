@@ -3918,6 +3918,10 @@ export type Database = {
         Args: { p_mad: number; p_median: number; p_value: number }
         Returns: number
       }
+      can_access_profile: {
+        Args: { profile_user_id: string }
+        Returns: boolean
+      }
       can_user_optimize: {
         Args: { user_uuid: string }
         Returns: boolean
