@@ -15,37 +15,59 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 222.2 47.4% 11.2%;
+    --primary: 214 84% 56%;        /* Clean blue - primary actions */
     --primary-foreground: 210 40% 98%;
 
-    --secondary: 210 40% 96.1%;
+    --secondary: 210 17% 98%;      /* Off-white - backgrounds */
     --secondary-foreground: 222.2 47.4% 11.2%;
 
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 214 84% 56%;
+    --accent: 158 64% 52%;         /* Emerald - success/highlights */
     --accent-foreground: 210 40% 98%;
 
-    /* Professional accent colors for subtle highlights */
-    --accent-blue: 214 84% 56%;
-    --accent-blue-foreground: 210 40% 98%;
+    /* Brand Colors - PPC Pal Professional Design */
+    --brand-primary: 214 84% 56%;        /* Clean blue - primary actions */
+    --brand-primary-foreground: 210 40% 98%;
     
-    --accent-emerald: 158 64% 52%;
-    --accent-emerald-foreground: 210 40% 98%;
+    --brand-secondary: 210 17% 98%;      /* Off-white - backgrounds */
+    --brand-secondary-foreground: 222.2 47.4% 11.2%;
     
-    --accent-amber: 38 92% 50%;
-    --accent-amber-foreground: 222.2 47.4% 11.2%;
-    
-    --accent-purple: 262 52% 47%;
-    --accent-purple-foreground: 210 40% 98%;
+    --brand-accent: 158 64% 52%;         /* Emerald - success/highlights */
+    --brand-accent-foreground: 210 40% 98%;
 
-    --destructive: 0 84.2% 60.2%;
+    /* Neutral Palette - Sophisticated Grays */
+    --neutral-50: 210 20% 98%;
+    --neutral-100: 210 14% 89%;
+    --neutral-200: 214 13% 80%;
+    --neutral-300: 213 10% 71%;
+    --neutral-400: 215 9% 61%;
+    --neutral-500: 215 8% 51%;
+    --neutral-600: 215 12% 42%;
+    --neutral-700: 215 16% 32%;
+    --neutral-800: 215 20% 22%;
+    --neutral-900: 215 24% 15%;
+
+    /* Status Colors - Subtle & Clear */
+    --success: 142 76% 36%;     /* Forest green */
+    --success-foreground: 210 40% 98%;
+    
+    --warning: 38 92% 50%;      /* Amber */
+    --warning-foreground: 222.2 47.4% 11.2%;
+    
+    --error: 0 84% 60%;         /* Red */
+    --error-foreground: 210 40% 98%;
+    
+    --info: 199 89% 48%;        /* Sky blue */
+    --info-foreground: 210 40% 98%;
+
+    --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 214 13% 80%;        /* Using neutral-200 */
+    --input: 214 13% 80%;
+    --ring: 214 84% 56%;          /* Using brand-primary */
 
     --radius: 0.5rem;
 
