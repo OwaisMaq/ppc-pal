@@ -544,36 +544,95 @@ serve(async (req) => {
         )
       }
 
-      // Robust UK profile detection across EU endpoint results
-      function isUKProfile(profile: any) {
+      // Enhanced profile detection for major English-speaking markets
+      function isSupportedProfile(profile: any) {
         const cc = (profile.countryCode || profile.country || '').toUpperCase();
         const currency = (profile.currencyCode || '').toUpperCase();
         const mk = (profile.marketplaceString || profile.marketplace || profile.accountInfo?.marketplaceString || '').toLowerCase();
         const name = (profile.accountInfo?.name || '').toLowerCase();
+        
+        // Support major English-speaking markets
+        const supportedCountries = ['GB', 'UK', 'US', 'CA', 'AU'];
+        const supportedCurrencies = ['GBP', 'USD', 'CAD', 'AUD'];
+        
+        // UK detection
         const hasUKDomain = mk.includes('.co.uk') || mk.includes('united kingdom');
         const hasUKToken = /\buk\b/.test(mk) || /\buk\b/.test(name);
-        return cc === 'GB' || cc === 'UK' || currency === 'GBP' || hasUKDomain || hasUKToken;
+        const isUK = cc === 'GB' || cc === 'UK' || currency === 'GBP' || hasUKDomain || hasUKToken;
+        
+        // US detection
+        const hasUSDomain = mk.includes('.com') && !mk.includes('.co.uk') && !mk.includes('.ca') && !mk.includes('.au');
+        const isUS = cc === 'US' || currency === 'USD' || hasUSDomain;
+        
+        // Canada detection  
+        const hasCaDomain = mk.includes('.ca') || mk.includes('canada');
+        const isCA = cc === 'CA' || currency === 'CAD' || hasCaDomain;
+        
+        // Australia detection
+        const hasAuDomain = mk.includes('.au') || mk.includes('australia');
+        const isAU = cc === 'AU' || currency === 'AUD' || hasAuDomain;
+        
+        return {
+          isSupported: isUK || isUS || isCA || isAU,
+          marketplace: isUK ? 'UK' : isUS ? 'US' : isCA ? 'CA' : isAU ? 'AU' : 'UNKNOWN',
+          countryCode: cc,
+          currency: currency
+        };
       }
 
-      const ukProfiles = profiles
-        .map((p: any) => ({ ...p, _isUK: isUKProfile(p) }))
-        .filter((p: any) => p._isUK);
+      // Log all found profiles for debugging
+      console.log(`[${timestamp}] Analyzing ${profiles.length} total profiles:`);
+      profiles.forEach((profile, index) => {
+        const analysis = isSupportedProfile(profile);
+        console.log(`[${timestamp}] Profile ${index + 1}:`, JSON.stringify({
+          profileId: profile.profileId,
+          countryCode: profile.countryCode || profile.country,
+          currency: profile.currencyCode,
+          marketplace: profile.marketplaceString || profile.marketplace,
+          accountName: profile.accountInfo?.name,
+          region: profile.region,
+          analysis: analysis
+        }, null, 2));
+      });
 
-      console.log('UK profiles found (robust match):', ukProfiles.length)
+      const validProfiles = profiles
+        .map((p: any) => {
+          const analysis = isSupportedProfile(p);
+          return { ...p, _analysis: analysis };
+        })
+        .filter((p: any) => p._analysis.isSupported);
 
-      if (!ukProfiles || ukProfiles.length === 0) {
+      console.log(`[${timestamp}] Supported profiles found:`, validProfiles.length);
+
+      if (!validProfiles || validProfiles.length === 0) {
         const foundCountryCodes = Array.from(new Set(profiles.map((p: any) => (p.countryCode || p.country || '').toUpperCase()).filter(Boolean)));
         const foundCurrencies = Array.from(new Set(profiles.map((p: any) => (p.currencyCode || '').toUpperCase()).filter(Boolean)));
         const marketplaces = Array.from(new Set(profiles.map((p: any) => (p.marketplaceString || p.marketplace || '').toLowerCase()).filter(Boolean))).slice(0, 10);
-        console.warn('No UK profile matched. Found countries:', foundCountryCodes, 'currencies:', foundCurrencies, 'marketplaces sample:', marketplaces);
+        const rejectedProfiles = profiles.map(p => {
+          const analysis = isSupportedProfile(p);
+          return {
+            profileId: p.profileId,
+            countryCode: p.countryCode || p.country,
+            currency: p.currencyCode,
+            marketplace: p.marketplaceString || p.marketplace,
+            reason: analysis.isSupported ? 'accepted' : 'unsupported marketplace'
+          };
+        });
+        
+        console.warn(`[${timestamp}] No supported profiles found. Supported markets: US, UK, CA, AU`);
+        console.warn(`[${timestamp}] Found countries:`, foundCountryCodes, 'currencies:', foundCurrencies);
+        console.warn(`[${timestamp}] Rejected profiles:`, JSON.stringify(rejectedProfiles, null, 2));
+        
         return new Response(
           JSON.stringify({ 
-            error: 'No UK profile found',
-            details: 'We could not confidently detect a UK profile. We look for GB/UK country, GBP currency, or .co.uk/United Kingdom in marketplace.',
+            error: 'No supported advertising profiles found',
+            details: `We found ${profiles.length} advertising profile(s) but none are from supported marketplaces (US, UK, Canada, Australia). Currently supported: USD, GBP, CAD, AUD currencies.`,
             profileCount: profiles.length,
             foundCountryCodes,
             foundCurrencies,
             marketplacesSample: marketplaces,
+            rejectedProfiles: rejectedProfiles.slice(0, 5), // Show first 5 for debugging
+            supportedMarkets: ['United States (USD)', 'United Kingdom (GBP)', 'Canada (CAD)', 'Australia (AUD)'],
             requiresSetup: true
           }),
           { 
@@ -594,8 +653,8 @@ serve(async (req) => {
       // Encryption key retrieved; will pass directly to DB function
       console.log('Encryption key retrieved; passing directly to DB function');
 
-      // Store connection for each UK profile only
-      for (const profile of ukProfiles) {
+      // Store connection for each supported profile
+      for (const profile of validProfiles) {
         const expiresAt = new Date(Date.now() + (tokenData.expires_in * 1000))
         
         console.log('Storing UK connection for profile:', profile.profileId)
@@ -648,11 +707,11 @@ serve(async (req) => {
         console.log('Successfully stored tokens for profile:', profile.profileId);
       }
 
-      console.log('Successfully stored UK connections for user:', user.id)
+      console.log(`Successfully stored connections for user: ${user.id} across ${validProfiles.length} marketplace(s)`)
       
       // Automatically trigger sync for the newly connected profiles
       console.log('🚀 Auto-triggering sync for newly connected profiles...')
-      for (const profile of ukProfiles) {
+      for (const profile of validProfiles) {
         try {
           // Find the connection ID for this profile
           const { data: connection } = await supabase
@@ -707,9 +766,10 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           success: true, 
-          profileCount: ukProfiles.length,
+          profileCount: validProfiles.length,
           syncStarted: true,
-          message: `Connected ${ukProfiles.length} profile(s) and started data sync`
+          message: `Connected ${validProfiles.length} profile(s) and started data sync`,
+          marketplaces: validProfiles.map(p => p._analysis.marketplace)
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
