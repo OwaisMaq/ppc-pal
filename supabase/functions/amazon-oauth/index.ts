@@ -133,7 +133,7 @@ serve(async (req) => {
       const rawB64 = toBase64(stateBytes);
       const b64url = rawB64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/,'');
       const stateParam = `${user.id}_${Date.now()}_${b64url}`;
-      const scope = 'advertising::campaign_management'
+      const scope = 'advertising::campaign_management advertising::account_management'
       
       // Store OAuth state server-side
       const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
@@ -295,20 +295,20 @@ serve(async (req) => {
         { 
           url: 'https://advertising-api.amazon.com',
           region: 'North America',
-          priority: 1,
-          fallbackIps: ['52.206.64.20', '52.54.136.138'] // Example IPs for fallback
+          priority: 1
         },
         { 
           url: 'https://advertising-api.eu.amazon.com',
           region: 'Europe',
           priority: 2,
-          fallbackIps: ['52.48.64.20', '52.30.136.138'] // Example IPs for fallback
+          // Add IP fallback for DNS issues - this is critical for UK profiles
+          fallbackUrl: 'https://52.214.155.89/v2/profiles',
+          fallbackHost: 'advertising-api.eu.amazon.com'
         },
         { 
           url: 'https://advertising-api.fe.amazon.com',
-          region: 'Far East',
-          priority: 3,
-          fallbackIps: ['52.196.64.20', '52.198.136.138'] // Example IPs for fallback
+          region: 'Far East', 
+          priority: 3
         }
       ];
       
@@ -361,14 +361,34 @@ serve(async (req) => {
             dnsFailureCount++;
           }
           
-          // For DNS errors, we could try with IP address as fallback in production
-          // This is commented out as IP addresses change and need proper implementation
-          /*
-          if (isDnsError && endpoint.fallbackIps && retryCount < maxRetries) {
-            console.log(`DNS failed for ${endpoint.url}, trying with fallback approach...`);
-            // In production, you'd implement IP fallback here
+          // Try IP fallback for Europe endpoint specifically (critical for UK profiles)
+          if (isDnsError && endpoint.fallbackUrl && retryCount === 0) {
+            console.log(`DNS failed for ${endpoint.url}, trying IP fallback: ${endpoint.fallbackUrl}`);
+            try {
+              const fallbackHeaders = {
+                ...headers,
+                'Host': endpoint.fallbackHost // Set correct host header for IP request
+              };
+              
+              const fallbackResponse = await fetch(endpoint.fallbackUrl, {
+                headers: fallbackHeaders,
+                signal: AbortSignal.timeout(timeout)
+              });
+              
+              if (fallbackResponse.ok) {
+                const fallbackProfiles = await fallbackResponse.json();
+                console.log(`IP fallback successful for ${endpoint.region}: ${fallbackProfiles.length} profiles`);
+                return {
+                  success: true,
+                  profiles: fallbackProfiles,
+                  status: fallbackResponse.status,
+                  method: 'ip_fallback'
+                };
+              }
+            } catch (fallbackError) {
+              console.log(`IP fallback also failed for ${endpoint.region}:`, fallbackError.message);
+            }
           }
-          */
           
           if ((isDnsError || isTimeoutError) && retryCount < maxRetries) {
             const delay = Math.min(Math.pow(2, retryCount + 1) * 1000, 5000);
