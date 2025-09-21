@@ -133,7 +133,7 @@ serve(async (req) => {
       const rawB64 = toBase64(stateBytes);
       const b64url = rawB64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/,'');
       const stateParam = `${user.id}_${Date.now()}_${b64url}`;
-      const scope = 'advertising::campaign_management advertising::account_management'
+      const scope = 'advertising::campaign_management'
       
       // Store OAuth state server-side
       const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
