@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAmazonConnections } from '@/hooks/useAmazonConnections';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { CheckCircle, AlertCircle, Loader2, Wifi } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const AmazonCallback = () => {
@@ -10,6 +11,7 @@ const AmazonCallback = () => {
   const { handleOAuthCallback } = useAmazonConnections();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('Processing Amazon connection...');
+  const [diagnosticInfo, setDiagnosticInfo] = useState<any>(null);
 
   useEffect(() => {
     let processed = false;
@@ -51,14 +53,20 @@ const AmazonCallback = () => {
           
           const diagnostics = (result as any).diagnostics;
           if (diagnostics?.issueType === 'infrastructure_dns') {
-            detailedMessage += ' This appears to be a temporary network issue. Please try again in 5-10 minutes.';
+            detailedMessage = 'Network connectivity issues preventing connection to Amazon\'s advertising servers. This appears to be a temporary infrastructure problem.';
           } else if (diagnostics?.issueType === 'no_advertising_account') {
-            detailedMessage += ' Please ensure you have an active Amazon Advertising account with campaigns and API access enabled.';
+            detailedMessage = 'Successfully connected to Amazon\'s servers, but no advertising profiles were found. This usually means you don\'t have an active Amazon Advertising account.';
           } else if (diagnostics?.issueType === 'partial_connectivity') {
-            detailedMessage += ' Some Amazon regions are temporarily unavailable. Please try again shortly.';
+            detailedMessage = 'Some Amazon advertising regions are temporarily unavailable, but we successfully connected to others. However, no advertising profiles were found.';
           }
           
           setMessage(detailedMessage);
+          
+          // Store diagnostic info for display
+          if (diagnostics) {
+            setDiagnosticInfo(diagnostics);
+          }
+          
           return;
         }
         
@@ -130,6 +138,36 @@ const AmazonCallback = () => {
         </CardHeader>
         <CardContent className="text-center space-y-4">
           <p className="text-gray-600">{message}</p>
+          
+          {/* Show diagnostic information for setup issues */}
+          {status === 'error' && diagnosticInfo && (
+            <Alert className="text-left">
+              <Wifi className="h-4 w-4" />
+              <AlertDescription>
+                <strong>Connection Diagnostics:</strong>
+                <br />
+                {diagnosticInfo.successfulEndpoints > 0 ? (
+                  <>Successfully connected to {diagnosticInfo.successfulEndpoints} of {diagnosticInfo.totalEndpoints} Amazon regions.</>
+                ) : (
+                  <>Unable to connect to any Amazon advertising regions.</>
+                )}
+                {diagnosticInfo.dnsFailureCount > 0 && (
+                  <>
+                    <br />
+                    <strong>Network Issues:</strong> {diagnosticInfo.dnsFailureCount} region(s) have DNS connectivity problems.
+                  </>
+                )}
+                <br />
+                <strong>Recommendation:</strong> {diagnosticInfo.recommendation || 'Check your Amazon Advertising account setup and try again.'}
+                {diagnosticInfo.userAction && (
+                  <>
+                    <br />
+                    <strong>Next Steps:</strong> {diagnosticInfo.userAction}
+                  </>
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
           
           {status === 'error' && (
             <Button 

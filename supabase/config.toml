@@ -94,3 +94,6 @@ verify_jwt = true
 
 [functions.playbooks]
 verify_jwt = true
+
+[functions.amazon-diagnostics]
+verify_jwt = false

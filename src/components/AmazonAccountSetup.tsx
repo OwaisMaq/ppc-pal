@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { LinkIcon, RefreshCw, Trash2, CheckCircle, AlertCircle, Clock, ExternalLink, RotateCcw } from "lucide-react";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import AmazonOAuthSetup from "@/components/AmazonOAuthSetup";
+import AmazonConnectionDiagnostics from "@/components/AmazonConnectionDiagnostics";
 import { formatDistanceToNow } from "date-fns";
 
 const AmazonAccountSetup = () => {
@@ -150,6 +151,11 @@ const AmazonAccountSetup = () => {
           )}
         </CardContent>
       </Card>
+      
+      {/* Show diagnostics if there are connection issues */}
+      {connections.some(c => c.status === 'error' || c.status === 'setup_required') && (
+        <AmazonConnectionDiagnostics />
+      )}
       
       {/* Show OAuth setup guide if there are connection issues or no connections yet */}
       {(connections.length === 0 || connections.some(c => c.status === 'error' || c.status === 'setup_required')) && (

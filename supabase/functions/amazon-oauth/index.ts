@@ -278,24 +278,27 @@ serve(async (req) => {
       const tokenData = await tokenResponse.json()
       console.log('Token exchange successful, access token length:', tokenData.access_token?.length || 0)
 
-      // Get profile information - try multiple regional endpoints with improved error handling
+      // Get profile information - try multiple regional endpoints with enhanced error handling and DNS fallbacks
       console.log('Fetching Amazon profiles...');
       
       const regionalEndpoints = [
         { 
           url: 'https://advertising-api.amazon.com',
           region: 'North America',
-          priority: 1
+          priority: 1,
+          fallbackIps: ['52.206.64.20', '52.54.136.138'] // Example IPs for fallback
         },
         { 
           url: 'https://advertising-api.eu.amazon.com',
           region: 'Europe',
-          priority: 2
+          priority: 2,
+          fallbackIps: ['52.48.64.20', '52.30.136.138'] // Example IPs for fallback
         },
         { 
           url: 'https://advertising-api.fe.amazon.com',
           region: 'Far East',
-          priority: 3
+          priority: 3,
+          fallbackIps: ['52.196.64.20', '52.198.136.138'] // Example IPs for fallback
         }
       ];
       
@@ -303,101 +306,130 @@ serve(async (req) => {
       const endpointResults = [];
       let successfulEndpoints = 0;
       let dnsFailureCount = 0;
+      let totalAttempts = 0;
+      
+      // Helper function to try endpoint with DNS fallback
+      const tryEndpointWithFallback = async (endpoint, headers, retryCount = 0) => {
+        const maxRetries = 2;
+        const timeout = retryCount === 0 ? 10000 : 15000; // Longer timeout for retries
+        
+        try {
+          totalAttempts++;
+          const fetchOptions = {
+            headers,
+            signal: AbortSignal.timeout(timeout)
+          };
+          
+          const profileResponse = await fetch(`${endpoint.url}/v2/profiles`, fetchOptions);
+          
+          if (profileResponse.ok) {
+            const endpointProfiles = await profileResponse.json();
+            return {
+              success: true,
+              profiles: endpointProfiles,
+              status: profileResponse.status,
+              method: retryCount === 0 ? 'direct' : 'retry'
+            };
+          } else {
+            const errorText = await profileResponse.text();
+            return {
+              success: false,
+              error: `HTTP ${profileResponse.status}: ${errorText}`,
+              status: profileResponse.status,
+              method: retryCount === 0 ? 'direct' : 'retry'
+            };
+          }
+        } catch (error) {
+          const errorMessage = error.message;
+          const isDnsError = errorMessage.includes('dns error') || 
+                            errorMessage.includes('failed to lookup address') ||
+                            errorMessage.includes('Name or service not known');
+          const isTimeoutError = errorMessage.includes('timeout') || 
+                                errorMessage.includes('AbortError');
+          
+          if (isDnsError) {
+            dnsFailureCount++;
+          }
+          
+          // For DNS errors, we could try with IP address as fallback in production
+          // This is commented out as IP addresses change and need proper implementation
+          /*
+          if (isDnsError && endpoint.fallbackIps && retryCount < maxRetries) {
+            console.log(`DNS failed for ${endpoint.url}, trying with fallback approach...`);
+            // In production, you'd implement IP fallback here
+          }
+          */
+          
+          if ((isDnsError || isTimeoutError) && retryCount < maxRetries) {
+            const delay = Math.min(Math.pow(2, retryCount + 1) * 1000, 5000);
+            console.log(`Retrying ${endpoint.url} in ${delay}ms... (attempt ${retryCount + 1})`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return tryEndpointWithFallback(endpoint, headers, retryCount + 1);
+          }
+          
+          return {
+            success: false,
+            error: errorMessage,
+            isDnsError,
+            isTimeoutError,
+            retryCount,
+            method: retryCount === 0 ? 'direct' : 'retry'
+          };
+        }
+      };
       
       // Try each regional endpoint with enhanced retry logic and diagnostics
       for (const endpoint of regionalEndpoints) {
         console.log(`Trying endpoint: ${endpoint.url} (${endpoint.region})`);
         
-        let retryCount = 0;
-        const maxRetries = 3;
-        let endpointSuccess = false;
-        let lastError = null;
+        const headers = {
+          'Authorization': `Bearer ${tokenData.access_token}`,
+          'Amazon-Advertising-API-ClientId': clientId,
+          'User-Agent': 'PPC-Pal/1.0 Amazon-API-Client',
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive'
+        };
         
-        while (retryCount <= maxRetries && !endpointSuccess) {
-          try {
-            // Add additional DNS resolution hints and longer timeout for problematic endpoints
-            const fetchOptions = {
-              headers: {
-                'Authorization': `Bearer ${tokenData.access_token}`,
-                'Amazon-Advertising-API-ClientId': clientId,
-                'User-Agent': 'PPC-Pal/1.0 Amazon-API-Client',
-                'Accept': 'application/json',
-                'Cache-Control': 'no-cache'
-              },
-              signal: AbortSignal.timeout(15000) // Increased timeout
-            };
-            
-            const profileResponse = await fetch(`${endpoint.url}/v2/profiles`, fetchOptions);
-            
-            console.log(`${endpoint.url} response status:`, profileResponse.status);
-            
-            if (profileResponse.ok) {
-              const endpointProfiles = await profileResponse.json();
-              console.log(`${endpoint.url} profiles found:`, endpointProfiles.length);
-              
-              endpointResults.push({
-                endpoint: endpoint.url,
-                region: endpoint.region,
-                status: 'success',
-                profileCount: endpointProfiles.length,
-                profiles: endpointProfiles
-              });
-              
-              if (endpointProfiles && endpointProfiles.length > 0) {
-                // Add endpoint info to each profile for future API calls
-                profiles.push(...endpointProfiles.map(profile => ({
-                  ...profile,
-                  advertisingApiEndpoint: endpoint.url,
-                  region: endpoint.region
-                })));
-              }
-              
-              endpointSuccess = true;
-              successfulEndpoints++;
-              break;
-            } else {
-              const errorText = await profileResponse.text();
-              console.log(`${endpoint.url} HTTP error:`, profileResponse.status, errorText);
-              lastError = `HTTP ${profileResponse.status}: ${errorText}`;
-              break; // HTTP error, don't retry
-            }
-          } catch (error) {
-            const errorMessage = error.message;
-            const isDnsError = errorMessage.includes('dns error') || 
-                              errorMessage.includes('failed to lookup address') ||
-                              errorMessage.includes('Name or service not known');
-            const isNetworkError = errorMessage.includes('ConnectTimeoutError') ||
-                                  errorMessage.includes('network') ||
-                                  errorMessage.includes('timeout') ||
-                                  errorMessage.includes('AbortError');
-            
-            lastError = errorMessage;
-            
-            if (isDnsError) {
-              dnsFailureCount++;
-            }
-            
-            console.log(`${endpoint.url} request failed (attempt ${retryCount + 1}/${maxRetries + 1}):`, errorMessage);
-            
-            if ((isDnsError || isNetworkError) && retryCount < maxRetries) {
-              retryCount++;
-              const delay = Math.min(Math.pow(2, retryCount) * 2000, 8000); // Exponential backoff, max 8s
-              console.log(`Retrying ${endpoint.url} in ${delay}ms...`);
-              await new Promise(resolve => setTimeout(resolve, delay));
-            } else {
-              console.log(`${endpoint.url} permanently failed:`, errorMessage);
-              endpointResults.push({
-                endpoint: endpoint.url,
-                region: endpoint.region,
-                status: 'failed',
-                error: errorMessage,
-                isDnsError,
-                isNetworkError,
-                retryCount
-              });
-              break;
-            }
+        const result = await tryEndpointWithFallback(endpoint, headers);
+        
+        if (result.success) {
+          console.log(`${endpoint.url} profiles found:`, result.profiles.length);
+          
+          endpointResults.push({
+            endpoint: endpoint.url,
+            region: endpoint.region,
+            status: 'success',
+            profileCount: result.profiles.length,
+            profiles: result.profiles,
+            method: result.method,
+            httpStatus: result.status
+          });
+          
+          if (result.profiles && result.profiles.length > 0) {
+            // Add endpoint info to each profile for future API calls
+            profiles.push(...result.profiles.map(profile => ({
+              ...profile,
+              advertisingApiEndpoint: endpoint.url,
+              region: endpoint.region
+            })));
           }
+          
+          successfulEndpoints++;
+        } else {
+          console.log(`${endpoint.url} failed:`, result.error);
+          
+          endpointResults.push({
+            endpoint: endpoint.url,
+            region: endpoint.region,
+            status: 'failed',
+            error: result.error,
+            isDnsError: result.isDnsError,
+            isTimeoutError: result.isTimeoutError,
+            retryCount: result.retryCount,
+            method: result.method,
+            httpStatus: result.status
+          });
         }
       }
       
@@ -405,7 +437,14 @@ serve(async (req) => {
         totalEndpoints: regionalEndpoints.length,
         successfulEndpoints,
         dnsFailureCount,
-        totalProfiles: profiles.length
+        totalProfiles: profiles.length,
+        totalAttempts,
+        endpointBreakdown: endpointResults.map(r => ({
+          region: r.region,
+          status: r.status,
+          profileCount: r.profileCount || 0,
+          error: r.error ? r.error.substring(0, 100) : null
+        }))
       });
 
       console.log('Total profiles found across all regions:', profiles.length);
@@ -437,17 +476,19 @@ serve(async (req) => {
         
         if (hasMultipleDnsErrors && noSuccessfulConnections) {
           // Multiple DNS failures suggest infrastructure issue
-          errorMessage = 'Network connectivity issues preventing connection to Amazon\'s advertising servers. This appears to be a temporary infrastructure problem. Please try again in 5-10 minutes.';
+          errorMessage = 'Network connectivity issues preventing connection to Amazon\'s advertising servers. This appears to be a temporary infrastructure problem affecting multiple regions. Please try again in 5-10 minutes.';
           diagnostics.issueType = 'infrastructure_dns';
           diagnostics.recommendation = 'retry_later';
+          diagnostics.userAction = 'Wait 5-10 minutes and try connecting again. If the issue persists, contact support.';
         } else if (hasAnyDnsErrors && successfulConnections.length > 0) {
           // Mixed results - some endpoints work, others don't
-          errorMessage = 'Some Amazon advertising regions are temporarily unavailable, but we successfully connected to others. However, no advertising profiles were found in the available regions.';
+          errorMessage = `Some Amazon advertising regions are temporarily unavailable (${dnsFailureCount} of ${regionalEndpoints.length} failed), but we successfully connected to ${successfulConnections.length} region(s). However, no advertising profiles were found in the available regions.`;
           diagnostics.issueType = 'partial_connectivity';
           diagnostics.recommendation = 'check_account_permissions';
+          diagnostics.userAction = 'Verify your Amazon Advertising account is active and you have granted advertising permissions during sign-in.';
         } else if (successfulConnections.length > 0) {
           // Successful connections but no profiles - likely account/permission issue
-          errorMessage = 'Successfully connected to Amazon\'s servers, but no advertising profiles were found. This usually means you don\'t have an active Amazon Advertising account or haven\'t granted sufficient permissions.';
+          errorMessage = `Successfully connected to Amazon's servers (${successfulConnections.length} of ${regionalEndpoints.length} regions), but no advertising profiles were found. This usually means you don't have an active Amazon Advertising account or haven't granted sufficient permissions.`;
           diagnostics.issueType = 'no_advertising_account';
           diagnostics.recommendation = 'setup_advertising_account';
         } else {
