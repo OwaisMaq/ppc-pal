@@ -45,7 +45,20 @@ const AmazonCallback = () => {
         
         if (result?.requiresSetup) {
           setStatus('error');
-          setMessage(result.details || 'Amazon Advertising account setup required. Please ensure you have an active Amazon Advertising account with API access.');
+          
+          // Provide specific guidance based on diagnostics if available
+          let detailedMessage = result.details || 'Amazon Advertising account setup required.';
+          
+          const diagnostics = (result as any).diagnostics;
+          if (diagnostics?.issueType === 'infrastructure_dns') {
+            detailedMessage += ' This appears to be a temporary network issue. Please try again in 5-10 minutes.';
+          } else if (diagnostics?.issueType === 'no_advertising_account') {
+            detailedMessage += ' Please ensure you have an active Amazon Advertising account with campaigns and API access enabled.';
+          } else if (diagnostics?.issueType === 'partial_connectivity') {
+            detailedMessage += ' Some Amazon regions are temporarily unavailable. Please try again shortly.';
+          }
+          
+          setMessage(detailedMessage);
           return;
         }
         

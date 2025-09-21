@@ -278,52 +278,87 @@ serve(async (req) => {
       const tokenData = await tokenResponse.json()
       console.log('Token exchange successful, access token length:', tokenData.access_token?.length || 0)
 
-      // Get profile information - try multiple regional endpoints
+      // Get profile information - try multiple regional endpoints with improved error handling
       console.log('Fetching Amazon profiles...');
       
       const regionalEndpoints = [
-        'https://advertising-api.amazon.com',     // North America
-        'https://advertising-api.eu.amazon.com', // Europe (FIXED - was advertising-api-eu)
-        'https://advertising-api.fe.amazon.com'  // Far East (FIXED - was advertising-api-fe)
+        { 
+          url: 'https://advertising-api.amazon.com',
+          region: 'North America',
+          priority: 1
+        },
+        { 
+          url: 'https://advertising-api.eu.amazon.com',
+          region: 'Europe',
+          priority: 2
+        },
+        { 
+          url: 'https://advertising-api.fe.amazon.com',
+          region: 'Far East',
+          priority: 3
+        }
       ];
       
-      let profileResponse;
       let profiles = [];
+      const endpointResults = [];
+      let successfulEndpoints = 0;
+      let dnsFailureCount = 0;
       
-      // Try each regional endpoint with retry logic
+      // Try each regional endpoint with enhanced retry logic and diagnostics
       for (const endpoint of regionalEndpoints) {
-        console.log(`Trying endpoint: ${endpoint}`);
+        console.log(`Trying endpoint: ${endpoint.url} (${endpoint.region})`);
         
         let retryCount = 0;
-        const maxRetries = 2;
+        const maxRetries = 3;
+        let endpointSuccess = false;
+        let lastError = null;
         
-        while (retryCount <= maxRetries) {
+        while (retryCount <= maxRetries && !endpointSuccess) {
           try {
-            profileResponse = await fetch(`${endpoint}/v2/profiles`, {
+            // Add additional DNS resolution hints and longer timeout for problematic endpoints
+            const fetchOptions = {
               headers: {
                 'Authorization': `Bearer ${tokenData.access_token}`,
                 'Amazon-Advertising-API-ClientId': clientId,
+                'User-Agent': 'PPC-Pal/1.0 Amazon-API-Client',
+                'Accept': 'application/json',
+                'Cache-Control': 'no-cache'
               },
-              signal: AbortSignal.timeout(10000) // 10 second timeout
-            });
+              signal: AbortSignal.timeout(15000) // Increased timeout
+            };
             
-            console.log(`${endpoint} response status:`, profileResponse.status);
+            const profileResponse = await fetch(`${endpoint.url}/v2/profiles`, fetchOptions);
+            
+            console.log(`${endpoint.url} response status:`, profileResponse.status);
             
             if (profileResponse.ok) {
               const endpointProfiles = await profileResponse.json();
-              console.log(`${endpoint} profiles found:`, endpointProfiles.length);
+              console.log(`${endpoint.url} profiles found:`, endpointProfiles.length);
+              
+              endpointResults.push({
+                endpoint: endpoint.url,
+                region: endpoint.region,
+                status: 'success',
+                profileCount: endpointProfiles.length,
+                profiles: endpointProfiles
+              });
               
               if (endpointProfiles && endpointProfiles.length > 0) {
                 // Add endpoint info to each profile for future API calls
                 profiles.push(...endpointProfiles.map(profile => ({
                   ...profile,
-                  advertisingApiEndpoint: endpoint
+                  advertisingApiEndpoint: endpoint.url,
+                  region: endpoint.region
                 })));
               }
-              break; // Success, move to next endpoint
+              
+              endpointSuccess = true;
+              successfulEndpoints++;
+              break;
             } else {
               const errorText = await profileResponse.text();
-              console.log(`${endpoint} error:`, profileResponse.status, errorText);
+              console.log(`${endpoint.url} HTTP error:`, profileResponse.status, errorText);
+              lastError = `HTTP ${profileResponse.status}: ${errorText}`;
               break; // HTTP error, don't retry
             }
           } catch (error) {
@@ -333,26 +368,49 @@ serve(async (req) => {
                               errorMessage.includes('Name or service not known');
             const isNetworkError = errorMessage.includes('ConnectTimeoutError') ||
                                   errorMessage.includes('network') ||
-                                  errorMessage.includes('timeout');
+                                  errorMessage.includes('timeout') ||
+                                  errorMessage.includes('AbortError');
             
-            console.log(`${endpoint} request failed (attempt ${retryCount + 1}/${maxRetries + 1}):`, errorMessage);
+            lastError = errorMessage;
+            
+            if (isDnsError) {
+              dnsFailureCount++;
+            }
+            
+            console.log(`${endpoint.url} request failed (attempt ${retryCount + 1}/${maxRetries + 1}):`, errorMessage);
             
             if ((isDnsError || isNetworkError) && retryCount < maxRetries) {
               retryCount++;
-              const delay = Math.pow(2, retryCount) * 1000; // Exponential backoff
-              console.log(`Retrying ${endpoint} in ${delay}ms...`);
+              const delay = Math.min(Math.pow(2, retryCount) * 2000, 8000); // Exponential backoff, max 8s
+              console.log(`Retrying ${endpoint.url} in ${delay}ms...`);
               await new Promise(resolve => setTimeout(resolve, delay));
             } else {
-              console.log(`${endpoint} permanently failed:`, errorMessage);
+              console.log(`${endpoint.url} permanently failed:`, errorMessage);
+              endpointResults.push({
+                endpoint: endpoint.url,
+                region: endpoint.region,
+                status: 'failed',
+                error: errorMessage,
+                isDnsError,
+                isNetworkError,
+                retryCount
+              });
               break;
             }
           }
         }
       }
+      
+      console.log('Endpoint diagnostics:', {
+        totalEndpoints: regionalEndpoints.length,
+        successfulEndpoints,
+        dnsFailureCount,
+        totalProfiles: profiles.length
+      });
 
       console.log('Total profiles found across all regions:', profiles.length);
 
-      // Handle case where no profiles are returned
+      // Handle case where no profiles are returned with detailed diagnostics
       if (!profiles || profiles.length === 0) {
         console.warn('No Amazon Advertising profiles found for user:', user.id);
         console.warn('This usually means:');
@@ -361,15 +419,43 @@ serve(async (req) => {
         console.warn('3. User account is not eligible for Advertising API access');
         console.warn('4. Temporary network/DNS issues connecting to Amazon endpoints');
         
-        // Check if we had DNS/network errors on all endpoints
-        const hasNetworkErrors = regionalEndpoints.every(endpoint => {
-          // This is a simple heuristic - in a real implementation you'd track this
-          return true; // Assume network issues if no profiles found
-        });
+        // Analyze the actual failure patterns
+        const dnsIssues = endpointResults.filter(r => r.status === 'failed' && r.isDnsError);
+        const networkIssues = endpointResults.filter(r => r.status === 'failed' && r.isNetworkError);
+        const successfulConnections = endpointResults.filter(r => r.status === 'success');
+        const hasAnyDnsErrors = dnsIssues.length > 0;
+        const hasMultipleDnsErrors = dnsIssues.length >= 2;
+        const noSuccessfulConnections = successfulConnections.length === 0;
         
-        const errorMessage = hasNetworkErrors 
-          ? 'Temporary connection issue with Amazon\'s servers. Please try connecting again in a few minutes.'
-          : 'This account may not have access to Amazon Advertising, or insufficient permissions were granted. Please ensure you have an active Amazon Advertising account and grant all requested permissions.';
+        let errorMessage: string;
+        let diagnostics: any = {
+          endpointResults,
+          successfulEndpoints,
+          dnsFailureCount,
+          analysisTimestamp: new Date().toISOString()
+        };
+        
+        if (hasMultipleDnsErrors && noSuccessfulConnections) {
+          // Multiple DNS failures suggest infrastructure issue
+          errorMessage = 'Network connectivity issues preventing connection to Amazon\'s advertising servers. This appears to be a temporary infrastructure problem. Please try again in 5-10 minutes.';
+          diagnostics.issueType = 'infrastructure_dns';
+          diagnostics.recommendation = 'retry_later';
+        } else if (hasAnyDnsErrors && successfulConnections.length > 0) {
+          // Mixed results - some endpoints work, others don't
+          errorMessage = 'Some Amazon advertising regions are temporarily unavailable, but we successfully connected to others. However, no advertising profiles were found in the available regions.';
+          diagnostics.issueType = 'partial_connectivity';
+          diagnostics.recommendation = 'check_account_permissions';
+        } else if (successfulConnections.length > 0) {
+          // Successful connections but no profiles - likely account/permission issue
+          errorMessage = 'Successfully connected to Amazon\'s servers, but no advertising profiles were found. This usually means you don\'t have an active Amazon Advertising account or haven\'t granted sufficient permissions.';
+          diagnostics.issueType = 'no_advertising_account';
+          diagnostics.recommendation = 'setup_advertising_account';
+        } else {
+          // Complete failure but not DNS-related
+          errorMessage = 'Unable to connect to Amazon\'s advertising servers. This may be a temporary issue or a problem with your account permissions.';
+          diagnostics.issueType = 'general_connectivity';
+          diagnostics.recommendation = 'retry_and_check_permissions';
+        }
         
         return new Response(
           JSON.stringify({ 
@@ -377,7 +463,8 @@ serve(async (req) => {
             details: errorMessage,
             profileCount: 0,
             requiresSetup: true,
-            isTemporary: hasNetworkErrors
+            isTemporary: hasAnyDnsErrors || noSuccessfulConnections,
+            diagnostics
           }),
           { 
             status: 200, // Not a server error, but a setup issue

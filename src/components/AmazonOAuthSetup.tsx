@@ -39,6 +39,15 @@ const AmazonOAuthSetup = () => {
           </AlertDescription>
         </Alert>
 
+        <Alert className="border-blue-200 bg-blue-50">
+          <AlertTriangle className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="text-blue-800">
+            <strong>Connection Issues?</strong> If you're experiencing "Temporary connection issue" errors, 
+            this is usually due to network connectivity problems with Amazon's servers. Try again in a few minutes, 
+            or contact support if the issue persists.
+          </AlertDescription>
+        </Alert>
+
         <div className="space-y-3">
           <h4 className="font-semibold text-gray-900">Prerequisites:</h4>
           <ul className="list-disc list-inside space-y-2 text-sm text-gray-700">
