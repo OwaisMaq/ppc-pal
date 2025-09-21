@@ -41,9 +41,14 @@ const AmazonCallback = () => {
       }
 
       try {
-        console.log('Processing Amazon OAuth callback:', { code: code.substring(0, 10) + '...', state });
+        const timestamp = new Date().toISOString();
+        console.log(`[${timestamp}] Processing Amazon OAuth callback:`, { 
+          code: code.substring(0, 10) + '...', 
+          state,
+          timestamp 
+        });
         const result = await handleOAuthCallback(code, state);
-        console.log('OAuth callback result:', result);
+        console.log(`[${timestamp}] OAuth callback result:`, JSON.stringify(result, null, 2));
         
         if (result?.requiresSetup) {
           setStatus('error');
@@ -86,13 +91,20 @@ const AmazonCallback = () => {
             navigate('/dashboard');
           }, 3000);
         } else {
-          console.log('OAuth callback returned falsy result:', result);
+          console.log('OAuth callback returned falsy result:', JSON.stringify(result, null, 2));
           setStatus('error');
           setMessage('Failed to connect Amazon account');
         }
       } catch (error) {
-        console.error('Callback processing error:', error);
-        console.error('Error details:', error);
+        const timestamp = new Date().toISOString();
+        console.error(`[${timestamp}] Callback processing error:`, error);
+        console.error(`[${timestamp}] Full error details:`, JSON.stringify({
+          message: error.message,
+          stack: error.stack,
+          name: error.name,
+          cause: error.cause,
+          timestamp
+        }, null, 2));
         setStatus('error');
         setMessage(`Connection error: ${error.message || 'Unknown error'}`);
       }

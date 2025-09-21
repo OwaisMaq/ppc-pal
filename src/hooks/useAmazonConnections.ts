@@ -190,16 +190,20 @@ export const useAmazonConnections = () => {
         },
       });
 
-      console.log('Callback response:', { data, error });
+      const timestamp = new Date().toISOString();
+      console.log(`[${timestamp}] Callback response:`, JSON.stringify({ data, error }, null, 2));
       
-      // Log the actual error details
+      // Log the actual error details with full context
       if (error) {
-        console.error('Detailed callback error:', {
+        console.error(`[${timestamp}] Detailed callback error:`, JSON.stringify({
           message: error.message,
           context: error.context,
           details: error.details,
-          status: error.status
-        });
+          status: error.status,
+          stack: error.stack,
+          name: error.name,
+          timestamp
+        }, null, 2));
       }
 
       if (error) {
@@ -209,13 +213,15 @@ export const useAmazonConnections = () => {
       
       // Handle case where no profiles were found (setup required)
       if (data?.requiresSetup) {
-        console.warn('Amazon setup required:', data);
+        const timestamp = new Date().toISOString();
+        console.warn(`[${timestamp}] Amazon setup required:`, JSON.stringify(data, null, 2));
         toast.error(data.details || 'Amazon Advertising account setup required');
         return { 
           success: false, 
           requiresSetup: true,
           error: data.error,
-          details: data.details
+          details: data.details,
+          diagnostics: data.diagnostics || null
         };
       }
       

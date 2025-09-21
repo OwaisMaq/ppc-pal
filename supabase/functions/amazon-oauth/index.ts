@@ -52,16 +52,18 @@ serve(async (req) => {
   }
 
   try {
-    console.log('Amazon OAuth function called with method:', req.method);
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] Amazon OAuth function called with method:`, req.method);
     
     // Check environment variables
     const encryptionKey = Deno.env.get('ENCRYPTION_KEY');
-    console.log('Environment check:', {
+    console.log(`[${timestamp}] Environment check:`, {
       hasEncryptionKey: !!encryptionKey,
       hasSupabaseUrl: !!Deno.env.get('SUPABASE_URL'),
       hasServiceKey: !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
       hasAmazonClientId: !!Deno.env.get('AMAZON_CLIENT_ID'),
-      hasAmazonClientSecret: !!Deno.env.get('AMAZON_CLIENT_SECRET')
+      hasAmazonClientSecret: !!Deno.env.get('AMAZON_CLIENT_SECRET'),
+      timestamp
     });
     
     const supabase = createClient(
@@ -96,19 +98,20 @@ serve(async (req) => {
     let requestBody;
     try {
       requestBody = await req.json();
-      console.log('Request body received:', { 
+      console.log(`[${timestamp}] Request body received:`, { 
         action: requestBody.action,
         hasCode: !!requestBody.code,
         hasState: !!requestBody.state,
-        hasRedirectUri: !!requestBody.redirectUri
+        hasRedirectUri: !!requestBody.redirectUri,
+        timestamp
       });
     } catch (jsonError) {
-      console.error('Failed to parse JSON body:', jsonError.message);
+      console.error(`[${timestamp}] Failed to parse JSON body:`, jsonError.message);
       throw new Error('Invalid JSON body');
     }
 
     const { action, code, state } = requestBody;
-    console.log('Amazon OAuth action:', action)
+    console.log(`[${timestamp}] Amazon OAuth action:`, action)
 
     if (action === 'initiate') {
       // Generate OAuth URL for Amazon Advertising API
@@ -215,17 +218,17 @@ serve(async (req) => {
         );
       }
       
-      console.log('OAuth state validated for user:', oauthState.user_id);
+      console.log(`[${timestamp}] OAuth state validated for user:`, oauthState.user_id);
       
       const clientId = Deno.env.get('AMAZON_CLIENT_ID')
       const clientSecret = Deno.env.get('AMAZON_CLIENT_SECRET')
       
       if (!clientId || !clientSecret) {
-        console.error('Amazon credentials not configured');
+        console.error(`[${timestamp}] Amazon credentials not configured`);
         throw new Error('Amazon credentials not configured')
       }
 
-      console.log('Exchanging code for tokens using stored redirect URI...');
+      console.log(`[${timestamp}] Exchanging code for tokens using stored redirect URI:`, oauthState.redirect_uri);
       
       // Exchange code for tokens using the stored redirect URI
       const tokenResponse = await fetch('https://api.amazon.com/auth/o2/token', {
@@ -242,7 +245,7 @@ serve(async (req) => {
         }),
       })
 
-      console.log('Token response status:', tokenResponse.status);
+      console.log(`[${timestamp}] Token response status:`, tokenResponse.status);
 
       if (!tokenResponse.ok) {
         const errorData = await tokenResponse.text()
@@ -276,10 +279,17 @@ serve(async (req) => {
         .lt('expires_at', new Date().toISOString());
 
       const tokenData = await tokenResponse.json()
-      console.log('Token exchange successful, access token length:', tokenData.access_token?.length || 0)
+      console.log(`[${timestamp}] Token exchange successful, access token length:`, tokenData.access_token?.length || 0)
+      console.log(`[${timestamp}] Token data summary:`, {
+        hasAccessToken: !!tokenData.access_token,
+        hasRefreshToken: !!tokenData.refresh_token,
+        tokenType: tokenData.token_type,
+        expiresIn: tokenData.expires_in,
+        timestamp
+      });
 
       // Get profile information - try multiple regional endpoints with enhanced error handling and DNS fallbacks
-      console.log('Fetching Amazon profiles...');
+      console.log(`[${timestamp}] Fetching Amazon profiles...`);
       
       const regionalEndpoints = [
         { 
@@ -380,7 +390,7 @@ serve(async (req) => {
       
       // Try each regional endpoint with enhanced retry logic and diagnostics
       for (const endpoint of regionalEndpoints) {
-        console.log(`Trying endpoint: ${endpoint.url} (${endpoint.region})`);
+        console.log(`[${timestamp}] Trying endpoint: ${endpoint.url} (${endpoint.region})`);
         
         const headers = {
           'Authorization': `Bearer ${tokenData.access_token}`,
@@ -391,10 +401,25 @@ serve(async (req) => {
           'Connection': 'keep-alive'
         };
         
+        const startTime = Date.now();
         const result = await tryEndpointWithFallback(endpoint, headers);
+        const endTime = Date.now();
+        
+        console.log(`[${timestamp}] Endpoint ${endpoint.url} result:`, JSON.stringify({
+          success: result.success,
+          profileCount: result.profiles?.length || 0,
+          httpStatus: result.status,
+          error: result.error,
+          isDnsError: result.isDnsError,
+          isTimeoutError: result.isTimeoutError,
+          responseTime: endTime - startTime,
+          method: result.method,
+          retryCount: result.retryCount || 0,
+          timestamp
+        }, null, 2));
         
         if (result.success) {
-          console.log(`${endpoint.url} profiles found:`, result.profiles.length);
+          console.log(`[${timestamp}] ${endpoint.url} profiles found:`, result.profiles.length);
           
           endpointResults.push({
             endpoint: endpoint.url,
@@ -433,7 +458,7 @@ serve(async (req) => {
         }
       }
       
-      console.log('Endpoint diagnostics:', {
+      console.log(`[${timestamp}] Endpoint diagnostics:`, JSON.stringify({
         totalEndpoints: regionalEndpoints.length,
         successfulEndpoints,
         dnsFailureCount,
@@ -443,20 +468,25 @@ serve(async (req) => {
           region: r.region,
           status: r.status,
           profileCount: r.profileCount || 0,
-          error: r.error ? r.error.substring(0, 100) : null
-        }))
-      });
+          error: r.error ? r.error.substring(0, 100) : null,
+          isDnsError: r.isDnsError,
+          isTimeoutError: r.isTimeoutError,
+          httpStatus: r.httpStatus,
+          method: r.method
+        })),
+        timestamp
+      }, null, 2));
 
-      console.log('Total profiles found across all regions:', profiles.length);
+      console.log(`[${timestamp}] Total profiles found across all regions:`, profiles.length);
 
       // Handle case where no profiles are returned with detailed diagnostics
       if (!profiles || profiles.length === 0) {
-        console.warn('No Amazon Advertising profiles found for user:', user.id);
-        console.warn('This usually means:');
-        console.warn('1. User does not have an active Amazon Advertising account');
-        console.warn('2. User has not granted sufficient permissions');
-        console.warn('3. User account is not eligible for Advertising API access');
-        console.warn('4. Temporary network/DNS issues connecting to Amazon endpoints');
+        console.warn(`[${timestamp}] No Amazon Advertising profiles found for user:`, user.id);
+        console.warn(`[${timestamp}] This usually means:`);
+        console.warn(`[${timestamp}] 1. User does not have an active Amazon Advertising account`);
+        console.warn(`[${timestamp}] 2. User has not granted sufficient permissions`);
+        console.warn(`[${timestamp}] 3. User account is not eligible for Advertising API access`);
+        console.warn(`[${timestamp}] 4. Temporary network/DNS issues connecting to Amazon endpoints`);
         
         // Analyze the actual failure patterns
         const dnsIssues = endpointResults.filter(r => r.status === 'failed' && r.isDnsError);
