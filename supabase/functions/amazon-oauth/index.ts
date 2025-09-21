@@ -301,9 +301,10 @@ serve(async (req) => {
           url: 'https://advertising-api.eu.amazon.com',
           region: 'Europe',
           priority: 2,
-          // Add IP fallback for DNS issues - this is critical for UK profiles
-          fallbackUrl: 'https://52.214.155.89/v2/profiles',
-          fallbackHost: 'advertising-api.eu.amazon.com'
+          // Critical: Use direct IP for DNS issues affecting UK profiles
+          fallbackUrl: 'https://52.30.136.138/v2/profiles',
+          fallbackHost: 'advertising-api.eu.amazon.com',
+          isUKProfileEndpoint: true
         },
         { 
           url: 'https://advertising-api.fe.amazon.com',
@@ -362,8 +363,8 @@ serve(async (req) => {
           }
           
           // Try IP fallback for Europe endpoint specifically (critical for UK profiles)
-          if (isDnsError && endpoint.fallbackUrl && retryCount === 0) {
-            console.log(`DNS failed for ${endpoint.url}, trying IP fallback: ${endpoint.fallbackUrl}`);
+          if (isDnsError && endpoint.fallbackUrl && endpoint.isUKProfileEndpoint) {
+            console.log(`DNS failed for UK profile endpoint ${endpoint.url}, trying IP fallback: ${endpoint.fallbackUrl}`);
             try {
               const fallbackHeaders = {
                 ...headers,
@@ -377,16 +378,18 @@ serve(async (req) => {
               
               if (fallbackResponse.ok) {
                 const fallbackProfiles = await fallbackResponse.json();
-                console.log(`IP fallback successful for ${endpoint.region}: ${fallbackProfiles.length} profiles`);
+                console.log(`✅ IP fallback successful for ${endpoint.region}: ${fallbackProfiles.length} profiles found`);
                 return {
                   success: true,
                   profiles: fallbackProfiles,
                   status: fallbackResponse.status,
                   method: 'ip_fallback'
                 };
+              } else {
+                console.log(`❌ IP fallback HTTP error for ${endpoint.region}: ${fallbackResponse.status}`);
               }
             } catch (fallbackError) {
-              console.log(`IP fallback also failed for ${endpoint.region}:`, fallbackError.message);
+              console.log(`❌ IP fallback failed for ${endpoint.region}:`, fallbackError.message);
             }
           }
           
