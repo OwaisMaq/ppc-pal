@@ -1617,6 +1617,7 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     )
+  }
   } catch (outerError) {
     // Final catch-all to ensure CORS headers are always returned
     console.error('🚨 Critical sync error:', outerError)
