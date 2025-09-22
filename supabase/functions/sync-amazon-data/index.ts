@@ -400,17 +400,26 @@ async function fetchAllPages(
 }
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
-  let syncJobId: string | undefined;
-
+  // Wrap entire function to ensure CORS headers are always returned
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    let syncJobId: string | undefined;
+    let supabase: any;
+
+    try {
+      // Initialize Supabase client
+      supabase = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      )
+
+      if (!supabase) {
+        throw new Error('Failed to initialize Supabase client')
+      }
 
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
@@ -1577,17 +1586,21 @@ serve(async (req) => {
     else if (message.includes('Invalid authorization')) code = 'INVALID_AUTH'
 
     // Mark sync job as failed  
-    if (syncJobId) {
-      await supabase
-        .from('sync_jobs')
-        .update({ 
-          status: 'error',
-          finished_at: new Date().toISOString(),
-          progress_percent: 0,
-          phase: message,
-          error_details: { error: message, code }
-        })
-        .eq('id', syncJobId)
+    if (syncJobId && supabase) {
+      try {
+        await supabase
+          .from('sync_jobs')
+          .update({ 
+            status: 'error',
+            finished_at: new Date().toISOString(),
+            progress_percent: 0,
+            phase: message,
+            error_details: { error: message, code }
+          })
+          .eq('id', syncJobId)
+      } catch (jobUpdateError) {
+        console.error('Failed to update sync job status:', jobUpdateError)
+      }
     }
 
     return new Response(
@@ -1601,6 +1614,21 @@ serve(async (req) => {
       }),
       { 
         status: code === 'NO_AUTH' || code === 'INVALID_AUTH' ? 401 : 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    )
+  } catch (outerError) {
+    // Final catch-all to ensure CORS headers are always returned
+    console.error('🚨 Critical sync error:', outerError)
+    return new Response(
+      JSON.stringify({ 
+        success: false,
+        code: 'CRITICAL_ERROR',
+        message: 'An unexpected error occurred during sync',
+        error: (outerError as Error)?.message || 'Unknown error'
+      }),
+      { 
+        status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     )
