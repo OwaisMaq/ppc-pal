@@ -298,17 +298,13 @@ serve(async (req) => {
           priority: 1
         },
         { 
-          url: 'https://advertising-api.eu.amazon.com',
+          url: 'https://advertising-api-eu.amazon.com',
           region: 'Europe',
-          priority: 2,
-          // Critical: Use direct IP for DNS issues affecting UK profiles
-          fallbackUrl: 'https://52.30.136.138/v2/profiles',
-          fallbackHost: 'advertising-api.eu.amazon.com',
-          isUKProfileEndpoint: true
+          priority: 2
         },
         { 
-          url: 'https://advertising-api.fe.amazon.com',
-          region: 'Far East', 
+          url: 'https://advertising-api-fe.amazon.com',
+          region: 'Far East',
           priority: 3
         }
       ];
@@ -360,37 +356,6 @@ serve(async (req) => {
           
           if (isDnsError) {
             dnsFailureCount++;
-          }
-          
-          // Try IP fallback for Europe endpoint specifically (critical for UK profiles)
-          if (isDnsError && endpoint.fallbackUrl && endpoint.isUKProfileEndpoint) {
-            console.log(`DNS failed for UK profile endpoint ${endpoint.url}, trying IP fallback: ${endpoint.fallbackUrl}`);
-            try {
-              const fallbackHeaders = {
-                ...headers,
-                'Host': endpoint.fallbackHost // Set correct host header for IP request
-              };
-              
-              const fallbackResponse = await fetch(endpoint.fallbackUrl, {
-                headers: fallbackHeaders,
-                signal: AbortSignal.timeout(timeout)
-              });
-              
-              if (fallbackResponse.ok) {
-                const fallbackProfiles = await fallbackResponse.json();
-                console.log(`✅ IP fallback successful for ${endpoint.region}: ${fallbackProfiles.length} profiles found`);
-                return {
-                  success: true,
-                  profiles: fallbackProfiles,
-                  status: fallbackResponse.status,
-                  method: 'ip_fallback'
-                };
-              } else {
-                console.log(`❌ IP fallback HTTP error for ${endpoint.region}: ${fallbackResponse.status}`);
-              }
-            } catch (fallbackError) {
-              console.log(`❌ IP fallback failed for ${endpoint.region}:`, fallbackError.message);
-            }
           }
           
           if ((isDnsError || isTimeoutError) && retryCount < maxRetries) {
