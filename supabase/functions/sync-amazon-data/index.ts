@@ -380,6 +380,18 @@ async function fetchAllPages(
       console.error(`❌ Failed to fetch ${endpoint}: ${response.status} ${errorText}`)
       console.error(`🔗 Request URL: ${url}`)
       console.error(`🌍 API Endpoint: ${apiEndpoint}`)
+      
+      // Debug token information when there's an auth error
+      if (response.status === 403 || response.status === 401) {
+        console.error('🔑 Auth error - Token debug info:', {
+          tokenLength: accessToken?.length || 0,
+          tokenStart: accessToken?.substring(0, 15),
+          tokenEnd: accessToken?.substring(accessToken?.length - 15),
+          hasBearer: accessToken?.startsWith('Bearer '),
+          isString: typeof accessToken === 'string'
+        })
+      }
+      
       break
     }
     
