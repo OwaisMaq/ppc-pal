@@ -3205,6 +3205,7 @@ export type Database = {
           started_at: string
           status: string
           sync_details: Json | null
+          updated_at: string | null
           user_id: string
         }
         Insert: {
@@ -3218,6 +3219,7 @@ export type Database = {
           started_at?: string
           status?: string
           sync_details?: Json | null
+          updated_at?: string | null
           user_id: string
         }
         Update: {
@@ -3231,6 +3233,7 @@ export type Database = {
           started_at?: string
           status?: string
           sync_details?: Json | null
+          updated_at?: string | null
           user_id?: string
         }
         Relationships: []
