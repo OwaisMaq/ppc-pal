@@ -332,6 +332,7 @@ export type Database = {
       }
       amazon_connections: {
         Row: {
+          access_token_encrypted: string | null
           advertising_api_endpoint: string | null
           campaign_count: number | null
           created_at: string
@@ -343,6 +344,7 @@ export type Database = {
           marketplace_id: string | null
           profile_id: string
           profile_name: string | null
+          refresh_token_encrypted: string | null
           reporting_api_version: string | null
           setup_required_reason: string | null
           status: Database["public"]["Enums"]["api_connection_status"]
@@ -355,6 +357,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          access_token_encrypted?: string | null
           advertising_api_endpoint?: string | null
           campaign_count?: number | null
           created_at?: string
@@ -366,6 +369,7 @@ export type Database = {
           marketplace_id?: string | null
           profile_id: string
           profile_name?: string | null
+          refresh_token_encrypted?: string | null
           reporting_api_version?: string | null
           setup_required_reason?: string | null
           status?: Database["public"]["Enums"]["api_connection_status"]
@@ -378,6 +382,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          access_token_encrypted?: string | null
           advertising_api_endpoint?: string | null
           campaign_count?: number | null
           created_at?: string
@@ -389,6 +394,7 @@ export type Database = {
           marketplace_id?: string | null
           profile_id?: string
           profile_name?: string | null
+          refresh_token_encrypted?: string | null
           reporting_api_version?: string | null
           setup_required_reason?: string | null
           status?: Database["public"]["Enums"]["api_connection_status"]
