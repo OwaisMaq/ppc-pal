@@ -556,6 +556,16 @@ serve(async (req) => {
 
     let accessToken = tokens[0].access_token
     const refreshToken = tokens[0].refresh_token
+    
+    // Debug: Log token info (first and last 10 chars only for security)
+    console.log('🔑 Access token format check:', {
+      length: accessToken?.length || 0,
+      startsWith: accessToken?.substring(0, 10),
+      endsWith: accessToken?.substring(accessToken?.length - 10),
+      isString: typeof accessToken === 'string',
+      hasBearer: accessToken?.startsWith('Bearer '),
+      containsColon: accessToken?.includes(':')
+    });
 
     // Check if token needs refresh (expires within 5 minutes)
     const expiresAt = new Date(tokens[0].expires_at)
@@ -623,6 +633,11 @@ serve(async (req) => {
     
     // Fetch campaigns
     console.log('📁 Fetching campaigns...')
+    console.log('🔑 Token being used for API call:', {
+      tokenLength: accessToken?.length || 0,
+      tokenStart: accessToken?.substring(0, 15) + '...',
+      tokenType: typeof accessToken
+    });
     const campaigns = await fetchAllPages(accessToken, connection.profile_id, 'campaigns', 10000, apiEndpoint)
     console.log(`✅ Found ${campaigns.length} campaigns`)
 
