@@ -1581,7 +1581,7 @@ serve(async (req) => {
       await supabase
         .from('sync_jobs')
         .update({ 
-          status: 'failed',
+          status: 'error',
           finished_at: new Date().toISOString(),
           progress_percent: 0,
           phase: message,
