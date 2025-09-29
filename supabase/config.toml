@@ -97,3 +97,6 @@ verify_jwt = true
 
 [functions.amazon-diagnostics]
 verify_jwt = false
+
+[functions.refresh-amazon-token]
+verify_jwt = true
