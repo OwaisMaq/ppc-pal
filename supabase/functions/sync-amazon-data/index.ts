@@ -176,13 +176,18 @@ async function createReportRequest(
     console.log(`🎯 Filtering to ${entityIds.length} specific entities`)
   }
 
+  const clientId = Deno.env.get('AMAZON_CLIENT_ID')
+  if (!clientId || clientId.trim() === '') {
+    throw new Error('AMAZON_CLIENT_ID is required for Amazon API calls')
+  }
+
   const response = await fetchWithRetry(
     `${apiEndpoint}/reporting/reports`,
     {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
-        'Amazon-Advertising-API-ClientId': Deno.env.get('AMAZON_CLIENT_ID') || '',
+        'Amazon-Advertising-API-ClientId': clientId.trim(),
         'Amazon-Advertising-API-Scope': profileId,
         'Content-Type': 'application/vnd.amazon.reporting.v3+json'
       },
@@ -258,13 +263,18 @@ async function pollReportStatus(
 ): Promise<ReportRequest> {
   const startTime = Date.now()
   
+  const clientId = Deno.env.get('AMAZON_CLIENT_ID')
+  if (!clientId || clientId.trim() === '') {
+    throw new Error('AMAZON_CLIENT_ID is required for Amazon API calls')
+  }
+
   while (Date.now() - startTime < maxWaitTime) {
     const response = await fetchWithRetry(
       `${apiEndpoint}/reporting/reports/${reportId}`,
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
-          'Amazon-Advertising-API-ClientId': Deno.env.get('AMAZON_CLIENT_ID') || '',
+          'Amazon-Advertising-API-ClientId': clientId.trim(),
           'Amazon-Advertising-API-Scope': profileId,
           'Content-Type': 'application/vnd.amazon.reporting.v3+json'
         }
@@ -366,14 +376,28 @@ async function fetchAllPages(
       url += `&nextToken=${encodeURIComponent(nextToken)}`
     }
     
-    const response = await fetchWithRetry(url, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Amazon-Advertising-API-ClientId': Deno.env.get('AMAZON_CLIENT_ID') || '',
-        'Amazon-Advertising-API-Scope': profileId,
-        'Content-Type': 'application/json'
-      }
+    const clientId = Deno.env.get('AMAZON_CLIENT_ID')
+    if (!clientId || clientId.trim() === '') {
+      throw new Error('AMAZON_CLIENT_ID environment variable is not set or empty')
+    }
+
+    const headers = {
+      'Authorization': `Bearer ${accessToken}`,
+      'Amazon-Advertising-API-ClientId': clientId.trim(),
+      'Amazon-Advertising-API-Scope': profileId,
+      'Content-Type': 'application/json'
+    }
+
+    console.log('🔍 Request headers debug:', {
+      authHeaderLength: headers['Authorization'].length,
+      authHeaderPrefix: headers['Authorization'].substring(0, 20),
+      clientIdLength: headers['Amazon-Advertising-API-ClientId'].length,
+      clientIdPrefix: headers['Amazon-Advertising-API-ClientId'].substring(0, 20),
+      profileId: headers['Amazon-Advertising-API-Scope'],
+      url: url
     })
+
+    const response = await fetchWithRetry(url, { headers })
     
     if (!response.ok) {
       const errorText = await response.text()
@@ -1490,6 +1514,11 @@ serve(async (req) => {
     if (campaignIds.length > 0) {
       try {
         console.log('💰 Syncing budget usage data...')
+        const clientId = Deno.env.get('AMAZON_CLIENT_ID')
+        if (!clientId || clientId.trim() === '') {
+          throw new Error('AMAZON_CLIENT_ID is required for Amazon API calls')
+        }
+
         for (const campaignId of campaignIds) {
           try {
             const response = await fetchWithRetry(
@@ -1497,7 +1526,7 @@ serve(async (req) => {
               {
                 headers: {
                   'Authorization': `Bearer ${accessToken}`,
-                  'Amazon-Advertising-API-ClientId': Deno.env.get('AMAZON_CLIENT_ID') || '',
+                  'Amazon-Advertising-API-ClientId': clientId.trim(),
                   'Amazon-Advertising-API-Scope': connection.profile_id,
                   'Content-Type': 'application/json'
                 }
