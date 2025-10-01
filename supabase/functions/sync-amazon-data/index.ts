@@ -390,13 +390,13 @@ async function fetchAllPages(
     // Amazon Advertising API v3 uses POST endpoints with JSON bodies
     const url = `${apiEndpoint}/sp/${endpoint}/list`
     
-    const headers = {
-      'Authorization': `Bearer ${accessToken}`,
-      'Amazon-Advertising-API-ClientId': clientId.trim(),
-      'Amazon-Advertising-API-Scope': profileId,
-      'Content-Type': acceptType,  // Use versioned content type
-      'Accept': acceptType
-    }
+    // Use Headers object to ensure Content-Type isn't overridden by fetch
+    const headers = new Headers()
+    headers.set('Authorization', `Bearer ${accessToken}`)
+    headers.set('Amazon-Advertising-API-ClientId', clientId.trim())
+    headers.set('Amazon-Advertising-API-Scope', profileId)
+    headers.set('Content-Type', acceptType)
+    headers.set('Accept', acceptType)
 
     // Request body for pagination
     const requestBody: any = {
@@ -410,11 +410,12 @@ async function fetchAllPages(
     console.log('🔍 Request debug:', {
       url,
       method: 'POST',
-      acceptHeader: acceptType,
+      contentType: headers.get('Content-Type'),
+      acceptHeader: headers.get('Accept'),
       hasNextToken: !!nextToken,
-      authHeaderLength: headers['Authorization'].length,
-      clientIdLength: headers['Amazon-Advertising-API-ClientId'].length,
-      profileId: headers['Amazon-Advertising-API-Scope']
+      authHeaderLength: headers.get('Authorization')?.length || 0,
+      clientIdLength: headers.get('Amazon-Advertising-API-ClientId')?.length || 0,
+      profileId: headers.get('Amazon-Advertising-API-Scope')
     })
 
     const response = await fetchWithRetry(url, {
