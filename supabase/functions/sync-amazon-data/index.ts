@@ -371,7 +371,8 @@ async function fetchAllPages(
     pageCount++
     console.log(`📄 Fetching page ${pageCount} from ${endpoint}`)
     
-    let url = `${apiEndpoint}/sp/${endpoint}?count=1000`
+    // Use v2 API for entity endpoints (required by Amazon Advertising API)
+    let url = `${apiEndpoint}/v2/sp/${endpoint}?count=1000`
     if (nextToken) {
       url += `&nextToken=${encodeURIComponent(nextToken)}`
     }
