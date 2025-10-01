@@ -1408,6 +1408,7 @@ export type Database = {
           attribution_model: string | null
           bid_strategy: string | null
           budget: number | null
+          campaign_id: string | null
           campaign_type: string | null
           clicks: number | null
           clicks_14d: number | null
@@ -1461,6 +1462,7 @@ export type Database = {
           attribution_model?: string | null
           bid_strategy?: string | null
           budget?: number | null
+          campaign_id?: string | null
           campaign_type?: string | null
           clicks?: number | null
           clicks_14d?: number | null
@@ -1514,6 +1516,7 @@ export type Database = {
           attribution_model?: string | null
           bid_strategy?: string | null
           budget?: number | null
+          campaign_id?: string | null
           campaign_type?: string | null
           clicks?: number | null
           clicks_14d?: number | null
