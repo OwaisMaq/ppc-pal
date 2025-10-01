@@ -2565,6 +2565,7 @@ export type Database = {
           clicks: number | null
           clicks_14d: number | null
           clicks_7d: number | null
+          connection_id: string | null
           conversion_rate: number | null
           conversion_rate_14d: number | null
           conversion_rate_7d: number | null
@@ -2608,6 +2609,7 @@ export type Database = {
           clicks?: number | null
           clicks_14d?: number | null
           clicks_7d?: number | null
+          connection_id?: string | null
           conversion_rate?: number | null
           conversion_rate_14d?: number | null
           conversion_rate_7d?: number | null
@@ -2651,6 +2653,7 @@ export type Database = {
           clicks?: number | null
           clicks_14d?: number | null
           clicks_7d?: number | null
+          connection_id?: string | null
           conversion_rate?: number | null
           conversion_rate_14d?: number | null
           conversion_rate_7d?: number | null
@@ -2688,6 +2691,27 @@ export type Database = {
             columns: ["adgroup_id"]
             isOneToOne: false
             referencedRelation: "ad_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keywords_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "amazon_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keywords_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "amazon_connections_client"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keywords_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "amazon_connections_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -3474,6 +3498,7 @@ export type Database = {
           spend_7d: number | null
           status: Database["public"]["Enums"]["campaign_status"]
           type: string | null
+          updated_at: string | null
         }
         Insert: {
           acos?: number | null
@@ -3520,6 +3545,7 @@ export type Database = {
           spend_7d?: number | null
           status?: Database["public"]["Enums"]["campaign_status"]
           type?: string | null
+          updated_at?: string | null
         }
         Update: {
           acos?: number | null
@@ -3566,6 +3592,7 @@ export type Database = {
           spend_7d?: number | null
           status?: Database["public"]["Enums"]["campaign_status"]
           type?: string | null
+          updated_at?: string | null
         }
         Relationships: [
           {
