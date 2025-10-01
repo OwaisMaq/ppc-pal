@@ -3401,6 +3401,7 @@ export type Database = {
           amazon_target_id: string
           asin: string | null
           bid: number | null
+          campaign_id: string | null
           clicks: number | null
           clicks_14d: number | null
           clicks_7d: number | null
@@ -3443,6 +3444,7 @@ export type Database = {
           amazon_target_id: string
           asin?: string | null
           bid?: number | null
+          campaign_id?: string | null
           clicks?: number | null
           clicks_14d?: number | null
           clicks_7d?: number | null
@@ -3485,6 +3487,7 @@ export type Database = {
           amazon_target_id?: string
           asin?: string | null
           bid?: number | null
+          campaign_id?: string | null
           clicks?: number | null
           clicks_14d?: number | null
           clicks_7d?: number | null
