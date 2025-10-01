@@ -716,9 +716,14 @@ serve(async (req) => {
 
     // Store campaigns with updated schema
     const campaignIds: string[] = []
+    const campaignUuidMap = new Map<string, string>() // Map Amazon campaign ID to UUID
+    
     for (const campaign of campaigns) {
       try {
-        const { error: campaignError } = await supabase
+        // Map Amazon status to database enum (lowercase)
+        const statusValue = campaign.state?.toLowerCase() || 'enabled'
+        
+        const { data: upsertedCampaign, error: campaignError } = await supabase
           .from('campaigns')
           .upsert({
             campaign_id: campaign.campaignId,
@@ -726,7 +731,7 @@ serve(async (req) => {
             name: campaign.name,
             campaign_type: campaign.campaignType,
             targeting_type: campaign.targetingType,
-            status: campaign.state,
+            status: statusValue,
             daily_budget: campaign.dynamicBidding?.strategy ? null : campaign.budget?.budget,
             start_date: campaign.startDate,
             end_date: campaign.endDate,
@@ -738,11 +743,14 @@ serve(async (req) => {
             onConflict: 'campaign_id,connection_id',
             ignoreDuplicates: false
           })
+          .select('id, campaign_id')
+          .single()
 
         if (campaignError) {
           console.warn(`Failed to store campaign ${campaign.campaignId}:`, campaignError)
-        } else {
+        } else if (upsertedCampaign) {
           campaignIds.push(campaign.campaignId)
+          campaignUuidMap.set(campaign.campaignId, upsertedCampaign.id)
         }
       } catch (error) {
         console.warn(`Failed to process campaign ${campaign.campaignId}:`, error)
@@ -757,36 +765,60 @@ serve(async (req) => {
     console.log(`✅ Found ${adGroups.length} ad groups`)
 
     const adGroupIds: string[] = []
+    const adGroupUuidMap = new Map<string, string>() // Map Amazon ad group ID to UUID
+    
     for (const adGroup of adGroups) {
       try {
-        // Get the stored campaign for targeting type
-        const { data: storedCampaign } = await supabase
+        // Get the stored campaign UUID
+        const campaignUuid = campaignUuidMap.get(adGroup.campaignId)
+        if (!campaignUuid) {
+          // Campaign not in our map, try to look it up
+          const { data: storedCampaign } = await supabase
+            .from('campaigns')
+            .select('id, targeting_type')
+            .eq('campaign_id', adGroup.campaignId)
+            .eq('connection_id', connectionId)
+            .single()
+          
+          if (!storedCampaign) {
+            console.warn(`Campaign ${adGroup.campaignId} not found for ad group ${adGroup.adGroupId}`)
+            continue
+          }
+          
+          campaignUuidMap.set(adGroup.campaignId, storedCampaign.id)
+        }
+
+        // Map Amazon status to database enum (lowercase)
+        const statusValue = adGroup.state?.toLowerCase() || 'enabled'
+        const storedCampaign = await supabase
           .from('campaigns')
           .select('targeting_type')
-          .eq('campaign_id', adGroup.campaignId)
-          .eq('connection_id', connectionId)
+          .eq('id', campaignUuidMap.get(adGroup.campaignId))
           .single()
 
-        const { error: adGroupError } = await supabase
+        const { data: upsertedAdGroup, error: adGroupError } = await supabase
           .from('ad_groups')
           .upsert({
-            adgroup_id: adGroup.adGroupId,
-            campaign_id: adGroup.campaignId,
+            amazon_adgroup_id: adGroup.adGroupId,
+            campaign_id: campaignUuidMap.get(adGroup.campaignId)!,
             connection_id: connectionId,
             name: adGroup.name,
             default_bid: adGroup.defaultBid,
-            status: adGroup.state,
-            campaign_targeting_type: storedCampaign?.targeting_type,
+            status: statusValue,
+            campaign_targeting_type: storedCampaign.data?.targeting_type,
             updated_at: new Date().toISOString()
           }, {
             onConflict: 'adgroup_id,connection_id',
             ignoreDuplicates: false
           })
+          .select('id, amazon_adgroup_id')
+          .single()
 
         if (adGroupError) {
           console.warn(`Failed to store ad group ${adGroup.adGroupId}:`, adGroupError)
-        } else {
+        } else if (upsertedAdGroup) {
           adGroupIds.push(adGroup.adGroupId)
+          adGroupUuidMap.set(adGroup.adGroupId, upsertedAdGroup.id)
         }
       } catch (error) {
         console.warn(`Failed to sync ad groups for campaign ${adGroup.campaignId}:`, error)
@@ -803,16 +835,59 @@ serve(async (req) => {
     const keywordIds: string[] = []
     for (const keyword of keywords) {
       try {
+        // Get the ad group UUID
+        let adGroupUuid = adGroupUuidMap.get(keyword.adGroupId)
+        if (!adGroupUuid) {
+          // Ad group not in our map, try to look it up
+          const { data: storedAdGroup } = await supabase
+            .from('ad_groups')
+            .select('id')
+            .eq('amazon_adgroup_id', keyword.adGroupId)
+            .eq('connection_id', connectionId)
+            .single()
+          
+          if (!storedAdGroup) {
+            console.warn(`Ad group ${keyword.adGroupId} not found for keyword ${keyword.keywordId}`)
+            continue
+          }
+          
+          adGroupUuid = storedAdGroup.id
+          adGroupUuidMap.set(keyword.adGroupId, adGroupUuid)
+        }
+
+        // Get the campaign UUID
+        let campaignUuid = campaignUuidMap.get(keyword.campaignId)
+        if (!campaignUuid) {
+          // Campaign not in our map, try to look it up
+          const { data: storedCampaign } = await supabase
+            .from('campaigns')
+            .select('id')
+            .eq('campaign_id', keyword.campaignId)
+            .eq('connection_id', connectionId)
+            .single()
+          
+          if (!storedCampaign) {
+            console.warn(`Campaign ${keyword.campaignId} not found for keyword ${keyword.keywordId}`)
+            continue
+          }
+          
+          campaignUuid = storedCampaign.id
+          campaignUuidMap.set(keyword.campaignId, campaignUuid)
+        }
+
+        // Map Amazon status to database enum (lowercase)
+        const statusValue = keyword.state?.toLowerCase() || 'enabled'
+
         const { error: keywordError } = await supabase
           .from('keywords')
           .upsert({
             amazon_keyword_id: keyword.keywordId,
-            adgroup_id: keyword.adGroupId,
-            campaign_id: keyword.campaignId,
+            adgroup_id: adGroupUuid,
+            campaign_id: campaignUuid,
             connection_id: connectionId,
             keyword_text: keyword.keywordText,
             match_type: keyword.matchType,
-            status: keyword.state,
+            status: statusValue,
             bid: keyword.bid,
             updated_at: new Date().toISOString()
           }, {
@@ -840,16 +915,59 @@ serve(async (req) => {
     const targetIds: string[] = []
     for (const target of targets) {
       try {
+        // Get the ad group UUID
+        let adGroupUuid = adGroupUuidMap.get(target.adGroupId)
+        if (!adGroupUuid) {
+          // Ad group not in our map, try to look it up
+          const { data: storedAdGroup } = await supabase
+            .from('ad_groups')
+            .select('id')
+            .eq('amazon_adgroup_id', target.adGroupId)
+            .eq('connection_id', connectionId)
+            .single()
+          
+          if (!storedAdGroup) {
+            console.warn(`Ad group ${target.adGroupId} not found for target ${target.targetId}`)
+            continue
+          }
+          
+          adGroupUuid = storedAdGroup.id
+          adGroupUuidMap.set(target.adGroupId, adGroupUuid)
+        }
+
+        // Get the campaign UUID
+        let campaignUuid = campaignUuidMap.get(target.campaignId)
+        if (!campaignUuid) {
+          // Campaign not in our map, try to look it up
+          const { data: storedCampaign } = await supabase
+            .from('campaigns')
+            .select('id')
+            .eq('campaign_id', target.campaignId)
+            .eq('connection_id', connectionId)
+            .single()
+          
+          if (!storedCampaign) {
+            console.warn(`Campaign ${target.campaignId} not found for target ${target.targetId}`)
+            continue
+          }
+          
+          campaignUuid = storedCampaign.id
+          campaignUuidMap.set(target.campaignId, campaignUuid)
+        }
+
+        // Map Amazon status to database enum (lowercase)
+        const statusValue = target.state?.toLowerCase() || 'enabled'
+
         const { error: targetError } = await supabase
           .from('targets')
           .upsert({
             amazon_target_id: target.targetId,
-            adgroup_id: target.adGroupId,
-            campaign_id: target.campaignId,
+            adgroup_id: adGroupUuid,
+            campaign_id: campaignUuid,
             connection_id: connectionId,
             expression_type: target.expression?.[0]?.type,
             expression_value: target.expression?.[0]?.value,
-            status: target.state,
+            status: statusValue,
             bid: target.bid,
             updated_at: new Date().toISOString()
           }, {
