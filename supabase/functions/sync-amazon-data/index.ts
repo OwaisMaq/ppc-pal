@@ -159,13 +159,13 @@ async function createReportRequest(
     }
   }
 
-  // Map report types to correct v3 reportTypeId and groupBy values
+  // Map report types to correct v3 reportTypeId and groupBy values per Amazon Ads API v3 documentation
   const reportTypeMapping: Record<string, { reportTypeId: string, groupBy: string, allowsFilters: boolean }> = {
     'campaigns': { reportTypeId: 'spCampaigns', groupBy: 'campaign', allowsFilters: false },
-    'adGroups': { reportTypeId: 'spAdGroups', groupBy: 'adGroup', allowsFilters: false },
-    'keywords': { reportTypeId: 'spKeywords', groupBy: 'targeting', allowsFilters: false },
-    'targets': { reportTypeId: 'spTargets', groupBy: 'targeting', allowsFilters: false },
-    'searchTerms': { reportTypeId: 'spSearchTerms', groupBy: 'searchTerm', allowsFilters: false }
+    'adGroups': { reportTypeId: 'spCampaigns', groupBy: 'adGroup', allowsFilters: false },  // Ad groups use spCampaigns with adGroup groupBy
+    'keywords': { reportTypeId: 'spTargeting', groupBy: 'targeting', allowsFilters: false },  // Keywords use spTargeting
+    'targets': { reportTypeId: 'spTargeting', groupBy: 'targeting', allowsFilters: false },  // Targets also use spTargeting
+    'searchTerms': { reportTypeId: 'spSearchTerm', groupBy: 'searchTerm', allowsFilters: false }  // Note: spSearchTerm (no 's')
   }
 
   const mapping = reportTypeMapping[reportType]
