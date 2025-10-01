@@ -714,7 +714,7 @@ serve(async (req) => {
 
     await updateProgress(20, 'Storing campaign data...')
 
-    // Store campaigns
+    // Store campaigns with updated schema
     const campaignIds: string[] = []
     for (const campaign of campaigns) {
       try {
