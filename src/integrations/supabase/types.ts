@@ -1477,6 +1477,7 @@ export type Database = {
           start_date: string | null
           status: Database["public"]["Enums"]["campaign_status"]
           targeting_type: string | null
+          updated_at: string | null
         }
         Insert: {
           acos?: number | null
@@ -1533,6 +1534,7 @@ export type Database = {
           start_date?: string | null
           status?: Database["public"]["Enums"]["campaign_status"]
           targeting_type?: string | null
+          updated_at?: string | null
         }
         Update: {
           acos?: number | null
@@ -1589,6 +1591,7 @@ export type Database = {
           start_date?: string | null
           status?: Database["public"]["Enums"]["campaign_status"]
           targeting_type?: string | null
+          updated_at?: string | null
         }
         Relationships: [
           {
