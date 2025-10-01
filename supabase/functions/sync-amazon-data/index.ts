@@ -66,7 +66,7 @@ interface PerformanceData {
   impressions?: number
   clicks?: number
   cost?: number
-  attributedSales7d?: number
+  sales7d?: number
   purchases7d?: number
   attributedSales1d?: number
   purchases1d?: number
@@ -130,7 +130,7 @@ async function createReportRequest(
   reportType: string,
   dateRange: number,
   timeUnit: 'SUMMARY' | 'DAILY' = 'SUMMARY',
-  columns: string[] = ['impressions', 'clicks', 'cost', 'attributedSales7d', 'purchases7d'],
+  columns: string[] = ['impressions', 'clicks', 'cost', 'sales7d', 'purchases7d'],
   entityIds?: string[],
   apiEndpoint: string = 'https://advertising-api.amazon.com'
 ): Promise<string> {
@@ -1022,11 +1022,11 @@ serve(async (req) => {
     let totalMetricsUpdated = 0
 
     // Define columns for each report type - use v3 camelCase format
-    const campaignColumns = ['impressions', 'clicks', 'cost', 'purchases7d', 'attributedSales7d']
-    const adGroupColumns = ['impressions', 'clicks', 'cost', 'purchases7d', 'attributedSales7d']  
-    const targetColumns = ['impressions', 'clicks', 'cost', 'purchases7d', 'attributedSales7d']
-    const keywordColumns = ['impressions', 'clicks', 'cost', 'purchases7d', 'attributedSales7d']
-    const searchTermColumns = ['date','campaignId','adGroupId','keywordId','searchTerm','clicks','impressions','cost','attributedConversions7d','attributedSales7d']
+    const campaignColumns = ['impressions', 'clicks', 'cost', 'purchases7d', 'sales7d']
+    const adGroupColumns = ['impressions', 'clicks', 'cost', 'purchases7d', 'sales7d']  
+    const targetColumns = ['impressions', 'clicks', 'cost', 'purchases7d', 'sales7d']
+    const keywordColumns = ['impressions', 'clicks', 'cost', 'purchases7d', 'sales7d']
+    const searchTermColumns = ['date','campaignId','adGroupId','keywordId','searchTerm','clicks','impressions','cost','attributedConversions7d','sales7d']
 
     // Only generate reports if we have data to report on
     if (campaignIds.length === 0 && adGroupIds.length === 0 && keywordIds.length === 0 && targetIds.length === 0) {
@@ -1091,9 +1091,9 @@ serve(async (req) => {
                 impressions: record.impressions || 0,
                 clicks: record.clicks || 0,
                 spend: record.cost || 0,
-                sales: record.attributedSales7d || 0,
+                sales: record.sales7d || 0,
                 orders: record.purchases7d || 0,
-                sales_7d: record.attributedSales7d || 0,
+                sales_7d: record.sales7d || 0,
                 orders_7d: record.purchases7d || 0,
                 updated_at: new Date().toISOString()
               }
@@ -1132,14 +1132,14 @@ serve(async (req) => {
                     .onConflict('profile_id,campaign_id,hour_start')
 
                   // Insert conversion data
-                  if (record.attributedSales7d || record.purchases7d) {
+                  if (record.sales7d || record.purchases7d) {
                     await supabase
                       .from('ams_messages_sp_conversion')
                       .insert({
                         profile_id: connection.profile_id,
                         campaign_id: record.campaignId,
                         hour_start: new Date(record.date + 'T12:00:00Z'),
-                        attributed_sales: record.attributedSales7d || 0,
+                        attributed_sales: record.sales7d || 0,
                         attributed_conversions: record.purchases7d || 0,
                         connection_id: connectionId,
                         payload: {}
@@ -1253,9 +1253,9 @@ serve(async (req) => {
                 impressions: record.impressions || 0,
                 clicks: record.clicks || 0,
                 spend: record.cost || 0,
-                sales: record.attributedSales7d || 0,
+                sales: record.sales7d || 0,
                 orders: record.purchases7d || 0,
-                sales_7d: record.attributedSales7d || 0,
+                sales_7d: record.sales7d || 0,
                 orders_7d: record.purchases7d || 0,
                 updated_at: new Date().toISOString()
               }
@@ -1294,7 +1294,7 @@ serve(async (req) => {
                     .onConflict('profile_id,campaign_id,ad_group_id,hour_start')
 
                   // Insert conversion data
-                  if (record.attributedSales7d || record.purchases7d) {
+                  if (record.sales7d || record.purchases7d) {
                     await supabase
                       .from('ams_messages_sp_conversion')
                       .insert({
@@ -1302,7 +1302,7 @@ serve(async (req) => {
                         campaign_id: record.campaignId,
                         ad_group_id: record.adGroupId,
                         hour_start: new Date(record.date + 'T12:00:00Z'),
-                        attributed_sales: record.attributedSales7d || 0,
+                        attributed_sales: record.sales7d || 0,
                         attributed_conversions: record.purchases7d || 0,
                         connection_id: connectionId,
                         payload: {}
@@ -1416,9 +1416,9 @@ serve(async (req) => {
                 impressions: record.impressions || 0,
                 clicks: record.clicks || 0,
                 spend: record.cost || 0,
-                sales: record.attributedSales7d || 0,
+                sales: record.sales7d || 0,
                 orders: record.purchases7d || 0,
-                sales_7d: record.attributedSales7d || 0,
+                sales_7d: record.sales7d || 0,
                 orders_7d: record.purchases7d || 0,
                 updated_at: new Date().toISOString()
               }
@@ -1458,7 +1458,7 @@ serve(async (req) => {
                     .onConflict('profile_id,campaign_id,ad_group_id,target_id,hour_start')
 
                   // Insert conversion data
-                  if (record.attributedSales7d || record.purchases7d) {
+                  if (record.sales7d || record.purchases7d) {
                     await supabase
                       .from('ams_messages_sp_conversion')
                       .insert({
@@ -1467,7 +1467,7 @@ serve(async (req) => {
                         ad_group_id: record.adGroupId,
                         target_id: record.targetId,
                         hour_start: new Date(record.date + 'T12:00:00Z'),
-                        attributed_sales: record.attributedSales7d || 0,
+                        attributed_sales: record.sales7d || 0,
                         attributed_conversions: record.purchases7d || 0,
                         connection_id: connectionId,
                         payload: {}
@@ -1505,7 +1505,7 @@ serve(async (req) => {
           'searchTerms',
           dateRange,
           timeUnitOpt,
-          ['date','campaignId','adGroupId','keywordId','searchTerm','clicks','impressions','cost','attributedConversions7d','attributedSales7d'],
+          ['date','campaignId','adGroupId','keywordId','searchTerm','clicks','impressions','cost','attributedConversions7d','sales7d'],
           campaignIds,
           apiEndpoint
         )
@@ -1536,7 +1536,7 @@ serve(async (req) => {
                     clicks: record.clicks || 0,
                     cost_micros: Math.round((record.cost || 0) * 1000000),
                     attributed_conversions_7d: record.attributedConversions7d || 0,
-                    attributed_sales_7d_micros: Math.round((record.attributedSales7d || 0) * 1000000),
+                    attributed_sales_7d_micros: Math.round((record.sales7d || 0) * 1000000),
                     attributed_conversions_1d: record.attributedConversions1d || 0,
                     match_type: record.matchType || 'BROAD',
                     targeting: record.targeting || ''
@@ -1557,7 +1557,7 @@ serve(async (req) => {
 
           totalMetricsUpdated += searchTermMetricsUpdated
           console.log(`✅ Updated metrics for ${searchTermMetricsUpdated} search terms`)
-          diagnostics.searchTermReport = { rows: performanceData.length, timeUnit: timeUnitOpt, columns: ['date','campaignId','adGroupId','keywordId','searchTerm','clicks','impressions','cost','attributedConversions7d','attributedSales7d'] }
+          diagnostics.searchTermReport = { rows: performanceData.length, timeUnit: timeUnitOpt, columns: ['date','campaignId','adGroupId','keywordId','searchTerm','clicks','impressions','cost','attributedConversions7d','sales7d'] }
         }
 
         console.log('✅ Search terms performance data synced successfully')
@@ -1598,9 +1598,9 @@ serve(async (req) => {
                 impressions: record.impressions || 0,
                 clicks: record.clicks || 0,
                 spend: record.cost || 0,
-                sales: record.attributedSales7d || 0,
+                sales: record.sales7d || 0,
                 orders: record.purchases7d || 0,
-                sales_7d: record.attributedSales7d || 0,
+                sales_7d: record.sales7d || 0,
                 orders_7d: record.purchases7d || 0,
                 updated_at: new Date().toISOString()
               }
@@ -1747,10 +1747,10 @@ serve(async (req) => {
         apiVersion: 'v3',
         usedReportingV3: true,
         columnsUsed: {
-          campaign: ['impressions', 'clicks', 'cost', 'purchases7d', 'attributedSales7d'],
-          adGroup: ['impressions', 'clicks', 'cost', 'purchases7d', 'attributedSales7d'], 
-          target: ['impressions', 'clicks', 'cost', 'purchases7d', 'attributedSales7d'],
-          searchTerm: ['impressions', 'clicks', 'cost', 'purchases7d', 'attributedSales7d']
+          campaign: ['impressions', 'clicks', 'cost', 'purchases7d', 'sales7d'],
+          adGroup: ['impressions', 'clicks', 'cost', 'purchases7d', 'sales7d'], 
+          target: ['impressions', 'clicks', 'cost', 'purchases7d', 'sales7d'],
+          searchTerm: ['impressions', 'clicks', 'cost', 'purchases7d', 'sales7d']
         },
         diagnostics
       }),
