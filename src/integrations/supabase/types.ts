@@ -95,6 +95,7 @@ export type Database = {
           acos: number | null
           acos_14d: number | null
           acos_7d: number | null
+          adgroup_id: string | null
           amazon_adgroup_id: string
           campaign_id: string
           clicks: number | null
@@ -132,6 +133,7 @@ export type Database = {
           acos?: number | null
           acos_14d?: number | null
           acos_7d?: number | null
+          adgroup_id?: string | null
           amazon_adgroup_id: string
           campaign_id: string
           clicks?: number | null
@@ -169,6 +171,7 @@ export type Database = {
           acos?: number | null
           acos_14d?: number | null
           acos_7d?: number | null
+          adgroup_id?: string | null
           amazon_adgroup_id?: string
           campaign_id?: string
           clicks?: number | null

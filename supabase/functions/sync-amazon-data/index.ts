@@ -751,7 +751,7 @@ serve(async (req) => {
 
     await updateProgress(30, 'Fetching ad groups...')
 
-    // Fetch and store ad groups
+    // Fetch and store ad groups with updated schema
     console.log('📁 Fetching ad groups...')
     const adGroups = await fetchAllPages(accessToken, connection.profile_id, 'adGroups', 10000, apiEndpoint)
     console.log(`✅ Found ${adGroups.length} ad groups`)
