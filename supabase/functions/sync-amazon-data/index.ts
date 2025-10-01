@@ -357,7 +357,7 @@ async function fetchAllPages(
   const results: any[] = []
   let nextToken: string | undefined
   let pageCount = 0
-  const maxPages = Math.ceil(maxResults / 1000) // Assuming 1000 per page max
+  const maxPages = Math.ceil(maxResults / 1000)
   
   // Validate the API endpoint before starting
   if (!apiEndpoint.includes('advertising-api')) {
@@ -367,21 +367,18 @@ async function fetchAllPages(
   
   console.log(`🌍 Fetching ${endpoint} from regional endpoint: ${apiEndpoint}`)
   
+  const clientId = Deno.env.get('AMAZON_CLIENT_ID')
+  if (!clientId || clientId.trim() === '') {
+    throw new Error('AMAZON_CLIENT_ID environment variable is not set or empty')
+  }
+  
   do {
     pageCount++
     console.log(`📄 Fetching page ${pageCount} from ${endpoint}`)
     
-    // Use v2 API for entity endpoints (required by Amazon Advertising API)
-    let url = `${apiEndpoint}/v2/sp/${endpoint}?count=1000`
-    if (nextToken) {
-      url += `&nextToken=${encodeURIComponent(nextToken)}`
-    }
+    // Amazon Advertising API v3 uses POST endpoints with JSON bodies
+    const url = `${apiEndpoint}/sp/${endpoint}/list`
     
-    const clientId = Deno.env.get('AMAZON_CLIENT_ID')
-    if (!clientId || clientId.trim() === '') {
-      throw new Error('AMAZON_CLIENT_ID environment variable is not set or empty')
-    }
-
     const headers = {
       'Authorization': `Bearer ${accessToken}`,
       'Amazon-Advertising-API-ClientId': clientId.trim(),
@@ -389,16 +386,29 @@ async function fetchAllPages(
       'Content-Type': 'application/json'
     }
 
-    console.log('🔍 Request headers debug:', {
+    // Request body for pagination
+    const requestBody: any = {
+      maxResults: 1000
+    }
+    
+    if (nextToken) {
+      requestBody.nextToken = nextToken
+    }
+
+    console.log('🔍 Request debug:', {
+      url,
+      method: 'POST',
+      hasNextToken: !!nextToken,
       authHeaderLength: headers['Authorization'].length,
-      authHeaderPrefix: headers['Authorization'].substring(0, 20),
       clientIdLength: headers['Amazon-Advertising-API-ClientId'].length,
-      clientIdPrefix: headers['Amazon-Advertising-API-ClientId'].substring(0, 20),
-      profileId: headers['Amazon-Advertising-API-Scope'],
-      url: url
+      profileId: headers['Amazon-Advertising-API-Scope']
     })
 
-    const response = await fetchWithRetry(url, { headers })
+    const response = await fetchWithRetry(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(requestBody)
+    })
     
     if (!response.ok) {
       const errorText = await response.text()
@@ -421,10 +431,20 @@ async function fetchAllPages(
     }
     
     const data = await response.json()
-    results.push(...(data.campaigns || data.adGroups || data.keywords || data.targets || []))
-    nextToken = data.nextToken
     
-    console.log(`✅ Page ${pageCount}: ${data.campaigns?.length || data.adGroups?.length || data.keywords?.length || data.targets?.length || 0} items`)
+    // Handle the response structure - Amazon returns arrays directly in the response
+    if (Array.isArray(data)) {
+      results.push(...data)
+      console.log(`✅ Page ${pageCount}: ${data.length} items`)
+      break // Array response means no pagination
+    } else {
+      // Handle paginated response
+      const items = data.campaigns || data.adGroups || data.keywords || data.targetingClauses || []
+      results.push(...items)
+      nextToken = data.nextToken
+      
+      console.log(`✅ Page ${pageCount}: ${items.length} items, hasNextToken: ${!!nextToken}`)
+    }
     
     if (pageCount >= maxPages) {
       console.log(`⚠️ Reached max pages limit (${maxPages})`)
@@ -754,32 +774,6 @@ serve(async (req) => {
         } else {
           adGroupIds.push(adGroup.adGroupId)
         }
-
-        // Sync keywords for this ad group
-        try {
-          const keywords = await fetchAllPages(accessToken, connection.profile_id, `adGroups/${adGroup.adGroupId}/keywords`, 10000, apiEndpoint)
-          
-          for (const keyword of keywords) {
-            await supabase
-              .from('keywords')
-              .upsert({
-                amazon_keyword_id: keyword.keywordId,
-                adgroup_id: adGroup.adGroupId,
-                campaign_id: adGroup.campaignId,
-                connection_id: connectionId,
-                keyword_text: keyword.keywordText,
-                match_type: keyword.matchType,
-                state: keyword.state,
-                bid: keyword.bid,
-                updated_at: new Date().toISOString()
-              }, {
-                onConflict: 'adgroup_id,amazon_keyword_id',
-                ignoreDuplicates: false
-              })
-          }
-        } catch (error) {
-          console.warn(`Failed to sync keywords for ad group ${adGroup.adGroupId}:`, error)
-        }
       } catch (error) {
         console.warn(`Failed to sync ad groups for campaign ${adGroup.campaignId}:`, error)
       }
@@ -824,9 +818,9 @@ serve(async (req) => {
 
     await updateProgress(50, 'Fetching targets...')
 
-    // Fetch targets
+    // Fetch product targets (formerly called 'targets')
     console.log('📁 Fetching targets...')
-    const targets = await fetchAllPages(accessToken, connection.profile_id, 'targets', 10000, apiEndpoint)
+    const targets = await fetchAllPages(accessToken, connection.profile_id, 'productTargets', 10000, apiEndpoint)
     console.log(`✅ Found ${targets.length} targets`)
 
     const targetIds: string[] = []
@@ -859,11 +853,12 @@ serve(async (req) => {
       }
     }
 
-    // Fetch advertised products for ASIN data (only for campaigns, not performance)
-    if (campaignIds.length > 0) {
+    // Skip advertised products for now - the v3 API uses a different endpoint structure
+    // TODO: Implement advertised products fetch using the correct v3 endpoint
+    if (false && campaignIds.length > 0) {
       try {
         console.log('📁 Fetching advertised products for ASIN data...')
-        const advertisedProducts = await fetchAllPages(accessToken, connection.profile_id, 'advertised/products', 10000, apiEndpoint)
+        const advertisedProducts = [] // await fetchAllPages(accessToken, connection.profile_id, 'advertisedProducts', 10000, apiEndpoint)
         console.log(`✅ Found ${advertisedProducts.length} advertised products`)
         
         // Group ASINs by campaign for efficient updates
