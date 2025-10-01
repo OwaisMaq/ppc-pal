@@ -1026,7 +1026,7 @@ serve(async (req) => {
     const adGroupColumns = ['impressions', 'clicks', 'cost', 'purchases7d', 'sales7d']  
     const targetColumns = ['impressions', 'clicks', 'cost', 'purchases7d', 'sales7d']
     const keywordColumns = ['impressions', 'clicks', 'cost', 'purchases7d', 'sales7d']
-    const searchTermColumns = ['date','campaignId','adGroupId','keywordId','searchTerm','clicks','impressions','cost','attributedConversions7d','sales7d']
+    const searchTermColumns = ['date','campaignId','adGroupId','keywordId','searchTerm','clicks','impressions','cost','purchases7d','sales7d']
 
     // Only generate reports if we have data to report on
     if (campaignIds.length === 0 && adGroupIds.length === 0 && keywordIds.length === 0 && targetIds.length === 0) {
