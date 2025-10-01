@@ -1005,7 +1005,7 @@ serve(async (req) => {
               asins: asins,
               updated_at: new Date().toISOString()
             })
-            .eq('campaign_id', campaignId)
+            .eq('amazon_campaign_id', campaignId)
             .eq('connection_id', connectionId)
         }
         
@@ -1089,7 +1089,9 @@ serve(async (req) => {
               const updateData: any = {
                 impressions: record.impressions || 0,
                 clicks: record.clicks || 0,
-                cost: record.cost || 0,
+                spend: record.cost || 0,
+                sales: record.attributedSales7d || 0,
+                orders: record.purchases7d || 0,
                 sales_7d: record.attributedSales7d || 0,
                 orders_7d: record.purchases7d || 0,
                 updated_at: new Date().toISOString()
@@ -1103,7 +1105,7 @@ serve(async (req) => {
               const { error: updateError } = await supabase
                 .from('campaigns')
                 .update(updateData)
-                .eq('campaign_id', record.campaignId)
+                .eq('amazon_campaign_id', record.campaignId)
                 .eq('connection_id', connectionId)
 
               if (updateError) {
@@ -1129,15 +1131,15 @@ serve(async (req) => {
                     .onConflict('profile_id,campaign_id,hour_start')
 
                   // Insert conversion data
-                  if (record.sales_7d || record.purchases_7d) {
+                  if (record.attributedSales7d || record.purchases7d) {
                     await supabase
                       .from('ams_messages_sp_conversion')
                       .insert({
                         profile_id: connection.profile_id,
                         campaign_id: record.campaignId,
                         hour_start: new Date(record.date + 'T12:00:00Z'),
-                        attributed_sales: record.sales_7d || 0,
-                        attributed_conversions: record.purchases_7d || 0,
+                        attributed_sales: record.attributedSales7d || 0,
+                        attributed_conversions: record.purchases7d || 0,
                         connection_id: connectionId,
                         payload: {}
                       })
@@ -1182,7 +1184,7 @@ serve(async (req) => {
                   const updateData: any = {
                     impressions: record.impressions || 0,
                     clicks: record.clicks || 0,
-                    cost: record.cost || 0,
+                    spend: record.cost || 0,
                     updated_at: new Date().toISOString()
                   }
 
@@ -1193,7 +1195,7 @@ serve(async (req) => {
                   const { error: updateError } = await supabase
                     .from('campaigns')
                     .update(updateData)
-                    .eq('campaign_id', record.campaignId)
+                    .eq('amazon_campaign_id', record.campaignId)
                     .eq('connection_id', connectionId)
 
                   if (!updateError) {
@@ -1249,7 +1251,9 @@ serve(async (req) => {
               const updateData: any = {
                 impressions: record.impressions || 0,
                 clicks: record.clicks || 0,
-                cost: record.cost || 0,
+                spend: record.cost || 0,
+                sales: record.attributedSales7d || 0,
+                orders: record.purchases7d || 0,
                 sales_7d: record.attributedSales7d || 0,
                 orders_7d: record.purchases7d || 0,
                 updated_at: new Date().toISOString()
@@ -1262,7 +1266,7 @@ serve(async (req) => {
               const { error: updateError } = await supabase
                 .from('ad_groups')
                 .update(updateData)
-                .eq('adgroup_id', record.adGroupId)
+                .eq('amazon_adgroup_id', record.adGroupId)
                 .eq('connection_id', connectionId)
 
               if (updateError) {
@@ -1343,7 +1347,7 @@ serve(async (req) => {
                   const updateData: any = {
                     impressions: record.impressions || 0,
                     clicks: record.clicks || 0,
-                    cost: record.cost || 0,
+                    spend: record.cost || 0,
                     updated_at: new Date().toISOString()
                   }
 
@@ -1354,7 +1358,7 @@ serve(async (req) => {
                   const { error: updateError } = await supabase
                     .from('ad_groups')
                     .update(updateData)
-                    .eq('adgroup_id', record.adGroupId)
+                    .eq('amazon_adgroup_id', record.adGroupId)
                     .eq('connection_id', connectionId)
 
                   if (!updateError) {
@@ -1410,7 +1414,9 @@ serve(async (req) => {
               const updateData: any = {
                 impressions: record.impressions || 0,
                 clicks: record.clicks || 0,
-                cost: record.cost || 0,
+                spend: record.cost || 0,
+                sales: record.attributedSales7d || 0,
+                orders: record.purchases7d || 0,
                 sales_7d: record.attributedSales7d || 0,
                 orders_7d: record.purchases7d || 0,
                 updated_at: new Date().toISOString()
@@ -1590,7 +1596,9 @@ serve(async (req) => {
               const updateData: any = {
                 impressions: record.impressions || 0,
                 clicks: record.clicks || 0,
-                cost: record.cost || 0,
+                spend: record.cost || 0,
+                sales: record.attributedSales7d || 0,
+                orders: record.purchases7d || 0,
                 sales_7d: record.attributedSales7d || 0,
                 orders_7d: record.purchases7d || 0,
                 updated_at: new Date().toISOString()
