@@ -808,7 +808,7 @@ serve(async (req) => {
             campaign_targeting_type: storedCampaign.data?.targeting_type,
             updated_at: new Date().toISOString()
           }, {
-            onConflict: 'adgroup_id,connection_id',
+            onConflict: 'amazon_adgroup_id,connection_id',
             ignoreDuplicates: false
           })
           .select('id, amazon_adgroup_id')
