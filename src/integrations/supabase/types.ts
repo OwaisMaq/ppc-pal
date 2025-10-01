@@ -1408,6 +1408,7 @@ export type Database = {
           attribution_model: string | null
           bid_strategy: string | null
           budget: number | null
+          budget_type: string | null
           campaign_id: string | null
           campaign_type: string | null
           clicks: number | null
@@ -1462,6 +1463,7 @@ export type Database = {
           attribution_model?: string | null
           bid_strategy?: string | null
           budget?: number | null
+          budget_type?: string | null
           campaign_id?: string | null
           campaign_type?: string | null
           clicks?: number | null
@@ -1516,6 +1518,7 @@ export type Database = {
           attribution_model?: string | null
           bid_strategy?: string | null
           budget?: number | null
+          budget_type?: string | null
           campaign_id?: string | null
           campaign_type?: string | null
           clicks?: number | null
@@ -2528,6 +2531,7 @@ export type Database = {
           amazon_keyword_id: string
           asin: string | null
           bid: number | null
+          campaign_id: string | null
           clicks: number | null
           clicks_14d: number | null
           clicks_7d: number | null
@@ -2570,6 +2574,7 @@ export type Database = {
           amazon_keyword_id: string
           asin?: string | null
           bid?: number | null
+          campaign_id?: string | null
           clicks?: number | null
           clicks_14d?: number | null
           clicks_7d?: number | null
@@ -2612,6 +2617,7 @@ export type Database = {
           amazon_keyword_id?: string
           asin?: string | null
           bid?: number | null
+          campaign_id?: string | null
           clicks?: number | null
           clicks_14d?: number | null
           clicks_7d?: number | null
@@ -3405,6 +3411,7 @@ export type Database = {
           clicks: number | null
           clicks_14d: number | null
           clicks_7d: number | null
+          connection_id: string | null
           conversion_rate: number | null
           conversion_rate_14d: number | null
           conversion_rate_7d: number | null
@@ -3448,6 +3455,7 @@ export type Database = {
           clicks?: number | null
           clicks_14d?: number | null
           clicks_7d?: number | null
+          connection_id?: string | null
           conversion_rate?: number | null
           conversion_rate_14d?: number | null
           conversion_rate_7d?: number | null
@@ -3491,6 +3499,7 @@ export type Database = {
           clicks?: number | null
           clicks_14d?: number | null
           clicks_7d?: number | null
+          connection_id?: string | null
           conversion_rate?: number | null
           conversion_rate_14d?: number | null
           conversion_rate_7d?: number | null
@@ -3528,6 +3537,27 @@ export type Database = {
             columns: ["adgroup_id"]
             isOneToOne: false
             referencedRelation: "ad_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "targets_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "amazon_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "targets_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "amazon_connections_client"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "targets_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "amazon_connections_safe"
             referencedColumns: ["id"]
           },
         ]
