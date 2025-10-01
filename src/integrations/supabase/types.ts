@@ -130,6 +130,7 @@ export type Database = {
           spend_14d: number | null
           spend_7d: number | null
           status: Database["public"]["Enums"]["campaign_status"]
+          updated_at: string | null
         }
         Insert: {
           acos?: number | null
@@ -170,6 +171,7 @@ export type Database = {
           spend_14d?: number | null
           spend_7d?: number | null
           status?: Database["public"]["Enums"]["campaign_status"]
+          updated_at?: string | null
         }
         Update: {
           acos?: number | null
@@ -210,6 +212,7 @@ export type Database = {
           spend_14d?: number | null
           spend_7d?: number | null
           status?: Database["public"]["Enums"]["campaign_status"]
+          updated_at?: string | null
         }
         Relationships: [
           {
@@ -1466,6 +1469,7 @@ export type Database = {
           impressions_7d: number | null
           last_updated: string | null
           name: string
+          placement_bidding: Json | null
           product_type: string | null
           roas: number | null
           roas_14d: number | null
@@ -1521,6 +1525,7 @@ export type Database = {
           impressions_7d?: number | null
           last_updated?: string | null
           name: string
+          placement_bidding?: Json | null
           product_type?: string | null
           roas?: number | null
           roas_14d?: number | null
@@ -1576,6 +1581,7 @@ export type Database = {
           impressions_7d?: number | null
           last_updated?: string | null
           name?: string
+          placement_bidding?: Json | null
           product_type?: string | null
           roas?: number | null
           roas_14d?: number | null
@@ -2596,6 +2602,7 @@ export type Database = {
           spend_14d: number | null
           spend_7d: number | null
           status: Database["public"]["Enums"]["campaign_status"]
+          updated_at: string | null
         }
         Insert: {
           acos?: number | null
@@ -2640,6 +2647,7 @@ export type Database = {
           spend_14d?: number | null
           spend_7d?: number | null
           status?: Database["public"]["Enums"]["campaign_status"]
+          updated_at?: string | null
         }
         Update: {
           acos?: number | null
@@ -2684,6 +2692,7 @@ export type Database = {
           spend_14d?: number | null
           spend_7d?: number | null
           status?: Database["public"]["Enums"]["campaign_status"]
+          updated_at?: string | null
         }
         Relationships: [
           {
