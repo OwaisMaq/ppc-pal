@@ -1406,6 +1406,7 @@ export type Database = {
           attributed_sales_7d: number | null
           attributed_sales_legacy: number | null
           attribution_model: string | null
+          bid_strategy: string | null
           budget: number | null
           campaign_type: string | null
           clicks: number | null
@@ -1458,6 +1459,7 @@ export type Database = {
           attributed_sales_7d?: number | null
           attributed_sales_legacy?: number | null
           attribution_model?: string | null
+          bid_strategy?: string | null
           budget?: number | null
           campaign_type?: string | null
           clicks?: number | null
@@ -1510,6 +1512,7 @@ export type Database = {
           attributed_sales_7d?: number | null
           attributed_sales_legacy?: number | null
           attribution_model?: string | null
+          bid_strategy?: string | null
           budget?: number | null
           campaign_type?: string | null
           clicks?: number | null
