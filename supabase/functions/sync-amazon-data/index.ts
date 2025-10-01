@@ -159,13 +159,14 @@ async function createReportRequest(
     }
   }
 
-  // Map report types to correct v3 reportTypeId and groupBy values
-  const reportTypeMapping: Record<string, { reportTypeId: string, groupBy: string, allowsFilters: boolean }> = {
-    'campaigns': { reportTypeId: 'spCampaigns', groupBy: 'campaign', allowsFilters: true },
-    'adGroups': { reportTypeId: 'spAdGroups', groupBy: 'adGroup', allowsFilters: true },
-    'keywords': { reportTypeId: 'spKeywords', groupBy: 'adGroup', allowsFilters: false },
-    'targets': { reportTypeId: 'spTargets', groupBy: 'target', allowsFilters: true },
-    'searchTerms': { reportTypeId: 'spSearchTerms', groupBy: 'searchTerm', allowsFilters: true }
+  // Map report types to correct v3 groupBy values
+  // Note: Sponsored Products v3 reports don't use reportTypeId, only groupBy
+  const reportTypeMapping: Record<string, { groupBy: string, allowsFilters: boolean }> = {
+    'campaigns': { groupBy: 'campaign', allowsFilters: false },
+    'adGroups': { groupBy: 'adGroup', allowsFilters: false },
+    'keywords': { groupBy: 'targeting', allowsFilters: false },
+    'targets': { groupBy: 'targeting', allowsFilters: false },
+    'searchTerms': { groupBy: 'searchTerm', allowsFilters: false }
   }
 
   const mapping = reportTypeMapping[reportType]
@@ -201,17 +202,8 @@ async function createReportRequest(
           adProduct: 'SPONSORED_PRODUCTS',
           groupBy: [mapping.groupBy],
           columns: columns,
-          reportTypeId: mapping.reportTypeId,
           timeUnit: timeUnit,
-          format: 'GZIP_JSON',
-          ...(entityIds && mapping.allowsFilters && { 
-            filters: [{
-              field: reportType === 'campaigns' ? 'CAMPAIGN_ID' : 
-                     reportType === 'adGroups' ? 'AD_GROUP_ID' :
-                     reportType === 'targets' ? 'TARGET_ID' : 'SEARCH_TERM',
-              values: entityIds
-            }]
-          })
+          format: 'GZIP_JSON'
         }
       })
     }
@@ -238,7 +230,6 @@ async function createReportRequest(
           adProduct: 'SPONSORED_PRODUCTS',
           groupBy: [mapping.groupBy],
           columns: columns,
-          reportTypeId: mapping.reportTypeId,
           timeUnit: timeUnit,
           format: 'GZIP_JSON'
         }
