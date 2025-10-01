@@ -726,7 +726,7 @@ serve(async (req) => {
             name: campaign.name,
             campaign_type: campaign.campaignType,
             targeting_type: campaign.targetingType,
-            state: campaign.state,
+            status: campaign.state,
             daily_budget: campaign.dynamicBidding?.strategy ? null : campaign.budget?.budget,
             start_date: campaign.startDate,
             end_date: campaign.endDate,
