@@ -159,14 +159,13 @@ async function createReportRequest(
     }
   }
 
-  // Map report types to correct v3 groupBy values
-  // Note: Sponsored Products v3 reports don't use reportTypeId, only groupBy
-  const reportTypeMapping: Record<string, { groupBy: string, allowsFilters: boolean }> = {
-    'campaigns': { groupBy: 'campaign', allowsFilters: false },
-    'adGroups': { groupBy: 'adGroup', allowsFilters: false },
-    'keywords': { groupBy: 'targeting', allowsFilters: false },
-    'targets': { groupBy: 'targeting', allowsFilters: false },
-    'searchTerms': { groupBy: 'searchTerm', allowsFilters: false }
+  // Map report types to correct v3 reportTypeId and groupBy values
+  const reportTypeMapping: Record<string, { reportTypeId: string, groupBy: string, allowsFilters: boolean }> = {
+    'campaigns': { reportTypeId: 'spCampaigns', groupBy: 'campaign', allowsFilters: false },
+    'adGroups': { reportTypeId: 'spAdGroups', groupBy: 'adGroup', allowsFilters: false },
+    'keywords': { reportTypeId: 'spKeywords', groupBy: 'targeting', allowsFilters: false },
+    'targets': { reportTypeId: 'spTargets', groupBy: 'targeting', allowsFilters: false },
+    'searchTerms': { reportTypeId: 'spSearchTerms', groupBy: 'searchTerm', allowsFilters: false }
   }
 
   const mapping = reportTypeMapping[reportType]
@@ -200,6 +199,7 @@ async function createReportRequest(
         endDate: requestBody.reportEndDate,
         configuration: {
           adProduct: 'SPONSORED_PRODUCTS',
+          reportTypeId: mapping.reportTypeId,
           groupBy: [mapping.groupBy],
           columns: columns,
           timeUnit: timeUnit,
@@ -228,6 +228,7 @@ async function createReportRequest(
         endDate: requestBody.reportEndDate,
         configuration: {
           adProduct: 'SPONSORED_PRODUCTS',
+          reportTypeId: mapping.reportTypeId,
           groupBy: [mapping.groupBy],
           columns: columns,
           timeUnit: timeUnit,
