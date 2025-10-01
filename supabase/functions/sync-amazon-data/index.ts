@@ -394,7 +394,7 @@ async function fetchAllPages(
       'Authorization': `Bearer ${accessToken}`,
       'Amazon-Advertising-API-ClientId': clientId.trim(),
       'Amazon-Advertising-API-Scope': profileId,
-      'Content-Type': 'application/json',
+      'Content-Type': acceptType,  // Use versioned content type
       'Accept': acceptType
     }
 
