@@ -726,7 +726,7 @@ serve(async (req) => {
         const { data: upsertedCampaign, error: campaignError } = await supabase
           .from('campaigns')
           .upsert({
-            campaign_id: campaign.campaignId,
+            amazon_campaign_id: campaign.campaignId,
             connection_id: connectionId,
             name: campaign.name,
             campaign_type: campaign.campaignType,
@@ -740,10 +740,10 @@ serve(async (req) => {
             budget_type: campaign.budget?.budgetType,
             updated_at: new Date().toISOString()
           }, {
-            onConflict: 'campaign_id,connection_id',
+            onConflict: 'amazon_campaign_id,connection_id',
             ignoreDuplicates: false
           })
-          .select('id, campaign_id')
+          .select('id, amazon_campaign_id')
           .single()
 
         if (campaignError) {
@@ -776,7 +776,7 @@ serve(async (req) => {
           const { data: storedCampaign } = await supabase
             .from('campaigns')
             .select('id, targeting_type')
-            .eq('campaign_id', adGroup.campaignId)
+            .eq('amazon_campaign_id', adGroup.campaignId)
             .eq('connection_id', connectionId)
             .single()
           
@@ -862,7 +862,7 @@ serve(async (req) => {
           const { data: storedCampaign } = await supabase
             .from('campaigns')
             .select('id')
-            .eq('campaign_id', keyword.campaignId)
+            .eq('amazon_campaign_id', keyword.campaignId)
             .eq('connection_id', connectionId)
             .single()
           
@@ -942,7 +942,7 @@ serve(async (req) => {
           const { data: storedCampaign } = await supabase
             .from('campaigns')
             .select('id')
-            .eq('campaign_id', target.campaignId)
+            .eq('amazon_campaign_id', target.campaignId)
             .eq('connection_id', connectionId)
             .single()
           
@@ -1671,7 +1671,7 @@ serve(async (req) => {
                   budget_remaining: budgetData.remainingBudget || 0,
                   updated_at: new Date().toISOString()
                 })
-                .eq('campaign_id', campaignId)
+                .eq('amazon_campaign_id', campaignId)
                 .eq('connection_id', connectionId)
             }
           } catch (error) {
