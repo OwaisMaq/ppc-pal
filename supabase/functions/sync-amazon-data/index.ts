@@ -1090,11 +1090,14 @@ serve(async (req) => {
               const updateData: any = {
                 impressions: record.impressions || 0,
                 clicks: record.clicks || 0,
-                cost_7d: record.cost || 0,
-                attributed_sales_7d: record.sales7d || 0,
-                attributed_conversions_7d: record.purchases7d || 0,
-                impressions_7d: record.impressions || 0,
                 clicks_7d: record.clicks || 0,
+                impressions_7d: record.impressions || 0,
+                cost_7d: record.cost || 0,
+                cost_legacy: record.cost || 0,
+                attributed_sales_7d: record.sales7d || 0,
+                attributed_sales_legacy: record.sales7d || 0,
+                attributed_conversions_7d: record.purchases7d || 0,
+                attributed_conversions_legacy: record.purchases7d || 0,
                 updated_at: new Date().toISOString()
               }
 
