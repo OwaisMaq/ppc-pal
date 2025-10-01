@@ -160,14 +160,12 @@ async function createReportRequest(
   }
 
   // Map report types to correct v3 reportTypeId and groupBy values
-  // Note: v3 API doesn't have separate reportTypeIds for adGroups, keywords, targets
-  // All SP reports use adProduct: 'SPONSORED_PRODUCTS' and differentiate via groupBy
-  const reportTypeMapping: Record<string, { reportTypeId: string | null, groupBy: string, allowsFilters: boolean }> = {
-    'campaigns': { reportTypeId: null, groupBy: 'campaign', allowsFilters: true },
-    'adGroups': { reportTypeId: null, groupBy: 'adGroup', allowsFilters: true },
-    'keywords': { reportTypeId: null, groupBy: 'adGroup', allowsFilters: false }, // Keywords must group by adGroup, not keyword
-    'targets': { reportTypeId: null, groupBy: 'target', allowsFilters: true },
-    'searchTerms': { reportTypeId: null, groupBy: 'searchTerm', allowsFilters: true }
+  const reportTypeMapping: Record<string, { reportTypeId: string, groupBy: string, allowsFilters: boolean }> = {
+    'campaigns': { reportTypeId: 'spCampaigns', groupBy: 'campaign', allowsFilters: true },
+    'adGroups': { reportTypeId: 'spAdGroups', groupBy: 'adGroup', allowsFilters: true },
+    'keywords': { reportTypeId: 'spKeywords', groupBy: 'adGroup', allowsFilters: false },
+    'targets': { reportTypeId: 'spTargets', groupBy: 'target', allowsFilters: true },
+    'searchTerms': { reportTypeId: 'spSearchTerms', groupBy: 'searchTerm', allowsFilters: true }
   }
 
   const mapping = reportTypeMapping[reportType]
@@ -203,7 +201,7 @@ async function createReportRequest(
           adProduct: 'SPONSORED_PRODUCTS',
           groupBy: [mapping.groupBy],
           columns: columns,
-          ...(mapping.reportTypeId && { reportTypeId: mapping.reportTypeId }),
+          reportTypeId: mapping.reportTypeId,
           timeUnit: timeUnit,
           format: 'GZIP_JSON',
           ...(entityIds && mapping.allowsFilters && { 
