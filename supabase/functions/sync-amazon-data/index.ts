@@ -372,6 +372,17 @@ async function fetchAllPages(
     throw new Error('AMAZON_CLIENT_ID environment variable is not set or empty')
   }
   
+  // Map endpoints to their required content types
+  const contentTypeMap: Record<string, string> = {
+    'campaigns': 'application/vnd.spcampaign.v3+json',
+    'adGroups': 'application/vnd.spadGroup.v3+json',
+    'keywords': 'application/vnd.spkeyword.v3+json',
+    'productTargets': 'application/vnd.sptargetingClause.v3+json',
+    'targets': 'application/vnd.sptargetingClause.v3+json'
+  }
+  
+  const acceptType = contentTypeMap[endpoint] || 'application/json'
+  
   do {
     pageCount++
     console.log(`📄 Fetching page ${pageCount} from ${endpoint}`)
@@ -383,7 +394,8 @@ async function fetchAllPages(
       'Authorization': `Bearer ${accessToken}`,
       'Amazon-Advertising-API-ClientId': clientId.trim(),
       'Amazon-Advertising-API-Scope': profileId,
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'Accept': acceptType
     }
 
     // Request body for pagination
@@ -398,6 +410,7 @@ async function fetchAllPages(
     console.log('🔍 Request debug:', {
       url,
       method: 'POST',
+      acceptHeader: acceptType,
       hasNextToken: !!nextToken,
       authHeaderLength: headers['Authorization'].length,
       clientIdLength: headers['Amazon-Advertising-API-ClientId'].length,
@@ -818,10 +831,10 @@ serve(async (req) => {
 
     await updateProgress(50, 'Fetching targets...')
 
-    // Fetch product targets (formerly called 'targets')
-    console.log('📁 Fetching targets...')
-    const targets = await fetchAllPages(accessToken, connection.profile_id, 'productTargets', 10000, apiEndpoint)
-    console.log(`✅ Found ${targets.length} targets`)
+    // Fetch targeting clauses (product targets and keywords)
+    console.log('📁 Fetching targeting clauses...')
+    const targets = await fetchAllPages(accessToken, connection.profile_id, 'targets', 10000, apiEndpoint)
+    console.log(`✅ Found ${targets.length} targeting clauses`)
 
     const targetIds: string[] = []
     for (const target of targets) {
