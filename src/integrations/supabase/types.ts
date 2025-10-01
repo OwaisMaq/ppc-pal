@@ -98,9 +98,11 @@ export type Database = {
           adgroup_id: string | null
           amazon_adgroup_id: string
           campaign_id: string
+          campaign_targeting_type: string | null
           clicks: number | null
           clicks_14d: number | null
           clicks_7d: number | null
+          connection_id: string | null
           conversion_rate_14d: number | null
           conversion_rate_7d: number | null
           cpc_14d: number | null
@@ -136,9 +138,11 @@ export type Database = {
           adgroup_id?: string | null
           amazon_adgroup_id: string
           campaign_id: string
+          campaign_targeting_type?: string | null
           clicks?: number | null
           clicks_14d?: number | null
           clicks_7d?: number | null
+          connection_id?: string | null
           conversion_rate_14d?: number | null
           conversion_rate_7d?: number | null
           cpc_14d?: number | null
@@ -174,9 +178,11 @@ export type Database = {
           adgroup_id?: string | null
           amazon_adgroup_id?: string
           campaign_id?: string
+          campaign_targeting_type?: string | null
           clicks?: number | null
           clicks_14d?: number | null
           clicks_7d?: number | null
+          connection_id?: string | null
           conversion_rate_14d?: number | null
           conversion_rate_7d?: number | null
           cpc_14d?: number | null
@@ -211,6 +217,27 @@ export type Database = {
             columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ad_groups_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "amazon_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ad_groups_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "amazon_connections_client"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ad_groups_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "amazon_connections_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -3426,6 +3453,8 @@ export type Database = {
           ctr_14d: number | null
           ctr_7d: number | null
           expression: Json | null
+          expression_type: string | null
+          expression_value: string | null
           id: string
           impressions: number | null
           impressions_14d: number | null
@@ -3470,6 +3499,8 @@ export type Database = {
           ctr_14d?: number | null
           ctr_7d?: number | null
           expression?: Json | null
+          expression_type?: string | null
+          expression_value?: string | null
           id?: string
           impressions?: number | null
           impressions_14d?: number | null
@@ -3514,6 +3545,8 @@ export type Database = {
           ctr_14d?: number | null
           ctr_7d?: number | null
           expression?: Json | null
+          expression_type?: string | null
+          expression_value?: string | null
           id?: string
           impressions?: number | null
           impressions_14d?: number | null

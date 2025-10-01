@@ -775,7 +775,7 @@ serve(async (req) => {
             connection_id: connectionId,
             name: adGroup.name,
             default_bid: adGroup.defaultBid,
-            state: adGroup.state,
+            status: adGroup.state,
             campaign_targeting_type: storedCampaign?.targeting_type,
             updated_at: new Date().toISOString()
           }, {
@@ -812,7 +812,7 @@ serve(async (req) => {
             connection_id: connectionId,
             keyword_text: keyword.keywordText,
             match_type: keyword.matchType,
-            state: keyword.state,
+            status: keyword.state,
             bid: keyword.bid,
             updated_at: new Date().toISOString()
           }, {
@@ -849,7 +849,7 @@ serve(async (req) => {
             connection_id: connectionId,
             expression_type: target.expression?.[0]?.type,
             expression_value: target.expression?.[0]?.value,
-            state: target.state,
+            status: target.state,
             bid: target.bid,
             updated_at: new Date().toISOString()
           }, {
