@@ -281,14 +281,14 @@ async function pollReportStatus(
     const result = await response.json()
     console.log(`📊 Report ${reportId} status: ${result.status}`)
     
-    if (result.status === 'COMPLETED') {
+    if (result.status === 'COMPLETED' || result.status === 'SUCCESS') {
       return result
     } else if (result.status === 'FAILED') {
       throw new Error(`Report generation failed: ${result.statusDetails}`)
     }
     
-    // Wait 10 seconds before next poll
-    await new Promise(resolve => setTimeout(resolve, 10000))
+    // Wait 5 seconds before next poll (reduced from 10s for faster response)
+    await new Promise(resolve => setTimeout(resolve, 5000))
   }
   
   throw new Error('Report generation timeout')
@@ -498,9 +498,9 @@ serve(async (req) => {
     }
 
     const { connectionId, dateRangeDays, diagnosticMode, timeUnit } = await req.json()
-    const dateRange = Number(dateRangeDays) || 30  // Changed from 90 to 30 days to comply with Amazon API limits
+    const dateRange = Number(dateRangeDays) || 7  // Reduced to 7 days for faster sync - SUMMARY processes much faster
     const diag = Boolean(diagnosticMode)
-    const timeUnitOpt: 'SUMMARY' | 'DAILY' = (timeUnit === 'SUMMARY' ? 'SUMMARY' : 'DAILY')
+    const timeUnitOpt: 'SUMMARY' | 'DAILY' = (timeUnit === 'DAILY' ? 'DAILY' : 'SUMMARY') // Default to SUMMARY for faster processing
     console.log('🚀 Starting sync for user:', user.id, 'connection:', connectionId, 'dateRangeDays:', dateRange, 'diagnosticMode:', diag)
     
     // Use helper function to clean up existing jobs and create new one
