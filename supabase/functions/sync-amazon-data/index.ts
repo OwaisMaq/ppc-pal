@@ -238,6 +238,27 @@ async function createReportRequest(
     }
     
     console.error('📊 Report creation error details:', errorDetails)
+    
+    // Handle 425 (Too Early) - duplicate report request
+    if (response.status === 425) {
+      console.log('⚠️ Duplicate report detected (425), waiting 10 seconds before retry...')
+      await new Promise(resolve => setTimeout(resolve, 10000))
+      
+      // Try to extract existing report ID from error response
+      try {
+        const errorJson = JSON.parse(errorText)
+        if (errorJson.detail && errorJson.detail.includes('duplicate of :')) {
+          const existingReportId = errorJson.detail.split('duplicate of : ')[1]?.trim()
+          if (existingReportId) {
+            console.log(`✅ Using existing report ID: ${existingReportId}`)
+            return existingReportId
+          }
+        }
+      } catch (e) {
+        console.warn('Could not parse 425 error response for report ID')
+      }
+    }
+    
     throw new Error(`Report creation failed: ${response.status} ${errorText}`)
   }
 
@@ -1489,13 +1510,18 @@ serve(async (req) => {
     if (campaignIds.length > 0) {
       console.log('🔍 Syncing search terms performance data...')
       try {
+        // For SUMMARY time unit, we cannot include 'date' column per Amazon API restrictions
+        const searchTermColumns = timeUnitOpt === 'SUMMARY' 
+          ? ['campaignId','adGroupId','keywordId','searchTerm','clicks','impressions','cost','purchases7d','sales7d']
+          : ['date','campaignId','adGroupId','keywordId','searchTerm','clicks','impressions','cost','purchases7d','sales7d']
+        
         const reportId = await createReportRequest(
           accessToken, 
           connection.profile_id, 
           'searchTerms',
           dateRange,
           timeUnitOpt,
-          ['date','campaignId','adGroupId','keywordId','searchTerm','clicks','impressions','cost','purchases7d','sales7d'],
+          searchTermColumns,
           campaignIds,
           apiEndpoint
         )
@@ -1546,7 +1572,7 @@ serve(async (req) => {
           }
 
           console.log(`✅ Updated metrics for ${searchTermMetricsUpdated} search terms`)
-          diagnostics.searchTermReport = { rows: performanceData.length, timeUnit: timeUnitOpt, columns: ['date','campaignId','adGroupId','keywordId','searchTerm','clicks','impressions','cost','purchases7d','sales7d'] }
+          diagnostics.searchTermReport = { rows: performanceData.length, timeUnit: timeUnitOpt, columns: searchTermColumns }
         }
 
         console.log('✅ Search terms performance data synced successfully')
