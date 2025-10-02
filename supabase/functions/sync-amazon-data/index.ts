@@ -1508,7 +1508,7 @@ serve(async (req) => {
           'searchTerms',
           dateRange,
           timeUnitOpt,
-          ['date','campaignId','adGroupId','keywordId','searchTerm','clicks','impressions','cost','attributedConversions7d','sales7d'],
+          ['date','campaignId','adGroupId','keywordId','searchTerm','clicks','impressions','cost','purchases7d','sales7d'],
           campaignIds,
           apiEndpoint
         )
@@ -1538,9 +1538,9 @@ serve(async (req) => {
                     impressions: record.impressions || 0,
                     clicks: record.clicks || 0,
                     cost_micros: Math.round((record.cost || 0) * 1000000),
-                    attributed_conversions_7d: record.attributedConversions7d || 0,
+                    attributed_conversions_7d: record.purchases7d || 0,
                     attributed_sales_7d_micros: Math.round((record.sales7d || 0) * 1000000),
-                    attributed_conversions_1d: record.attributedConversions1d || 0,
+                    attributed_conversions_1d: record.purchases1d || 0,
                     match_type: record.matchType || 'BROAD',
                     targeting: record.targeting || ''
                   }, {
@@ -1558,9 +1558,8 @@ serve(async (req) => {
             }
           }
 
-          totalMetricsUpdated += searchTermMetricsUpdated
           console.log(`✅ Updated metrics for ${searchTermMetricsUpdated} search terms`)
-          diagnostics.searchTermReport = { rows: performanceData.length, timeUnit: timeUnitOpt, columns: ['date','campaignId','adGroupId','keywordId','searchTerm','clicks','impressions','cost','attributedConversions7d','sales7d'] }
+          diagnostics.searchTermReport = { rows: performanceData.length, timeUnit: timeUnitOpt, columns: ['date','campaignId','adGroupId','keywordId','searchTerm','clicks','impressions','cost','purchases7d','sales7d'] }
         }
 
         console.log('✅ Search terms performance data synced successfully')
