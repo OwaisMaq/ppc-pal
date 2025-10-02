@@ -208,21 +208,33 @@ serve(async (req) => {
           });
         }
 
-        const { data: freshConn, error: freshConnErr } = await db
-          .from("amazon_connections")
-          .select("access_token")
-          .eq("id", connectionId)
+        // Get tokens from secure storage using RPC
+        const { data: tokensArray, error: tokenError } = await db
+          .rpc('get_tokens', {
+            p_profile_id: conn.profile_id
+          })
           .single();
-          
-        if (freshConnErr || !freshConn?.access_token) {
-          console.error("Failed to get fresh access token for archive:", freshConnErr);
+        
+        if (tokenError) {
+          console.error('Token retrieval error for archive:', tokenError);
+          return new Response("Failed to retrieve stored tokens", { 
+            status: 502, 
+            headers: corsHeaders 
+          });
+        }
+        
+        // RPC returns an array, get the first element
+        const tokens = tokensArray?.[0];
+        
+        if (!tokens || !tokens.access_token) {
+          console.error('No access token found for profile:', conn.profile_id);
           return new Response("Failed to get fresh access token", { 
             status: 502, 
             headers: corsHeaders 
           });
         }
         
-        const access_token = freshConn.access_token;
+        const access_token = tokens.access_token;
 
         // Get AMS base URL
         const base =
@@ -332,23 +344,34 @@ serve(async (req) => {
       });
     }
 
-    // Get the updated connection with fresh access token
+    // Get tokens from secure storage using RPC
     console.log("Getting fresh access token...");
-    const { data: freshConn, error: freshConnErr } = await db
-      .from("amazon_connections")
-      .select("access_token")
-      .eq("id", connectionId)
+    const { data: tokensArray, error: tokenError } = await db
+      .rpc('get_tokens', {
+        p_profile_id: conn.profile_id
+      })
       .single();
-      
-    if (freshConnErr || !freshConn?.access_token) {
-      console.error("Failed to get fresh access token:", freshConnErr);
+    
+    if (tokenError) {
+      console.error('Token retrieval error:', tokenError);
+      return new Response("Failed to retrieve stored tokens", { 
+        status: 502, 
+        headers: corsHeaders 
+      });
+    }
+    
+    // RPC returns an array, get the first element
+    const tokens = tokensArray?.[0];
+    
+    if (!tokens || !tokens.access_token) {
+      console.error('No access token found for profile:', conn.profile_id);
       return new Response("Failed to get fresh access token", { 
         status: 502, 
         headers: corsHeaders 
       });
     }
     
-    const access_token = freshConn.access_token;
+    const access_token = tokens.access_token;
     console.log("Fresh access token obtained");
     
     console.log("Using AMS base URL:", baseUrl);
