@@ -1427,25 +1427,6 @@ serve(async (req) => {
                 console.warn(`Failed to update target ${record.targetId} metrics:`, updateError)
               } else {
                 targetMetricsUpdated++
-                sales_7d: record.sales7d || 0,
-                orders_7d: record.purchases7d || 0,
-                updated_at: new Date().toISOString()
-              }
-
-              if (timeUnitOpt === 'DAILY' && record.date) {
-                updateData.date = record.date
-              }
-
-              const { error: updateError } = await supabase
-                .from('targets')
-                .update(updateData)
-                .eq('amazon_target_id', record.targetId)
-                .eq('connection_id', connectionId)
-
-              if (updateError) {
-                console.warn(`Failed to update target ${record.targetId} metrics:`, updateError)
-              } else {
-                targetMetricsUpdated++
                 
                 // Also insert into fact tables for daily data
                 if (timeUnitOpt === 'DAILY' && record.date) {
