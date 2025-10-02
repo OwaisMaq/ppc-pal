@@ -498,9 +498,9 @@ serve(async (req) => {
     }
 
     const { connectionId, dateRangeDays, diagnosticMode, timeUnit } = await req.json()
-    const dateRange = Number(dateRangeDays) || 7  // Reduced to 7 days for faster sync - SUMMARY processes much faster
+    const dateRange = Number(dateRangeDays) || 7
     const diag = Boolean(diagnosticMode)
-    const timeUnitOpt: 'SUMMARY' | 'DAILY' = 'DAILY' // Always use DAILY to get per-entity data, then aggregate
+    const timeUnitOpt: 'SUMMARY' | 'DAILY' = 'SUMMARY' // Use SUMMARY for faster processing
     console.log('🚀 Starting sync for user:', user.id, 'connection:', connectionId, 'dateRangeDays:', dateRange, 'diagnosticMode:', diag)
     
     // Use helper function to clean up existing jobs and create new one
@@ -1083,56 +1083,32 @@ serve(async (req) => {
           const performanceData = await downloadAndParseReport(reportResult.url)
           
           console.log(`📊 Processing ${performanceData.length} campaign performance records...`)
-          
-          // Aggregate data by campaign ID
-          const campaignMetrics = new Map<string, {
-            impressions: number,
-            clicks: number,
-            cost: number,
-            sales: number,
-            conversions: number
-          }>()
-          
-          for (const record of performanceData) {
-            const campaignId = record.campaignId
-            const existing = campaignMetrics.get(campaignId) || { impressions: 0, clicks: 0, cost: 0, sales: 0, conversions: 0 }
-            
-            existing.impressions += record.impressions || 0
-            existing.clicks += record.clicks || 0
-            existing.cost += record.cost || 0
-            existing.sales += record.sales7d || 0
-            existing.conversions += record.purchases7d || 0
-            
-            campaignMetrics.set(campaignId, existing)
-          }
-          
-          console.log(`📊 Updating metrics for ${campaignMetrics.size} campaigns...`)
           let campaignMetricsUpdated = 0
 
-          for (const [campaignId, metrics] of campaignMetrics.entries()) {
+          for (const record of performanceData) {
             try {
               const updateData: any = {
-                impressions: metrics.impressions,
-                clicks: metrics.clicks,
-                clicks_7d: metrics.clicks,
-                impressions_7d: metrics.impressions,
-                cost_7d: metrics.cost,
-                cost_legacy: metrics.cost,
-                attributed_sales_7d: metrics.sales,
-                attributed_sales_legacy: metrics.sales,
-                attributed_conversions_7d: metrics.conversions,
-                attributed_conversions_legacy: metrics.conversions,
+                impressions: record.impressions || 0,
+                clicks: record.clicks || 0,
+                clicks_7d: record.clicks || 0,
+                impressions_7d: record.impressions || 0,
+                cost_7d: record.cost || 0,
+                cost_legacy: record.cost || 0,
+                attributed_sales_7d: record.sales7d || 0,
+                attributed_sales_legacy: record.sales7d || 0,
+                attributed_conversions_7d: record.purchases7d || 0,
+                attributed_conversions_legacy: record.purchases7d || 0,
                 updated_at: new Date().toISOString()
               }
 
               const { error: updateError } = await supabase
                 .from('campaigns')
                 .update(updateData)
-                .eq('amazon_campaign_id', campaignId)
+                .eq('amazon_campaign_id', record.campaignId)
                 .eq('connection_id', connectionId)
 
               if (updateError) {
-                console.warn(`Failed to update campaign ${campaignId} metrics:`, updateError)
+                console.warn(`Failed to update campaign ${record.campaignId} metrics:`, updateError)
               } else {
                 campaignMetricsUpdated++
                 
@@ -1267,53 +1243,29 @@ serve(async (req) => {
           const performanceData = await downloadAndParseReport(reportResult.url)
           
           console.log(`📊 Processing ${performanceData.length} ad group performance records...`)
-          
-          // Aggregate data by ad group ID
-          const adGroupMetrics = new Map<string, {
-            impressions: number,
-            clicks: number,
-            cost: number,
-            sales: number,
-            conversions: number
-          }>()
-          
-          for (const record of performanceData) {
-            const adGroupId = record.adGroupId
-            const existing = adGroupMetrics.get(adGroupId) || { impressions: 0, clicks: 0, cost: 0, sales: 0, conversions: 0 }
-            
-            existing.impressions += record.impressions || 0
-            existing.clicks += record.clicks || 0
-            existing.cost += record.cost || 0
-            existing.sales += record.sales7d || 0
-            existing.conversions += record.purchases7d || 0
-            
-            adGroupMetrics.set(adGroupId, existing)
-          }
-          
-          console.log(`📊 Updating metrics for ${adGroupMetrics.size} ad groups...`)
           let adGroupMetricsUpdated = 0
 
-          for (const [adGroupId, metrics] of adGroupMetrics.entries()) {
+          for (const record of performanceData) {
             try {
               const updateData: any = {
-                impressions: metrics.impressions,
-                clicks: metrics.clicks,
-                spend: metrics.cost,
-                sales: metrics.sales,
-                orders: metrics.conversions,
-                sales_7d: metrics.sales,
-                orders_7d: metrics.conversions,
+                impressions: record.impressions || 0,
+                clicks: record.clicks || 0,
+                spend: record.cost || 0,
+                sales: record.sales7d || 0,
+                orders: record.purchases7d || 0,
+                sales_7d: record.sales7d || 0,
+                orders_7d: record.purchases7d || 0,
                 updated_at: new Date().toISOString()
               }
 
               const { error: updateError } = await supabase
                 .from('ad_groups')
                 .update(updateData)
-                .eq('amazon_adgroup_id', adGroupId)
+                .eq('amazon_adgroup_id', record.adGroupId)
                 .eq('connection_id', connectionId)
 
               if (updateError) {
-                console.warn(`Failed to update ad group ${adGroupId} metrics:`, updateError)
+                console.warn(`Failed to update ad group ${record.adGroupId} metrics:`, updateError)
               } else {
                 adGroupMetricsUpdated++
                 
@@ -1450,53 +1402,29 @@ serve(async (req) => {
           const performanceData = await downloadAndParseReport(reportResult.url)
           
           console.log(`📊 Processing ${performanceData.length} target performance records...`)
-          
-          // Aggregate data by target ID
-          const targetMetrics = new Map<string, {
-            impressions: number,
-            clicks: number,
-            cost: number,
-            sales: number,
-            conversions: number
-          }>()
-          
-          for (const record of performanceData) {
-            const targetId = record.targetId
-            const existing = targetMetrics.get(targetId) || { impressions: 0, clicks: 0, cost: 0, sales: 0, conversions: 0 }
-            
-            existing.impressions += record.impressions || 0
-            existing.clicks += record.clicks || 0
-            existing.cost += record.cost || 0
-            existing.sales += record.sales7d || 0
-            existing.conversions += record.purchases7d || 0
-            
-            targetMetrics.set(targetId, existing)
-          }
-          
-          console.log(`📊 Updating metrics for ${targetMetrics.size} targets...`)
           let targetMetricsUpdated = 0
 
-          for (const [targetId, metrics] of targetMetrics.entries()) {
+          for (const record of performanceData) {
             try {
               const updateData: any = {
-                impressions: metrics.impressions,
-                clicks: metrics.clicks,
-                spend: metrics.cost,
-                sales: metrics.sales,
-                orders: metrics.conversions,
-                sales_7d: metrics.sales,
-                orders_7d: metrics.conversions,
+                impressions: record.impressions || 0,
+                clicks: record.clicks || 0,
+                spend: record.cost || 0,
+                sales: record.sales7d || 0,
+                orders: record.purchases7d || 0,
+                sales_7d: record.sales7d || 0,
+                orders_7d: record.purchases7d || 0,
                 updated_at: new Date().toISOString()
               }
 
               const { error: updateError } = await supabase
                 .from('targets')
                 .update(updateData)
-                .eq('amazon_target_id', targetId)
+                .eq('amazon_target_id', record.targetId)
                 .eq('connection_id', connectionId)
 
               if (updateError) {
-                console.warn(`Failed to update target ${targetId} metrics:`, updateError)
+                console.warn(`Failed to update target ${record.targetId} metrics:`, updateError)
               } else {
                 targetMetricsUpdated++
                 sales_7d: record.sales7d || 0,
@@ -1670,42 +1598,19 @@ serve(async (req) => {
           const performanceData = await downloadAndParseReport(reportResult.url)
           
           console.log(`📊 Processing ${performanceData.length} keyword performance records...`)
-          
-          // Aggregate data by keyword ID
-          const keywordMetrics = new Map<string, {
-            impressions: number,
-            clicks: number,
-            cost: number,
-            sales: number,
-            conversions: number
-          }>()
-          
-          for (const record of performanceData) {
-            const keywordId = record.keywordId || record.targetId // v3 API uses targetId for keywords
-            const existing = keywordMetrics.get(keywordId) || { impressions: 0, clicks: 0, cost: 0, sales: 0, conversions: 0 }
-            
-            existing.impressions += record.impressions || 0
-            existing.clicks += record.clicks || 0
-            existing.cost += record.cost || 0
-            existing.sales += record.sales7d || 0
-            existing.conversions += record.purchases7d || 0
-            
-            keywordMetrics.set(keywordId, existing)
-          }
-          
-          console.log(`📊 Updating metrics for ${keywordMetrics.size} keywords...`)
           let keywordMetricsUpdated = 0
 
-          for (const [keywordId, metrics] of keywordMetrics.entries()) {
+          for (const record of performanceData) {
             try {
+              const keywordId = record.keywordId || record.targetId // v3 API uses targetId for keywords
               const updateData: any = {
-                impressions: metrics.impressions,
-                clicks: metrics.clicks,
-                spend: metrics.cost,
-                sales: metrics.sales,
-                orders: metrics.conversions,
-                sales_7d: metrics.sales,
-                orders_7d: metrics.conversions,
+                impressions: record.impressions || 0,
+                clicks: record.clicks || 0,
+                spend: record.cost || 0,
+                sales: record.sales7d || 0,
+                orders: record.purchases7d || 0,
+                sales_7d: record.sales7d || 0,
+                orders_7d: record.purchases7d || 0,
                 updated_at: new Date().toISOString()
               }
 
