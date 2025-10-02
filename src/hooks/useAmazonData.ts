@@ -51,7 +51,7 @@ export const useAmazonData = () => {
             const token = session.data.session?.access_token;
             if (token) {
               await supabase.functions.invoke('sync-amazon-data', {
-                body: { connectionId: usable.id, timeUnit: 'DAILY', dateRangeDays: 30 },
+                body: { connectionId: usable.id, dateRangeDays: 7 },
                 headers: { Authorization: `Bearer ${token}` },
               });
               // Refetch after a short delay to allow writes
