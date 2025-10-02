@@ -211,9 +211,34 @@ async function createReportRequest(
 
   if (!response.ok) {
     const errorText = await response.text()
-    console.error(`❌ Report creation failed: ${response.status} ${errorText}`)
     
-    // Enhanced error logging for debugging
+    // Handle 425 (Too Early) - duplicate report request - BEFORE logging error
+    if (response.status === 425) {
+      console.log('⚠️ Duplicate report detected (425), extracting existing report ID...')
+      
+      // Try to extract existing report ID from error response
+      try {
+        const errorJson = JSON.parse(errorText)
+        if (errorJson.detail && errorJson.detail.includes('duplicate of')) {
+          // Extract report ID - format is "duplicate of : REPORT_ID" or "duplicate of: REPORT_ID"
+          const match = errorJson.detail.match(/duplicate of\s*:\s*([a-f0-9-]+)/i)
+          if (match && match[1]) {
+            const existingReportId = match[1].trim()
+            console.log(`✅ Using existing duplicate report ID: ${existingReportId}`)
+            return existingReportId
+          }
+        }
+      } catch (e) {
+        console.warn('Could not parse 425 error response for report ID:', e)
+      }
+      
+      // If we couldn't extract the report ID, wait and throw error to retry
+      console.log('⚠️ Could not extract report ID from 425 error, will throw error')
+      await new Promise(resolve => setTimeout(resolve, 5000))
+    }
+    
+    // Log error details
+    console.error(`❌ Report creation failed: ${response.status} ${errorText}`)
     const errorDetails = {
       stage: 'create',
       status: response.status,
@@ -236,28 +261,7 @@ async function createReportRequest(
         }
       }).substring(0, 300)
     }
-    
     console.error('📊 Report creation error details:', errorDetails)
-    
-    // Handle 425 (Too Early) - duplicate report request
-    if (response.status === 425) {
-      console.log('⚠️ Duplicate report detected (425), waiting 10 seconds before retry...')
-      await new Promise(resolve => setTimeout(resolve, 10000))
-      
-      // Try to extract existing report ID from error response
-      try {
-        const errorJson = JSON.parse(errorText)
-        if (errorJson.detail && errorJson.detail.includes('duplicate of :')) {
-          const existingReportId = errorJson.detail.split('duplicate of : ')[1]?.trim()
-          if (existingReportId) {
-            console.log(`✅ Using existing report ID: ${existingReportId}`)
-            return existingReportId
-          }
-        }
-      } catch (e) {
-        console.warn('Could not parse 425 error response for report ID')
-      }
-    }
     
     throw new Error(`Report creation failed: ${response.status} ${errorText}`)
   }
@@ -272,10 +276,11 @@ async function pollReportStatus(
   accessToken: string, 
   profileId: string, 
   reportId: string,
-  maxWaitTime = 300000, // 5 minutes
+  maxWaitTime = 120000, // Reduced to 2 minutes from 5 minutes
   apiEndpoint: string = 'https://advertising-api.amazon.com'
 ): Promise<ReportRequest> {
   const startTime = Date.now()
+  let pollCount = 0
   
   const clientId = Deno.env.get('AMAZON_CLIENT_ID')
   if (!clientId || clientId.trim() === '') {
@@ -283,6 +288,7 @@ async function pollReportStatus(
   }
 
   while (Date.now() - startTime < maxWaitTime) {
+    pollCount++
     const response = await fetchWithRetry(
       `${apiEndpoint}/reporting/reports/${reportId}`,
       {
@@ -300,7 +306,8 @@ async function pollReportStatus(
     }
 
     const result = await response.json()
-    console.log(`📊 Report ${reportId} status: ${result.status}`)
+    const elapsedSeconds = Math.round((Date.now() - startTime) / 1000)
+    console.log(`📊 Report ${reportId} status: ${result.status} (poll #${pollCount}, ${elapsedSeconds}s elapsed)`)
     
     if (result.status === 'COMPLETED' || result.status === 'SUCCESS') {
       return result
@@ -308,11 +315,17 @@ async function pollReportStatus(
       throw new Error(`Report generation failed: ${result.statusDetails}`)
     }
     
-    // Wait 5 seconds before next poll (reduced from 10s for faster response)
+    // If report is still PENDING after many polls, log warning
+    if (pollCount > 10) {
+      console.warn(`⚠️ Report ${reportId} still PENDING after ${pollCount} polls (${elapsedSeconds}s)`)
+    }
+    
+    // Wait 5 seconds before next poll
     await new Promise(resolve => setTimeout(resolve, 5000))
   }
   
-  throw new Error('Report generation timeout')
+  console.error(`❌ Report ${reportId} timed out after ${Math.round(maxWaitTime / 1000)}s`)
+  throw new Error(`Report generation timeout after ${Math.round(maxWaitTime / 1000)} seconds - report may still be processing`)
 }
 
 // Download and parse gzipped JSON report
@@ -1098,7 +1111,7 @@ serve(async (req) => {
           apiEndpoint
         )
 
-        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 300000, apiEndpoint)
+        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 120000, apiEndpoint)
         
         if (reportResult.url) {
           const performanceData = await downloadAndParseReport(reportResult.url)
@@ -1179,7 +1192,12 @@ serve(async (req) => {
 
         console.log('✅ Campaign performance data synced successfully')
       } catch (error) {
-        if (error instanceof Error && error.message.includes('400')) {
+        // Log warning but don't fail entire sync if report times out
+        if (error instanceof Error && error.message.includes('timeout')) {
+          console.warn('⚠️  Campaign performance report timed out - continuing with entity sync only')
+          console.warn('💡 Tip: Performance data may appear after Amazon finishes processing the report')
+          diagnostics.campaignReportError = `Report timeout: ${error.message}`
+        } else if (error instanceof Error && error.message.includes('400')) {
           console.warn('⚠️ Campaign report failed, trying with minimal columns...')
           try {
               const reportId = await createReportRequest(
@@ -1258,7 +1276,7 @@ serve(async (req) => {
           apiEndpoint
         )
 
-        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 300000, apiEndpoint)
+        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 120000, apiEndpoint)
         
         if (reportResult.url) {
           const performanceData = await downloadAndParseReport(reportResult.url)
@@ -1338,7 +1356,11 @@ serve(async (req) => {
 
         console.log('✅ Ad group performance data synced successfully')
       } catch (error) {
-        if (error instanceof Error && error.message.includes('400')) {
+        // Log warning but don't fail entire sync if report times out
+        if (error instanceof Error && error.message.includes('timeout')) {
+          console.warn('⚠️ Ad group performance report timed out - continuing with entity sync only')
+          diagnostics.adGroupReportError = `Report timeout: ${error.message}`
+        } else if (error instanceof Error && error.message.includes('400')) {
           console.warn('⚠️ Ad group report failed, trying with minimal columns...')
           try {
             const reportId = await createReportRequest(
@@ -1417,7 +1439,7 @@ serve(async (req) => {
           apiEndpoint
         )
 
-        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 300000, apiEndpoint)
+        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 120000, apiEndpoint)
         
         if (reportResult.url) {
           const performanceData = await downloadAndParseReport(reportResult.url)
@@ -1499,8 +1521,14 @@ serve(async (req) => {
 
         console.log('✅ Target performance data synced successfully')
       } catch (error) {
-        console.error('❌ Target performance sync failed:', error)
-        diagnostics.targetReportError = String(error)
+        // Log warning but don't fail entire sync if report times out
+        if (error instanceof Error && error.message.includes('timeout')) {
+          console.warn('⚠️ Target performance report timed out - continuing with entity sync only')
+          diagnostics.targetReportError = `Report timeout: ${error.message}`
+        } else {
+          console.error('❌ Target performance sync failed:', error)
+          diagnostics.targetReportError = String(error)
+        }
       }
     }
 
@@ -1526,7 +1554,7 @@ serve(async (req) => {
           apiEndpoint
         )
 
-        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 300000, apiEndpoint)
+        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 120000, apiEndpoint)
         
         if (reportResult.url) {
           const performanceData = await downloadAndParseReport(reportResult.url)
@@ -1577,8 +1605,14 @@ serve(async (req) => {
 
         console.log('✅ Search terms performance data synced successfully')
       } catch (error) {
-        console.error('❌ Search terms performance sync failed:', error)
-        diagnostics.searchTermReportError = String(error)
+        // Log warning but don't fail entire sync if report times out
+        if (error instanceof Error && error.message.includes('timeout')) {
+          console.warn('⚠️ Search terms performance report timed out - continuing with entity sync only')
+          diagnostics.searchTermReportError = `Report timeout: ${error.message}`
+        } else {
+          console.error('❌ Search terms performance sync failed:', error)
+          diagnostics.searchTermReportError = String(error)
+        }
       }
     }
 
@@ -1599,7 +1633,7 @@ serve(async (req) => {
           apiEndpoint
         )
 
-        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 300000, apiEndpoint)
+        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 120000, apiEndpoint)
         
         if (reportResult.url) {
           const performanceData = await downloadAndParseReport(reportResult.url)
@@ -1644,8 +1678,14 @@ serve(async (req) => {
 
         console.log('✅ Keyword performance data synced successfully')
       } catch (error) {
-        console.error('❌ Keyword performance sync failed:', error)
-        diagnostics.keywordReportError = String(error)
+        // Log warning but don't fail entire sync if report times out
+        if (error instanceof Error && error.message.includes('timeout')) {
+          console.warn('⚠️ Keyword performance report timed out - continuing with entity sync only')
+          diagnostics.keywordReportError = `Report timeout: ${error.message}`
+        } else {
+          console.error('❌ Keyword performance sync failed:', error)
+          diagnostics.keywordReportError = String(error)
+        }
       }
     }
 
