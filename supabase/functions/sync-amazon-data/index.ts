@@ -471,19 +471,15 @@ serve(async (req) => {
 
   // Wrap entire function to ensure CORS headers are always returned
   try {
-    let syncJobId: string | undefined;
-    let supabase: any;
+    // Initialize Supabase client
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
 
-    try {
-      // Initialize Supabase client
-      supabase = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-      )
-
-      if (!supabase) {
-        throw new Error('Failed to initialize Supabase client')
-      }
+    if (!supabase) {
+      throw new Error('Failed to initialize Supabase client')
+    }
 
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
@@ -503,6 +499,18 @@ serve(async (req) => {
     const timeUnitOpt: 'SUMMARY' | 'DAILY' = 'SUMMARY' // Use SUMMARY for faster processing
     console.log('🚀 Starting sync for user:', user.id, 'connection:', connectionId, 'dateRangeDays:', dateRange, 'diagnosticMode:', diag)
     
+    // Verify connection exists and belongs to user
+    const { data: connection, error: connectionError } = await supabase
+      .from('amazon_connections')
+      .select('*')
+      .eq('id', connectionId)
+      .eq('user_id', user.id)
+      .single()
+
+    if (connectionError || !connection) {
+      throw new Error('Connection not found or not authorized')
+    }
+
     // Use helper function to clean up existing jobs and create new one
     const { data: newJobId, error: jobError } = await supabase
       .rpc('cleanup_and_create_sync_job', {
@@ -515,91 +523,83 @@ serve(async (req) => {
       throw new Error('Failed to create sync job: ' + (jobError?.message || 'Unknown error'))
     }
     
-    syncJobId = newJobId
-    console.log('✅ Created sync job:', syncJobId)
+    console.log('✅ Created sync job:', newJobId)
 
-    // Update sync job progress with timeout check
-    const updateProgress = async (progress: number, phase?: string) => {
-      if (syncJobId) {
-        // Check if sync has been running too long (30 minutes)
-        const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString()
-        
-        const { data: currentJob } = await supabase
-          .from('sync_jobs')
-          .select('started_at, status')
-          .eq('id', syncJobId)
-          .single()
-          
-        if (currentJob && currentJob.started_at < thirtyMinutesAgo && currentJob.status === 'running') {
-          console.warn('⏰ Sync job has exceeded 30 minute timeout')
-          throw new Error('Sync job timeout - process took too long')
+    // Define background sync task
+    const backgroundSync = async () => {
+      try {
+        const syncJobId = newJobId
+
+        // Update sync job progress with timeout check
+        const updateProgress = async (progress: number, phase?: string) => {
+          if (syncJobId) {
+            // Check if sync has been running too long (30 minutes)
+            const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString()
+            
+            const { data: currentJob } = await supabase
+              .from('sync_jobs')
+              .select('started_at, status')
+              .eq('id', syncJobId)
+              .single()
+              
+            if (currentJob && currentJob.started_at < thirtyMinutesAgo && currentJob.status === 'running') {
+              console.warn('⏰ Sync job has exceeded 30 minute timeout')
+              throw new Error('Sync job timeout - process took too long')
+            }
+            
+            await supabase
+              .from('sync_jobs')
+              .update({ 
+                progress_percent: progress,
+                ...(phase && { phase })
+              })
+              .eq('id', syncJobId)
+          }
         }
-        
-        await supabase
-          .from('sync_jobs')
-          .update({ 
-            progress_percent: progress,
-            ...(phase && { phase })
-          })
-          .eq('id', syncJobId)
-      }
-    }
 
-    // Get Amazon connection
-    const { data: connection, error: connectionError } = await supabase
-      .from('amazon_connections')
-      .select('*')
-      .eq('id', connectionId)
-      .eq('user_id', user.id)
-      .single()
+        // Check connection status - allow active connections even with setup_required_reason
+        // since tokens might still be valid
+        if (connection.status !== 'active' && connection.status !== 'setup_required') {
+          throw new Error(`Connection is not active (status: ${connection.status})`)
+        }
 
-    if (connectionError || !connection) {
-      throw new Error('Connection not found')
-    }
+        // Get encryption key
+        const encryptionKey = Deno.env.get('ENCRYPTION_KEY')
+        if (!encryptionKey) {
+          throw new Error('ENCRYPTION_KEY environment variable not found')
+        }
 
-    // Check connection status - allow active connections even with setup_required_reason
-    // since tokens might still be valid
-    if (connection.status !== 'active' && connection.status !== 'setup_required') {
-      throw new Error(`Connection is not active (status: ${connection.status})`)
-    }
+        // Set encryption key in session for token decryption
+        const { error: setKeyError } = await supabase
+          .rpc('set_config', {
+            key: 'app.enc_key',
+            value: encryptionKey,
+            is_local: true
+          });
 
-    // Get encryption key
-    const encryptionKey = Deno.env.get('ENCRYPTION_KEY')
-    if (!encryptionKey) {
-      throw new Error('ENCRYPTION_KEY environment variable not found')
-    }
+        if (setKeyError) {
+          console.error('Failed to set encryption key in session:', setKeyError);
+          throw new Error('Failed to configure session for token retrieval');
+        }
 
-    // Set encryption key in session for token decryption
-    const { error: setKeyError } = await supabase
-      .rpc('set_config', {
-        key: 'app.enc_key',
-        value: encryptionKey,
-        is_local: true
-      });
-
-    if (setKeyError) {
-      console.error('Failed to set encryption key in session:', setKeyError);
-      throw new Error('Failed to configure session for token retrieval');
-    }
-
-    // Get tokens from secure storage using the RPC function
-    let tokensResult;
-    try {
-      tokensResult = await supabase.rpc('get_tokens', { p_profile_id: connection.profile_id });
-    } catch (error) {
-      console.error('RPC get_tokens failed:', error);
-      
-      // Update connection with error status
-      await supabase
-        .from('amazon_connections')
-        .update({ 
-          setup_required_reason: 'Failed to retrieve tokens - please reconnect your Amazon account',
-          health_status: 'error'
-        })
-        .eq('id', connectionId)
-        
-      throw new Error('Failed to retrieve stored tokens - connection needs to be re-established');
-    }
+        // Get tokens from secure storage using the RPC function
+        let tokensResult;
+        try {
+          tokensResult = await supabase.rpc('get_tokens', { p_profile_id: connection.profile_id });
+        } catch (error) {
+          console.error('RPC get_tokens failed:', error);
+          
+          // Update connection with error status
+          await supabase
+            .from('amazon_connections')
+            .update({ 
+              setup_required_reason: 'Failed to retrieve tokens - please reconnect your Amazon account',
+              health_status: 'error'
+            })
+            .eq('id', connectionId)
+            
+          throw new Error('Failed to retrieve stored tokens - connection needs to be re-established');
+        }
 
     const { data: tokens, error: tokensError } = tokensResult;
 
@@ -1718,89 +1718,84 @@ serve(async (req) => {
       }
     }
 
+        // Mark sync job as complete
+        await supabase
+          .from('sync_jobs')
+          .update({
+            status: 'completed',
+            finished_at: new Date().toISOString(),
+            progress_percent: 100,
+            phase: 'Sync completed successfully'
+          })
+          .eq('id', syncJobId)
+
+        console.log('✅ Background sync completed successfully')
+      } catch (error) {
+        console.error('🚨 Background sync error:', error)
+        const message = (error as Error)?.message || 'Unknown error'
+        let code = 'SYNC_ERROR'
+        
+        // Categorize errors for better user feedback
+        if (message.includes('Connection is not active')) code = 'CONNECTION_INACTIVE'
+        else if (message.includes('Token expired') || message.includes('refresh failed')) code = 'TOKEN_EXPIRED'
+        else if (message.includes('Missing Amazon client secret') || message.includes('clientSecret is not defined')) code = 'MISSING_AMAZON_SECRET'
+        else if (message.includes('Connection not found')) code = 'CONNECTION_NOT_FOUND'
+
+        // Mark sync job as failed  
+        try {
+          await supabase
+            .from('sync_jobs')
+            .update({ 
+              status: 'error',
+              finished_at: new Date().toISOString(),
+              progress_percent: 0,
+              phase: message,
+              error_details: { error: message, code }
+            })
+            .eq('id', syncJobId)
+        } catch (jobUpdateError) {
+          console.error('Failed to update sync job status:', jobUpdateError)
+        }
+      }
+    }
+
+    // Start background sync (non-blocking)
+    EdgeRuntime.waitUntil(backgroundSync())
+
+    // Return immediate response
     return new Response(
       JSON.stringify({
         success: true,
-        code: 'SYNC_COMPLETE',
-        message: `Comprehensive sync completed with full performance data`,
-        entitiesSynced: {
-          campaigns: campaignIds.length,
-          adGroups: adGroupIds.length,
-          keywords: keywordIds.length,
-          targets: targetIds.length
-        },
-        metricsUpdated: totalMetricsUpdated,
-        apiVersion: 'v3',
-        usedReportingV3: true,
-        columnsUsed: {
-          campaign: ['impressions', 'clicks', 'cost', 'purchases7d', 'sales7d'],
-          adGroup: ['impressions', 'clicks', 'cost', 'purchases7d', 'sales7d'], 
-          target: ['impressions', 'clicks', 'cost', 'purchases7d', 'sales7d'],
-          searchTerm: ['impressions', 'clicks', 'cost', 'purchases7d', 'sales7d']
-        },
-        diagnostics
+        message: 'Data sync started in background',
+        jobId: newJobId,
+        connectionId: connectionId
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-    );
-
-    } catch (error) {
-    console.error('🚨 Sync error:', error)
-    const message = (error as Error)?.message || 'Unknown error'
-    let code = 'SYNC_ERROR'
-    
-    // Categorize errors for better user feedback
-    if (message.includes('Connection is not active')) code = 'CONNECTION_INACTIVE'
-    else if (message.includes('Token expired') || message.includes('refresh failed')) code = 'TOKEN_EXPIRED'
-    else if (message.includes('Missing Amazon client secret') || message.includes('clientSecret is not defined')) code = 'MISSING_AMAZON_SECRET'
-    else if (message.includes('Connection not found')) code = 'CONNECTION_NOT_FOUND'
-    else if (message.includes('No authorization header')) code = 'NO_AUTH'
-    else if (message.includes('Invalid authorization')) code = 'INVALID_AUTH'
-
-    // Mark sync job as failed  
-    if (syncJobId && supabase) {
-      try {
-        await supabase
-          .from('sync_jobs')
-          .update({ 
-            status: 'error',
-            finished_at: new Date().toISOString(),
-            progress_percent: 0,
-            phase: message,
-            error_details: { error: message, code }
-          })
-          .eq('id', syncJobId)
-      } catch (jobUpdateError) {
-        console.error('Failed to update sync job status:', jobUpdateError)
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 202 // Accepted
       }
-    }
+    )
+
+  } catch (error) {
+    // Handle errors during setup phase (before background task starts)
+    console.error('🚨 Sync setup error:', error)
+    const message = (error as Error)?.message || 'Unknown error'
+    let code = 'SETUP_ERROR'
+    
+    // Categorize errors
+    if (message.includes('No authorization header')) code = 'NO_AUTH'
+    else if (message.includes('Invalid authorization')) code = 'INVALID_AUTH'
+    else if (message.includes('Connection not found')) code = 'CONNECTION_NOT_FOUND'
 
     return new Response(
       JSON.stringify({ 
         success: false, 
         code, 
-        message: message.includes('clientSecret') 
-          ? 'Amazon client secret configuration is missing. Please contact support.' 
-          : message,
+        message,
         error: message 
       }),
       { 
         status: code === 'NO_AUTH' || code === 'INVALID_AUTH' ? 401 : 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
-    )
-  }
-  } catch (outerError) {
-    // Final catch-all to ensure CORS headers are always returned
-    console.error('🚨 Critical sync error:', outerError)
-    return new Response(
-      JSON.stringify({ 
-        success: false,
-        code: 'CRITICAL_ERROR',
-        message: 'An unexpected error occurred during sync',
-        error: (outerError as Error)?.message || 'Unknown error'
-      }),
-      { 
-        status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     )
