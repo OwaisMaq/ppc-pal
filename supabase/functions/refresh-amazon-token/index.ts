@@ -117,7 +117,7 @@ serve(async (req) => {
     }
 
     // Get tokens from secure storage using the RPC function
-    const { data: tokens, error: tokenError } = await supabase
+    const { data: tokensArray, error: tokenError } = await supabase
       .rpc('get_tokens', {
         p_profile_id: connection.profile_id
       })
@@ -134,8 +134,11 @@ serve(async (req) => {
       throw new Error('Failed to retrieve stored tokens')
     }
 
+    // RPC returns an array, get the first element
+    const tokens = tokensArray?.[0]
+    
     if (!tokens || !tokens.refresh_token) {
-      console.error('No refresh token found for profile:', connection.profile_id)
+      console.error('No refresh token found for profile:', connection.profile_id, 'tokens:', tokens)
       await supabase
         .from('amazon_connections')
         .update({ 
