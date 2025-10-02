@@ -188,13 +188,21 @@ serve(async (req) => {
       console.log("Processing archive request for subscription:", subscriptionId);
       try {
         // Get fresh access token for archive
-        const refreshResult = await db.functions.invoke('refresh-amazon-token', {
-          body: { connectionId }
+        const authHeader = req.headers.get("Authorization") ?? "";
+        const refreshResult = await fetch(`${SB_URL}/functions/v1/refresh-amazon-token`, {
+          method: 'POST',
+          headers: {
+            'Authorization': authHeader,
+            'apikey': SB_ANON,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ connectionId })
         });
         
-        if (refreshResult.error) {
-          console.error("Token refresh failed for archive:", refreshResult.error);
-          return new Response(`Token refresh failed: ${refreshResult.error.message}`, { 
+        if (!refreshResult.ok) {
+          const errorText = await refreshResult.text();
+          console.error("Token refresh failed for archive:", errorText);
+          return new Response(`Token refresh failed: ${errorText}`, { 
             status: 502, 
             headers: corsHeaders 
           });
@@ -304,13 +312,21 @@ serve(async (req) => {
 
     // Refresh the Amazon token first to ensure we have a valid access token
     console.log("Refreshing Amazon token...");
-    const refreshResult = await db.functions.invoke('refresh-amazon-token', {
-      body: { connectionId }
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const refreshResult = await fetch(`${SB_URL}/functions/v1/refresh-amazon-token`, {
+      method: 'POST',
+      headers: {
+        'Authorization': authHeader,
+        'apikey': SB_ANON,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ connectionId })
     });
     
-    if (refreshResult.error) {
-      console.error("Token refresh failed:", refreshResult.error);
-      return new Response(`Token refresh failed: ${refreshResult.error.message}`, { 
+    if (!refreshResult.ok) {
+      const errorText = await refreshResult.text();
+      console.error("Token refresh failed:", errorText);
+      return new Response(`Token refresh failed: ${errorText}`, { 
         status: 502, 
         headers: corsHeaders 
       });
