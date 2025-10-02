@@ -259,12 +259,12 @@ export default function AmsSetup() {
             <div className="rounded-md border border-blue-200 bg-blue-50 p-4 mb-4">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0">
-                  <Server className="h-5 w-5 text-blue-600" />
+                  <Zap className="h-5 w-5 text-blue-600" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-sm font-medium text-blue-800">Automated Real-time Streaming</h3>
+                  <h3 className="text-sm font-medium text-blue-800">Real-time Streaming</h3>
                   <p className="text-sm text-blue-700 mt-1">
-                    Real-time data streams are automatically activated when you connect your Amazon account. Both traffic and conversion data are streamed and processed automatically every hour.
+                    Enable streaming subscriptions below to receive hourly updates for clicks, impressions, cost, and conversions directly from Amazon.
                   </p>
                 </div>
               </div>
@@ -273,7 +273,7 @@ export default function AmsSetup() {
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="flex flex-col space-y-3 rounded-md border p-4">
                 <div className="flex items-center justify-between">
-                  <div>
+                  <div className="flex-1">
                     <p className="font-medium flex items-center gap-2">
                       sp-traffic
                       {subs["sp-traffic"]?.status === "active" && (
@@ -282,9 +282,11 @@ export default function AmsSetup() {
                     </p>
                     <p className="text-sm text-muted-foreground">Impressions, clicks, cost (hourly)</p>
                   </div>
-                  <Badge variant={subs["sp-traffic"]?.status === "active" ? "default" : "secondary"}>
-                    {subs["sp-traffic"]?.status === "active" ? "Active" : "Inactive"}
-                  </Badge>
+                  <Switch 
+                    checked={subs["sp-traffic"]?.status === "active"}
+                    onCheckedChange={(checked) => toggleDataset("sp-traffic", checked)}
+                    disabled={processing}
+                  />
                 </div>
                 {subs["sp-traffic"] && (
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -301,7 +303,7 @@ export default function AmsSetup() {
               </div>
               <div className="flex flex-col space-y-3 rounded-md border p-4">
                 <div className="flex items-center justify-between">
-                  <div>
+                  <div className="flex-1">
                     <p className="font-medium flex items-center gap-2">
                       sp-conversion
                       {subs["sp-conversion"]?.status === "active" && (
@@ -310,9 +312,11 @@ export default function AmsSetup() {
                     </p>
                     <p className="text-sm text-muted-foreground">Attributed conversions and sales (hourly)</p>
                   </div>
-                  <Badge variant={subs["sp-conversion"]?.status === "active" ? "default" : "secondary"}>
-                    {subs["sp-conversion"]?.status === "active" ? "Active" : "Inactive"}
-                  </Badge>
+                  <Switch 
+                    checked={subs["sp-conversion"]?.status === "active"}
+                    onCheckedChange={(checked) => toggleDataset("sp-conversion", checked)}
+                    disabled={processing}
+                  />
                 </div>
                 {subs["sp-conversion"] && (
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
