@@ -41,7 +41,7 @@ const ConsolidatedDataView = ({ selectedASIN }: ConsolidatedDataViewProps) => {
 
   const handleSyncAll = async () => {
     for (const connection of activeConnections) {
-      await syncAllData(connection.id, { dateRangeDays: 7, timeUnit: 'SUMMARY' });
+      await syncAllData(connection.id, { dateRangeDays: 7 });
     }
   };
 
