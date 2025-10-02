@@ -209,7 +209,7 @@ serve(async (req) => {
         }
 
         // Get tokens from secure storage using RPC with authenticated client
-        const { data: tokensArray, error: tokenError } = await authClient
+        const { data: tokensArray, error: tokenError } = await auth
           .rpc('get_tokens', {
             p_profile_id: conn.profile_id
           })
@@ -346,7 +346,7 @@ serve(async (req) => {
 
     // Get tokens from secure storage using RPC with authenticated client
     console.log("Getting fresh access token...");
-    const { data: tokensArray, error: tokenError } = await authClient
+    const { data: tokensArray, error: tokenError } = await auth
       .rpc('get_tokens', {
         p_profile_id: conn.profile_id
       })
