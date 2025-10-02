@@ -212,8 +212,7 @@ serve(async (req) => {
         const { data: tokensArray, error: tokenError } = await auth
           .rpc('get_tokens', {
             p_profile_id: conn.profile_id
-          })
-          .single();
+          });
         
         if (tokenError) {
           console.error('Token retrieval error for archive:', tokenError);
@@ -349,8 +348,7 @@ serve(async (req) => {
     const { data: tokensArray, error: tokenError } = await auth
       .rpc('get_tokens', {
         p_profile_id: conn.profile_id
-      })
-      .single();
+      });
     
     if (tokenError) {
       console.error('Token retrieval error:', tokenError);
