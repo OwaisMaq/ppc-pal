@@ -374,8 +374,14 @@ serve(async (req) => {
     
     console.log("Using AMS base URL:", baseUrl);
 
-    // Create subscription
-    const subscriptionPayload = { datasetId, destinationArn: finalDestinationArn, compression: "GZIP" };
+    // Create subscription with correct Amazon API format
+    const clientRequestToken = crypto.randomUUID();
+    const subscriptionPayload = { 
+      dataSetId: datasetId,  // Amazon expects capital S
+      destinationArn: finalDestinationArn, 
+      compression: "GZIP",
+      clientRequestToken  // Required for idempotency
+    };
     console.log("Creating AMS subscription with payload:", subscriptionPayload);
     
     const res = await fetch(`${baseUrl}/streams/subscriptions`, {
