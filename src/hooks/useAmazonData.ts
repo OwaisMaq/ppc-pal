@@ -319,6 +319,12 @@ export const useAmazonData = () => {
       }
 
       console.log('Sync response:', data);
+      
+      // Background sync now returns 202 with jobId
+      if (data?.success && data?.jobId) {
+        toast.success('Data sync started in background. Progress will be shown below.');
+        return;
+      }
 
       if (data && data.success === false) {
         const counts = data.entitiesSynced ? ` (campaigns: ${data.entitiesSynced.campaigns || 0}, ad groups: ${data.entitiesSynced.adGroups || 0}, keywords: ${data.entitiesSynced.keywords || 0}, targets: ${data.entitiesSynced.targets || 0})` : '';
@@ -333,25 +339,6 @@ export const useAmazonData = () => {
         const counts = data?.entitiesSynced ? ` (campaigns: ${data.entitiesSynced.campaigns || 0}, ad groups: ${data.entitiesSynced.adGroups || 0}, keywords: ${data.entitiesSynced.keywords || 0}, targets: ${data.entitiesSynced.targets || 0}; metrics updated: ${data.metricsUpdated || 0})` : '';
         toast.success(`Data sync completed successfully!${counts}`);
       }
-
-      setLastSyncDiagnostics(data?.diagnostics || null);
-
-      if (data?.diagnostics?.rollupError) {
-        console.error('Roll-up error:', data.diagnostics.rollupError);
-        toast.warning(`Data synced but roll-up failed: ${data.diagnostics.rollupError}`);
-      }
-
-      if (data?.diagnostics?.writeErrors?.length) {
-        const first = data.diagnostics.writeErrors[0];
-        console.error('Write error details:', first);
-        toast.error(`Write error on ${first.entity || 'unknown'} ${first.id || ''}: ${first.error}`);
-      }
-
-      // Refresh data immediately and then again after 3 seconds to catch any delayed updates
-      fetchAllData();
-      setTimeout(() => {
-        fetchAllData();
-      }, 3000);
     } catch (error: any) {
       console.error('Error syncing data:', error);
       toast.error(error.message || 'Failed to sync Amazon data');

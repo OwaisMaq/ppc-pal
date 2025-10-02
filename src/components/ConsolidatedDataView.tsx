@@ -6,6 +6,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { useAmazonData } from "@/hooks/useAmazonData";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { SyncStatusIndicator } from "@/components/SyncStatusIndicator";
+import { SyncProgressBar } from "@/components/SyncProgressBar";
 import { 
   ChevronDown, 
   ChevronRight, 
@@ -94,6 +95,7 @@ const ConsolidatedDataView = ({ selectedASIN }: ConsolidatedDataViewProps) => {
 
   return (
     <div className="space-y-4">
+      <SyncProgressBar />
       <SyncStatusIndicator onSyncAll={handleSyncAll} loading={loading} />
       
       <Card>
