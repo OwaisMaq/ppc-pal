@@ -727,13 +727,13 @@ serve(async (req) => {
               console.log(`⚠️ Entity sync failed for profile ${profile.profileId}:`, error)
             })
             
-            // Then trigger data sync for 30-day backfill - don't await to avoid timeout
+            // Then trigger data sync for 7-day backfill - don't await to avoid timeout
             console.log(`📊 Triggering data sync for connection ${connection.id}...`)
             supabase.functions.invoke('sync-amazon-data', {
               body: { 
                 connectionId: connection.id,
-                dateRangeDays: 30,
-                timeUnit: 'DAILY',
+                dateRangeDays: 7,
+                timeUnit: 'SUMMARY',
                 diagnosticMode: false
               },
               headers: {
