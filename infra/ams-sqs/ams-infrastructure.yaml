@@ -11,36 +11,32 @@ Parameters:
   SupabaseIngestUrl:
     Type: String
     Description: 'Supabase function URL for AMS ingest (e.g., https://[project-id].supabase.co/functions/v1/ams-ingest)'
-    # TODO: Replace with your actual Supabase function URL
   
   SupabaseIngestSecret:
     Type: String
     NoEcho: true
     Description: 'HMAC secret for signing requests to Supabase'
-    # TODO: Generate a secure random secret and store it in both AWS and Supabase
 
 Resources:
-  # Dead Letter Queue for failed messages
   AmsEventsDLQ:
     Type: AWS::SQS::Queue
     Properties:
       QueueName: !Sub 'ams-events-dlq-${Environment}'
-      MessageRetentionPeriod: 1209600  # 14 days
-      VisibilityTimeoutSeconds: 60
+      MessageRetentionPeriod: 1209600
+      VisibilityTimeout: 60
       Tags:
         - Key: Environment
           Value: !Ref Environment
         - Key: Component
           Value: AMS
 
-  # Main SQS Queue for AMS events
   AmsEventsQueue:
     Type: AWS::SQS::Queue
     Properties:
       QueueName: !Sub 'ams-events-queue-${Environment}'
-      MessageRetentionPeriod: 345600   # 4 days
-      VisibilityTimeoutSeconds: 360    # 6 minutes (6x Lambda timeout of 60s)
-      ReceiveMessageWaitTimeSeconds: 20 # Long polling
+      MessageRetentionPeriod: 345600
+      VisibilityTimeout: 360
+      ReceiveMessageWaitTimeSeconds: 20
       RedrivePolicy:
         deadLetterTargetArn: !GetAtt AmsEventsDLQ.Arn
         maxReceiveCount: 5
@@ -50,7 +46,6 @@ Resources:
         - Key: Component
           Value: AMS
 
-  # Queue Policy to allow Amazon Marketing Stream to send messages
   AmsEventsQueuePolicy:
     Type: AWS::SQS::QueuePolicy
     Properties:
@@ -59,7 +54,6 @@ Resources:
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
-          # Allow Amazon Marketing Stream EU region
           - Sid: AllowAmazonMarketingStreamEU
             Effect: Allow
             Principal:
@@ -73,7 +67,6 @@ Resources:
                 aws:SourceAccount: "119690846692"
               ArnLike:
                 aws:SourceArn: "arn:aws:sns:eu-west-1:119690846692:*"
-          # Allow Amazon Marketing Stream NA region
           - Sid: AllowAmazonMarketingStreamNA
             Effect: Allow
             Principal:
@@ -87,7 +80,6 @@ Resources:
                 aws:SourceAccount: "668473351658"
               ArnLike:
                 aws:SourceArn: "arn:aws:sns:us-east-1:668473351658:*"
-          # Allow Amazon Marketing Stream FE region
           - Sid: AllowAmazonMarketingStreamFE
             Effect: Allow
             Principal:
@@ -102,7 +94,6 @@ Resources:
               ArnLike:
                 aws:SourceArn: "arn:aws:sns:us-west-2:320228592410:*"
 
-  # IAM Role for Lambda function
   AmsLambdaExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -128,7 +119,6 @@ Resources:
                   - sqs:GetQueueAttributes
                 Resource: !GetAtt AmsEventsQueue.Arn
 
-  # Lambda function for processing SQS messages
   AmsIngestLambda:
     Type: AWS::Lambda::Function
     Properties:
@@ -145,7 +135,6 @@ Resources:
           NODE_ENV: production
       Code:
         ZipFile: |
-          // Placeholder code - replace with actual implementation
           exports.handler = async (event) => {
             console.log('AMS Lambda triggered with event:', JSON.stringify(event, null, 2));
             return { statusCode: 200, body: 'OK' };
@@ -156,7 +145,6 @@ Resources:
         - Key: Component
           Value: AMS
 
-  # SQS trigger for Lambda
   AmsLambdaTrigger:
     Type: AWS::Lambda::EventSourceMapping
     Properties:
@@ -166,14 +154,12 @@ Resources:
       MaximumBatchingWindowInSeconds: 5
       Enabled: true
 
-  # CloudWatch Log Group for Lambda
   AmsLambdaLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub '/aws/lambda/ams-ingest-lambda-${Environment}'
       RetentionInDays: 14
 
-  # CloudWatch Alarm: Queue backlog
   QueueBacklogAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
@@ -184,14 +170,13 @@ Resources:
       Statistic: Maximum
       Period: 300
       EvaluationPeriods: 1
-      Threshold: 300  # 5 minutes
+      Threshold: 300
       ComparisonOperator: GreaterThanThreshold
       Dimensions:
         - Name: QueueName
           Value: !GetAtt AmsEventsQueue.QueueName
       TreatMissingData: notBreaching
 
-  # CloudWatch Alarm: Lambda errors
   LambdaErrorsAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
@@ -209,7 +194,6 @@ Resources:
           Value: !Ref AmsIngestLambda
       TreatMissingData: notBreaching
 
-  # CloudWatch Alarm: DLQ messages
   DLQMessagesAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
