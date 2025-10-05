@@ -54,6 +54,18 @@ Resources:
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
+          - Sid: AllowAmazonAdsAPIValidation
+            Effect: Allow
+            Principal:
+              AWS: 
+                - "arn:aws:iam::119690846692:root"
+                - "arn:aws:iam::668473351658:root"
+                - "arn:aws:iam::320228592410:root"
+            Action:
+              - sqs:SendMessage
+              - sqs:GetQueueAttributes
+              - sqs:GetQueueUrl
+            Resource: !GetAtt AmsEventsQueue.Arn
           - Sid: AllowAmazonMarketingStreamEU
             Effect: Allow
             Principal:
