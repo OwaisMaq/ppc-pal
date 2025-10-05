@@ -50,6 +50,58 @@ Resources:
         - Key: Component
           Value: AMS
 
+  # Queue Policy to allow Amazon Marketing Stream to send messages
+  AmsEventsQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref AmsEventsQueue
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          # Allow Amazon Marketing Stream EU region
+          - Sid: AllowAmazonMarketingStreamEU
+            Effect: Allow
+            Principal:
+              Service: sns.amazonaws.com
+            Action:
+              - sqs:SendMessage
+              - sqs:GetQueueAttributes
+            Resource: !GetAtt AmsEventsQueue.Arn
+            Condition:
+              StringEquals:
+                aws:SourceAccount: "119690846692"
+              ArnLike:
+                aws:SourceArn: "arn:aws:sns:eu-west-1:119690846692:*"
+          # Allow Amazon Marketing Stream NA region
+          - Sid: AllowAmazonMarketingStreamNA
+            Effect: Allow
+            Principal:
+              Service: sns.amazonaws.com
+            Action:
+              - sqs:SendMessage
+              - sqs:GetQueueAttributes
+            Resource: !GetAtt AmsEventsQueue.Arn
+            Condition:
+              StringEquals:
+                aws:SourceAccount: "668473351658"
+              ArnLike:
+                aws:SourceArn: "arn:aws:sns:us-east-1:668473351658:*"
+          # Allow Amazon Marketing Stream FE region
+          - Sid: AllowAmazonMarketingStreamFE
+            Effect: Allow
+            Principal:
+              Service: sns.amazonaws.com
+            Action:
+              - sqs:SendMessage
+              - sqs:GetQueueAttributes
+            Resource: !GetAtt AmsEventsQueue.Arn
+            Condition:
+              StringEquals:
+                aws:SourceAccount: "320228592410"
+              ArnLike:
+                aws:SourceArn: "arn:aws:sns:us-west-2:320228592410:*"
+
   # IAM Role for Lambda function
   AmsLambdaExecutionRole:
     Type: AWS::IAM::Role
