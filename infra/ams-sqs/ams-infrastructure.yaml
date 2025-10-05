@@ -138,7 +138,7 @@ Resources:
       Role: !GetAtt AmsLambdaExecutionRole.Arn
       Timeout: 60
       MemorySize: 256
-      ReservedConcurrencyLimit: 10  # Prevent runaway costs
+      ReservedConcurrentExecutions: 10  # Prevent runaway costs
       Environment:
         Variables:
           SUPABASE_INGEST_URL: !Ref SupabaseIngestUrl
