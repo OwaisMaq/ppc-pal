@@ -25,51 +25,70 @@ export const useSyncJobProgress = (connectionId?: string, options?: UseSyncJobPr
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      setActiveSyncJob(null);
+      return;
+    }
 
     let isSubscribed = true;
+    let fetchTimeout: NodeJS.Timeout;
 
-    // Fetch current running sync job once on mount
+    // Debounced fetch with abort controller
     const fetchActiveSyncJob = async () => {
       if (!isSubscribed) return;
       
-      setIsLoading(true);
-      try {
-        let query = supabase
-          .from('sync_jobs')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('status', 'running')
-          .order('started_at', { ascending: false });
+      // Clear any pending fetch
+      clearTimeout(fetchTimeout);
+      
+      // Debounce the fetch to prevent rapid retries
+      fetchTimeout = setTimeout(async () => {
+        if (!isSubscribed) return;
+        
+        setIsLoading(true);
+        try {
+          let query = supabase
+            .from('sync_jobs')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('status', 'running')
+            .order('started_at', { ascending: false });
 
-        if (connectionId) {
-          query = query.eq('connection_id', connectionId);
-        }
+          if (connectionId) {
+            query = query.eq('connection_id', connectionId);
+          }
 
-        const { data, error } = await query.maybeSingle();
+          const { data, error } = await query.maybeSingle();
 
-        if (error) {
-          console.error('Error fetching sync job:', error.message);
-          return;
-        }
+          if (error) {
+            // Only log error once, don't spam console
+            if (isSubscribed) {
+              console.warn('Sync job fetch failed:', error.message);
+            }
+            return;
+          }
 
-        if (isSubscribed) {
-          setActiveSyncJob(data);
+          if (isSubscribed) {
+            setActiveSyncJob(data);
+          }
+        } catch (error) {
+          // Silently fail to prevent console spam
+          if (isSubscribed) {
+            console.warn('Sync job fetch exception');
+          }
+        } finally {
+          if (isSubscribed) {
+            setIsLoading(false);
+          }
         }
-      } catch (error) {
-        console.error('Error fetching active sync job:', error);
-      } finally {
-        if (isSubscribed) {
-          setIsLoading(false);
-        }
-      }
+      }, 500); // 500ms debounce
     };
 
     fetchActiveSyncJob();
 
-    // Subscribe to sync_jobs changes
+    // Subscribe to sync_jobs changes with unique channel per instance
+    const channelId = `sync-jobs-${user.id}${connectionId ? `-${connectionId}` : ''}-${Date.now()}`;
     const channel = supabase
-      .channel(`sync-jobs-progress-${user.id}${connectionId ? `-${connectionId}` : ''}`)
+      .channel(channelId)
       .on(
         'postgres_changes',
         {
@@ -103,6 +122,7 @@ export const useSyncJobProgress = (connectionId?: string, options?: UseSyncJobPr
 
     return () => {
       isSubscribed = false;
+      clearTimeout(fetchTimeout);
       supabase.removeChannel(channel);
     };
   }, [user?.id, connectionId]);
