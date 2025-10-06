@@ -1114,7 +1114,7 @@ serve(async (req) => {
         )
 
         await updateSyncJobProgress(supabase, syncJobId, 55, 'Waiting for campaign report to generate...')
-        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 180000, apiEndpoint) // 3 minutes for campaign data
+        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 90000, apiEndpoint) // 90 seconds for SUMMARY reports
         
         if (reportResult.url) {
           const performanceData = await downloadAndParseReport(reportResult.url)
@@ -1214,7 +1214,7 @@ serve(async (req) => {
                 apiEndpoint
               )
 
-              const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 300000, apiEndpoint)
+              const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 90000, apiEndpoint) // 90 seconds retry
             
             if (reportResult.url) {
               const performanceData = await downloadAndParseReport(reportResult.url)
@@ -1279,7 +1279,7 @@ serve(async (req) => {
           apiEndpoint
         )
 
-        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 120000, apiEndpoint)
+        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 90000, apiEndpoint) // 90 seconds
         
         if (reportResult.url) {
           const performanceData = await downloadAndParseReport(reportResult.url)
@@ -1377,7 +1377,7 @@ serve(async (req) => {
               apiEndpoint
             )
 
-            const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 300000, apiEndpoint)
+            const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 90000, apiEndpoint) // 90 seconds retry
             
             if (reportResult.url) {
               const performanceData = await downloadAndParseReport(reportResult.url)
@@ -1442,7 +1442,7 @@ serve(async (req) => {
           apiEndpoint
         )
 
-        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 120000, apiEndpoint)
+        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 90000, apiEndpoint) // 90 seconds
         
         if (reportResult.url) {
           const performanceData = await downloadAndParseReport(reportResult.url)
@@ -1557,7 +1557,7 @@ serve(async (req) => {
           apiEndpoint
         )
 
-        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 120000, apiEndpoint)
+        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 90000, apiEndpoint) // 90 seconds
         
         if (reportResult.url) {
           const performanceData = await downloadAndParseReport(reportResult.url)
@@ -1636,7 +1636,7 @@ serve(async (req) => {
           apiEndpoint
         )
 
-        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 120000, apiEndpoint)
+        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 90000, apiEndpoint) // 90 seconds
         
         if (reportResult.url) {
           const performanceData = await downloadAndParseReport(reportResult.url)
