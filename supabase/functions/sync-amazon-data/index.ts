@@ -1111,7 +1111,7 @@ serve(async (req) => {
           apiEndpoint
         )
 
-        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 120000, apiEndpoint)
+        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 300000, apiEndpoint) // 5 minutes for campaign data
         
         if (reportResult.url) {
           const performanceData = await downloadAndParseReport(reportResult.url)
