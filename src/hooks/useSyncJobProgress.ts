@@ -23,9 +23,17 @@ export const useSyncJobProgress = (connectionId?: string, options?: UseSyncJobPr
   const { user } = useAuth();
   const [activeSyncJob, setActiveSyncJob] = useState<SyncJob | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [errorCount, setErrorCount] = useState(0);
 
   useEffect(() => {
     if (!user?.id) return;
+    
+    // Stop polling if too many errors
+    if (errorCount > 5) {
+      console.error('Too many errors fetching sync job, stopping polling');
+      setActiveSyncJob(null);
+      return;
+    }
 
     // Fetch current running sync job
     const fetchActiveSyncJob = async () => {
@@ -46,15 +54,23 @@ export const useSyncJobProgress = (connectionId?: string, options?: UseSyncJobPr
         const { data, error } = await query;
 
         if (error) {
-          console.error('Error fetching sync job:', error);
+          console.error('Error fetching sync job:', error, error.message);
+          setErrorCount(prev => prev + 1);
           return;
         }
 
+        // Reset error count on success
+        setErrorCount(0);
+
         if (data && data.length > 0) {
           setActiveSyncJob(data[0]);
+        } else {
+          // No running jobs found, clear active sync
+          setActiveSyncJob(null);
         }
       } catch (error) {
         console.error('Error fetching active sync job:', error);
+        setErrorCount(prev => prev + 1);
       } finally {
         setIsLoading(false);
       }
