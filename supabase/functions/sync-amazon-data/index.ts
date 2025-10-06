@@ -1070,7 +1070,7 @@ serve(async (req) => {
         await supabase
           .from('sync_jobs')
           .update({ 
-            status: 'completed',
+            status: 'success',
             finished_at: new Date().toISOString(),
             progress_percent: 100,
             phase: 'Sync completed - no entities found'
@@ -1750,7 +1750,7 @@ serve(async (req) => {
       await supabase
         .from('sync_jobs')
         .update({ 
-          status: 'completed',
+          status: 'success',
           finished_at: new Date().toISOString(),
           progress_percent: 100,
           phase: 'Sync completed successfully'
@@ -1792,7 +1792,7 @@ serve(async (req) => {
         await supabase
           .from('sync_jobs')
           .update({
-            status: 'completed',
+            status: 'success',
             finished_at: new Date().toISOString(),
             progress_percent: 100,
             phase: 'Sync completed successfully'

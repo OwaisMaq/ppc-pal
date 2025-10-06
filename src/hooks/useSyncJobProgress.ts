@@ -82,7 +82,7 @@ export const useSyncJobProgress = (connectionId?: string, options?: UseSyncJobPr
             // Only show running jobs
             if (newJob.status === 'running') {
               setActiveSyncJob(newJob);
-            } else if (newJob.status === 'completed') {
+            } else if (newJob.status === 'success') {
               // Clear active job and call onComplete
               if (activeSyncJob?.id === newJob.id) {
                 setActiveSyncJob(null);
