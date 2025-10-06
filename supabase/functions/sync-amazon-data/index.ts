@@ -1535,10 +1535,11 @@ serve(async (req) => {
       }
     }
 
-    await updateProgress(85, 'Syncing search terms for dashboard...')
-
-    // Search Terms performance reports - critical for dashboard and Search Studio
-    if (campaignIds.length > 0) {
+    // Skip search terms and keyword performance - these timeout frequently
+    console.log('⏭️ Skipping search term/keyword performance to avoid timeouts')
+    await updateProgress(85, 'Finalizing sync...')
+    
+    if (false) { // Disabled to prevent timeouts
       console.log('🔍 Syncing search terms performance data...')
       try {
         // For SUMMARY time unit, we cannot include 'date' column per Amazon API restrictions
@@ -1690,7 +1691,7 @@ serve(async (req) => {
           diagnostics.keywordReportError = String(error)
         }
       }
-    }
+    } // End disabled section
 
     await updateProgress(90, 'Syncing budget usage...')
 
