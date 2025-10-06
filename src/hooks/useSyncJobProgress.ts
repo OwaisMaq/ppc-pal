@@ -39,7 +39,7 @@ export const useSyncJobProgress = (connectionId?: string, options?: UseSyncJobPr
     const fetchActiveSyncJob = async () => {
       setIsLoading(true);
       try {
-        const query = supabase
+        let query = supabase
           .from('sync_jobs')
           .select('*')
           .eq('user_id', user.id)
@@ -48,10 +48,10 @@ export const useSyncJobProgress = (connectionId?: string, options?: UseSyncJobPr
           .limit(1);
 
         if (connectionId) {
-          query.eq('connection_id', connectionId);
+          query = query.eq('connection_id', connectionId);
         }
 
-        const { data, error } = await query;
+        const { data, error } = await query.maybeSingle();
 
         if (error) {
           console.error('Error fetching sync job:', error, error.message);
@@ -62,8 +62,8 @@ export const useSyncJobProgress = (connectionId?: string, options?: UseSyncJobPr
         // Reset error count on success
         setErrorCount(0);
 
-        if (data && data.length > 0) {
-          setActiveSyncJob(data[0]);
+        if (data) {
+          setActiveSyncJob(data);
         } else {
           // No running jobs found, clear active sync
           setActiveSyncJob(null);
