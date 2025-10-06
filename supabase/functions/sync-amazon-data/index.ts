@@ -1100,6 +1100,8 @@ serve(async (req) => {
     if (campaignIds.length > 0) {
       console.log('📊 Syncing campaign performance data...')
       try {
+        await updateSyncJobProgress(supabase, syncJobId, 50, 'Requesting campaign performance report...')
+        
         const reportId = await createReportRequest(
           accessToken, 
           connection.profile_id, 
@@ -1111,7 +1113,8 @@ serve(async (req) => {
           apiEndpoint
         )
 
-        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 300000, apiEndpoint) // 5 minutes for campaign data
+        await updateSyncJobProgress(supabase, syncJobId, 55, 'Waiting for campaign report to generate...')
+        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 180000, apiEndpoint) // 3 minutes for campaign data
         
         if (reportResult.url) {
           const performanceData = await downloadAndParseReport(reportResult.url)
