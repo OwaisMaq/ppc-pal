@@ -54,69 +54,30 @@ Resources:
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
-          - Sid: AllowAmazonMarketingStreamEUDirect
+          - Sid: AllowAmazonMarketingStreamEU
             Effect: Allow
             Principal:
-              AWS: "arn:aws:iam::119690846692:root"
+              AWS: "119690846692"
             Action:
               - sqs:SendMessage
               - sqs:GetQueueAttributes
             Resource: !GetAtt AmsEventsQueue.Arn
-          - Sid: AllowAmazonMarketingStreamEUSNS
+          - Sid: AllowAmazonMarketingStreamNA
             Effect: Allow
             Principal:
-              Service: sns.amazonaws.com
+              AWS: "668473351658"
             Action:
               - sqs:SendMessage
               - sqs:GetQueueAttributes
             Resource: !GetAtt AmsEventsQueue.Arn
-            Condition:
-              StringEquals:
-                aws:SourceAccount: "119690846692"
-              ArnLike:
-                aws:SourceArn: "arn:aws:sns:eu-west-1:119690846692:*"
-          - Sid: AllowAmazonMarketingStreamNADirect
+          - Sid: AllowAmazonMarketingStreamFE
             Effect: Allow
             Principal:
-              AWS: "arn:aws:iam::668473351658:root"
+              AWS: "320228592410"
             Action:
               - sqs:SendMessage
               - sqs:GetQueueAttributes
             Resource: !GetAtt AmsEventsQueue.Arn
-          - Sid: AllowAmazonMarketingStreamNASNS
-            Effect: Allow
-            Principal:
-              Service: sns.amazonaws.com
-            Action:
-              - sqs:SendMessage
-              - sqs:GetQueueAttributes
-            Resource: !GetAtt AmsEventsQueue.Arn
-            Condition:
-              StringEquals:
-                aws:SourceAccount: "668473351658"
-              ArnLike:
-                aws:SourceArn: "arn:aws:sns:us-east-1:668473351658:*"
-          - Sid: AllowAmazonMarketingStreamFEDirect
-            Effect: Allow
-            Principal:
-              AWS: "arn:aws:iam::320228592410:root"
-            Action:
-              - sqs:SendMessage
-              - sqs:GetQueueAttributes
-            Resource: !GetAtt AmsEventsQueue.Arn
-          - Sid: AllowAmazonMarketingStreamFESNS
-            Effect: Allow
-            Principal:
-              Service: sns.amazonaws.com
-            Action:
-              - sqs:SendMessage
-              - sqs:GetQueueAttributes
-            Resource: !GetAtt AmsEventsQueue.Arn
-            Condition:
-              StringEquals:
-                aws:SourceAccount: "320228592410"
-              ArnLike:
-                aws:SourceArn: "arn:aws:sns:us-west-2:320228592410:*"
 
   AmsLambdaExecutionRole:
     Type: AWS::IAM::Role
