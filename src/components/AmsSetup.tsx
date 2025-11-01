@@ -50,40 +50,61 @@ export default function AmsSetup() {
   }, [selectedConnectionId, list]);
 
   const toggleDataset = async (datasetId: AmsDataset, enabled: boolean) => {
-    console.log('toggleDataset called:', { datasetId, enabled, selectedConnectionId });
-    if (!selectedConnectionId) return;
+    console.log('🔄 toggleDataset called:', { datasetId, enabled, selectedConnectionId });
     
+    if (!selectedConnectionId) {
+      console.error('❌ No connection selected');
+      toast({
+        title: "Error",
+        description: "Please select a connection first",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsProcessing(true);
     try {
       if (enabled) {
-        // Use managed SQS - no ARN required
-        await subscribe({
+        console.log('📡 Subscribing to dataset:', datasetId);
+        const result = await subscribe({
           connectionId: selectedConnectionId,
           datasetId
         });
+        console.log('✅ Subscribe result:', result);
         toast({
           title: "Subscription activated",
           description: `${datasetId} data stream is now active`,
         });
       } else {
         const sub = subs[datasetId];
+        console.log('🗑️ Archiving subscription:', sub);
         if (sub?.subscription_id) {
-          await archive({ connectionId: selectedConnectionId, subscriptionId: sub.subscription_id });
+          const result = await archive({ connectionId: selectedConnectionId, subscriptionId: sub.subscription_id });
+          console.log('✅ Archive result:', result);
           toast({
             title: "Subscription archived", 
             description: `${datasetId} data stream has been stopped`,
           });
+        } else {
+          console.warn('⚠️ No subscription_id found for dataset:', datasetId);
         }
       }
+      // Refresh subscriptions
+      console.log('🔄 Refreshing subscription list...');
       const rows = await list(selectedConnectionId);
       const byDataset: Record<string, any> = {};
       rows.forEach(r => { byDataset[r.dataset_id] = r; });
       setSubs(byDataset);
+      console.log('✅ Subscriptions refreshed:', byDataset);
     } catch (error: any) {
+      console.error('❌ Toggle error:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to update subscription",
         variant: "destructive",
       });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -282,10 +303,13 @@ export default function AmsSetup() {
                     </p>
                     <p className="text-sm text-muted-foreground">Impressions, clicks, cost (hourly)</p>
                   </div>
-                  <Switch 
+                   <Switch 
                     checked={subs["sp-traffic"]?.status === "active"}
-                    onCheckedChange={(checked) => toggleDataset("sp-traffic", checked)}
-                    disabled={processing}
+                    onCheckedChange={(checked) => {
+                      console.log('🎯 Switch clicked for sp-traffic:', checked);
+                      toggleDataset("sp-traffic", checked);
+                    }}
+                    disabled={processing || isProcessing}
                   />
                 </div>
                 {subs["sp-traffic"] && (
@@ -312,10 +336,13 @@ export default function AmsSetup() {
                     </p>
                     <p className="text-sm text-muted-foreground">Attributed conversions and sales (hourly)</p>
                   </div>
-                  <Switch 
+                   <Switch 
                     checked={subs["sp-conversion"]?.status === "active"}
-                    onCheckedChange={(checked) => toggleDataset("sp-conversion", checked)}
-                    disabled={processing}
+                    onCheckedChange={(checked) => {
+                      console.log('🎯 Switch clicked for sp-conversion:', checked);
+                      toggleDataset("sp-conversion", checked);
+                    }}
+                    disabled={processing || isProcessing}
                   />
                 </div>
                 {subs["sp-conversion"] && (
