@@ -54,7 +54,15 @@ Resources:
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
-          - Sid: AllowAmazonMarketingStreamEU
+          - Sid: AllowAmazonMarketingStreamEUDirect
+            Effect: Allow
+            Principal:
+              AWS: "arn:aws:iam::119690846692:root"
+            Action:
+              - sqs:SendMessage
+              - sqs:GetQueueAttributes
+            Resource: !GetAtt AmsEventsQueue.Arn
+          - Sid: AllowAmazonMarketingStreamEUSNS
             Effect: Allow
             Principal:
               Service: sns.amazonaws.com
@@ -67,7 +75,15 @@ Resources:
                 aws:SourceAccount: "119690846692"
               ArnLike:
                 aws:SourceArn: "arn:aws:sns:eu-west-1:119690846692:*"
-          - Sid: AllowAmazonMarketingStreamNA
+          - Sid: AllowAmazonMarketingStreamNADirect
+            Effect: Allow
+            Principal:
+              AWS: "arn:aws:iam::668473351658:root"
+            Action:
+              - sqs:SendMessage
+              - sqs:GetQueueAttributes
+            Resource: !GetAtt AmsEventsQueue.Arn
+          - Sid: AllowAmazonMarketingStreamNASNS
             Effect: Allow
             Principal:
               Service: sns.amazonaws.com
@@ -80,7 +96,15 @@ Resources:
                 aws:SourceAccount: "668473351658"
               ArnLike:
                 aws:SourceArn: "arn:aws:sns:us-east-1:668473351658:*"
-          - Sid: AllowAmazonMarketingStreamFE
+          - Sid: AllowAmazonMarketingStreamFEDirect
+            Effect: Allow
+            Principal:
+              AWS: "arn:aws:iam::320228592410:root"
+            Action:
+              - sqs:SendMessage
+              - sqs:GetQueueAttributes
+            Resource: !GetAtt AmsEventsQueue.Arn
+          - Sid: AllowAmazonMarketingStreamFESNS
             Effect: Allow
             Principal:
               Service: sns.amazonaws.com
