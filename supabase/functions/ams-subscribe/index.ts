@@ -96,27 +96,27 @@ serve(async (req) => {
       });
     }
 
-    // Helper function to get region and SQS ARN based on advertising API endpoint
-    const getRegionAndArn = (apiEndpoint: string) => {
+    // Helper function to get region and destination ARN based on advertising API endpoint
+    const getRegionAndArn = (apiEndpoint: string, type: 'sqs' | 's3' = 's3') => {
+      let region: string;
+      let baseUrl: string;
+      let arn: string | undefined;
+      
       if (apiEndpoint?.includes('advertising-api-eu')) {
-        return { 
-          region: 'eu-west-1', 
-          arn: Deno.env.get('AMS_SQS_ARN_EU'),
-          baseUrl: 'https://advertising-api-eu.amazon.com' 
-        };
+        region = 'eu-west-1';
+        baseUrl = 'https://advertising-api-eu.amazon.com';
+        arn = type === 's3' ? Deno.env.get('AMS_S3_ARN_EU') : Deno.env.get('AMS_SQS_ARN_EU');
       } else if (apiEndpoint?.includes('advertising-api-fe')) {
-        return { 
-          region: 'us-west-2', 
-          arn: Deno.env.get('AMS_SQS_ARN_FE'),
-          baseUrl: 'https://advertising-api-fe.amazon.com' 
-        };
+        region = 'us-west-2';
+        baseUrl = 'https://advertising-api-fe.amazon.com';
+        arn = type === 's3' ? Deno.env.get('AMS_S3_ARN_FE') : Deno.env.get('AMS_SQS_ARN_FE');
       } else {
-        return { 
-          region: 'us-east-1', 
-          arn: Deno.env.get('AMS_SQS_ARN_NA'),
-          baseUrl: 'https://advertising-api.amazon.com' 
-        };
+        region = 'us-east-1';
+        baseUrl = 'https://advertising-api.amazon.com';
+        arn = type === 's3' ? Deno.env.get('AMS_S3_ARN_NA') : Deno.env.get('AMS_SQS_ARN_NA');
       }
+      
+      return { region, arn, baseUrl };
     };
 
     // Authenticate user first
@@ -298,13 +298,17 @@ serve(async (req) => {
       });
     }
   } else if (action === 'subscribe') {
-    // Handle subscribe action - use managed SQS ARNs by default
+    // Handle subscribe action - use S3 by default for simpler setup
     
-    // Get region and ARN based on connection's advertising API endpoint
-    const { region: managedRegion, arn: managedArn, baseUrl } = getRegionAndArn(conn.advertising_api_endpoint);
+    // Use provided values or default to S3
+    const finalDestinationType = destinationType || "s3";
     
-    // Use provided values or fall back to managed ones
-    const finalDestinationType = destinationType || "sqs";
+    // Get region and ARN based on connection's advertising API endpoint and destination type
+    const { region: managedRegion, arn: managedArn, baseUrl } = getRegionAndArn(
+      conn.advertising_api_endpoint, 
+      finalDestinationType as 'sqs' | 's3'
+    );
+    
     const finalRegion = region || managedRegion;
     const finalDestinationArn = destinationArn || managedArn;
     
@@ -312,9 +316,10 @@ serve(async (req) => {
     
     if (!finalDestinationArn) {
       console.error("No destination ARN available for region:", finalRegion);
+      const destType = finalDestinationType.toUpperCase();
       return new Response(JSON.stringify({ 
         success: false, 
-        error: `No managed SQS ARN configured for region: ${finalRegion}` 
+        error: `No managed ${destType} ARN configured for region: ${finalRegion}. Please set AMS_${destType}_ARN_${finalRegion === 'eu-west-1' ? 'EU' : finalRegion === 'us-west-2' ? 'FE' : 'NA'} in Supabase secrets.` 
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }

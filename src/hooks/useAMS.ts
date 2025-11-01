@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 export type AmsDataset = "sp-traffic" | "sp-conversion";
-export type AmsDestinationType = "firehose" | "sqs" | "kinesis";
+export type AmsDestinationType = "s3" | "sqs" | "kinesis" | "firehose";
 
 export interface AmsSubscription {
   id: string;
@@ -48,7 +48,11 @@ export const useAMS = () => {
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("ams-subscribe", {
-        body: { action: "subscribe", ...params },
+        body: { 
+          action: "subscribe", 
+          ...params,
+          destinationType: params.destinationType || 's3' // Default to S3 for simpler setup
+        },
       });
       if (error) throw error as any;
       toast({ title: "Subscribed", description: `${params.datasetId} stream enabled` });

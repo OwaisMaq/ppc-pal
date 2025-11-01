@@ -282,11 +282,30 @@ export default function AmsSetup() {
                 <div className="flex-shrink-0">
                   <Zap className="h-5 w-5 text-blue-600" />
                 </div>
-                <div className="flex-1">
-                  <h3 className="text-sm font-medium text-blue-800">Real-time Streaming</h3>
-                  <p className="text-sm text-blue-700 mt-1">
-                    Enable streaming subscriptions below to receive hourly updates for clicks, impressions, cost, and conversions directly from Amazon.
+                <div className="flex-1 space-y-2">
+                  <h3 className="text-sm font-medium text-blue-800">Real-time Streaming via S3</h3>
+                  <p className="text-sm text-blue-700">
+                    Enable streaming subscriptions below to receive hourly updates for clicks, impressions, cost, and conversions from Amazon.
                   </p>
+                  <div className="bg-white/60 rounded p-3 text-xs space-y-1 text-blue-900">
+                    <p className="font-medium">📋 Quick Setup Required:</p>
+                    <ol className="list-decimal ml-4 space-y-1">
+                      <li>Create an S3 bucket in your AWS account (e.g., <code className="bg-blue-100 px-1 py-0.5 rounded">ppcpal-ams-data-eu</code>)</li>
+                      <li>Add bucket policy to allow Amazon Marketing Stream write access</li>
+                      <li>Create IAM credentials for PPC Pal to read files</li>
+                      <li>Update Supabase secrets with your S3 bucket ARN</li>
+                    </ol>
+                    <p className="mt-2 pt-2 border-t border-blue-200">
+                      <a 
+                        href="https://github.com/yourusername/ppcpal/blob/main/infra/ams-s3/S3_SETUP_GUIDE.md" 
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-800 underline font-medium"
+                      >
+                        View Complete S3 Setup Guide →
+                      </a>
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
