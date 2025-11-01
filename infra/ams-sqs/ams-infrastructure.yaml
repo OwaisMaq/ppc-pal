@@ -57,8 +57,7 @@ Resources:
           - Sid: AllowAmazonMarketingStreamEU
             Effect: Allow
             Principal:
-              AWS: 
-                - "arn:aws:iam::119690846692:root"
+              AWS: "119690846692"
             Action:
               - sqs:SendMessage
               - sqs:GetQueueAttributes
@@ -66,8 +65,7 @@ Resources:
           - Sid: AllowAmazonMarketingStreamNA
             Effect: Allow
             Principal:
-              AWS: 
-                - "arn:aws:iam::668473351658:root"
+              AWS: "668473351658"
             Action:
               - sqs:SendMessage
               - sqs:GetQueueAttributes
@@ -75,8 +73,7 @@ Resources:
           - Sid: AllowAmazonMarketingStreamFE
             Effect: Allow
             Principal:
-              AWS: 
-                - "arn:aws:iam::320228592410:root"
+              AWS: "320228592410"
             Action:
               - sqs:SendMessage
               - sqs:GetQueueAttributes
