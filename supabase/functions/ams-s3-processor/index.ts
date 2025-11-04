@@ -91,14 +91,14 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  if (req.method !== 'POST') {
-    return new Response(
-      JSON.stringify({ error: 'Method not allowed' }),
-      { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
-
   try {
+    if (req.method !== 'POST') {
+      return new Response(
+        JSON.stringify({ error: 'Method not allowed' }),
+        { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { connectionId } = await req.json();
     
     if (!connectionId) {
@@ -108,15 +108,28 @@ Deno.serve(async (req) => {
       );
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const s3BucketArn = Deno.env.get('AWS_S3_BUCKET_ARN_EU');
     const s3Region = Deno.env.get('AWS_REGION_EU');
+    const awsAccessKey = Deno.env.get('AWS_ACCESS_KEY_ID');
+    const awsSecretKey = Deno.env.get('AWS_SECRET_ACCESS_KEY');
 
-    if (!s3BucketArn || !s3Region) {
-      console.error('Missing S3 configuration');
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('Missing Supabase configuration');
       return new Response(
-        JSON.stringify({ error: 'S3 not configured' }),
+        JSON.stringify({ error: 'Server configuration error' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!s3BucketArn || !s3Region || !awsAccessKey || !awsSecretKey) {
+      console.error('Missing S3/AWS configuration');
+      return new Response(
+        JSON.stringify({ 
+          error: 'S3 not configured',
+          message: 'AWS credentials or S3 bucket not configured. Please check your secrets.'
+        }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
