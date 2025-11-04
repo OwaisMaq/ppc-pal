@@ -20,7 +20,7 @@ export const useAmazonData = () => {
     }
   }, [user]);
 
-  const fetchAllData = async () => {
+  const fetchAllData = async (skipAutoSync = false) => {
     setLoading(true);
     try {
       await Promise.all([
@@ -31,7 +31,10 @@ export const useAmazonData = () => {
       ]);
 
       // One-time auto sync if user has a connection but no data yet
-      if (!initialSyncAttempted) {
+      // Skip if explicitly disabled to prevent loops
+      if (!skipAutoSync && !initialSyncAttempted) {
+        setInitialSyncAttempted(true); // Set immediately to prevent race conditions
+        
         try {
           const { data: conns } = await supabase
             .from('amazon_connections')
@@ -46,7 +49,6 @@ export const useAmazonData = () => {
           });
 
           if (usable && campaigns.length === 0) {
-            setInitialSyncAttempted(true);
             const session = await supabase.auth.getSession();
             const token = session.data.session?.access_token;
             if (token) {
@@ -54,8 +56,8 @@ export const useAmazonData = () => {
                 body: { connectionId: usable.id, dateRangeDays: 7 },
                 headers: { Authorization: `Bearer ${token}` },
               });
-              // Refetch after a short delay to allow writes
-              setTimeout(() => { fetchAllData(); }, 2000);
+              // Refetch after a delay, but with skipAutoSync=true to prevent loop
+              setTimeout(() => { fetchAllData(true); }, 3000);
             }
           }
         } catch (e) {
