@@ -379,12 +379,11 @@ serve(async (req) => {
     
     console.log("Using AMS base URL:", baseUrl);
 
-    // Create subscription with destination object for SQS
+    // Create subscription with sqsDestination for SQS
     const clientRequestToken = crypto.randomUUID();
     const subscriptionPayload = { 
       dataSetId: datasetId,  // Amazon expects capital S
-      destination: {
-        deliveryChannel: "SQS",
+      sqsDestination: {
         queueArn: finalDestinationArn
       },
       clientRequestToken  // Required for idempotency
