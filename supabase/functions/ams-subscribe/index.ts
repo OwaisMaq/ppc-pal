@@ -326,6 +326,36 @@ serve(async (req) => {
       });
     }
 
+    // Check if an active subscription already exists for this connection and dataset
+    console.log("Checking for existing subscription...");
+    const { data: existingSub, error: checkError } = await db
+      .from("ams_subscriptions")
+      .select("*")
+      .eq("connection_id", connectionId)
+      .eq("dataset_id", datasetId)
+      .eq("status", "active")
+      .maybeSingle();
+    
+    if (checkError) {
+      console.error("Error checking existing subscription:", checkError);
+    }
+    
+    if (existingSub) {
+      console.log("Active subscription already exists:", existingSub.subscription_id);
+      return new Response(JSON.stringify({ 
+        success: true, 
+        subscriptionId: existingSub.subscription_id, 
+        snsTopicArn: existingSub.sns_topic_arn,
+        datasetId,
+        message: "Subscription already active"
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    console.log("No active subscription found, creating new one...");
+
     // Refresh the Amazon token first to ensure we have a valid access token
     console.log("Refreshing Amazon token...");
     const authHeader = req.headers.get("Authorization") ?? "";
