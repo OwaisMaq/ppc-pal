@@ -11,7 +11,7 @@ import { useAMS, AmsDataset } from "@/hooks/useAMS";
 import { useAmsMetrics } from "@/hooks/useAmsMetrics";
 import { DataFreshnessIndicator } from "@/components/DataFreshnessIndicator";
 import { ConnectionStatusAlert } from "@/components/ConnectionStatusAlert";
-import { Loader2, Server, Network, Clock, Activity, Zap } from "lucide-react";
+import { Loader2, Server, Network, Clock, Activity, Zap, Database } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -154,6 +154,31 @@ export default function AmsSetup() {
     }
   };
 
+  const handleProcessS3Data = async () => {
+    if (!selectedConnectionId) return;
+    setIsProcessing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('ams-s3-processor', {
+        body: { connectionId: selectedConnectionId }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "S3 Processing Complete",
+        description: `Processed ${data?.processedFiles || 0} files with ${data?.totalRecords || 0} records`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "S3 Processing Failed",
+        description: error.message || "Failed to process S3 data",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleTestDelivery = async () => {
     if (!selectedConnectionId) return;
     setIsProcessing(true);
@@ -252,19 +277,30 @@ export default function AmsSetup() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex items-end gap-2">
-                <Button variant="outline" onClick={refreshConnections} disabled={processing}>
+              <div className="flex items-end gap-2 flex-wrap">
+                <Button variant="outline" onClick={refreshConnections} disabled={processing} size="sm">
                   Refresh
                 </Button>
                 <Button 
                   variant="outline"
                   onClick={handleRefreshToken}
                   disabled={!selectedConnectionId || isProcessing}
+                  size="sm"
                 >
                   {isProcessing ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   ) : null}
                   Refresh Token
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={handleProcessS3Data}
+                  disabled={!selectedConnectionId || isProcessing}
+                  size="sm"
+                  className="gap-2"
+                >
+                  <Database className="h-4 w-4" />
+                  Process S3
                 </Button>
               </div>
             </div>

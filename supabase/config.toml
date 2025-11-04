@@ -1,5 +1,7 @@
-
 project_id = "ucbkcxupzjbblnzyiyui"
+
+[functions.ams-s3-processor]
+verify_jwt = false
 
 [api]
 enabled = true
