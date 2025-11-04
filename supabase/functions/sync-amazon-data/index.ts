@@ -276,7 +276,7 @@ async function pollReportStatus(
   accessToken: string, 
   profileId: string, 
   reportId: string,
-  maxWaitTime = 120000, // Reduced to 2 minutes from 5 minutes
+  maxWaitTime = 45000, // Reduced to 45 seconds to avoid edge function timeouts
   apiEndpoint: string = 'https://advertising-api.amazon.com'
 ): Promise<ReportRequest> {
   const startTime = Date.now()
@@ -285,6 +285,11 @@ async function pollReportStatus(
   const clientId = Deno.env.get('AMAZON_CLIENT_ID')
   if (!clientId || clientId.trim() === '') {
     throw new Error('AMAZON_CLIENT_ID is required for Amazon API calls')
+  }
+  
+  // Warn if max wait time is too long
+  if (maxWaitTime > 60000) {
+    console.warn(`⚠️ Report polling timeout of ${maxWaitTime}ms may cause edge function timeout`)
   }
 
   while (Date.now() - startTime < maxWaitTime) {
@@ -1214,7 +1219,7 @@ serve(async (req) => {
                 apiEndpoint
               )
 
-              const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 90000, apiEndpoint) // 90 seconds retry
+              const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 45000, apiEndpoint) // 45 seconds retry
             
             if (reportResult.url) {
               const performanceData = await downloadAndParseReport(reportResult.url)
@@ -1279,7 +1284,7 @@ serve(async (req) => {
           apiEndpoint
         )
 
-        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 90000, apiEndpoint) // 90 seconds
+        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 45000, apiEndpoint) // 45 seconds to avoid timeouts
         
         if (reportResult.url) {
           const performanceData = await downloadAndParseReport(reportResult.url)
@@ -1377,7 +1382,7 @@ serve(async (req) => {
               apiEndpoint
             )
 
-            const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 90000, apiEndpoint) // 90 seconds retry
+            const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 45000, apiEndpoint) // 45 seconds retry
             
             if (reportResult.url) {
               const performanceData = await downloadAndParseReport(reportResult.url)
@@ -1442,7 +1447,7 @@ serve(async (req) => {
           apiEndpoint
         )
 
-        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 90000, apiEndpoint) // 90 seconds
+        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 45000, apiEndpoint) // 45 seconds to avoid timeouts
         
         if (reportResult.url) {
           const performanceData = await downloadAndParseReport(reportResult.url)
@@ -1558,7 +1563,7 @@ serve(async (req) => {
           apiEndpoint
         )
 
-        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 90000, apiEndpoint) // 90 seconds
+        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 45000, apiEndpoint) // 45 seconds to avoid timeouts
         
         if (reportResult.url) {
           const performanceData = await downloadAndParseReport(reportResult.url)
@@ -1636,7 +1641,7 @@ serve(async (req) => {
           apiEndpoint
         )
 
-        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 90000, apiEndpoint) // 90 seconds
+        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 45000, apiEndpoint) // 45 seconds to avoid timeouts
         
         if (reportResult.url) {
           const performanceData = await downloadAndParseReport(reportResult.url)
