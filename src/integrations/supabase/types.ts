@@ -2986,6 +2986,83 @@ export type Database = {
           },
         ]
       }
+      pending_amazon_reports: {
+        Row: {
+          completed_at: string | null
+          configuration: Json | null
+          connection_id: string
+          created_at: string
+          download_url: string | null
+          error_details: string | null
+          id: string
+          last_polled_at: string | null
+          poll_count: number | null
+          report_id: string
+          report_type: string
+          status: string
+          sync_job_id: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          configuration?: Json | null
+          connection_id: string
+          created_at?: string
+          download_url?: string | null
+          error_details?: string | null
+          id?: string
+          last_polled_at?: string | null
+          poll_count?: number | null
+          report_id: string
+          report_type: string
+          status?: string
+          sync_job_id?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          configuration?: Json | null
+          connection_id?: string
+          created_at?: string
+          download_url?: string | null
+          error_details?: string | null
+          id?: string
+          last_polled_at?: string | null
+          poll_count?: number | null
+          report_id?: string
+          report_type?: string
+          status?: string
+          sync_job_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_amazon_reports_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "amazon_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_amazon_reports_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "amazon_connections_client"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_amazon_reports_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "amazon_connections_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_amazon_reports_sync_job_id_fkey"
+            columns: ["sync_job_id"]
+            isOneToOne: false
+            referencedRelation: "sync_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       plan_entitlements: {
         Row: {
           created_at: string | null

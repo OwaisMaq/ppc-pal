@@ -1101,9 +1101,9 @@ serve(async (req) => {
       )
     }
 
-    // Campaign performance reports
+    // Campaign performance reports - Queue for async processing
     if (campaignIds.length > 0) {
-      console.log('📊 Syncing campaign performance data...')
+      console.log('📊 Queueing campaign performance report...')
       try {
         await updateProgress(50, 'Requesting campaign performance report...')
         
@@ -1118,8 +1118,35 @@ serve(async (req) => {
           apiEndpoint
         )
 
-        await updateProgress(55, 'Waiting for campaign report to generate...')
-        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 90000, apiEndpoint) // 90 seconds for SUMMARY reports
+        // Queue report for async processing instead of waiting
+        await updateProgress(55, 'Queuing report for background processing...')
+        const { error: queueError } = await supabase
+          .from('pending_amazon_reports')
+          .insert({
+            connection_id: connectionId,
+            sync_job_id: syncJobId,
+            report_id: reportId,
+            report_type: 'campaign_performance',
+            status: 'pending',
+            configuration: {
+              dateRange,
+              timeUnit: timeUnitOpt,
+              columns: campaignColumns,
+              entityIds: campaignIds,
+              entityType: 'campaigns'
+            }
+          })
+
+        if (queueError) {
+          console.error('Failed to queue campaign report:', queueError)
+          diagnostics.campaignReportError = queueError.message
+        } else {
+          console.log(`✅ Campaign report ${reportId} queued - will be processed in background`)
+          diagnostics.campaignReport = { reportId, status: 'queued' }
+        }
+        
+        // Skip to next section instead of waiting
+        const reportResult: any = { url: null }
         
         if (reportResult.url) {
           const performanceData = await downloadAndParseReport(reportResult.url)
@@ -1267,11 +1294,11 @@ serve(async (req) => {
       }
     }
 
-    await updateProgress(70, 'Syncing ad group performance...')
+    await updateProgress(70, 'Queueing ad group performance report...')
 
-    // Ad Group performance reports
+    // Ad Group performance reports - Queue for async processing
     if (adGroupIds.length > 0) {
-      console.log('📊 Syncing ad group performance data...')
+      console.log('📊 Queueing ad group performance report...')
       try {
         const reportId = await createReportRequest(
           accessToken, 
@@ -1284,7 +1311,34 @@ serve(async (req) => {
           apiEndpoint
         )
 
-        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 45000, apiEndpoint) // 45 seconds to avoid timeouts
+        // Queue report for async processing
+        const { error: queueError } = await supabase
+          .from('pending_amazon_reports')
+          .insert({
+            connection_id: connectionId,
+            sync_job_id: syncJobId,
+            report_id: reportId,
+            report_type: 'adgroup_performance',
+            status: 'pending',
+            configuration: {
+              dateRange,
+              timeUnit: timeUnitOpt,
+              columns: adGroupColumns,
+              entityIds: adGroupIds,
+              entityType: 'adGroups'
+            }
+          })
+
+        if (queueError) {
+          console.error('Failed to queue ad group report:', queueError)
+          diagnostics.adGroupReportError = queueError.message
+        } else {
+          console.log(`✅ Ad group report ${reportId} queued - will be processed in background`)
+          diagnostics.adGroupReport = { reportId, status: 'queued' }
+        }
+
+        // Skip to next section
+        const reportResult: any = { url: null }
         
         if (reportResult.url) {
           const performanceData = await downloadAndParseReport(reportResult.url)
@@ -1430,11 +1484,11 @@ serve(async (req) => {
       }
     }
 
-    await updateProgress(80, 'Syncing target performance...')
+    await updateProgress(80, 'Queueing target performance report...')
 
-    // Target performance reports
+    // Target performance reports - Queue for async processing
     if (targetIds.length > 0) {
-      console.log('📊 Syncing target performance data...')
+      console.log('📊 Queueing target performance report...')
       try {
         const reportId = await createReportRequest(
           accessToken, 
@@ -1447,7 +1501,34 @@ serve(async (req) => {
           apiEndpoint
         )
 
-        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 45000, apiEndpoint) // 45 seconds to avoid timeouts
+        // Queue report for async processing
+        const { error: queueError } = await supabase
+          .from('pending_amazon_reports')
+          .insert({
+            connection_id: connectionId,
+            sync_job_id: syncJobId,
+            report_id: reportId,
+            report_type: 'target_performance',
+            status: 'pending',
+            configuration: {
+              dateRange,
+              timeUnit: timeUnitOpt,
+              columns: targetColumns,
+              entityIds: targetIds,
+              entityType: 'targets'
+            }
+          })
+
+        if (queueError) {
+          console.error('Failed to queue target report:', queueError)
+          diagnostics.targetReportError = queueError.message
+        } else {
+          console.log(`✅ Target report ${reportId} queued - will be processed in background`)
+          diagnostics.targetReport = { reportId, status: 'queued' }
+        }
+
+        // Skip to next section
+        const reportResult: any = { url: null }
         
         if (reportResult.url) {
           const performanceData = await downloadAndParseReport(reportResult.url)
