@@ -51,7 +51,8 @@ export const useSyncJobProgress = (connectionId?: string, options?: UseSyncJobPr
             .select('*')
             .eq('user_id', user.id)
             .eq('status', 'running')
-            .order('started_at', { ascending: false });
+            .order('started_at', { ascending: false })
+            .limit(1);
 
           if (connectionId) {
             query = query.eq('connection_id', connectionId);
