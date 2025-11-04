@@ -428,7 +428,6 @@ serve(async (req) => {
         dataset_id: datasetId,
         destination_type: finalDestinationType,
         sns_topic_arn: snsTopicArn,  // Store the SNS topic ARN Amazon created
-        destination_arn: finalDestinationArn,
         region: finalRegion,
         status: "active",
         subscription_id: amazonResponse.subscriptionId || null,
@@ -449,7 +448,9 @@ serve(async (req) => {
     return new Response(JSON.stringify({ 
       success: true, 
       subscriptionId: amazonResponse.subscriptionId, 
-      datasetId 
+      snsTopicArn: snsTopicArn,
+      datasetId,
+      nextSteps: `Subscribe your SQS queue (arn:aws:sqs:${finalRegion}:229742714366:ams-events-queue-dev) to the SNS topic: ${snsTopicArn}`
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }

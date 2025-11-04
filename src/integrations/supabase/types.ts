@@ -679,6 +679,7 @@ export type Database = {
           id: string
           last_delivery_at: string | null
           region: string | null
+          sns_topic_arn: string | null
           status: string
           subscription_id: string | null
           updated_at: string
@@ -693,6 +694,7 @@ export type Database = {
           id?: string
           last_delivery_at?: string | null
           region?: string | null
+          sns_topic_arn?: string | null
           status?: string
           subscription_id?: string | null
           updated_at?: string
@@ -707,6 +709,7 @@ export type Database = {
           id?: string
           last_delivery_at?: string | null
           region?: string | null
+          sns_topic_arn?: string | null
           status?: string
           subscription_id?: string | null
           updated_at?: string
@@ -4033,10 +4036,7 @@ export type Database = {
       }
     }
     Functions: {
-      calculate_campaign_changes: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      calculate_campaign_changes: { Args: never; Returns: undefined }
       calculate_robust_z_score: {
         Args: { p_mad: number; p_median: number; p_value: number }
         Returns: number
@@ -4045,10 +4045,7 @@ export type Database = {
         Args: { profile_user_id: string }
         Returns: boolean
       }
-      can_user_optimize: {
-        Args: { user_uuid: string }
-        Returns: boolean
-      }
+      can_user_optimize: { Args: { user_uuid: string }; Returns: boolean }
       cleanup_and_create_sync_job: {
         Args: { p_connection_id: string; p_user_id: string }
         Returns: string
@@ -4076,10 +4073,7 @@ export type Database = {
         }
         Returns: string
       }
-      generate_path_fingerprint: {
-        Args: { path_json: Json }
-        Returns: string
-      }
+      generate_path_fingerprint: { Args: { path_json: Json }; Returns: string }
       get_ams_data_freshness: {
         Args: { connection_uuid: string }
         Returns: {
@@ -4089,10 +4083,7 @@ export type Database = {
           messages_24h: number
         }[]
       }
-      get_anomaly_severity: {
-        Args: { p_z_score: number }
-        Returns: string
-      }
+      get_anomaly_severity: { Args: { p_z_score: number }; Returns: string }
       get_campaign_rollup_kpis: {
         Args: {
           p_base_currency?: string
@@ -4152,7 +4143,7 @@ export type Database = {
         Returns: undefined
       }
       secure_profile_access_check: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           email: string
           id: string

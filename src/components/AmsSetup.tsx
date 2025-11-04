@@ -71,10 +71,28 @@ export default function AmsSetup() {
           datasetId
         });
         console.log('✅ Subscribe result:', result);
-        toast({
-          title: "Subscription activated",
-          description: `${datasetId} data stream is now active`,
-        });
+        
+        // Show SNS topic ARN and subscription instructions
+        if (result.snsTopicArn) {
+          toast({
+            title: "Amazon created SNS topic",
+            description: (
+              <div className="space-y-2 text-sm">
+                <p className="font-semibold">SNS Topic ARN:</p>
+                <code className="block bg-muted p-2 rounded text-xs break-all">{result.snsTopicArn}</code>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Now subscribe your SQS queue to this SNS topic using AWS CLI or Console
+                </p>
+              </div>
+            ),
+            duration: 10000, // Show for 10 seconds
+          });
+        } else {
+          toast({
+            title: "Subscription activated",
+            description: `${datasetId} data stream is now active`,
+          });
+        }
       } else {
         const sub = subs[datasetId];
         console.log('🗑️ Archiving subscription:', sub);
