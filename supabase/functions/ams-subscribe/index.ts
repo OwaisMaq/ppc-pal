@@ -298,10 +298,10 @@ serve(async (req) => {
       });
     }
   } else if (action === 'subscribe') {
-    // Handle subscribe action - use S3 by default for simpler setup
+    // Handle subscribe action - use S3 by default (SQS requires complex SNS setup)
     
-    // Use provided values or default to S3
-    const finalDestinationType = destinationType || "s3";
+    // Force S3 destination for reliability - SQS requires manual SNS topic subscription
+    const finalDestinationType = "s3";
     
     // Get region and ARN based on connection's advertising API endpoint and destination type
     const { region: managedRegion, arn: managedArn, baseUrl } = getRegionAndArn(

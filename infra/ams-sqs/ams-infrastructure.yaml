@@ -67,16 +67,6 @@ Resources:
                   - !Sub "arn:aws:sns:eu-west-1:119690846692:*"
                   - !Sub "arn:aws:sns:us-east-1:668473351658:*"
                   - !Sub "arn:aws:sns:us-west-2:320228592410:*"
-          - Sid: AllowAmazonMarketingStreamValidation
-            Effect: Allow
-            Principal:
-              AWS:
-                - "arn:aws:iam::119690846692:root"
-                - "arn:aws:iam::668473351658:root"
-                - "arn:aws:iam::320228592410:root"
-            Action:
-              - sqs:GetQueueAttributes
-            Resource: !GetAtt AmsEventsQueue.Arn
 
   AmsLambdaExecutionRole:
     Type: AWS::IAM::Role
