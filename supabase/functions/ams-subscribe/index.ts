@@ -298,33 +298,24 @@ serve(async (req) => {
       });
     }
   } else if (action === 'subscribe') {
-    // Handle subscribe action - use SQS (recommended for Amazon Marketing Stream)
+    // Handle subscribe action - Amazon AMS creates SNS topics for subscriptions
     
     // Default to SQS destination - standard approach for Amazon Marketing Stream
     const finalDestinationType = destinationType || "sqs";
     
-    // Get region and ARN based on connection's advertising API endpoint and destination type
-    const { region: managedRegion, arn: managedArn, baseUrl } = getRegionAndArn(
+    // Get region and base URL based on connection's advertising API endpoint
+    const { region: managedRegion, baseUrl } = getRegionAndArn(
       conn.advertising_api_endpoint, 
       finalDestinationType as 'sqs' | 's3'
     );
     
     const finalRegion = region || managedRegion;
-    const finalDestinationArn = destinationArn || managedArn;
     
-    console.log("Using configuration:", { finalDestinationType, finalRegion, finalDestinationArn });
-    
-    if (!finalDestinationArn) {
-      console.error("No destination ARN available for region:", finalRegion);
-      const destType = finalDestinationType.toUpperCase();
-      return new Response(JSON.stringify({ 
-        success: false, 
-        error: `No managed ${destType} ARN configured for region: ${finalRegion}. Please set AMS_${destType}_ARN_${finalRegion === 'eu-west-1' ? 'EU' : finalRegion === 'us-west-2' ? 'FE' : 'NA'} in Supabase secrets.` 
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
+    console.log("Using configuration:", { 
+      finalDestinationType, 
+      finalRegion,
+      note: "Amazon AMS will create SNS topic - no destination ARN needed for subscription creation"
+    });
 
     // Refresh the Amazon token first to ensure we have a valid access token
     console.log("Refreshing Amazon token...");
@@ -379,15 +370,15 @@ serve(async (req) => {
     
     console.log("Using AMS base URL:", baseUrl);
 
-    // Create subscription with correct Amazon API format
+    // Create subscription - Amazon will create an SNS topic for us
+    // We do NOT provide destinationArn - Amazon manages the SNS topic
     const clientRequestToken = crypto.randomUUID();
     const subscriptionPayload = { 
       dataSetId: datasetId,  // Amazon expects capital S
-      destinationArn: finalDestinationArn, 
-      compression: "GZIP",
+      // No destinationArn - Amazon creates and manages the SNS topic
       clientRequestToken  // Required for idempotency
     };
-    console.log("Creating AMS subscription with payload:", subscriptionPayload);
+    console.log("Creating AMS subscription with payload (Amazon will create SNS topic):", subscriptionPayload);
     
     const res = await fetch(`${baseUrl}/streams/subscriptions`, {
       method: "POST",
@@ -412,14 +403,22 @@ serve(async (req) => {
       });
     }
 
-    // Parse Amazon response to get subscription ID
+    // Parse Amazon response to get subscription ID and SNS topic ARN
     let amazonResponse;
     try {
       amazonResponse = JSON.parse(responseText);
+      console.log("Amazon created subscription:", {
+        subscriptionId: amazonResponse.subscriptionId,
+        snsTopicArn: amazonResponse.destinationArn,
+        status: amazonResponse.status
+      });
     } catch (e) {
       console.warn("Failed to parse Amazon response as JSON:", e);
       amazonResponse = {};
     }
+
+    // Extract the SNS topic ARN that Amazon created
+    const snsTopicArn = amazonResponse.destinationArn;
 
     // Persist subscription in our database
     const { error: dbError } = await db
@@ -428,6 +427,7 @@ serve(async (req) => {
         connection_id: connectionId,
         dataset_id: datasetId,
         destination_type: finalDestinationType,
+        sns_topic_arn: snsTopicArn,  // Store the SNS topic ARN Amazon created
         destination_arn: finalDestinationArn,
         region: finalRegion,
         status: "active",
