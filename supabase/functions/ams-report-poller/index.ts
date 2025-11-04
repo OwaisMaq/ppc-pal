@@ -261,7 +261,7 @@ Deno.serve(async (req) => {
     // Fetch pending reports (not completed or failed, and not polled too recently)
     const { data: pendingReports, error: fetchError } = await supabase
       .from('pending_amazon_reports')
-      .select('*, amazon_connections!inner(profile_id, advertising_api_endpoint)')
+      .select('*')
       .in('status', ['pending', 'processing'])
       .or(`last_polled_at.is.null,last_polled_at.lt.${new Date(Date.now() - 10000).toISOString()}`) // At least 10s since last poll
       .lt('poll_count', 100) // Max 100 polls (~15 minutes)
@@ -293,9 +293,20 @@ Deno.serve(async (req) => {
           })
           .eq('id', report.id)
 
+        // Fetch connection details
+        const { data: connection, error: connError } = await supabase
+          .from('amazon_connections')
+          .select('profile_id, advertising_api_endpoint')
+          .eq('id', report.connection_id)
+          .single()
+
+        if (connError || !connection) {
+          throw new Error('Failed to get connection details')
+        }
+
         // Get access token
         const { data: tokenData, error: tokenError } = await supabase.rpc('get_tokens', {
-          p_profile_id: report.amazon_connections.profile_id
+          p_profile_id: connection.profile_id
         })
 
         if (tokenError || !tokenData || tokenData.length === 0) {
@@ -303,12 +314,12 @@ Deno.serve(async (req) => {
         }
 
         const accessToken = tokenData[0].access_token
-        const apiEndpoint = report.amazon_connections.advertising_api_endpoint || 'https://advertising-api.amazon.com'
+        const apiEndpoint = connection.advertising_api_endpoint || 'https://advertising-api.amazon.com'
 
         // Check report status
         const reportStatus = await pollReportStatus(
           accessToken,
-          report.amazon_connections.profile_id,
+          connection.profile_id,
           report.report_id,
           apiEndpoint
         )
@@ -323,7 +334,7 @@ Deno.serve(async (req) => {
             report,
             reportData,
             report.connection_id,
-            report.amazon_connections.profile_id
+            connection.profile_id
           )
 
           // Mark as completed
