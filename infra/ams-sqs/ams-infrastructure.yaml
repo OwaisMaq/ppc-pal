@@ -54,33 +54,19 @@ Resources:
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
-          - Sid: AllowAmazonMarketingStreamEU
+          - Sid: AllowAmazonMarketingStreamSNS
             Effect: Allow
             Principal:
-              AWS:
-                - "119690846692"
+              Service: sns.amazonaws.com
             Action:
               - sqs:SendMessage
-              - sqs:GetQueueAttributes
             Resource: !GetAtt AmsEventsQueue.Arn
-          - Sid: AllowAmazonMarketingStreamNA
-            Effect: Allow
-            Principal:
-              AWS:
-                - "668473351658"
-            Action:
-              - sqs:SendMessage
-              - sqs:GetQueueAttributes
-            Resource: !GetAtt AmsEventsQueue.Arn
-          - Sid: AllowAmazonMarketingStreamFE
-            Effect: Allow
-            Principal:
-              AWS:
-                - "320228592410"
-            Action:
-              - sqs:SendMessage
-              - sqs:GetQueueAttributes
-            Resource: !GetAtt AmsEventsQueue.Arn
+            Condition:
+              ArnLike:
+                aws:SourceArn:
+                  - !Sub "arn:aws:sns:eu-west-1:119690846692:*"
+                  - !Sub "arn:aws:sns:us-east-1:668473351658:*"
+                  - !Sub "arn:aws:sns:us-west-2:320228592410:*"
 
   AmsLambdaExecutionRole:
     Type: AWS::IAM::Role
