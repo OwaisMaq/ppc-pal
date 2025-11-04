@@ -5,7 +5,11 @@
       "Sid": "AmazonMarketingStreamAccess",
       "Effect": "Allow",
       "Principal": {
-        "Service": "streaming.amazon-adsapi.com"
+        "AWS": [
+          "arn:aws:iam::119690846692:root",
+          "arn:aws:iam::668473351658:root",
+          "arn:aws:iam::320228592410:root"
+        ]
       },
       "Action": [
         "s3:PutObject",
