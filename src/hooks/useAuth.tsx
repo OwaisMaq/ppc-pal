@@ -89,9 +89,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     console.log('AuthProvider: Setting up auth state listener');
     
-    // Clean up any existing large tokens that might cause 400 errors
-    cleanupAuthState();
-    
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
