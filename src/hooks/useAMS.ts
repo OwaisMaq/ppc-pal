@@ -42,6 +42,7 @@ export const useAMS = () => {
     datasetId: AmsDataset;
     destinationType?: AmsDestinationType;
     destinationArn?: string;
+    snsTopicArn?: string;
     region?: string;
   }) => {
     console.log('useAMS.subscribe called with:', params);

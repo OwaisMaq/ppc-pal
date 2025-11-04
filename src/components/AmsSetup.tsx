@@ -24,6 +24,7 @@ export default function AmsSetup() {
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
   const [subs, setSubs] = useState<Record<string, any>>({});
   const [isProcessing, setIsProcessing] = useState(false);
+  const [snsTopicArn, setSnsTopicArn] = useState<string>("arn:aws:sns:eu-west-1:229742714366:ppcpal-ams-notifications-eu");
   const { metrics } = useAmsMetrics(selectedConnectionId || undefined);
   const { toast } = useToast();
 
@@ -68,31 +69,15 @@ export default function AmsSetup() {
         console.log('📡 Subscribing to dataset:', datasetId);
         const result = await subscribe({
           connectionId: selectedConnectionId,
-          datasetId
+          datasetId,
+          snsTopicArn: snsTopicArn || undefined
         });
         console.log('✅ Subscribe result:', result);
         
-        // Show SNS topic ARN and subscription instructions
-        if (result.snsTopicArn) {
-          toast({
-            title: "Amazon created SNS topic",
-            description: (
-              <div className="space-y-2 text-sm">
-                <p className="font-semibold">SNS Topic ARN:</p>
-                <code className="block bg-muted p-2 rounded text-xs break-all">{result.snsTopicArn}</code>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  {result.nextSteps || "Now subscribe your SQS queue to this SNS topic"}
-                </p>
-              </div>
-            ),
-            duration: 15000, // Show for 15 seconds
-          });
-        } else {
-          toast({
-            title: "Subscription activated",
-            description: `${datasetId} data stream is now active`,
-          });
-        }
+        toast({
+          title: "Subscription activated",
+          description: `${datasetId} data stream is now active with your SNS topic`,
+        });
       } else {
         const sub = subs[datasetId];
         console.log('🗑️ Archiving subscription:', sub);
@@ -330,6 +315,25 @@ export default function AmsSetup() {
                 className="pb-4 border-b border-border/50"
               />
             )}
+
+            {/* SNS Topic ARN Configuration */}
+            <Card className="p-4">
+              <div className="space-y-3">
+                <div>
+                  <Label htmlFor="sns-topic-arn" className="text-sm font-medium">SNS Topic ARN</Label>
+                  <p className="text-xs text-muted-foreground mt-1 mb-2">
+                    Your Amazon SNS topic ARN. Amazon Marketing Stream will publish data to this topic.
+                  </p>
+                </div>
+                <Input
+                  id="sns-topic-arn"
+                  value={snsTopicArn}
+                  onChange={(e) => setSnsTopicArn(e.target.value)}
+                  placeholder="arn:aws:sns:region:account:topic-name"
+                  className="font-mono text-sm"
+                />
+              </div>
+            </Card>
 
             <div className="rounded-md border border-blue-200 bg-blue-50 p-4 mb-4">
               <div className="flex items-start gap-3">

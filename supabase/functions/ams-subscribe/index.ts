@@ -82,8 +82,8 @@ serve(async (req) => {
       );
     }
 
-    const { connectionId, datasetId, destinationArn, region, action, subscriptionId, destinationType } = body;
-    console.log("Extracted parameters:", { connectionId, datasetId, destinationArn, region, action, subscriptionId, destinationType });
+    const { connectionId, datasetId, destinationArn, region, action, subscriptionId, destinationType, snsTopicArn } = body;
+    console.log("Extracted parameters:", { connectionId, datasetId, destinationArn, region, action, subscriptionId, destinationType, snsTopicArn });
     
     if (!connectionId || !datasetId) {
       console.error("Missing required parameters");
@@ -379,15 +379,22 @@ serve(async (req) => {
     
     console.log("Using AMS base URL:", baseUrl);
 
-    // Create subscription - Amazon will create an SNS topic for us
-    // Do NOT provide destinationArn - Amazon creates and manages the SNS topic
+    // Create subscription with user-provided SNS topic ARN if available
     const clientRequestToken = crypto.randomUUID();
-    const subscriptionPayload = { 
+    const subscriptionPayload: any = { 
       dataSetId: datasetId,  // Amazon expects capital S
-      // No destinationArn - let Amazon create the SNS topic
       clientRequestToken  // Required for idempotency
     };
-    console.log("Creating AMS subscription (Amazon will create SNS topic):", subscriptionPayload);
+    
+    // If user provided their own SNS topic ARN, use it
+    if (snsTopicArn) {
+      subscriptionPayload.destinationArn = snsTopicArn;
+      console.log("Creating AMS subscription with user SNS topic:", snsTopicArn);
+    } else {
+      console.log("Creating AMS subscription (Amazon will create SNS topic)");
+    }
+    
+    console.log("Subscription payload:", subscriptionPayload);
     
     const res = await fetch(`${baseUrl}/streams/subscriptions`, {
       method: "POST",
@@ -426,8 +433,8 @@ serve(async (req) => {
       amazonResponse = {};
     }
 
-    // Extract the SNS topic ARN that Amazon created
-    const snsTopicArn = amazonResponse.destinationArn;
+    // Extract the SNS topic ARN (either user-provided or Amazon-created)
+    const finalSnsTopicArn = snsTopicArn || amazonResponse.destinationArn;
 
     // Persist subscription in our database
     const { error: dbError } = await db
@@ -436,7 +443,7 @@ serve(async (req) => {
         connection_id: connectionId,
         dataset_id: datasetId,
         destination_type: finalDestinationType,
-        sns_topic_arn: snsTopicArn,  // Store the SNS topic ARN Amazon created
+        sns_topic_arn: finalSnsTopicArn,  // Store the SNS topic ARN
         region: finalRegion,
         status: "active",
         subscription_id: amazonResponse.subscriptionId || null,
@@ -457,9 +464,8 @@ serve(async (req) => {
     return new Response(JSON.stringify({ 
       success: true, 
       subscriptionId: amazonResponse.subscriptionId, 
-      snsTopicArn: snsTopicArn,
-      datasetId,
-      nextSteps: `Now subscribe your SQS queue to the SNS topic using AWS CLI: aws sns subscribe --region ${finalRegion} --topic-arn ${snsTopicArn} --protocol sqs --notification-endpoint ${finalDestinationArn}`
+      snsTopicArn: finalSnsTopicArn,
+      datasetId
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
