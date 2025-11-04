@@ -1,0 +1,17 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AmazonMarketingStreamAccess",
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "streaming.amazon-adsapi.com"
+      },
+      "Action": [
+        "s3:PutObject",
+        "s3:PutObjectAcl"
+      ],
+      "Resource": "arn:aws:s3:::ppcpal-ams-data-eu/*"
+    }
+  ]
+}
