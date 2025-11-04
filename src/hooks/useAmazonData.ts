@@ -26,17 +26,25 @@ export const useAmazonData = () => {
     console.log('fetchAllData called, skipAutoSync:', skipAutoSync, 'initialSyncAttempted:', initialSyncAttempted);
     setLoading(true);
     try {
-      await Promise.all([
-        fetchCampaigns(),
+      // Fetch data and get actual counts to avoid stale state issues
+      const [campaignCount] = await Promise.all([
+        fetchCampaigns().then(() => {
+          // Return the actual count by querying directly
+          return supabase
+            .from('campaigns')
+            .select('id', { count: 'exact', head: true })
+            .then(({ count }) => count || 0);
+        }),
         fetchAdGroups(),
         fetchKeywords(),
         fetchTargets()
       ]);
-      console.log('Data fetched - campaigns:', campaigns.length, 'skipAutoSync:', skipAutoSync, 'initialSyncAttempted:', initialSyncAttempted);
+      
+      console.log('Data fetched - actual campaign count:', campaignCount, 'skipAutoSync:', skipAutoSync, 'initialSyncAttempted:', initialSyncAttempted);
 
       // One-time auto sync if user has a connection but no data yet
       // Skip if explicitly disabled to prevent loops
-      if (!skipAutoSync && !initialSyncAttempted) {
+      if (!skipAutoSync && !initialSyncAttempted && campaignCount === 0) {
         console.log('Checking for auto-sync conditions...');
         setInitialSyncAttempted(true); // Set immediately to prevent race conditions
         
@@ -53,9 +61,9 @@ export const useAmazonData = () => {
             return status === 'active' || ((status === 'setup_required' || status === 'pending') && tokenOk);
           });
 
-          console.log('Usable connection found:', !!usable, 'campaigns.length:', campaigns.length);
+          console.log('Usable connection found:', !!usable);
           
-          if (usable && campaigns.length === 0) {
+          if (usable) {
             console.log('Triggering auto-sync for connection:', usable.id);
             const session = await supabase.auth.getSession();
             const token = session.data.session?.access_token;
@@ -71,14 +79,12 @@ export const useAmazonData = () => {
                 fetchAllData(true); 
               }, 3000);
             }
-          } else {
-            console.log('Auto-sync conditions not met - usable:', !!usable, 'campaigns:', campaigns.length);
           }
         } catch (e) {
           console.warn('Initial sync attempt skipped:', (e as any)?.message || e);
         }
       } else {
-        console.log('Skipping auto-sync check - skipAutoSync:', skipAutoSync, 'initialSyncAttempted:', initialSyncAttempted);
+        console.log('Skipping auto-sync check - skipAutoSync:', skipAutoSync, 'initialSyncAttempted:', initialSyncAttempted, 'campaignCount:', campaignCount);
       }
     } catch (error) {
       console.error('Error fetching Amazon data:', error);
