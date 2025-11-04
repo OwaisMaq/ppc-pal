@@ -1620,10 +1620,9 @@ serve(async (req) => {
       }
     }
 
-    await updateProgress(87, 'Syncing keyword performance...')
-
     // Keyword performance reports
     if (keywordIds.length > 0) {
+      await updateProgress(87, 'Syncing keyword performance...')
       console.log('📊 Syncing keyword performance data...')
       try {
         const reportId = await createReportRequest(
