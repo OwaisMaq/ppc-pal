@@ -24,7 +24,6 @@ export default function AmsSetup() {
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
   const [subs, setSubs] = useState<Record<string, any>>({});
   const [isProcessing, setIsProcessing] = useState(false);
-  const [snsTopicArn, setSnsTopicArn] = useState<string>("arn:aws:sns:eu-west-1:229742714366:ppcpal-ams-notifications-eu");
   const { metrics } = useAmsMetrics(selectedConnectionId || undefined);
   const { toast } = useToast();
 
@@ -69,14 +68,13 @@ export default function AmsSetup() {
         console.log('📡 Subscribing to dataset:', datasetId);
         const result = await subscribe({
           connectionId: selectedConnectionId,
-          datasetId,
-          snsTopicArn: snsTopicArn || undefined
+          datasetId
         });
         console.log('✅ Subscribe result:', result);
         
         toast({
           title: "Subscription activated",
-          description: `${datasetId} data stream is now active with your SNS topic`,
+          description: `${datasetId} data stream is now active`,
         });
       } else {
         const sub = subs[datasetId];
@@ -316,51 +314,33 @@ export default function AmsSetup() {
               />
             )}
 
-            {/* SNS Topic ARN Configuration */}
-            <Card className="p-4">
-              <div className="space-y-3">
-                <div>
-                  <Label htmlFor="sns-topic-arn" className="text-sm font-medium">SNS Topic ARN</Label>
-                  <p className="text-xs text-muted-foreground mt-1 mb-2">
-                    Your Amazon SNS topic ARN. Amazon Marketing Stream will publish data to this topic.
-                  </p>
-                </div>
-                <Input
-                  id="sns-topic-arn"
-                  value={snsTopicArn}
-                  onChange={(e) => setSnsTopicArn(e.target.value)}
-                  placeholder="arn:aws:sns:region:account:topic-name"
-                  className="font-mono text-sm"
-                />
-              </div>
-            </Card>
-
             <div className="rounded-md border border-blue-200 bg-blue-50 p-4 mb-4">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0">
                   <Zap className="h-5 w-5 text-blue-600" />
                 </div>
                 <div className="flex-1 space-y-2">
-                  <h3 className="text-sm font-medium text-blue-800">Real-time Streaming via S3</h3>
+                  <h3 className="text-sm font-medium text-blue-800">Amazon Marketing Stream via SQS</h3>
                   <p className="text-sm text-blue-700">
-                    Enable streaming subscriptions below to receive hourly updates for clicks, impressions, cost, and conversions from Amazon.
+                    Enable streaming subscriptions below to receive hourly updates for clicks, impressions, cost, and conversions.
                   </p>
                   <div className="bg-white/60 rounded p-3 text-xs space-y-1 text-blue-900">
-                    <p className="font-medium">📋 Quick Setup Required:</p>
+                    <p className="font-medium">🔄 How it works:</p>
                     <ol className="list-decimal ml-4 space-y-1">
-                      <li>Create an S3 bucket in your AWS account (e.g., <code className="bg-blue-100 px-1 py-0.5 rounded">ppcpal-ams-data-eu</code>)</li>
-                      <li>Add bucket policy to allow Amazon Marketing Stream write access</li>
-                      <li>Create IAM credentials for PPC Pal to read files</li>
-                      <li>Update Supabase secrets with your S3 bucket ARN</li>
+                      <li>Your SQS queue ARN is already configured in Supabase secrets</li>
+                      <li>Click toggle to subscribe to a dataset (sp-traffic or sp-conversion)</li>
+                      <li>Amazon automatically creates an SNS topic and subscribes your SQS queue</li>
+                      <li>You'll receive a confirmation message in your SQS queue - confirm it in AWS Console</li>
+                      <li>Data starts flowing hourly to your queue for processing</li>
                     </ol>
                     <p className="mt-2 pt-2 border-t border-blue-200">
                       <a 
-                        href="https://github.com/yourusername/ppcpal/blob/main/infra/ams-s3/S3_SETUP_GUIDE.md" 
+                        href="https://advertising.amazon.com/API/docs/en-us/guides/amazon-marketing-stream/onboarding/sqs/get-started" 
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-blue-600 hover:text-blue-800 underline font-medium"
                       >
-                        View Complete S3 Setup Guide →
+                        View Amazon Marketing Stream Guide →
                       </a>
                     </p>
                   </div>

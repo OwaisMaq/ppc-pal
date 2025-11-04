@@ -379,22 +379,15 @@ serve(async (req) => {
     
     console.log("Using AMS base URL:", baseUrl);
 
-    // Create subscription with user-provided SNS topic ARN if available
+    // Create subscription with SQS queue ARN (Amazon will create SNS topic automatically)
     const clientRequestToken = crypto.randomUUID();
     const subscriptionPayload: any = { 
       dataSetId: datasetId,  // Amazon expects capital S
+      destinationArn: finalDestinationArn,  // SQS queue ARN
       clientRequestToken  // Required for idempotency
     };
     
-    // If user provided their own SNS topic ARN, use it
-    if (snsTopicArn) {
-      subscriptionPayload.destinationArn = snsTopicArn;
-      console.log("Creating AMS subscription with user SNS topic:", snsTopicArn);
-    } else {
-      console.log("Creating AMS subscription (Amazon will create SNS topic)");
-    }
-    
-    console.log("Subscription payload:", subscriptionPayload);
+    console.log("Creating AMS subscription with SQS queue ARN:", finalDestinationArn);
     
     const res = await fetch(`${baseUrl}/streams/subscriptions`, {
       method: "POST",
@@ -433,8 +426,8 @@ serve(async (req) => {
       amazonResponse = {};
     }
 
-    // Extract the SNS topic ARN (either user-provided or Amazon-created)
-    const finalSnsTopicArn = snsTopicArn || amazonResponse.destinationArn;
+    // Extract the SNS topic ARN that Amazon created (from destinationArn in response)
+    const snsTopicArn = amazonResponse.destinationArn;
 
     // Persist subscription in our database
     const { error: dbError } = await db
@@ -443,7 +436,7 @@ serve(async (req) => {
         connection_id: connectionId,
         dataset_id: datasetId,
         destination_type: finalDestinationType,
-        sns_topic_arn: finalSnsTopicArn,  // Store the SNS topic ARN
+        sns_topic_arn: snsTopicArn,  // Store the SNS topic ARN Amazon created
         region: finalRegion,
         status: "active",
         subscription_id: amazonResponse.subscriptionId || null,
@@ -464,7 +457,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({ 
       success: true, 
       subscriptionId: amazonResponse.subscriptionId, 
-      snsTopicArn: finalSnsTopicArn,
+      snsTopicArn: snsTopicArn,
       datasetId
     }), {
       status: 200,
