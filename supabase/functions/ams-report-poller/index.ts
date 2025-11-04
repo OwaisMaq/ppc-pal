@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { gunzipSync } from 'https://deno.land/x/denoflate@1.2.1/mod.ts'
+import { gunzipSync } from 'node:zlib'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
