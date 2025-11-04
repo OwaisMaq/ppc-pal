@@ -298,10 +298,10 @@ serve(async (req) => {
       });
     }
   } else if (action === 'subscribe') {
-    // Handle subscribe action - use S3 by default (SQS requires complex SNS setup)
+    // Handle subscribe action - use SQS (recommended for Amazon Marketing Stream)
     
-    // Force S3 destination for reliability - SQS requires manual SNS topic subscription
-    const finalDestinationType = "s3";
+    // Default to SQS destination - standard approach for Amazon Marketing Stream
+    const finalDestinationType = destinationType || "sqs";
     
     // Get region and ARN based on connection's advertising API endpoint and destination type
     const { region: managedRegion, arn: managedArn, baseUrl } = getRegionAndArn(

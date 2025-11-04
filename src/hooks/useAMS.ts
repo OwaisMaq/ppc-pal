@@ -51,7 +51,7 @@ export const useAMS = () => {
         body: { 
           action: "subscribe", 
           ...params,
-          destinationType: params.destinationType || 'sqs' // Default to SQS to match infrastructure
+          destinationType: params.destinationType || 'sqs' // SQS is the standard destination for AMS
         },
       });
       if (error) throw error as any;
