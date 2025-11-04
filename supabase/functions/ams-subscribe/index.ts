@@ -436,6 +436,75 @@ serve(async (req) => {
     
     if (!res.ok) {
       console.error("AMS subscription creation failed");
+      
+      // If the error is "subscription already exists", try to fetch and sync it from Amazon
+      if (res.status === 400 && responseText.includes("Cannot have more than 1 subscriptions")) {
+        console.log("Subscription already exists on Amazon, attempting to list and sync...");
+        
+        try {
+          // List existing subscriptions from Amazon
+          const listRes = await fetch(`${baseUrl}/streams/subscriptions`, {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${access_token}`,
+              "Amazon-Advertising-API-ClientId": AMZ_CLIENT_ID,
+              "Amazon-Advertising-API-Scope": String(conn.profile_id),
+              "Content-Type": "application/json",
+            },
+          });
+          
+          if (listRes.ok) {
+            const listData = await listRes.json();
+            console.log("Listed subscriptions from Amazon:", listData);
+            
+            // Find the matching subscription
+            const matchingSub = listData.subscriptions?.find(
+              (sub: any) => sub.dataSetId === datasetId && sub.status === "ENABLED"
+            );
+            
+            if (matchingSub) {
+              console.log("Found matching subscription:", matchingSub);
+              
+              // Save to our database
+              const { error: dbError } = await db
+                .from("ams_subscriptions")
+                .upsert({
+                  connection_id: connectionId,
+                  dataset_id: datasetId,
+                  destination_type: finalDestinationType,
+                  sns_topic_arn: matchingSub.destinationArn,
+                  region: finalRegion,
+                  status: "active",
+                  subscription_id: matchingSub.subscriptionId,
+                  updated_at: new Date().toISOString()
+                }, {
+                  onConflict: "connection_id,dataset_id",
+                  ignoreDuplicates: false
+                });
+              
+              if (dbError) {
+                console.error("Failed to sync subscription to database:", dbError);
+              } else {
+                console.log("Successfully synced existing subscription to database");
+              }
+              
+              return new Response(JSON.stringify({ 
+                success: true, 
+                subscriptionId: matchingSub.subscriptionId, 
+                snsTopicArn: matchingSub.destinationArn,
+                datasetId,
+                message: "Subscription already existed, synced to database"
+              }), {
+                status: 200,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              });
+            }
+          }
+        } catch (listError) {
+          console.error("Failed to list/sync existing subscriptions:", listError);
+        }
+      }
+      
       return new Response(`AMS API error (${res.status}): ${responseText}`, { 
         status: 502, 
         headers: corsHeaders 
