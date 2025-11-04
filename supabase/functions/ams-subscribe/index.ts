@@ -457,13 +457,17 @@ serve(async (req) => {
             const listData = await listRes.json();
             console.log("Listed subscriptions from Amazon:", listData);
             
-            // Find the matching subscription
+            // Find the matching subscription (accept both ENABLED and PENDING_CONFIRMATION)
             const matchingSub = listData.subscriptions?.find(
-              (sub: any) => sub.dataSetId === datasetId && sub.status === "ENABLED"
+              (sub: any) => sub.dataSetId === datasetId && 
+              (sub.status === "ENABLED" || sub.status === "PENDING_CONFIRMATION")
             );
             
+            console.log("Searching for subscription with datasetId:", datasetId);
+            console.log("Found matching subscription:", matchingSub ? "YES" : "NO", matchingSub);
+            
             if (matchingSub) {
-              console.log("Found matching subscription:", matchingSub);
+              console.log("Attempting to save subscription to database...");
               
               // Save to our database
               const { error: dbError } = await db
@@ -488,6 +492,7 @@ serve(async (req) => {
                 console.log("Successfully synced existing subscription to database");
               }
               
+              console.log("Returning success response with existing subscription");
               return new Response(JSON.stringify({ 
                 success: true, 
                 subscriptionId: matchingSub.subscriptionId, 
@@ -498,6 +503,8 @@ serve(async (req) => {
                 status: 200,
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' }
               });
+            } else {
+              console.log("No matching subscription found in list, returning error");
             }
           }
         } catch (listError) {
