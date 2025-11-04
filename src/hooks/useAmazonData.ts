@@ -15,12 +15,15 @@ export const useAmazonData = () => {
   const [initialSyncAttempted, setInitialSyncAttempted] = useState(false);
 
   useEffect(() => {
+    console.log('useAmazonData useEffect triggered, user:', user?.id);
     if (user) {
+      console.log('Calling fetchAllData from useEffect');
       fetchAllData();
     }
   }, [user]);
 
   const fetchAllData = async (skipAutoSync = false) => {
+    console.log('fetchAllData called, skipAutoSync:', skipAutoSync, 'initialSyncAttempted:', initialSyncAttempted);
     setLoading(true);
     try {
       await Promise.all([
@@ -29,10 +32,12 @@ export const useAmazonData = () => {
         fetchKeywords(),
         fetchTargets()
       ]);
+      console.log('Data fetched - campaigns:', campaigns.length, 'skipAutoSync:', skipAutoSync, 'initialSyncAttempted:', initialSyncAttempted);
 
       // One-time auto sync if user has a connection but no data yet
       // Skip if explicitly disabled to prevent loops
       if (!skipAutoSync && !initialSyncAttempted) {
+        console.log('Checking for auto-sync conditions...');
         setInitialSyncAttempted(true); // Set immediately to prevent race conditions
         
         try {
@@ -48,7 +53,10 @@ export const useAmazonData = () => {
             return status === 'active' || ((status === 'setup_required' || status === 'pending') && tokenOk);
           });
 
+          console.log('Usable connection found:', !!usable, 'campaigns.length:', campaigns.length);
+          
           if (usable && campaigns.length === 0) {
+            console.log('Triggering auto-sync for connection:', usable.id);
             const session = await supabase.auth.getSession();
             const token = session.data.session?.access_token;
             if (token) {
@@ -56,13 +64,21 @@ export const useAmazonData = () => {
                 body: { connectionId: usable.id, dateRangeDays: 7 },
                 headers: { Authorization: `Bearer ${token}` },
               });
+              console.log('Auto-sync started, will refetch in 3 seconds with skipAutoSync=true');
               // Refetch after a delay, but with skipAutoSync=true to prevent loop
-              setTimeout(() => { fetchAllData(true); }, 3000);
+              setTimeout(() => { 
+                console.log('Refetching after auto-sync timeout');
+                fetchAllData(true); 
+              }, 3000);
             }
+          } else {
+            console.log('Auto-sync conditions not met - usable:', !!usable, 'campaigns:', campaigns.length);
           }
         } catch (e) {
           console.warn('Initial sync attempt skipped:', (e as any)?.message || e);
         }
+      } else {
+        console.log('Skipping auto-sync check - skipAutoSync:', skipAutoSync, 'initialSyncAttempted:', initialSyncAttempted);
       }
     } catch (error) {
       console.error('Error fetching Amazon data:', error);
