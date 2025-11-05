@@ -304,25 +304,63 @@ Deno.serve(async (req) => {
           throw new Error('Failed to get connection details')
         }
 
-        // Get access token
-        const { data: tokenData, error: tokenError } = await supabase.rpc('get_tokens', {
+        // Get access token - try to refresh if needed
+        let accessToken: string
+        let tokenData = await supabase.rpc('get_tokens', {
           p_profile_id: connection.profile_id
         })
 
-        if (tokenError || !tokenData || tokenData.length === 0) {
+        if (tokenData.error || !tokenData.data || tokenData.data.length === 0) {
           throw new Error('Failed to get access token')
         }
 
-        const accessToken = tokenData[0].access_token
+        accessToken = tokenData.data[0].access_token
         const apiEndpoint = connection.advertising_api_endpoint || 'https://advertising-api.amazon.com'
 
-        // Check report status
-        const reportStatus = await pollReportStatus(
-          accessToken,
-          connection.profile_id,
-          report.report_id,
-          apiEndpoint
-        )
+        // Check report status - will retry with token refresh if 401
+        let reportStatus: ReportStatus
+        try {
+          reportStatus = await pollReportStatus(
+            accessToken,
+            connection.profile_id,
+            report.report_id,
+            apiEndpoint
+          )
+        } catch (error) {
+          // If 401, try refreshing the token
+          if (error instanceof Error && error.message.includes('401')) {
+            console.log('🔄 Token expired, refreshing...')
+            
+            const { error: refreshError } = await supabase.functions.invoke('refresh-amazon-token', {
+              body: { profileId: connection.profile_id }
+            })
+
+            if (refreshError) {
+              throw new Error(`Token refresh failed: ${refreshError.message}`)
+            }
+
+            // Get new token
+            tokenData = await supabase.rpc('get_tokens', {
+              p_profile_id: connection.profile_id
+            })
+
+            if (tokenData.error || !tokenData.data || tokenData.data.length === 0) {
+              throw new Error('Failed to get refreshed token')
+            }
+
+            accessToken = tokenData.data[0].access_token
+
+            // Retry with new token
+            reportStatus = await pollReportStatus(
+              accessToken,
+              connection.profile_id,
+              report.report_id,
+              apiEndpoint
+            )
+          } else {
+            throw error
+          }
+        }
 
         if (reportStatus.status === 'SUCCESS' && reportStatus.url) {
           // Download and process report
