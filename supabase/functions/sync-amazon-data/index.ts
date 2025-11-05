@@ -1706,10 +1706,10 @@ serve(async (req) => {
       }
     }
 
-    // Keyword performance reports
+    // Keyword performance reports - Queue for async processing
     if (keywordIds.length > 0) {
-      await updateProgress(87, 'Syncing keyword performance...')
-      console.log('📊 Syncing keyword performance data...')
+      await updateProgress(87, 'Queueing keyword performance report...')
+      console.log('📊 Queueing keyword performance report...')
       try {
         const reportId = await createReportRequest(
           accessToken, 
@@ -1722,47 +1722,30 @@ serve(async (req) => {
           apiEndpoint
         )
 
-        const reportResult = await pollReportStatus(accessToken, connection.profile_id, reportId, 45000, apiEndpoint) // 45 seconds to avoid timeouts
-        
-        if (reportResult.url) {
-          const performanceData = await downloadAndParseReport(reportResult.url)
-          
-          console.log(`📊 Processing ${performanceData.length} keyword performance records...`)
-          let keywordMetricsUpdated = 0
-
-          for (const record of performanceData) {
-            try {
-              const keywordId = record.keywordId || record.targetId // v3 API uses targetId for keywords
-              const updateData: any = {
-                impressions: record.impressions || 0,
-                clicks: record.clicks || 0,
-                spend: record.cost || 0,
-                sales: record.sales7d || 0,
-                orders: record.purchases7d || 0,
-                sales_7d: record.sales7d || 0,
-                orders_7d: record.purchases7d || 0,
-                updated_at: new Date().toISOString()
-              }
-
-              const { error: updateError } = await supabase
-                .from('keywords')
-                .update(updateData)
-                .eq('amazon_keyword_id', keywordId)
-                .eq('connection_id', connectionId)
-
-              if (updateError) {
-                console.warn(`Failed to update keyword ${keywordId} metrics:`, updateError)
-              } else {
-                keywordMetricsUpdated++
-              }
-            } catch (error) {
-              console.warn(`Failed to process keyword performance record:`, error)
+        // Queue report for async processing
+        const { error: queueError } = await supabase
+          .from('pending_amazon_reports')
+          .insert({
+            connection_id: connectionId,
+            sync_job_id: syncJobId,
+            report_id: reportId,
+            report_type: 'keyword_performance',
+            status: 'pending',
+            configuration: {
+              dateRange,
+              timeUnit: timeUnitOpt,
+              columns: keywordColumns,
+              entityIds: [],
+              entityType: 'keywords'
             }
-          }
+          })
 
-          totalMetricsUpdated += keywordMetricsUpdated
-          console.log(`✅ Updated metrics for ${keywordMetricsUpdated} keywords`)
-          diagnostics.keywordReport = { rows: performanceData.length, timeUnit: timeUnitOpt, columns: keywordColumns }
+        if (queueError) {
+          console.error('Failed to queue keyword report:', queueError)
+          diagnostics.keywordReportError = queueError.message
+        } else {
+          console.log(`✅ Keyword report ${reportId} queued - will be processed in background`)
+          diagnostics.keywordReport = { reportId, status: 'queued' }
         }
 
         console.log('✅ Keyword performance data synced successfully')

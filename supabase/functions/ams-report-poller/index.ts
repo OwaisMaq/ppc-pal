@@ -238,6 +238,29 @@ async function processCompletedReport(
           if (!error) updated++
           break
         }
+
+        case 'keywords': {
+          const keywordId = record.keywordId || record.targetId // v3 API uses targetId for keywords
+          const updateData: any = {
+            impressions: record.impressions || 0,
+            clicks: record.clicks || 0,
+            spend: record.cost || 0,
+            sales: record.sales7d || 0,
+            orders: record.purchases7d || 0,
+            sales_7d: record.sales7d || 0,
+            orders_7d: record.purchases7d || 0,
+            updated_at: new Date().toISOString()
+          }
+
+          const { error } = await supabase
+            .from('keywords')
+            .update(updateData)
+            .eq('amazon_keyword_id', keywordId)
+            .eq('connection_id', connectionId)
+
+          if (!error) updated++
+          break
+        }
       }
     } catch (error) {
       console.warn(`Failed to process record:`, error)
