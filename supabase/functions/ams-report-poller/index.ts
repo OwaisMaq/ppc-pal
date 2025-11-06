@@ -109,7 +109,7 @@ async function processCompletedReport(
   connectionId: string,
   profileId: string
 ) {
-  console.log(`📊 Processing ${reportData.length} records for ${report.report_type}`)
+  console.log(`📊 Processing ${reportData.length} records for ${report.report_type}, entityType: ${report.configuration.entityType}`)
   
   const { timeUnit, entityType } = report.configuration
   let updated = 0
@@ -267,7 +267,7 @@ async function processCompletedReport(
     }
   }
 
-  console.log(`✅ Updated ${updated} ${entityType}`)
+  console.log(`✅ Updated ${updated} of ${reportData.length} ${entityType} records`)
   return updated
 }
 
@@ -395,20 +395,24 @@ Deno.serve(async (req) => {
         }
 
         if (reportStatus.status === 'SUCCESS' && reportStatus.url) {
+          console.log(`✅ Report ${report.report_id} ready, downloading from ${reportStatus.url}`)
+          
           // Download and process report
           const reportData = await downloadAndParseReport(reportStatus.url)
+          console.log(`📥 Downloaded ${reportData.length} records for ${report.report_type}`)
           
           // Process the data
-          await processCompletedReport(
+          const recordsUpdated = await processCompletedReport(
             supabase,
             report,
             reportData,
             report.connection_id,
             connection.profile_id
           )
+          console.log(`✅ Updated ${recordsUpdated} records in database`)
 
           // Mark as completed
-          await supabase
+          const { error: completeError } = await supabase
             .from('pending_amazon_reports')
             .update({
               status: 'completed',
@@ -416,6 +420,12 @@ Deno.serve(async (req) => {
               download_url: reportStatus.url
             })
             .eq('id', report.id)
+
+          if (completeError) {
+            console.error(`Failed to mark report ${report.report_id} as completed:`, completeError)
+          } else {
+            console.log(`✅ Marked report ${report.report_id} as completed`)
+          }
 
           results.push({ reportId: report.report_id, status: 'completed', records: reportData.length })
         } else if (reportStatus.status === 'FAILURE') {
