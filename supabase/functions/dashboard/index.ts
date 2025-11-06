@@ -41,13 +41,24 @@ interface TimeseriesPoint {
   impressions: number;
 }
 
-// Metric calculation helpers
+// Field mapping with attribution window priority
+function getFieldValue(row: any, baseField: string): number {
+  // Priority: _14d > _7d > _legacy > base field
+  const field14d = row[`${baseField}_14d`];
+  const field7d = row[`${baseField}_7d`];
+  const fieldLegacy = row[`${baseField}_legacy`];
+  const fieldBase = row[baseField];
+  
+  return field14d ?? field7d ?? fieldLegacy ?? fieldBase ?? 0;
+}
+
+// Metric calculation helpers with proper field mapping
 function calculateMetrics(row: any): Partial<DashboardKPIs> {
-  const spend = (row.cost_micros || 0) / 1e6;
-  const sales = (row.sales_7d_micros || 0) / 1e6;
+  const spend = getFieldValue(row, 'spend') || getFieldValue(row, 'cost');
+  const sales = getFieldValue(row, 'sales') || getFieldValue(row, 'attributed_sales');
   const clicks = row.clicks || 0;
   const impressions = row.impressions || 0;
-  const conversions = row.conv_7d || 0;
+  const conversions = getFieldValue(row, 'orders') || getFieldValue(row, 'attributed_conversions') || 0;
   
   return {
     spend,
@@ -254,25 +265,113 @@ Deno.serve(async (req) => {
     // Handle different endpoints
     switch (path) {
       case 'kpis': {
-        // Get aggregated data from fact table
-        const { data: factData, error: factError } = await supabase
-          .from('fact_search_term_daily')
-          .select('clicks,impressions,cost_micros,attributed_conversions_7d,attributed_sales_7d_micros')
-          .eq('profile_id', profileId)
-          .gte('date', from)
-          .lte('date', to);
-          
-        if (factError) throw factError;
+        let table: string;
+        let selectFields: string;
+        let additionalFilter = {};
         
-        // Aggregate metrics with proper null handling
-        const totals = (factData || []).reduce((acc: any, row: any) => {
-          acc.cost_micros += row.cost_micros || 0;
+        switch (level) {
+          case 'campaign':
+            table = 'campaigns';
+            selectFields = 'impressions,clicks,spend,spend_14d,spend_7d,sales,sales_14d,sales_7d,orders,orders_14d,orders_7d';
+            additionalFilter = { connection_id: connection.id };
+            break;
+          case 'ad_group':
+            table = 'ad_groups';
+            selectFields = 'impressions,clicks,spend,spend_14d,spend_7d,sales,sales_14d,sales_7d,orders,orders_14d,orders_7d';
+            if (entityId) {
+              additionalFilter = { campaign_id: entityId };
+            }
+            break;
+          case 'target':
+            table = 'targets';
+            selectFields = 'impressions,clicks,spend,spend_14d,spend_7d,sales,sales_14d,sales_7d,orders,orders_14d,orders_7d';
+            if (entityId) {
+              additionalFilter = { adgroup_id: entityId };
+            }
+            break;
+          case 'search_term':
+            table = 'keywords';
+            selectFields = 'impressions,clicks,spend,spend_14d,spend_7d,sales,sales_14d,sales_7d,orders,orders_14d,orders_7d';
+            if (entityId) {
+              additionalFilter = { adgroup_id: entityId };
+            }
+            break;
+          default:
+            throw new Error(`Unsupported level: ${level}`);
+        }
+        
+        // Query entity table
+        let query = supabase
+          .from(table)
+          .select(selectFields);
+        
+        if (level === 'campaign') {
+          query = query.eq('connection_id', connection.id);
+        } else {
+          // For sub-campaign entities, filter by profile through campaigns join
+          const { data: campaigns } = await supabase
+            .from('campaigns')
+            .select('id')
+            .eq('connection_id', connection.id);
+          
+          const campaignIds = (campaigns || []).map((c: any) => c.id);
+          if (campaignIds.length === 0) {
+            // No campaigns found, return zeros
+            const kpis: DashboardKPIs = {
+              spend: 0, sales: 0, acos: 0, roas: 0, clicks: 0,
+              impressions: 0, cpc: 0, ctr: 0, cvr: 0, conversions: 0
+            };
+            return new Response(
+              JSON.stringify({ ...kpis, duration_ms: duration }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json', 'x-request-id': requestId } }
+            );
+          }
+          
+          if (level === 'ad_group') {
+            query = query.in('campaign_id', campaignIds);
+          } else {
+            // For targets/keywords, need to filter through ad_groups
+            const { data: adGroups } = await supabase
+              .from('ad_groups')
+              .select('id')
+              .in('campaign_id', campaignIds);
+            
+            const adGroupIds = (adGroups || []).map((ag: any) => ag.id);
+            if (adGroupIds.length === 0) {
+              const kpis: DashboardKPIs = {
+                spend: 0, sales: 0, acos: 0, roas: 0, clicks: 0,
+                impressions: 0, cpc: 0, ctr: 0, cvr: 0, conversions: 0
+              };
+              return new Response(
+                JSON.stringify({ ...kpis, duration_ms: duration }),
+                { headers: { ...corsHeaders, 'Content-Type': 'application/json', 'x-request-id': requestId } }
+              );
+            }
+            
+            query = query.in('adgroup_id', adGroupIds);
+          }
+        }
+        
+        if (entityId) {
+          if (level === 'ad_group') {
+            query = query.eq('campaign_id', entityId);
+          } else if (level === 'target' || level === 'search_term') {
+            query = query.eq('adgroup_id', entityId);
+          }
+        }
+        
+        const { data: entityData, error: entityError } = await query;
+        if (entityError) throw entityError;
+        
+        // Aggregate metrics
+        const totals = (entityData || []).reduce((acc: any, row: any) => {
+          acc.spend += getFieldValue(row, 'spend');
+          acc.sales += getFieldValue(row, 'sales');
           acc.clicks += row.clicks || 0;
           acc.impressions += row.impressions || 0;
-          acc.sales_7d_micros += row.attributed_sales_7d_micros || 0;
-          acc.conv_7d += row.attributed_conversions_7d || 0;
+          acc.orders += getFieldValue(row, 'orders');
           return acc;
-        }, { cost_micros: 0, clicks: 0, impressions: 0, sales_7d_micros: 0, conv_7d: 0 });
+        }, { spend: 0, sales: 0, clicks: 0, impressions: 0, orders: 0 });
         
         const kpis = calculateMetrics(totals);
         
@@ -289,90 +388,103 @@ Deno.serve(async (req) => {
       }
       
       case 'table': {
-        // Get data from fact table grouped by entity
-        const { data: factData, error: factError } = await supabase
-          .from('fact_search_term_daily')
-          .select('campaign_id,ad_group_id,clicks,impressions,cost_micros,attributed_conversions_7d,attributed_sales_7d_micros')
-          .eq('profile_id', profileId)
-          .gte('date', from)
-          .lte('date', to);
+        let table: string;
+        let selectFields: string;
+        let idField: string;
+        let nameField: string;
         
-        if (factError) throw factError;
-        
-        // Group by entity with proper null handling
-        const grouped: Record<string, any> = {};
-        for (const row of factData || []) {
-          const key = level === 'campaign' ? row.campaign_id : row.ad_group_id;
-          if (!key) continue;
-          if (!grouped[key]) {
-            grouped[key] = {
-              id: key,
-              name: key,
-              cost_micros: 0,
-              sales_7d_micros: 0,
-              clicks: 0,
-              impressions: 0,
-              conv_7d: 0
-            };
-          }
-          grouped[key].cost_micros += row.cost_micros || 0;
-          grouped[key].clicks += row.clicks || 0;
-          grouped[key].impressions += row.impressions || 0;
-          grouped[key].sales_7d_micros += row.attributed_sales_7d_micros || 0;
-          grouped[key].conv_7d += row.attributed_conversions_7d || 0;
+        switch (level) {
+          case 'campaign':
+            table = 'campaigns';
+            selectFields = 'id,name,impressions,clicks,spend,spend_14d,spend_7d,sales,sales_14d,sales_7d,orders,orders_14d,orders_7d';
+            idField = 'id';
+            nameField = 'name';
+            break;
+          case 'ad_group':
+            table = 'ad_groups';
+            selectFields = 'id,name,impressions,clicks,spend,spend_14d,spend_7d,sales,sales_14d,sales_7d,orders,orders_14d,orders_7d';
+            idField = 'id';
+            nameField = 'name';
+            break;
+          case 'target':
+            table = 'targets';
+            selectFields = 'id,keyword_text,impressions,clicks,spend,spend_14d,spend_7d,sales,sales_14d,sales_7d,orders,orders_14d,orders_7d';
+            idField = 'id';
+            nameField = 'keyword_text';
+            break;
+          case 'search_term':
+            table = 'keywords';
+            selectFields = 'id,keyword_text,impressions,clicks,spend,spend_14d,spend_7d,sales,sales_14d,sales_7d,orders,orders_14d,orders_7d';
+            idField = 'id';
+            nameField = 'keyword_text';
+            break;
+          default:
+            throw new Error(`Unsupported level: ${level}`);
         }
-
-        // Resolve names from entity tables with fallbacks
-        const keys = Object.keys(grouped);
-        let entitiesFound = false;
         
-        if (keys.length > 0) {
-          if (level === 'campaign') {
-            const { data: entities, error: entityError } = await supabase
-              .from('entity_campaigns')
-              .select('campaign_id, name')
-              .eq('profile_id', profileId)
-              .in('campaign_id', keys);
-            
-            if (!entityError && entities && entities.length > 0) {
-              entitiesFound = true;
-              const nameMap = Object.fromEntries(entities.map((e: any) => [e.campaign_id, e.name]));
-              for (const k of keys) {
-                grouped[k].name = nameMap[k] || `Campaign ${k}`;
-              }
-            } else {
-              // Trigger entity sync in background if no entities found
-              console.log(`No campaign entities found for profile ${profileId}, triggering sync`);
-              triggerEntitySync(supabase, profileId, 'campaigns').catch(console.error);
-              for (const k of keys) grouped[k].name = `Campaign ${k}`;
+        // Query entity table
+        let query = supabase
+          .from(table)
+          .select(selectFields);
+        
+        if (level === 'campaign') {
+          query = query.eq('connection_id', connection.id);
+        } else {
+          // For sub-campaign entities, filter by profile through campaigns
+          const { data: campaigns } = await supabase
+            .from('campaigns')
+            .select('id')
+            .eq('connection_id', connection.id);
+          
+          const campaignIds = (campaigns || []).map((c: any) => c.id);
+          if (campaignIds.length === 0) {
+            return new Response(
+              JSON.stringify({ rows: [], duration_ms: duration }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json', 'x-request-id': requestId } }
+            );
+          }
+          
+          if (level === 'ad_group') {
+            query = query.in('campaign_id', campaignIds);
+            if (entityId) {
+              query = query.eq('campaign_id', entityId);
             }
-          } else if (level === 'ad_group') {
-            const { data: entities, error: entityError } = await supabase
-              .from('entity_ad_groups')
-              .select('ad_group_id, name')
-              .eq('profile_id', profileId)
-              .in('ad_group_id', keys);
+          } else {
+            // For targets/keywords, filter through ad_groups
+            const { data: adGroups } = await supabase
+              .from('ad_groups')
+              .select('id')
+              .in('campaign_id', campaignIds);
             
-            if (!entityError && entities && entities.length > 0) {
-              entitiesFound = true; 
-              const nameMap = Object.fromEntries(entities.map((e: any) => [e.ad_group_id, e.name]));
-              for (const k of keys) {
-                grouped[k].name = nameMap[k] || `Ad Group ${k}`;
-              }
-            } else {
-              // Trigger entity sync in background if no entities found
-              console.log(`No ad group entities found for profile ${profileId}, triggering sync`);
-              triggerEntitySync(supabase, profileId, 'ad_groups').catch(console.error);
-              for (const k of keys) grouped[k].name = `Ad Group ${k}`;
+            const adGroupIds = (adGroups || []).map((ag: any) => ag.id);
+            if (adGroupIds.length === 0) {
+              return new Response(
+                JSON.stringify({ rows: [], duration_ms: duration }),
+                { headers: { ...corsHeaders, 'Content-Type': 'application/json', 'x-request-id': requestId } }
+              );
+            }
+            
+            query = query.in('adgroup_id', adGroupIds);
+            if (entityId) {
+              query = query.eq('adgroup_id', entityId);
             }
           }
         }
-
-        // Sort and limit
-        const rows = Object.values(grouped)
-          .map((item: any) => ({ ...item, ...calculateMetrics(item) }))
-          .sort((a: any, b: any) => (b[sort] ?? 0) - (a[sort] ?? 0))
-          .slice(0, limit);
+        
+        query = query.limit(limit);
+        
+        const { data: entityData, error: entityError } = await query;
+        if (entityError) throw entityError;
+        
+        // Transform to table rows
+        const rows = (entityData || []).map((row: any) => {
+          const metrics = calculateMetrics(row);
+          return {
+            id: row[idField],
+            name: row[nameField] || `${level} ${row[idField]}`,
+            ...metrics
+          };
+        }).sort((a: any, b: any) => (b[sort] ?? 0) - (a[sort] ?? 0));
         
         return new Response(
           JSON.stringify({ rows, duration_ms: duration }),
@@ -393,40 +505,48 @@ Deno.serve(async (req) => {
             { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'x-request-id': requestId } }
           );
         }
-        const idCol = level === 'campaign' ? 'campaign_id' : 'ad_group_id';
         
-        // Get data from fact table for the specific entity
-        const { data: factData, error: factError } = await supabase
-          .from('fact_search_term_daily')
-          .select('date,clicks,impressions,cost_micros,attributed_conversions_7d,attributed_sales_7d_micros')
-          .eq('profile_id', profileId)
+        let table: string;
+        let selectFields: string;
+        let idCol: string;
+        
+        switch (level) {
+          case 'campaign':
+            table = 'campaign_performance_history';
+            selectFields = 'date,impressions,clicks,spend,sales,orders';
+            idCol = 'campaign_id';
+            break;
+          case 'ad_group':
+            table = 'adgroup_performance_history';
+            selectFields = 'date,impressions,clicks,spend,sales,orders';
+            idCol = 'adgroup_id';
+            break;
+          default:
+            // For target/keyword/search_term, return empty for now or could aggregate from fact tables
+            return new Response(
+              JSON.stringify({ points: [], duration_ms: duration }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json', 'x-request-id': requestId } }
+            );
+        }
+        
+        // Query history table
+        const { data: historyData, error: historyError } = await supabase
+          .from(table)
+          .select(selectFields)
           .eq(idCol, entityId)
+          .eq('attribution_window', '14d')
           .gte('date', from)
           .lte('date', to)
           .order('date');
           
-        if (factError) throw factError;
+        if (historyError) throw historyError;
 
-        // Group by date with proper null handling
-        const timeseries: Record<string, any> = {};
-        
-        for (const row of factData || []) {
-          const dateKey = row.date;
-          if (!timeseries[dateKey]) {
-            timeseries[dateKey] = { date: dateKey, cost_micros: 0, sales_7d_micros: 0, clicks: 0, impressions: 0 };
-          }
-          timeseries[dateKey].cost_micros += row.cost_micros || 0;
-          timeseries[dateKey].clicks += row.clicks || 0;
-          timeseries[dateKey].impressions += row.impressions || 0;
-          timeseries[dateKey].sales_7d_micros += row.attributed_sales_7d_micros || 0;
-        }
-
-        const points = Object.values(timeseries).map((item: any) => ({
-          date: item.date,
-          spend: item.cost_micros / 1e6,
-          sales: item.sales_7d_micros / 1e6,
-          clicks: item.clicks,
-          impressions: item.impressions
+        const points = (historyData || []).map((row: any) => ({
+          date: row.date,
+          spend: row.spend || 0,
+          sales: row.sales || 0,
+          clicks: row.clicks || 0,
+          impressions: row.impressions || 0
         }));
 
         return new Response(
