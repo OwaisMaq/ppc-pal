@@ -24,30 +24,12 @@ export const useAuth = () => {
   return context;
 };
 
-// Comprehensive cleanup function to remove all auth data
+// Only cleanup on explicit sign out - don't touch valid session data
 const cleanupAuthState = () => {
-  console.log('AuthProvider: Performing comprehensive auth state cleanup');
+  console.log('AuthProvider: Cleaning up auth state on sign out');
   
   try {
-    // Remove all Supabase auth keys from localStorage
-    Object.keys(localStorage).forEach((key) => {
-      if (key.startsWith('supabase.auth.') || key.includes('sb-') || 
-          key.startsWith('supabase-auth-') || key.includes('supabase_auth')) {
-        console.log('AuthProvider: Removing localStorage key:', key);
-        localStorage.removeItem(key);
-      }
-    });
-    
-    // Remove from sessionStorage
-    Object.keys(sessionStorage || {}).forEach((key) => {
-      if (key.startsWith('supabase.auth.') || key.includes('sb-') ||
-          key.startsWith('supabase-auth-') || key.includes('supabase_auth')) {
-        console.log('AuthProvider: Removing sessionStorage key:', key);
-        sessionStorage.removeItem(key);
-      }
-    });
-
-    // Clear auth-related cookies that might be causing the size issue
+    // Only clear cookies, leave localStorage alone (Supabase manages it)
     const cookiesToClear = [
       'sb-access-token',
       'sb-refresh-token', 
@@ -57,18 +39,15 @@ const cleanupAuthState = () => {
     ];
     
     cookiesToClear.forEach(cookieName => {
-      // Clear cookie for current domain
       document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
-      // Clear for subdomain
       document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${window.location.hostname};`;
-      // Clear for root domain
       const rootDomain = window.location.hostname.split('.').slice(-2).join('.');
       if (rootDomain !== window.location.hostname) {
         document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.${rootDomain};`;
       }
     });
 
-    console.log('AuthProvider: Auth cleanup completed successfully');
+    console.log('AuthProvider: Auth cleanup completed');
   } catch (error) {
     console.error('AuthProvider: Error during auth cleanup:', error);
   }

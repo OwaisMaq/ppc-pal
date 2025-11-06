@@ -12,7 +12,17 @@ export const useAmazonData = () => {
   const [targets, setTargets] = useState<Target[]>([]);
   const [loading, setLoading] = useState(false);
   const [lastSyncDiagnostics, setLastSyncDiagnostics] = useState<any | null>(null);
-  const [initialSyncAttempted, setInitialSyncAttempted] = useState(false);
+  
+  // Use localStorage to persist sync attempt across refreshes
+  const getInitialSyncAttempted = () => {
+    try {
+      return localStorage.getItem('ppcpal_initial_sync_attempted') === 'true';
+    } catch {
+      return false;
+    }
+  };
+  
+  const [initialSyncAttempted, setInitialSyncAttempted] = useState(getInitialSyncAttempted());
 
   useEffect(() => {
     console.log('useAmazonData useEffect triggered, user:', user?.id);
@@ -46,7 +56,12 @@ export const useAmazonData = () => {
       // Skip if explicitly disabled to prevent loops
       if (!skipAutoSync && !initialSyncAttempted && campaignCount === 0) {
         console.log('Checking for auto-sync conditions...');
-        setInitialSyncAttempted(true); // Set immediately to prevent race conditions
+        setInitialSyncAttempted(true);
+        try {
+          localStorage.setItem('ppcpal_initial_sync_attempted', 'true');
+        } catch (e) {
+          console.warn('Could not persist sync attempt flag:', e);
+        }
         
         try {
           const { data: conns } = await supabase

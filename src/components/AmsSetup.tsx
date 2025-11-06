@@ -306,14 +306,6 @@ export default function AmsSetup() {
               </div>
             </div>
 
-            {/* Data Freshness Indicator */}
-            {selectedConnectionId && (
-              <DataFreshnessIndicator 
-                connectionId={selectedConnectionId}
-                className="pb-4 border-b border-border/50"
-              />
-            )}
-
             <div className="rounded-md border border-blue-200 bg-blue-50 p-4 mb-4">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0">

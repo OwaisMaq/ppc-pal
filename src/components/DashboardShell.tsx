@@ -4,6 +4,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+import { HeaderSyncStatus } from "@/components/HeaderSyncStatus";
 
 const DashboardShell = ({ children }: PropsWithChildren) => {
   const { user, signOut } = useAuth();
@@ -19,6 +20,7 @@ const DashboardShell = ({ children }: PropsWithChildren) => {
               <div className="flex-1 max-w-xl">
                 <Input placeholder="Search…" className="h-9" />
               </div>
+              <HeaderSyncStatus />
               {user && (
                 <div className="flex items-center gap-2">
                   <span className="hidden sm:block text-xs text-muted-foreground">{user.email}</span>
