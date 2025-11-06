@@ -82,22 +82,49 @@ serve(async (req) => {
     }
 
     const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
     
-    if (authError || !user) {
-      throw new Error('Invalid authorization')
+    // Try to parse request body
+    const body = await req.json()
+    const connectionId = body.connectionId
+    const profileId = body.profileId
+    
+    console.log('Refreshing token for:', { connectionId, profileId })
+
+    // Determine if this is a service role call or user call
+    let userId: string | undefined
+    
+    if (token === Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')) {
+      // Service role call - no user context needed
+      console.log('Service role call detected')
+    } else {
+      // User call - verify authentication
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+      
+      if (authError || !user) {
+        throw new Error('Invalid authorization')
+      }
+      
+      userId = user.id
     }
 
-    const { connectionId } = await req.json()
-    console.log('Refreshing token for connection:', connectionId)
-
     // Get the connection details (using service role)
-    const { data: connection, error: connectionError } = await supabase
+    const query = supabase
       .from('amazon_connections')
       .select('id, user_id, profile_id, status')
-      .eq('id', connectionId)
-      .eq('user_id', user.id)
-      .single()
+    
+    if (connectionId) {
+      query.eq('id', connectionId)
+    } else if (profileId) {
+      query.eq('profile_id', profileId)
+    } else {
+      throw new Error('Either connectionId or profileId must be provided')
+    }
+    
+    if (userId) {
+      query.eq('user_id', userId)
+    }
+    
+    const { data: connection, error: connectionError } = await query.single()
 
     if (connectionError || !connection) {
       throw new Error('Connection not found')
@@ -209,7 +236,7 @@ serve(async (req) => {
     // Update tokens in secure storage using the correct RPC function
     const { error: updateError } = await supabase
       .rpc('store_tokens_with_key', {
-        p_user_id: user.id,
+        p_user_id: connection.user_id,
         p_profile_id: connection.profile_id,
         p_access_token: tokenData.access_token,
         p_refresh_token: tokenData.refresh_token || tokens.refresh_token,

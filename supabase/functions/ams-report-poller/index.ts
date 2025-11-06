@@ -354,12 +354,21 @@ Deno.serve(async (req) => {
           if (error instanceof Error && error.message.includes('401')) {
             console.log('🔄 Token expired, refreshing...')
             
-            const { error: refreshError } = await supabase.functions.invoke('refresh-amazon-token', {
-              body: { profileId: connection.profile_id }
+            const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+            const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+            
+            const refreshResponse = await fetch(`${supabaseUrl}/functions/v1/refresh-amazon-token`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${serviceRoleKey}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ profileId: connection.profile_id })
             })
-
-            if (refreshError) {
-              throw new Error(`Token refresh failed: ${refreshError.message}`)
+            
+            if (!refreshResponse.ok) {
+              const refreshError = await refreshResponse.text()
+              throw new Error(`Token refresh failed: ${refreshError}`)
             }
 
             // Get new token
