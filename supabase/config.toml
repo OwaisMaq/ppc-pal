@@ -105,3 +105,7 @@ verify_jwt = false
 
 [functions.refresh-amazon-token]
 verify_jwt = true
+
+[functions.historical-import]
+verify_jwt = true
+

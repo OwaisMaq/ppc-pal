@@ -10,12 +10,15 @@ import { Download, Trash2, Shield, Database, Calendar, FileText } from 'lucide-r
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAmazonConnections } from '@/hooks/useAmazonConnections';
+import { HistoricalDataImport } from '@/components/HistoricalDataImport';
 
 const DataManagement = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isDeleting, setIsDeleting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const { connections } = useAmazonConnections();
 
   const handleExportData = async () => {
     if (!user) return;
@@ -170,6 +173,11 @@ const DataManagement = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Historical Data Import */}
+          {connections && connections.length > 0 && (
+            <HistoricalDataImport profileId={connections[0].profile_id} />
+          )}
 
           {/* Data Export */}
           <Card>
