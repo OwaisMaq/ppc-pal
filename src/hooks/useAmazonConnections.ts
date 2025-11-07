@@ -13,7 +13,10 @@ export const useAmazonConnections = () => {
   useEffect(() => {
     if (user) {
       console.log('useAmazonConnections: Fetching connections for user:', user.id);
-      fetchConnections();
+      fetchConnections().then(() => {
+        // Auto-refresh expired/expiring tokens on login
+        autoRefreshExpiredTokens();
+      });
     }
   }, [user]);
 
@@ -407,6 +410,25 @@ export const useAmazonConnections = () => {
       return false;
     } finally {
       setLoading(false);
+    }
+  };
+
+  const autoRefreshExpiredTokens = async () => {
+    const now = Date.now();
+    const expiringSoon = 5 * 60 * 1000; // 5 minutes buffer
+
+    for (const conn of connections) {
+      const expiresAt = new Date(conn.token_expires_at).getTime();
+      const needsRefresh = (expiresAt - now) < expiringSoon;
+      
+      if (needsRefresh && conn.status === 'active') {
+        console.log(`Auto-refreshing token for connection ${conn.id} (expires at ${conn.token_expires_at})`);
+        try {
+          await refreshConnection(conn.id);
+        } catch (error) {
+          console.error(`Auto-refresh failed for ${conn.id}:`, error);
+        }
+      }
     }
   };
 
