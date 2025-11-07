@@ -119,11 +119,22 @@ async function processCompletedReport(
       switch (entityType) {
         case 'campaigns': {
           const updateData: any = {
+            // Update both legacy and attribution-windowed fields
             impressions: record.impressions || 0,
+            impressions_7d: record.impressions || 0,
+            impressions_14d: record.impressions || 0,
             clicks: record.clicks || 0,
+            clicks_7d: record.clicks || 0,
+            clicks_14d: record.clicks || 0,
             cost_legacy: record.cost || 0,
+            cost_7d: record.cost || 0,
+            cost_14d: record.cost || 0,
             attributed_sales_legacy: record.sales7d || 0,
+            attributed_sales_7d: record.sales7d || 0,
+            attributed_sales_14d: record.sales7d || 0,
             attributed_conversions_legacy: record.purchases7d || 0,
+            attributed_conversions_7d: record.purchases7d || 0,
+            attributed_conversions_14d: record.purchases7d || 0,
             updated_at: new Date().toISOString()
           }
 
@@ -169,11 +180,22 @@ async function processCompletedReport(
 
         case 'adGroups': {
           const updateData: any = {
+            // Update both legacy and attribution-windowed fields
             impressions: record.impressions || 0,
+            impressions_7d: record.impressions || 0,
+            impressions_14d: record.impressions || 0,
             clicks: record.clicks || 0,
+            clicks_7d: record.clicks || 0,
+            clicks_14d: record.clicks || 0,
             spend: record.cost || 0,
+            spend_7d: record.cost || 0,
+            spend_14d: record.cost || 0,
             sales: record.sales7d || 0,
+            sales_7d: record.sales7d || 0,
+            sales_14d: record.sales7d || 0,
             orders: record.purchases7d || 0,
+            orders_7d: record.purchases7d || 0,
+            orders_14d: record.purchases7d || 0,
             updated_at: new Date().toISOString()
           }
 
@@ -221,11 +243,22 @@ async function processCompletedReport(
 
         case 'targets': {
           const updateData: any = {
+            // Update both legacy and attribution-windowed fields
             impressions: record.impressions || 0,
+            impressions_7d: record.impressions || 0,
+            impressions_14d: record.impressions || 0,
             clicks: record.clicks || 0,
+            clicks_7d: record.clicks || 0,
+            clicks_14d: record.clicks || 0,
             spend: record.cost || 0,
+            spend_7d: record.cost || 0,
+            spend_14d: record.cost || 0,
             sales: record.sales7d || 0,
+            sales_7d: record.sales7d || 0,
+            sales_14d: record.sales7d || 0,
             orders: record.purchases7d || 0,
+            orders_7d: record.purchases7d || 0,
+            orders_14d: record.purchases7d || 0,
             updated_at: new Date().toISOString()
           }
 
@@ -242,13 +275,22 @@ async function processCompletedReport(
         case 'keywords': {
           const keywordId = record.keywordId || record.targetId // v3 API uses targetId for keywords
           const updateData: any = {
+            // Update both legacy and attribution-windowed fields
             impressions: record.impressions || 0,
+            impressions_7d: record.impressions || 0,
+            impressions_14d: record.impressions || 0,
             clicks: record.clicks || 0,
+            clicks_7d: record.clicks || 0,
+            clicks_14d: record.clicks || 0,
             spend: record.cost || 0,
+            spend_7d: record.cost || 0,
+            spend_14d: record.cost || 0,
             sales: record.sales7d || 0,
-            orders: record.purchases7d || 0,
             sales_7d: record.sales7d || 0,
+            sales_14d: record.sales7d || 0,
+            orders: record.purchases7d || 0,
             orders_7d: record.purchases7d || 0,
+            orders_14d: record.purchases7d || 0,
             updated_at: new Date().toISOString()
           }
 
@@ -394,7 +436,8 @@ Deno.serve(async (req) => {
           }
         }
 
-        if (reportStatus.status === 'SUCCESS' && reportStatus.url) {
+        // Amazon v3 API returns 'COMPLETED' instead of 'SUCCESS'
+        if ((reportStatus.status === 'SUCCESS' || reportStatus.status === 'COMPLETED') && reportStatus.url) {
           console.log(`✅ Report ${report.report_id} ready, downloading from ${reportStatus.url}`)
           
           // Download and process report
@@ -428,7 +471,7 @@ Deno.serve(async (req) => {
           }
 
           results.push({ reportId: report.report_id, status: 'completed', records: reportData.length })
-        } else if (reportStatus.status === 'FAILURE') {
+        } else if (reportStatus.status === 'FAILURE' || reportStatus.status === 'FATAL') {
           // Mark as failed
           await supabase
             .from('pending_amazon_reports')
