@@ -43,22 +43,21 @@ interface TimeseriesPoint {
 
 // Field mapping with attribution window priority
 function getFieldValue(row: any, baseField: string): number {
-  // Priority: _14d > _7d > _legacy > base field
+  // Priority: _14d > _7d > _legacy
   const field14d = row[`${baseField}_14d`];
   const field7d = row[`${baseField}_7d`];
   const fieldLegacy = row[`${baseField}_legacy`];
-  const fieldBase = row[baseField];
   
-  return field14d ?? field7d ?? fieldLegacy ?? fieldBase ?? 0;
+  return field14d ?? field7d ?? fieldLegacy ?? 0;
 }
 
 // Metric calculation helpers with proper field mapping
 function calculateMetrics(row: any): Partial<DashboardKPIs> {
-  const spend = getFieldValue(row, 'spend') || getFieldValue(row, 'cost');
-  const sales = getFieldValue(row, 'sales') || getFieldValue(row, 'attributed_sales');
-  const clicks = row.clicks || 0;
-  const impressions = row.impressions || 0;
-  const conversions = getFieldValue(row, 'orders') || getFieldValue(row, 'attributed_conversions') || 0;
+  const spend = getFieldValue(row, 'cost');
+  const sales = getFieldValue(row, 'attributed_sales');
+  const clicks = row.clicks || row.clicks_14d || row.clicks_7d || 0;
+  const impressions = row.impressions || row.impressions_14d || row.impressions_7d || 0;
+  const conversions = getFieldValue(row, 'attributed_conversions');
   
   return {
     spend,
@@ -272,26 +271,26 @@ Deno.serve(async (req) => {
         switch (level) {
           case 'campaign':
             table = 'campaigns';
-            selectFields = 'impressions,clicks,spend,spend_14d,spend_7d,sales,sales_14d,sales_7d,orders,orders_14d,orders_7d';
+            selectFields = 'impressions,clicks,impressions_14d,impressions_7d,clicks_14d,clicks_7d,cost_legacy,cost_14d,cost_7d,attributed_sales_legacy,attributed_sales_14d,attributed_sales_7d,attributed_conversions_legacy,attributed_conversions_14d,attributed_conversions_7d';
             additionalFilter = { connection_id: connection.id };
             break;
           case 'ad_group':
             table = 'ad_groups';
-            selectFields = 'impressions,clicks,spend,spend_14d,spend_7d,sales,sales_14d,sales_7d,orders,orders_14d,orders_7d';
+            selectFields = 'impressions,clicks,impressions_14d,impressions_7d,clicks_14d,clicks_7d,cost_legacy,cost_14d,cost_7d,attributed_sales_legacy,attributed_sales_14d,attributed_sales_7d,attributed_conversions_legacy,attributed_conversions_14d,attributed_conversions_7d';
             if (entityId) {
               additionalFilter = { campaign_id: entityId };
             }
             break;
           case 'target':
             table = 'targets';
-            selectFields = 'impressions,clicks,spend,spend_14d,spend_7d,sales,sales_14d,sales_7d,orders,orders_14d,orders_7d';
+            selectFields = 'impressions,clicks,impressions_14d,impressions_7d,clicks_14d,clicks_7d,cost_legacy,cost_14d,cost_7d,attributed_sales_legacy,attributed_sales_14d,attributed_sales_7d,attributed_conversions_legacy,attributed_conversions_14d,attributed_conversions_7d';
             if (entityId) {
               additionalFilter = { adgroup_id: entityId };
             }
             break;
           case 'search_term':
             table = 'keywords';
-            selectFields = 'impressions,clicks,spend,spend_14d,spend_7d,sales,sales_14d,sales_7d,orders,orders_14d,orders_7d';
+            selectFields = 'impressions,clicks,impressions_14d,impressions_7d,clicks_14d,clicks_7d,cost_legacy,cost_14d,cost_7d,attributed_sales_legacy,attributed_sales_14d,attributed_sales_7d,attributed_conversions_legacy,attributed_conversions_14d,attributed_conversions_7d';
             if (entityId) {
               additionalFilter = { adgroup_id: entityId };
             }
@@ -365,13 +364,13 @@ Deno.serve(async (req) => {
         
         // Aggregate metrics
         const totals = (entityData || []).reduce((acc: any, row: any) => {
-          acc.spend += getFieldValue(row, 'spend');
-          acc.sales += getFieldValue(row, 'sales');
-          acc.clicks += row.clicks || 0;
-          acc.impressions += row.impressions || 0;
-          acc.orders += getFieldValue(row, 'orders');
+          acc.cost += getFieldValue(row, 'cost');
+          acc.attributed_sales += getFieldValue(row, 'attributed_sales');
+          acc.clicks += row.clicks || row.clicks_14d || row.clicks_7d || 0;
+          acc.impressions += row.impressions || row.impressions_14d || row.impressions_7d || 0;
+          acc.attributed_conversions += getFieldValue(row, 'attributed_conversions');
           return acc;
-        }, { spend: 0, sales: 0, clicks: 0, impressions: 0, orders: 0 });
+        }, { cost: 0, attributed_sales: 0, clicks: 0, impressions: 0, attributed_conversions: 0 });
         
         const kpis = calculateMetrics(totals);
         
@@ -396,25 +395,25 @@ Deno.serve(async (req) => {
         switch (level) {
           case 'campaign':
             table = 'campaigns';
-            selectFields = 'id,name,impressions,clicks,spend,spend_14d,spend_7d,sales,sales_14d,sales_7d,orders,orders_14d,orders_7d';
+            selectFields = 'id,name,impressions,clicks,impressions_14d,impressions_7d,clicks_14d,clicks_7d,cost_legacy,cost_14d,cost_7d,attributed_sales_legacy,attributed_sales_14d,attributed_sales_7d,attributed_conversions_legacy,attributed_conversions_14d,attributed_conversions_7d';
             idField = 'id';
             nameField = 'name';
             break;
           case 'ad_group':
             table = 'ad_groups';
-            selectFields = 'id,name,impressions,clicks,spend,spend_14d,spend_7d,sales,sales_14d,sales_7d,orders,orders_14d,orders_7d';
+            selectFields = 'id,name,impressions,clicks,impressions_14d,impressions_7d,clicks_14d,clicks_7d,cost_legacy,cost_14d,cost_7d,attributed_sales_legacy,attributed_sales_14d,attributed_sales_7d,attributed_conversions_legacy,attributed_conversions_14d,attributed_conversions_7d';
             idField = 'id';
             nameField = 'name';
             break;
           case 'target':
             table = 'targets';
-            selectFields = 'id,keyword_text,impressions,clicks,spend,spend_14d,spend_7d,sales,sales_14d,sales_7d,orders,orders_14d,orders_7d';
+            selectFields = 'id,keyword_text,impressions,clicks,impressions_14d,impressions_7d,clicks_14d,clicks_7d,cost_legacy,cost_14d,cost_7d,attributed_sales_legacy,attributed_sales_14d,attributed_sales_7d,attributed_conversions_legacy,attributed_conversions_14d,attributed_conversions_7d';
             idField = 'id';
             nameField = 'keyword_text';
             break;
           case 'search_term':
             table = 'keywords';
-            selectFields = 'id,keyword_text,impressions,clicks,spend,spend_14d,spend_7d,sales,sales_14d,sales_7d,orders,orders_14d,orders_7d';
+            selectFields = 'id,keyword_text,impressions,clicks,impressions_14d,impressions_7d,clicks_14d,clicks_7d,cost_legacy,cost_14d,cost_7d,attributed_sales_legacy,attributed_sales_14d,attributed_sales_7d,attributed_conversions_legacy,attributed_conversions_14d,attributed_conversions_7d';
             idField = 'id';
             nameField = 'keyword_text';
             break;
