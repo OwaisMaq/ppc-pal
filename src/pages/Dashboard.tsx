@@ -11,11 +11,23 @@ import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { useState } from "react";
 const Dashboard = () => {
   const { connections } = useAmazonConnections();
-  const hasActiveConnections = connections.some(c => {
+  
+  // Check if there are ANY connections (even expired ones)
+  const hasConnections = connections.length > 0;
+  
+  // Check if tokens are healthy (not expired)
+  const hasHealthyTokens = connections.some(c => {
     const status = typeof c?.status === 'string' ? c.status.toLowerCase().trim() : String(c?.status ?? '');
     const tokenOk = c?.token_expires_at ? new Date(c.token_expires_at) > new Date() : true;
     return tokenOk && (status === 'active' || status === 'setup_required' || status === 'pending');
   });
+  
+  // Check if any tokens are expired
+  const hasExpiredTokens = connections.some(c => {
+    const tokenOk = c?.token_expires_at ? new Date(c.token_expires_at) > new Date() : true;
+    return !tokenOk;
+  });
+  
   const [selectedASIN, setSelectedASIN] = useState<string | null>(null);
   return (
     <DashboardShell>
@@ -31,7 +43,7 @@ const Dashboard = () => {
           </div>
           
           {/* ASIN Filter */}
-          {hasActiveConnections && (
+          {hasConnections && (
             <div className="mt-4">
               <div className="flex items-center gap-3">
                 <span className="text-sm font-medium text-muted-foreground">Filter by ASIN:</span>
@@ -45,11 +57,11 @@ const Dashboard = () => {
         </div>
 
         <div className="space-y-6">
-          {!hasActiveConnections && (
+          {!hasConnections && (
             <Card className="border-amber-200 bg-amber-50">
               <CardContent className="pt-6">
                 <p className="text-sm text-amber-800">
-                  No active Amazon connections. Please connect your account in Settings.
+                  No Amazon connections found. Please connect your account in Settings.
                 </p>
                 <div className="mt-3">
                   <Button asChild>
@@ -59,8 +71,23 @@ const Dashboard = () => {
               </CardContent>
             </Card>
           )}
+          
+          {hasConnections && hasExpiredTokens && (
+            <Card className="border-amber-200 bg-amber-50">
+              <CardContent className="pt-6">
+                <p className="text-sm text-amber-800">
+                  Your Amazon connection has expired. You can still view historical data, but you'll need to refresh your connection to sync new data.
+                </p>
+                <div className="mt-3">
+                  <Button asChild variant="outline">
+                    <Link to="/settings">Refresh Connection</Link>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-          {hasActiveConnections && (
+          {hasConnections && (
             <Tabs defaultValue="performance" className="w-full">
               <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="performance">Performance</TabsTrigger>
