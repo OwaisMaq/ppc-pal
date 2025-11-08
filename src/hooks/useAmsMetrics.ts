@@ -2,6 +2,15 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
+export interface TimeseriesDataPoint {
+  date: string;
+  spend: number;
+  sales: number;
+  clicks: number;
+  impressions: number;
+  orders: number;
+}
+
 export interface AmsMetrics {
   totalSpend: number;
   totalSales: number;
@@ -16,6 +25,7 @@ export interface AmsMetrics {
   campaignCount: number;
   lastMessageAt: string | null;
   messageCount24h: number;
+  timeseries: TimeseriesDataPoint[];
 }
 
 export interface AmsEntityData {
@@ -115,6 +125,45 @@ export const useAmsMetrics = (connectionId?: string, from?: Date, to?: Date) => 
       const cpc = totalClicks > 0 ? totalSpend / totalClicks : 0;
       const conversionRate = totalClicks > 0 ? (totalOrders / totalClicks) * 100 : 0;
 
+      // Aggregate time-series data by date
+      const timeseriesMap = new Map<string, TimeseriesDataPoint>();
+      
+      // Process traffic data
+      (trafficData || []).forEach(row => {
+        const date = new Date(row.hour_start).toISOString().split('T')[0];
+        const existing = timeseriesMap.get(date) || {
+          date,
+          spend: 0,
+          sales: 0,
+          clicks: 0,
+          impressions: 0,
+          orders: 0
+        };
+        existing.spend += Number(row.cost || 0);
+        existing.clicks += row.clicks || 0;
+        existing.impressions += row.impressions || 0;
+        timeseriesMap.set(date, existing);
+      });
+      
+      // Process conversion data
+      (conversionData || []).forEach(row => {
+        const date = new Date(row.hour_start).toISOString().split('T')[0];
+        const existing = timeseriesMap.get(date) || {
+          date,
+          spend: 0,
+          sales: 0,
+          clicks: 0,
+          impressions: 0,
+          orders: 0
+        };
+        existing.sales += Number(row.attributed_sales || 0);
+        existing.orders += row.attributed_conversions || 0;
+        timeseriesMap.set(date, existing);
+      });
+      
+      // Convert to sorted array
+      const timeseries = Array.from(timeseriesMap.values())
+        .sort((a, b) => a.date.localeCompare(b.date));
 
       // Get message stats for freshness indicators
       const { data: recentMessages } = await supabase
@@ -145,6 +194,7 @@ export const useAmsMetrics = (connectionId?: string, from?: Date, to?: Date) => 
         campaignCount: campaigns ? campaigns.length : 0,
         lastMessageAt: recentMessages?.[0]?.received_at || null,
         messageCount24h: messageCount24h || 0,
+        timeseries,
       });
 
       const campaignData: AmsEntityData[] = (campaigns || []).map(campaign => {

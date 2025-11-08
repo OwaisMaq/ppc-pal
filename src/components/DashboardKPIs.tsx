@@ -6,19 +6,23 @@ import { ChevronDown, ChevronRight, DollarSign, Target, BarChart3 } from "lucide
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import KpiChip from "./KpiChip";
 import { DashboardKPIs as KPIData } from "@/hooks/useDashboardData";
+import { TimeseriesDataPoint } from "@/hooks/useAmsMetrics";
+import { LineChart, Line, ResponsiveContainer } from "recharts";
 
 interface DashboardKPIsProps {
   data: KPIData | null;
   loading: boolean;
   error: string | null;
   previousData?: KPIData | null; // For delta calculations
+  timeseries?: TimeseriesDataPoint[];
 }
 
 export const DashboardKPIs: React.FC<DashboardKPIsProps> = ({
   data,
   loading,
   error,
-  previousData
+  previousData,
+  timeseries = []
 }) => {
   const [showSecondary, setShowSecondary] = useState(false);
   const formatCurrency = (value: number) => `$${value.toFixed(2)}`;
@@ -69,25 +73,33 @@ export const DashboardKPIs: React.FC<DashboardKPIsProps> = ({
       label: "Spend",
       value: formatCurrency(data.spend),
       change: previousData ? calculateChange(data.spend, previousData.spend) : undefined,
-      category: "Performance"
+      category: "Performance",
+      sparklineData: timeseries.map(d => ({ value: d.spend }))
     },
     {
       label: "Sales", 
       value: formatCurrency(data.sales),
       change: previousData ? calculateChange(data.sales, previousData.sales) : undefined,
-      category: "Performance"
+      category: "Performance",
+      sparklineData: timeseries.map(d => ({ value: d.sales }))
     },
     {
       label: "ACOS",
       value: formatPercentage(data.acos),
       change: previousData ? calculateChange(data.acos, previousData.acos) : undefined,
-      category: "Efficiency"
+      category: "Efficiency",
+      sparklineData: timeseries.map(d => ({ 
+        value: d.sales > 0 ? (d.spend / d.sales) * 100 : 0 
+      }))
     },
     {
       label: "ROAS",
       value: data.roas.toFixed(2),
       change: previousData ? calculateChange(data.roas, previousData.roas) : undefined,
-      category: "Efficiency"
+      category: "Efficiency",
+      sparklineData: timeseries.map(d => ({ 
+        value: d.spend > 0 ? d.sales / d.spend : 0 
+      }))
     }
   ];
 
@@ -96,31 +108,42 @@ export const DashboardKPIs: React.FC<DashboardKPIsProps> = ({
       label: "Clicks",
       value: formatNumber(data.clicks),
       change: previousData ? calculateChange(data.clicks, previousData.clicks) : undefined,
-      category: "Volume"
+      category: "Volume",
+      sparklineData: timeseries.map(d => ({ value: d.clicks }))
     },
     {
       label: "Impressions", 
       value: formatNumber(data.impressions),
       change: previousData ? calculateChange(data.impressions, previousData.impressions) : undefined,
-      category: "Volume"
+      category: "Volume",
+      sparklineData: timeseries.map(d => ({ value: d.impressions }))
     },
     {
       label: "CPC",
       value: formatCurrency(data.cpc),
       change: previousData ? calculateChange(data.cpc, previousData.cpc) : undefined,
-      category: "Efficiency"
+      category: "Efficiency",
+      sparklineData: timeseries.map(d => ({ 
+        value: d.clicks > 0 ? d.spend / d.clicks : 0 
+      }))
     },
     {
       label: "CTR",
       value: formatPercentage(data.ctr),
       change: previousData ? calculateChange(data.ctr, previousData.ctr) : undefined,
-      category: "Volume"
+      category: "Volume",
+      sparklineData: timeseries.map(d => ({ 
+        value: d.impressions > 0 ? (d.clicks / d.impressions) * 100 : 0 
+      }))
     },
     {
       label: "CVR",
       value: formatPercentage(data.cvr),
       change: previousData ? calculateChange(data.cvr, previousData.cvr) : undefined,
-      category: "Efficiency"
+      category: "Efficiency",
+      sparklineData: timeseries.map(d => ({ 
+        value: d.clicks > 0 ? (d.orders / d.clicks) * 100 : 0 
+      }))
     }
   ];
 
@@ -149,8 +172,9 @@ export const DashboardKPIs: React.FC<DashboardKPIsProps> = ({
             label={kpi.label}
             value={kpi.value}
             change={kpi.change}
-            className="h-24 md:h-20"
+            className="h-32 md:h-28"
             primary
+            sparklineData={kpi.sparklineData}
           />
         ))}
       </div>
@@ -183,8 +207,9 @@ export const DashboardKPIs: React.FC<DashboardKPIsProps> = ({
                         label={kpi.label}
                         value={kpi.value}
                         change={kpi.change}
-                        className="h-16 text-sm"
+                        className="h-24 text-sm"
                         compact
+                        sparklineData={kpi.sparklineData}
                       />
                     ))}
                   </div>

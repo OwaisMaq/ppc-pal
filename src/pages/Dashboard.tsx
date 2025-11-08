@@ -178,6 +178,7 @@ const Dashboard = () => {
               loading={metricsLoading}
               error={metricsError}
               previousData={comparisonKpiData}
+              timeseries={metrics?.timeseries}
             />
           </div>
         )}
