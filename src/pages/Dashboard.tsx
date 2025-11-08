@@ -4,6 +4,7 @@ import { DashboardKPIs } from "@/components/DashboardKPIs";
 import { DashboardChart } from "@/components/DashboardChart";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { ComparisonModeSelector, ComparisonMode } from "@/components/ComparisonModeSelector";
+import ActionsFeed from "@/components/ActionsFeed";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
@@ -189,6 +190,13 @@ const Dashboard = () => {
               error={metricsError}
               granularity="day"
             />
+          </div>
+        )}
+
+        {/* Actions Feed */}
+        {hasConnections && (
+          <div className="mb-6">
+            <ActionsFeed />
           </div>
         )}
 
