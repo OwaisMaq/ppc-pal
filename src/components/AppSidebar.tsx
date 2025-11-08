@@ -11,14 +11,14 @@ import {
   SidebarMenuItem,
   SidebarMenuButton
 } from "@/components/ui/sidebar";
-import { Bot, LayoutDashboard, Settings, Shield, BarChart3 } from "lucide-react";
+import { Bot, LayoutDashboard, Settings, Shield, Target } from "lucide-react";
 
 export function AppSidebar() {
   const location = useLocation();
 
   const items = [
     { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-    { title: "Performance", url: "/performance", icon: BarChart3 },
+    { title: "Campaigns", url: "/campaigns", icon: Target },
   ];
 
   const settingsItems = [

@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -8,7 +7,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import Auth from "@/pages/Auth";
 import Dashboard from "@/pages/Dashboard";
 import Feedback from "@/pages/Feedback";
-import PerformanceDashboard from "@/pages/PerformanceDashboard";
+import Campaigns from "@/pages/Campaigns";
 import Privacy from "@/pages/Privacy";
 import PublicLanding from "@/pages/PublicLanding";
 import About from "@/pages/About";
@@ -61,9 +60,9 @@ const App = () => {
                     <Settings />
                   </ProtectedRoute>
                 } />
-                <Route path="/performance" element={
+                <Route path="/campaigns" element={
                   <ProtectedRoute>
-                    <PerformanceDashboard />
+                    <Campaigns />
                   </ProtectedRoute>
                 } />
                 
