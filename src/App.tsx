@@ -23,8 +23,10 @@ import NotFound from "@/pages/NotFound";
 import AmazonCallback from "@/pages/AmazonCallback";
 import CookieConsent from "@/components/CookieConsent";
 import Settings from "@/pages/Settings";
+import Onboarding from "@/pages/Onboarding";
 
 import { DateRangeProvider } from "@/context/DateRangeContext";
+import { OnboardingCheck } from "@/components/OnboardingCheck";
 
 const queryClient = new QueryClient();
 
@@ -36,7 +38,8 @@ const App = () => {
           <Toaster />
           <DateRangeProvider>
             <BrowserRouter>
-              <Routes>
+              <OnboardingCheck>
+                <Routes>
                 {/* Public routes */}
                 <Route path="/" element={<PublicLanding />} />
                 <Route path="/about" element={<About />} />
@@ -44,6 +47,11 @@ const App = () => {
                 <Route path="/company" element={<Company />} />
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/auth/amazon/callback" element={<AmazonCallback />} />
+                <Route path="/onboarding" element={
+                  <ProtectedRoute>
+                    <Onboarding />
+                  </ProtectedRoute>
+                } />
                 
                 {/* Protected routes */}
                 <Route path="/dashboard" element={
@@ -105,6 +113,7 @@ const App = () => {
                 {/* 404 */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
+              </OnboardingCheck>
             </BrowserRouter>
             <CookieConsent />
           </DateRangeProvider>
