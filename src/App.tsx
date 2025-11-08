@@ -9,6 +9,7 @@ import Dashboard from "@/pages/Dashboard";
 import Feedback from "@/pages/Feedback";
 import Campaigns from "@/pages/Campaigns";
 import AIInsights from "@/pages/AIInsights";
+import SearchTerms from "@/pages/SearchTerms";
 import Privacy from "@/pages/Privacy";
 import PublicLanding from "@/pages/PublicLanding";
 import About from "@/pages/About";
@@ -69,6 +70,11 @@ const App = () => {
                 <Route path="/ai-insights" element={
                   <ProtectedRoute>
                     <AIInsights />
+                  </ProtectedRoute>
+                } />
+                <Route path="/search-terms" element={
+                  <ProtectedRoute>
+                    <SearchTerms />
                   </ProtectedRoute>
                 } />
                 
