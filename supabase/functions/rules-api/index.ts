@@ -264,9 +264,12 @@ Deno.serve(async (req) => {
             );
           }
 
-          // Trigger rules engine for specific rule
+          // Trigger rules engine for specific rule - forward the auth header
           const { data, error } = await supabase.functions.invoke('rules-engine-runner', {
-            body: { rule_id: ruleId, mode }
+            body: { rule_id: ruleId, mode },
+            headers: {
+              Authorization: authHeader || `Bearer ${supabaseServiceKey}`
+            }
           });
           
           if (error) throw error;
