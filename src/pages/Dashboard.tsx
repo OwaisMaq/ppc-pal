@@ -1,14 +1,10 @@
 import DashboardShell from "@/components/DashboardShell";
-import ConsolidatedDataView from "@/components/ConsolidatedDataView";
 import { ASINFilter } from "@/components/ASINFilter";
-import { AnomaliesPanel } from "@/components/AnomaliesPanel";
-import { BudgetCopilotPanel } from "@/components/BudgetCopilotPanel";
 import { DashboardKPIs } from "@/components/DashboardKPIs";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { ComparisonModeSelector, ComparisonMode } from "@/components/ComparisonModeSelector";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link } from "react-router-dom";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { useAmsMetrics } from "@/hooks/useAmsMetrics";
@@ -214,32 +210,6 @@ const Dashboard = () => {
             </Card>
           )}
 
-          {hasConnections && (
-            <Tabs defaultValue="performance" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="performance">Performance</TabsTrigger>
-                <TabsTrigger value="anomalies">Anomalies</TabsTrigger>
-                <TabsTrigger value="budget">Budget Copilot</TabsTrigger>
-                <TabsTrigger value="overview">Overview</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="performance" className="mt-6">
-                <ConsolidatedDataView selectedASIN={selectedASIN} />
-              </TabsContent>
-              
-              <TabsContent value="anomalies" className="mt-6">
-                <AnomaliesPanel />
-              </TabsContent>
-              
-              <TabsContent value="budget" className="mt-6">
-                <BudgetCopilotPanel />
-              </TabsContent>
-              
-              <TabsContent value="overview" className="mt-6">
-                <ConsolidatedDataView selectedASIN={selectedASIN} />
-              </TabsContent>
-            </Tabs>
-          )}
         </div>
       </div>
     </DashboardShell>
