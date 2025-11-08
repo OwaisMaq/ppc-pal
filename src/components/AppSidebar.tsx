@@ -11,7 +11,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton
 } from "@/components/ui/sidebar";
-import { Bot, LayoutDashboard, Database, Settings, Shield, Search, Target, BookOpen, BarChart3, Zap } from "lucide-react";
+import { Bot, LayoutDashboard, Settings, Shield, BarChart3 } from "lucide-react";
 
 export function AppSidebar() {
   const location = useLocation();
@@ -19,17 +19,6 @@ export function AppSidebar() {
   const items = [
     { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
     { title: "Performance", url: "/performance", icon: BarChart3 },
-    { title: "Data", url: "/data-management", icon: Database },
-  ];
-
-  const studioItems = [
-    { title: "Search Studio", url: "/search-studio", icon: Search },
-    { title: "Target Studio", url: "/target-studio", icon: Target },
-  ];
-
-  const automationItems = [
-    { title: "Automation", url: "/automation", icon: Zap },
-    { title: "Playbooks", url: "/playbooks", icon: BookOpen },
   ];
 
   const settingsItems = [
@@ -53,48 +42,6 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {items.map((item) => {
-                const isActive = location.pathname === item.url;
-                return (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild isActive={isActive} tooltip={item.title}>
-                      <NavLink to={item.url} end className="flex items-center gap-2">
-                        <item.icon className="h-4 w-4" />
-                        <span>{item.title}</span>
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarGroup>
-          <SidebarGroupLabel>Studios</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {studioItems.map((item) => {
-                const isActive = location.pathname === item.url;
-                return (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild isActive={isActive} tooltip={item.title}>
-                      <NavLink to={item.url} end className="flex items-center gap-2">
-                        <item.icon className="h-4 w-4" />
-                        <span>{item.title}</span>
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarGroup>
-          <SidebarGroupLabel>Automation</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {automationItems.map((item) => {
                 const isActive = location.pathname === item.url;
                 return (
                   <SidebarMenuItem key={item.title}>

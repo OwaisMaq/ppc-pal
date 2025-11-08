@@ -8,9 +8,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import Auth from "@/pages/Auth";
 import Dashboard from "@/pages/Dashboard";
 import Feedback from "@/pages/Feedback";
-import DataManagement from "@/pages/DataManagement";
 import PerformanceDashboard from "@/pages/PerformanceDashboard";
-import AutomationPage from "@/pages/AutomationPage";
 import Privacy from "@/pages/Privacy";
 import PublicLanding from "@/pages/PublicLanding";
 import About from "@/pages/About";
@@ -20,10 +18,6 @@ import NotFound from "@/pages/NotFound";
 import AmazonCallback from "@/pages/AmazonCallback";
 import CookieConsent from "@/components/CookieConsent";
 import Settings from "@/pages/Settings";
-import { SearchStudio } from "@/pages/SearchStudio";
-import { TargetStudio } from "@/pages/TargetStudio";
-import { PlaybooksPage } from "@/pages/PlaybooksPage";
-
 
 import { DateRangeProvider } from "@/context/DateRangeContext";
 
@@ -57,11 +51,6 @@ const App = () => {
                     <Feedback />
                   </ProtectedRoute>
                 } />
-                <Route path="/data-management" element={
-                  <ProtectedRoute>
-                    <DataManagement />
-                  </ProtectedRoute>
-                } />
                 <Route path="/privacy" element={
                   <ProtectedRoute>
                     <Privacy />
@@ -75,26 +64,6 @@ const App = () => {
                 <Route path="/performance" element={
                   <ProtectedRoute>
                     <PerformanceDashboard />
-                  </ProtectedRoute>
-                } />
-                <Route path="/automation" element={
-                  <ProtectedRoute>
-                    <AutomationPage />
-                  </ProtectedRoute>
-                } />
-                <Route path="/search-studio" element={
-                  <ProtectedRoute>
-                    <SearchStudio />
-                  </ProtectedRoute>
-                } />
-                <Route path="/target-studio" element={
-                  <ProtectedRoute>
-                    <TargetStudio />
-                  </ProtectedRoute>
-                } />
-                <Route path="/playbooks" element={
-                  <ProtectedRoute>
-                    <PlaybooksPage />
                   </ProtectedRoute>
                 } />
                 
