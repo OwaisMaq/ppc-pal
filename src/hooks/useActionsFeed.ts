@@ -50,9 +50,10 @@ export const useActionsFeed = (limit: number = 20) => {
   useEffect(() => {
     fetchActions();
     
-    // Subscribe to real-time updates
+    // Subscribe to real-time updates with unique channel name
+    const channelName = `action_queue_changes_${Math.random().toString(36).substring(7)}`;
     const channel = supabase
-      .channel('action_queue_changes')
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
