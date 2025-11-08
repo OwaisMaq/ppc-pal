@@ -5,6 +5,7 @@ import { AnomaliesPanel } from "@/components/AnomaliesPanel";
 import { BudgetCopilotPanel } from "@/components/BudgetCopilotPanel";
 import { DashboardKPIs } from "@/components/DashboardKPIs";
 import { DateRangePicker } from "@/components/DateRangePicker";
+import { ComparisonModeSelector, ComparisonMode } from "@/components/ComparisonModeSelector";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -14,7 +15,7 @@ import { useAmsMetrics } from "@/hooks/useAmsMetrics";
 import { useState, useMemo } from "react";
 import { DashboardKPIs as KPIData } from "@/hooks/useDashboardData";
 import { DateRange } from "react-day-picker";
-import { subDays, differenceInDays } from "date-fns";
+import { subDays, differenceInDays, subYears } from "date-fns";
 const Dashboard = () => {
   const { connections } = useAmazonConnections();
   
@@ -42,6 +43,10 @@ const Dashboard = () => {
     to: new Date(),
   });
   
+  // Comparison mode state
+  const [comparisonMode, setComparisonMode] = useState<ComparisonMode>("previous");
+  const [customComparisonRange, setCustomComparisonRange] = useState<DateRange | undefined>();
+  
   // Get first connection for metrics
   const primaryConnection = connections[0];
   
@@ -52,21 +57,41 @@ const Dashboard = () => {
     dateRange?.to
   );
   
-  // Calculate previous period for comparison
-  const previousPeriodRange = useMemo(() => {
+  // Calculate comparison period based on mode
+  const comparisonPeriodRange = useMemo(() => {
     if (!dateRange?.from || !dateRange?.to) return undefined;
+    
     const daysDiff = differenceInDays(dateRange.to, dateRange.from);
-    return {
-      from: subDays(dateRange.from, daysDiff + 1),
-      to: subDays(dateRange.from, 1),
-    };
-  }, [dateRange]);
+    
+    switch (comparisonMode) {
+      case "previous":
+        // Previous period (existing behavior)
+        return {
+          from: subDays(dateRange.from, daysDiff + 1),
+          to: subDays(dateRange.from, 1),
+        };
+      
+      case "last-year":
+        // Same period last year
+        return {
+          from: subYears(dateRange.from, 1),
+          to: subYears(dateRange.to, 1),
+        };
+      
+      case "custom":
+        // User-defined custom range
+        return customComparisonRange;
+      
+      default:
+        return undefined;
+    }
+  }, [dateRange, comparisonMode, customComparisonRange]);
   
-  // Fetch previous period metrics for comparison
-  const { metrics: previousMetrics } = useAmsMetrics(
+  // Fetch comparison period metrics
+  const { metrics: comparisonMetrics } = useAmsMetrics(
     primaryConnection?.id,
-    previousPeriodRange?.from,
-    previousPeriodRange?.to
+    comparisonPeriodRange?.from,
+    comparisonPeriodRange?.to
   );
   
   // Map AMS metrics to KPI format
@@ -86,22 +111,22 @@ const Dashboard = () => {
     };
   }, [metrics]);
   
-  // Map previous period metrics for comparison
-  const previousKpiData: KPIData | null = useMemo(() => {
-    if (!previousMetrics) return null;
+  // Map comparison period metrics
+  const comparisonKpiData: KPIData | null = useMemo(() => {
+    if (!comparisonMetrics) return null;
     return {
-      spend: previousMetrics.totalSpend || 0,
-      sales: previousMetrics.totalSales || 0,
-      acos: previousMetrics.acos || 0,
-      roas: previousMetrics.roas || 0,
-      clicks: previousMetrics.totalClicks || 0,
-      impressions: previousMetrics.totalImpressions || 0,
-      cpc: previousMetrics.cpc || 0,
-      ctr: previousMetrics.ctr || 0,
-      cvr: previousMetrics.conversionRate || 0,
-      conversions: previousMetrics.totalOrders || 0
+      spend: comparisonMetrics.totalSpend || 0,
+      sales: comparisonMetrics.totalSales || 0,
+      acos: comparisonMetrics.acos || 0,
+      roas: comparisonMetrics.roas || 0,
+      clicks: comparisonMetrics.totalClicks || 0,
+      impressions: comparisonMetrics.totalImpressions || 0,
+      cpc: comparisonMetrics.cpc || 0,
+      ctr: comparisonMetrics.ctr || 0,
+      cvr: comparisonMetrics.conversionRate || 0,
+      conversions: comparisonMetrics.totalOrders || 0
     };
-  }, [previousMetrics]);
+  }, [comparisonMetrics]);
   return (
     <DashboardShell>
       <div className="container mx-auto py-6 px-4">
@@ -117,21 +142,30 @@ const Dashboard = () => {
           
           {/* Filters Row */}
           {hasConnections && (
-            <div className="mt-4 flex flex-col md:flex-row gap-4 items-start md:items-center">
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-medium text-muted-foreground">Date Range:</span>
-                <DateRangePicker 
-                  value={dateRange}
-                  onChange={setDateRange}
-                />
+            <div className="mt-4 space-y-4">
+              <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-medium text-muted-foreground">Date Range:</span>
+                  <DateRangePicker 
+                    value={dateRange}
+                    onChange={setDateRange}
+                  />
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-medium text-muted-foreground">Filter by ASIN:</span>
+                  <ASINFilter 
+                    selectedASIN={selectedASIN}
+                    onASINChange={setSelectedASIN}
+                  />
+                </div>
               </div>
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-medium text-muted-foreground">Filter by ASIN:</span>
-                <ASINFilter 
-                  selectedASIN={selectedASIN}
-                  onASINChange={setSelectedASIN}
-                />
-              </div>
+              
+              <ComparisonModeSelector 
+                mode={comparisonMode}
+                onModeChange={setComparisonMode}
+                customRange={customComparisonRange}
+                onCustomRangeChange={setCustomComparisonRange}
+              />
             </div>
           )}
         </div>
@@ -143,7 +177,7 @@ const Dashboard = () => {
               data={kpiData}
               loading={metricsLoading}
               error={metricsError}
-              previousData={previousKpiData}
+              previousData={comparisonKpiData}
             />
           </div>
         )}
