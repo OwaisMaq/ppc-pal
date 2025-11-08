@@ -3,12 +3,15 @@ import ConsolidatedDataView from "@/components/ConsolidatedDataView";
 import { ASINFilter } from "@/components/ASINFilter";
 import { AnomaliesPanel } from "@/components/AnomaliesPanel";
 import { BudgetCopilotPanel } from "@/components/BudgetCopilotPanel";
+import { DashboardKPIs } from "@/components/DashboardKPIs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link } from "react-router-dom";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
-import { useState } from "react";
+import { useAmsMetrics } from "@/hooks/useAmsMetrics";
+import { useState, useMemo } from "react";
+import { DashboardKPIs as KPIData } from "@/hooks/useDashboardData";
 const Dashboard = () => {
   const { connections } = useAmazonConnections();
   
@@ -29,6 +32,27 @@ const Dashboard = () => {
   });
   
   const [selectedASIN, setSelectedASIN] = useState<string | null>(null);
+  
+  // Get first connection for metrics
+  const primaryConnection = connections[0];
+  const { metrics, loading: metricsLoading, error: metricsError } = useAmsMetrics(primaryConnection?.id);
+  
+  // Map AMS metrics to KPI format
+  const kpiData: KPIData | null = useMemo(() => {
+    if (!metrics) return null;
+    return {
+      spend: metrics.totalSpend || 0,
+      sales: metrics.totalSales || 0,
+      acos: metrics.acos || 0,
+      roas: metrics.roas || 0,
+      clicks: metrics.totalClicks || 0,
+      impressions: metrics.totalImpressions || 0,
+      cpc: metrics.cpc || 0,
+      ctr: metrics.ctr || 0,
+      cvr: metrics.conversionRate || 0,
+      conversions: metrics.totalOrders || 0
+    };
+  }, [metrics]);
   return (
     <DashboardShell>
       <div className="container mx-auto py-6 px-4">
@@ -55,6 +79,17 @@ const Dashboard = () => {
             </div>
           )}
         </div>
+
+        {/* KPI Summary Cards */}
+        {hasConnections && (
+          <div className="mb-6">
+            <DashboardKPIs 
+              data={kpiData}
+              loading={metricsLoading}
+              error={metricsError}
+            />
+          </div>
+        )}
 
         <div className="space-y-6">
           {!hasConnections && (
