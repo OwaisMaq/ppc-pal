@@ -6,11 +6,13 @@ import { DateRangePicker } from "@/components/DateRangePicker";
 import { ComparisonModeSelector, ComparisonMode } from "@/components/ComparisonModeSelector";
 import ActionsFeed from "@/components/ActionsFeed";
 import PendingApprovals from "@/components/PendingApprovals";
+import { SavingsKPI } from "@/components/SavingsKPI";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { useAmsMetrics } from "@/hooks/useAmsMetrics";
+import { useSavingsMetric } from "@/hooks/useSavingsMetric";
 import { useState, useMemo } from "react";
 import { DashboardKPIs as KPIData } from "@/hooks/useDashboardData";
 import { DateRange } from "react-day-picker";
@@ -52,6 +54,13 @@ const Dashboard = () => {
   // Fetch current period metrics
   const { metrics, loading: metricsLoading, error: metricsError } = useAmsMetrics(
     primaryConnection?.id,
+    dateRange?.from,
+    dateRange?.to
+  );
+  
+  // Fetch savings metric
+  const { savings, loading: savingsLoading } = useSavingsMetric(
+    primaryConnection?.profile_id,
     dateRange?.from,
     dateRange?.to
   );
@@ -168,6 +177,21 @@ const Dashboard = () => {
             </div>
           )}
         </div>
+
+        {/* Savings KPI - Prominent Display */}
+        {hasConnections && savings && (
+          <div className="mb-6">
+            <SavingsKPI
+              totalSavings={savings.totalSavings}
+              negativeKeywordsSavings={savings.negativeKeywordsSavings}
+              pausedTargetsSavings={savings.pausedTargetsSavings}
+              bidOptimizationSavings={savings.bidOptimizationSavings}
+              acosImprovementSavings={savings.acosImprovementSavings}
+              actionCount={savings.actionCount}
+              loading={savingsLoading}
+            />
+          </div>
+        )}
 
         {/* KPI Summary Cards */}
         {hasConnections && (
