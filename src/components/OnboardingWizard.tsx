@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Bot, CheckCircle, Target, TrendingUp, Sparkles } from "lucide-react";
-import { AmazonOAuthSetup } from "./AmazonOAuthSetup";
+import AmazonOAuthSetup from "./AmazonOAuthSetup";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -105,12 +105,14 @@ export const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <AmazonOAuthSetup onConnectionSuccess={() => setCurrentStep(3)} />
-              <div className="mt-4 p-4 bg-muted/50 rounded-lg">
-                <p className="text-sm text-muted-foreground">
-                  <strong>Note:</strong> We use Amazon's official OAuth to securely access your advertising data. 
-                  We never see your Amazon password and you can revoke access anytime.
+              <AmazonOAuthSetup />
+              <div className="mt-6 text-center">
+                <p className="text-sm text-muted-foreground mb-4">
+                  Once you've connected your account, click continue to proceed.
                 </p>
+                <Button onClick={() => setCurrentStep(3)}>
+                  Continue
+                </Button>
               </div>
             </CardContent>
           </Card>

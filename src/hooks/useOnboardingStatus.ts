@@ -21,7 +21,7 @@ export const useOnboardingStatus = () => {
           .eq('id', user.id)
           .maybeSingle();
 
-        if (error && error.code !== 'PGRST116') {
+        if (error) {
           console.error('Error checking onboarding status:', error);
           setNeedsOnboarding(false);
         } else if (!data) {
