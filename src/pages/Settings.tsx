@@ -4,18 +4,14 @@ import AmsSetup from "@/components/AmsSetup";
 import { ASINLabelManager } from "@/components/ASINLabelManager";
 import { NotificationSettings } from "@/components/NotificationSettings";
 import { ConnectionStatusAlert } from "@/components/ConnectionStatusAlert";
-import { AutomationRulesList } from "@/components/AutomationRulesList";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Settings as SettingsIcon, Info, Tag, Bell, Zap } from "lucide-react";
+import { RefreshCw, Settings as SettingsIcon, Info, Tag, Bell } from "lucide-react";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
-import { useAutomationRules } from "@/hooks/useAutomation";
 import { useEffect } from "react";
 
 const Settings = () => {
   const { connections, refreshConnections, refreshConnection, initiateConnection, loading } = useAmazonConnections();
-  const profileId = connections.length > 0 ? connections[0].profile_id : null;
-  const { rules, loading: rulesLoading, toggleRule, changeMode, runRule, initializeRules } = useAutomationRules(profileId || '');
 
   useEffect(() => {
     document.title = "Settings - Amazon Connections | PPC Pal";
@@ -115,40 +111,6 @@ const Settings = () => {
               <h2 className="text-xl font-semibold">Notifications</h2>
             </div>
             <NotificationSettings />
-          </div>
-
-          {/* Automation Rules Section */}
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Zap className="h-5 w-5 text-brand-accent" />
-                <h2 className="text-xl font-semibold">Automation Rules</h2>
-              </div>
-              {profileId && rules.length === 0 && !rulesLoading && (
-                <Button 
-                  onClick={() => initializeRules(profileId)}
-                  variant="outline"
-                  className="flex items-center gap-2"
-                >
-                  Initialize Default Rules
-                </Button>
-              )}
-            </div>
-            {profileId ? (
-              <AutomationRulesList 
-                rules={rules}
-                loading={rulesLoading}
-                onToggleRule={toggleRule}
-                onChangeMode={changeMode}
-                onRunRule={runRule}
-              />
-            ) : (
-              <Card>
-                <CardContent className="py-8 text-center text-muted-foreground">
-                  Connect an Amazon account to configure automation rules
-                </CardContent>
-              </Card>
-            )}
           </div>
         </div>
       </div>
