@@ -109,3 +109,6 @@ verify_jwt = true
 [functions.historical-import]
 verify_jwt = true
 
+[functions.ai-insights]
+verify_jwt = true
+
