@@ -1,6 +1,7 @@
 import DashboardShell from "@/components/DashboardShell";
 import { ASINFilter } from "@/components/ASINFilter";
 import { DashboardKPIs } from "@/components/DashboardKPIs";
+import { DashboardChart } from "@/components/DashboardChart";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { ComparisonModeSelector, ComparisonMode } from "@/components/ComparisonModeSelector";
 import { Card, CardContent } from "@/components/ui/card";
@@ -175,6 +176,18 @@ const Dashboard = () => {
               error={metricsError}
               previousData={comparisonKpiData}
               timeseries={metrics?.timeseries}
+            />
+          </div>
+        )}
+
+        {/* Trend Charts */}
+        {hasConnections && (
+          <div className="mb-6">
+            <DashboardChart
+              data={{ points: metrics?.timeseries || [] }}
+              loading={metricsLoading}
+              error={metricsError}
+              granularity="day"
             />
           </div>
         )}
