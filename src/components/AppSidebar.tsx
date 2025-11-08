@@ -11,7 +11,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton
 } from "@/components/ui/sidebar";
-import { Bot, LayoutDashboard, Settings, Shield, Target, Sparkles, Search } from "lucide-react";
+import { Bot, LayoutDashboard, Settings, Shield, Target, Sparkles, Search, DollarSign, AlertTriangle, GitBranch, Users } from "lucide-react";
 
 export function AppSidebar() {
   const location = useLocation();
@@ -21,6 +21,10 @@ export function AppSidebar() {
     { title: "Campaigns", url: "/campaigns", icon: Target },
     { title: "Search Terms", url: "/search-terms", icon: Search },
     { title: "AI Insights", url: "/ai-insights", icon: Sparkles },
+    { title: "Budget Copilot", url: "/budget-copilot", icon: DollarSign },
+    { title: "Anomalies", url: "/anomalies", icon: AlertTriangle },
+    { title: "Attribution", url: "/attribution", icon: GitBranch },
+    { title: "Multi-Account", url: "/multi-account", icon: Users },
   ];
 
   const settingsItems = [

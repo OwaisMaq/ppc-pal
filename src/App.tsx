@@ -11,6 +11,10 @@ import Campaigns from "@/pages/Campaigns";
 import AIInsights from "@/pages/AIInsights";
 import SearchTerms from "@/pages/SearchTerms";
 import Privacy from "@/pages/Privacy";
+import BudgetCopilot from "@/pages/BudgetCopilot";
+import Anomalies from "@/pages/Anomalies";
+import Attribution from "@/pages/Attribution";
+import MultiAccount from "@/pages/MultiAccount";
 import PublicLanding from "@/pages/PublicLanding";
 import About from "@/pages/About";
 import Contact from "@/pages/Contact";
@@ -75,6 +79,26 @@ const App = () => {
                 <Route path="/search-terms" element={
                   <ProtectedRoute>
                     <SearchTerms />
+                  </ProtectedRoute>
+                } />
+                <Route path="/budget-copilot" element={
+                  <ProtectedRoute>
+                    <BudgetCopilot />
+                  </ProtectedRoute>
+                } />
+                <Route path="/anomalies" element={
+                  <ProtectedRoute>
+                    <Anomalies />
+                  </ProtectedRoute>
+                } />
+                <Route path="/attribution" element={
+                  <ProtectedRoute>
+                    <Attribution />
+                  </ProtectedRoute>
+                } />
+                <Route path="/multi-account" element={
+                  <ProtectedRoute>
+                    <MultiAccount />
                   </ProtectedRoute>
                 } />
                 
