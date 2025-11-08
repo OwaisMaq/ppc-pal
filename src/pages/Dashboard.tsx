@@ -4,6 +4,7 @@ import { ASINFilter } from "@/components/ASINFilter";
 import { AnomaliesPanel } from "@/components/AnomaliesPanel";
 import { BudgetCopilotPanel } from "@/components/BudgetCopilotPanel";
 import { DashboardKPIs } from "@/components/DashboardKPIs";
+import { DateRangePicker } from "@/components/DateRangePicker";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -12,6 +13,8 @@ import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { useAmsMetrics } from "@/hooks/useAmsMetrics";
 import { useState, useMemo } from "react";
 import { DashboardKPIs as KPIData } from "@/hooks/useDashboardData";
+import { DateRange } from "react-day-picker";
+import { subDays, differenceInDays } from "date-fns";
 const Dashboard = () => {
   const { connections } = useAmazonConnections();
   
@@ -33,9 +36,38 @@ const Dashboard = () => {
   
   const [selectedASIN, setSelectedASIN] = useState<string | null>(null);
   
+  // Date range state - default to last 30 days
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: subDays(new Date(), 30),
+    to: new Date(),
+  });
+  
   // Get first connection for metrics
   const primaryConnection = connections[0];
-  const { metrics, loading: metricsLoading, error: metricsError } = useAmsMetrics(primaryConnection?.id);
+  
+  // Fetch current period metrics
+  const { metrics, loading: metricsLoading, error: metricsError } = useAmsMetrics(
+    primaryConnection?.id,
+    dateRange?.from,
+    dateRange?.to
+  );
+  
+  // Calculate previous period for comparison
+  const previousPeriodRange = useMemo(() => {
+    if (!dateRange?.from || !dateRange?.to) return undefined;
+    const daysDiff = differenceInDays(dateRange.to, dateRange.from);
+    return {
+      from: subDays(dateRange.from, daysDiff + 1),
+      to: subDays(dateRange.from, 1),
+    };
+  }, [dateRange]);
+  
+  // Fetch previous period metrics for comparison
+  const { metrics: previousMetrics } = useAmsMetrics(
+    primaryConnection?.id,
+    previousPeriodRange?.from,
+    previousPeriodRange?.to
+  );
   
   // Map AMS metrics to KPI format
   const kpiData: KPIData | null = useMemo(() => {
@@ -53,6 +85,23 @@ const Dashboard = () => {
       conversions: metrics.totalOrders || 0
     };
   }, [metrics]);
+  
+  // Map previous period metrics for comparison
+  const previousKpiData: KPIData | null = useMemo(() => {
+    if (!previousMetrics) return null;
+    return {
+      spend: previousMetrics.totalSpend || 0,
+      sales: previousMetrics.totalSales || 0,
+      acos: previousMetrics.acos || 0,
+      roas: previousMetrics.roas || 0,
+      clicks: previousMetrics.totalClicks || 0,
+      impressions: previousMetrics.totalImpressions || 0,
+      cpc: previousMetrics.cpc || 0,
+      ctr: previousMetrics.ctr || 0,
+      cvr: previousMetrics.conversionRate || 0,
+      conversions: previousMetrics.totalOrders || 0
+    };
+  }, [previousMetrics]);
   return (
     <DashboardShell>
       <div className="container mx-auto py-6 px-4">
@@ -66,9 +115,16 @@ const Dashboard = () => {
             </p>
           </div>
           
-          {/* ASIN Filter */}
+          {/* Filters Row */}
           {hasConnections && (
-            <div className="mt-4">
+            <div className="mt-4 flex flex-col md:flex-row gap-4 items-start md:items-center">
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium text-muted-foreground">Date Range:</span>
+                <DateRangePicker 
+                  value={dateRange}
+                  onChange={setDateRange}
+                />
+              </div>
               <div className="flex items-center gap-3">
                 <span className="text-sm font-medium text-muted-foreground">Filter by ASIN:</span>
                 <ASINFilter 
@@ -87,6 +143,7 @@ const Dashboard = () => {
               data={kpiData}
               loading={metricsLoading}
               error={metricsError}
+              previousData={previousKpiData}
             />
           </div>
         )}
