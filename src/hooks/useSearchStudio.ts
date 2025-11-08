@@ -86,15 +86,6 @@ export const useSearchStudio = () => {
         }
       });
 
-      const { data, error } = await supabase.functions.invoke('search-studio', {
-        body: null,
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (error) throw error;
-
       const response = await fetch(`https://ucbkcxupzjbblnzyiyui.supabase.co/functions/v1/search-studio/terms?${params}`, {
         headers: {
           'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
