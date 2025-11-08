@@ -179,11 +179,16 @@ const SearchTerms = () => {
             ) : filteredTerms.length === 0 ? (
               <div className="text-center py-12">
                 <Search className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">
+                <p className="text-muted-foreground mb-2">
                   {searchQuery || filterAction !== 'all' 
                     ? 'No search terms match your filters' 
-                    : 'No search terms found'}
+                    : 'No search terms data available yet'}
                 </p>
+                {!searchQuery && filterAction === 'all' && (
+                  <p className="text-sm text-muted-foreground">
+                    Search terms data will appear here after your campaigns collect more performance data.
+                  </p>
+                )}
               </div>
             ) : (
               <div className="space-y-4">
