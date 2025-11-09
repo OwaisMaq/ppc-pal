@@ -112,6 +112,9 @@ verify_jwt = true
 [functions.ai-insights]
 verify_jwt = true
 
+[functions.ml-predictions]
+verify_jwt = true
+
 [functions.budget-forecast]
 verify_jwt = true
 

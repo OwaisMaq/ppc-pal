@@ -60,62 +60,67 @@ serve(async (req) => {
       .gte('date', thirtyDaysAgo)
       .limit(100);
 
-    // Aggregate campaign metrics
-    const campaignMap = new Map();
-    campaigns?.forEach((row: any) => {
-      const id = row.campaign_id;
-      if (!campaignMap.has(id)) {
-        campaignMap.set(id, {
-          campaign_id: id,
-          campaign_name: row.campaign_name,
-          spend: 0,
-          sales: 0,
-          clicks: 0,
-          impressions: 0,
-        });
-      }
-      const campaign = campaignMap.get(id);
-      campaign.spend += row.spend || 0;
-      campaign.sales += row.sales || 0;
-      campaign.clicks += row.clicks || 0;
-      campaign.impressions += row.impressions || 0;
+    // Call ML predictions function to get statistical predictions
+    console.log('Calling ml-predictions for statistical analysis...');
+    const { data: mlData, error: mlError } = await supabase.functions.invoke('ml-predictions', {
+      headers: { Authorization: authHeader! }
     });
 
-    const campaignData = Array.from(campaignMap.values()).map((c: any) => ({
-      name: c.campaign_name,
-      spend: c.spend.toFixed(2),
-      sales: c.sales.toFixed(2),
-      acos: c.sales > 0 ? ((c.spend / c.sales) * 100).toFixed(1) : 'N/A',
-      ctr: c.impressions > 0 ? ((c.clicks / c.impressions) * 100).toFixed(2) : 'N/A',
-      cpc: c.clicks > 0 ? (c.spend / c.clicks).toFixed(2) : 'N/A',
-      conversions: Math.floor(c.sales / 25),
-    }));
+    if (mlError) {
+      console.error('ML predictions error:', mlError);
+      // Fallback to empty predictions if ML service fails
+      mlData.predictions = [];
+      mlData.summary = { total_campaigns: 0, waste_detected: 0, winners_detected: 0, anomalies_detected: 0 };
+    }
 
-    // Generate AI insights
-    const systemPrompt = `You are an Amazon PPC advertising expert AI assistant. Analyze campaign data and provide actionable insights.
+    const mlPredictions = mlData?.predictions || [];
+    const mlSummary = mlData?.summary || { total_campaigns: 0, waste_detected: 0, winners_detected: 0, anomalies_detected: 0 };
+
+    console.log(`Received ${mlPredictions.length} statistical predictions`);
+
+    // Use AI only to explain the numeric predictions in human-readable format
+    const systemPrompt = `You are an Amazon PPC advertising expert AI assistant. Your job is to take STATISTICAL PREDICTIONS (calculated using deterministic math: moving averages, Z-scores, waste detection) and explain them in clear, actionable human language.
+
+You will receive:
+- Statistical predictions with numeric actions (e.g., "decrease bid by 15%")
+- Reason codes (e.g., "high_acos_anomaly", "waste_keyword")
+- Metrics (CPC, CTR, CVR, ACOS, ROAS for 7d/14d/30d windows)
+- Z-scores showing statistical anomalies
+
 Your response must be valid JSON with this structure:
 {
   "insights": [
     {
       "type": "bid_adjustment" | "keyword_suggestion" | "negative_keyword" | "budget_change",
       "campaign": "campaign name",
-      "action": "brief action taken",
-      "reason": "clear explanation why",
+      "action": "human-readable action (e.g., 'Decrease bid by 15%' or 'Add negative keywords')",
+      "reason": "2-3 sentence explanation referencing the metrics and why this math-based prediction makes sense",
       "impact": "low" | "medium" | "high",
       "timestamp": "ISO date string"
     }
   ],
-  "strategy": "2-3 sentence summary of overall strategy focus"
-}`;
+  "strategy": "2-3 sentence summary explaining the overall statistical patterns detected and recommended strategy"
+}
 
-    const userPrompt = `Analyze these campaigns and provide 3-5 AI recommendations:
-${JSON.stringify(campaignData.slice(0, 10), null, 2)}
+IMPORTANT: You are NOT making decisions. You are only explaining the decisions already made by the statistical engine in plain English.`;
 
-Focus on:
-- Campaigns with high ACOS (>30%)
-- Low CTR campaigns (<0.5%)
-- High CPC without conversions
-- Budget optimization opportunities`;
+    const userPrompt = `Explain these statistical predictions in clear, actionable language:
+
+Statistical Summary:
+- Total campaigns analyzed: ${mlSummary.total_campaigns}
+- Waste detected: ${mlSummary.waste_detected}
+- High performers detected: ${mlSummary.winners_detected}
+- Anomalies detected: ${mlSummary.anomalies_detected}
+
+Predictions to explain:
+${JSON.stringify(mlPredictions, null, 2)}
+
+For each prediction:
+1. Convert the numeric action into a clear instruction (e.g., action_numeric: -0.15 → "Decrease bid by 15%")
+2. Explain the reason_code using the provided metrics (reference specific numbers like CPC, CTR, ACOS, Z-scores)
+3. Make it actionable and easy to understand for advertisers
+
+Keep explanations clear, specific, and reference the actual metrics provided.`;
 
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -129,7 +134,7 @@ Focus on:
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
-        temperature: 0.7,
+        temperature: 0.3, // Lower temperature for more consistent explanations
       }),
     });
 
