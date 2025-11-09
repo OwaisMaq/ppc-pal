@@ -56,8 +56,7 @@ export const useAttribution = () => {
   const getAvailableModels = useCallback(async () => {
     try {
       const { data, error } = await supabase.functions.invoke('attribution', {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
+        body: { operation: 'models' }
       });
 
       if (error) throw error;
@@ -79,17 +78,15 @@ export const useAttribution = () => {
     setError(null);
 
     try {
-      const params = new URLSearchParams({
-        profileId: filters.profileId,
-        from: filters.dateFrom,
-        to: filters.dateTo,
-        source: filters.source || 'v3',
-        limit: (filters.limit || 25).toString()
-      });
-
-      const { data, error } = await supabase.functions.invoke('attribution/paths?' + params.toString(), {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
+      const { data, error } = await supabase.functions.invoke('attribution', {
+        body: {
+          operation: 'paths',
+          profileId: filters.profileId,
+          from: filters.dateFrom,
+          to: filters.dateTo,
+          source: filters.source || 'v3',
+          limit: filters.limit || 25
+        }
       });
 
       if (error) throw error;
@@ -114,16 +111,14 @@ export const useAttribution = () => {
     source?: string;
   }) => {
     try {
-      const params = new URLSearchParams({
-        profileId: filters.profileId,
-        from: filters.dateFrom,
-        to: filters.dateTo,
-        source: filters.source || 'v3'
-      });
-
-      const { data, error } = await supabase.functions.invoke('attribution/time-lag?' + params.toString(), {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
+      const { data, error } = await supabase.functions.invoke('attribution', {
+        body: {
+          operation: 'time-lag',
+          profileId: filters.profileId,
+          from: filters.dateFrom,
+          to: filters.dateTo,
+          source: filters.source || 'v3'
+        }
       });
 
       if (error) throw error;
@@ -145,10 +140,11 @@ export const useAttribution = () => {
     setError(null);
 
     try {
-      const { data, error } = await supabase.functions.invoke('attribution/run', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(request),
+      const { data, error } = await supabase.functions.invoke('attribution', {
+        body: {
+          operation: 'run',
+          ...request
+        }
       });
 
       if (error) throw error;
@@ -183,16 +179,14 @@ export const useAttribution = () => {
     setError(null);
 
     try {
-      const params = new URLSearchParams({
-        profileId: filters.profileId,
-        from: filters.dateFrom,
-        to: filters.dateTo,
-        model: filters.model
-      });
-
-      const { data, error } = await supabase.functions.invoke('attribution/summary?' + params.toString(), {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
+      const { data, error } = await supabase.functions.invoke('attribution', {
+        body: {
+          operation: 'summary',
+          profileId: filters.profileId,
+          from: filters.dateFrom,
+          to: filters.dateTo,
+          model: filters.model
+        }
       });
 
       if (error) throw error;

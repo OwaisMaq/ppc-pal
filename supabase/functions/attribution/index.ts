@@ -27,11 +27,14 @@ serve(async (req) => {
   );
 
   try {
-    const url = new URL(req.url);
-    const path = url.pathname;
+    const body = req.method === 'POST' || req.method === 'PUT' 
+      ? await req.json() 
+      : { operation: new URL(req.url).searchParams.get('operation') };
+    
+    const operation = body?.operation;
 
     // GET /models - list available models
-    if (req.method === 'GET' && path.endsWith('/models')) {
+    if (operation === 'models') {
       const models = [
         {
           id: 'last_click',
@@ -72,8 +75,7 @@ serve(async (req) => {
     }
 
     // POST /run - start attribution modeling
-    if (req.method === 'POST' && path.endsWith('/run')) {
-      const body: AttributionRequest = await req.json();
+    if (operation === 'run') {
       
       console.log('Starting attribution run:', body);
 
@@ -160,11 +162,11 @@ serve(async (req) => {
     }
 
     // GET /summary - get attributed results
-    if (req.method === 'GET' && path.endsWith('/summary')) {
-      const profileId = url.searchParams.get('profileId');
-      const from = url.searchParams.get('from');
-      const to = url.searchParams.get('to');
-      const model = url.searchParams.get('model') || 'last_click';
+    if (operation === 'summary') {
+      const profileId = body.profileId;
+      const from = body.from;
+      const to = body.to;
+      const model = body.model || 'last_click';
 
       if (!profileId || !from || !to) {
         return new Response('Missing required parameters', { 
@@ -207,12 +209,12 @@ serve(async (req) => {
     }
 
     // GET /paths - get top conversion paths
-    if (req.method === 'GET' && path.endsWith('/paths')) {
-      const profileId = url.searchParams.get('profileId');
-      const from = url.searchParams.get('from');
-      const to = url.searchParams.get('to');
-      const source = url.searchParams.get('source') || 'v3';
-      const limit = parseInt(url.searchParams.get('limit') || '25');
+    if (operation === 'paths') {
+      const profileId = body.profileId;
+      const from = body.from;
+      const to = body.to;
+      const source = body.source || 'v3';
+      const limit = body.limit || 25;
 
       if (!profileId || !from || !to) {
         return new Response('Missing required parameters', { 
@@ -261,11 +263,11 @@ serve(async (req) => {
     }
 
     // GET /time-lag - get time to conversion histogram
-    if (req.method === 'GET' && path.endsWith('/time-lag')) {
-      const profileId = url.searchParams.get('profileId');
-      const from = url.searchParams.get('from');
-      const to = url.searchParams.get('to');
-      const source = url.searchParams.get('source') || 'v3';
+    if (operation === 'time-lag') {
+      const profileId = body.profileId;
+      const from = body.from;
+      const to = body.to;
+      const source = body.source || 'v3';
 
       if (!profileId || !from || !to) {
         return new Response('Missing required parameters', { 
