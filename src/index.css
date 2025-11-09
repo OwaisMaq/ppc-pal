@@ -6,27 +6,26 @@
 
 @layer base {
   :root {
-    /* Windows XP Luna Colors */
-    --background: 210 55% 92%;     /* Light blue-gray */
-    --foreground: 0 0% 20%;        /* Dark gray text */
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
 
-    --card: 0 0% 100%;             /* White cards */
-    --card-foreground: 0 0% 20%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 20%;
+    --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 217 89% 55%;        /* XP Blue #2F7ED6 */
-    --primary-foreground: 0 0% 100%;
+    --primary: 214 84% 56%;        /* Clean blue - primary actions */
+    --primary-foreground: 210 40% 98%;
 
-    --secondary: 210 55% 92%;      /* Light blue-gray */
-    --secondary-foreground: 0 0% 20%;
+    --secondary: 210 17% 98%;      /* Off-white - backgrounds */
+    --secondary-foreground: 222.2 47.4% 11.2%;
 
-    --muted: 210 40% 96%;          /* Very light blue */
-    --muted-foreground: 217 10% 40%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 88 50% 53%;          /* XP Green */
-    --accent-foreground: 0 0% 100%;
+    --accent: 158 64% 52%;         /* Emerald - success/highlights */
+    --accent-foreground: 210 40% 98%;
 
     /* Brand Colors - PPC Pal Professional Design */
     --brand-primary: 214 84% 56%;        /* Clean blue - primary actions */
@@ -66,19 +65,11 @@
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 213 27% 84%;        /* Light blue-gray border */
-    --input: 0 0% 100%;           /* White input background */
-    --ring: 217 89% 55%;
+    --border: 214 13% 80%;        /* Using neutral-200 */
+    --input: 214 13% 80%;
+    --ring: 214 84% 56%;          /* Using brand-primary */
 
-    --radius: 0.5rem;              /* Rounded corners XP style */
-    
-    /* Windows XP Luna Colors */
-    --xp-blue-start: 217 89% 55%;  /* #2F7ED6 */
-    --xp-blue-end: 221 100% 40%;   /* #0054E3 */
-    --xp-green: 88 50% 53%;        /* #73D216 Start button */
-    --xp-orange: 27 98% 54%;       /* #EB6F16 */
-    --xp-title-bar-start: 217 89% 61%; /* Lighter blue */
-    --xp-title-bar-end: 221 100% 48%;  /* Darker blue */
+    --radius: 0.5rem;
 
     --sidebar-background: 0 0% 98%;
 

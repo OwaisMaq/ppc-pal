@@ -5,26 +5,26 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-semibold transition-all focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-transparent",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "text-white shadow-md hover:shadow-lg active:shadow-sm",
+        default: "bg-primary text-primary-foreground hover:bg-primary/90",
         destructive:
-          "bg-gradient-to-b from-[#F88060] to-[#D84A2E] text-white shadow-md hover:shadow-lg active:shadow-sm",
+          "bg-destructive text-destructive-foreground hover:bg-destructive/90",
         outline:
-          "border-[#5B9DD6] bg-gradient-to-b from-white to-[#ECF4FB] text-[#1E5DC8] hover:from-[#F0F8FF] hover:to-[#D8EBFA] shadow-sm",
+          "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
         secondary:
-          "bg-gradient-to-b from-[#F0F0F0] to-[#D8D8D8] text-[#333] border-[#ACA899] shadow-sm hover:from-[#F8F8F8] hover:to-[#E0E0E0]",
-        ghost: "hover:bg-[#E8F3FD] text-[#1E5DC8]",
-        link: "text-[#0066CC] underline-offset-4 hover:underline",
-        translucent: "bg-white/90 backdrop-blur-sm text-[#1E5DC8] border-[#5B9DD6] shadow-sm",
+          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        ghost: "hover:bg-accent hover:text-accent-foreground",
+        link: "text-primary underline-offset-4 hover:underline",
+        translucent: "bg-background/60 text-foreground border border-border/20 shadow-sm hover:bg-background/80 hover:shadow-md transition-all duration-200",
       },
       size: {
         default: "h-10 px-4 py-2",
-        sm: "h-8 px-3 text-xs rounded",
-        lg: "h-11 px-8 rounded-lg",
-        xl: "h-14 px-10 text-base rounded-lg",
+        sm: "h-9 rounded-md px-3",
+        lg: "h-11 rounded-md px-8",
+        xl: "h-12 px-10 text-base",
         icon: "h-10 w-10",
       },
     },
@@ -42,19 +42,11 @@ export interface ButtonProps
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, style, ...props }, ref) => {
+  ({ className, variant, size, asChild = false, ...props }, ref) => {
     const Comp = asChild ? Slot : "button"
-    
-    // Apply XP-style gradient for default variant
-    const defaultStyle = variant === "default" || !variant ? {
-      background: 'linear-gradient(180deg, #5FA3E8 0%, #2F7ED6 50%, #1E5DC8 100%)',
-      ...style
-    } : style;
-    
     return (
       <Comp
         className={cn(buttonVariants({ variant, size, className }))}
-        style={defaultStyle}
         ref={ref}
         {...props}
       />
