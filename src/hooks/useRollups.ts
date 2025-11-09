@@ -55,13 +55,7 @@ export function useRollups() {
         base: filters.base || 'GBP',
       });
 
-      const { data, error } = await supabase.functions.invoke('rollups/kpis', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: null,
-      });
+      const { data, error } = await supabase.functions.invoke(`rollups/kpis?${params.toString()}`);
 
       if (error) throw error;
 
@@ -100,13 +94,7 @@ export function useRollups() {
         limit: (filters.limit || 10).toString(),
       });
 
-      const { data, error } = await supabase.functions.invoke('rollups/breakdown', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: null,
-      });
+      const { data, error } = await supabase.functions.invoke(`rollups/breakdown?${params.toString()}`);
 
       if (error) throw error;
 
