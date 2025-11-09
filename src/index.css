@@ -6,26 +6,27 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Windows 98 Classic Colors */
+    --background: 0 0% 75%;        /* Classic gray #C0C0C0 */
+    --foreground: 0 0% 0%;         /* Black text */
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 0 0% 75%;              /* Classic gray */
+    --card-foreground: 0 0% 0%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 75%;
+    --popover-foreground: 0 0% 0%;
 
-    --primary: 214 84% 56%;        /* Clean blue - primary actions */
-    --primary-foreground: 210 40% 98%;
+    --primary: 210 100% 25%;       /* Windows blue #000080 */
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 17% 98%;      /* Off-white - backgrounds */
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 0 0% 75%;         /* Classic gray */
+    --secondary-foreground: 0 0% 0%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 0 0% 83%;             /* Light gray */
+    --muted-foreground: 0 0% 35%;
 
-    --accent: 158 64% 52%;         /* Emerald - success/highlights */
-    --accent-foreground: 210 40% 98%;
+    --accent: 180 100% 35%;        /* Teal accent */
+    --accent-foreground: 0 0% 100%;
 
     /* Brand Colors - PPC Pal Professional Design */
     --brand-primary: 214 84% 56%;        /* Clean blue - primary actions */
@@ -65,11 +66,20 @@
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214 13% 80%;        /* Using neutral-200 */
-    --input: 214 13% 80%;
-    --ring: 214 84% 56%;          /* Using brand-primary */
+    --border: 0 0% 50%;           /* Dark gray borders */
+    --input: 0 0% 100%;           /* White input background */
+    --ring: 210 100% 25%;
 
-    --radius: 0.5rem;
+    --radius: 0;                   /* No rounded corners in Win98 */
+    
+    /* Windows 98 3D Border Colors */
+    --win98-highlight: 0 0% 100%;  /* White for top-left borders */
+    --win98-light: 0 0% 87%;       /* Light gray */
+    --win98-shadow: 0 0% 50%;      /* Dark gray for bottom-right */
+    --win98-dark-shadow: 0 0% 0%;  /* Black for outer shadow */
+    --win98-face: 0 0% 75%;        /* Button face */
+    --win98-title-bar: 210 100% 25%; /* Title bar blue */
+    --win98-title-bar-gradient: 180 100% 35%; /* Title bar gradient */
 
     --sidebar-background: 0 0% 98%;
 
