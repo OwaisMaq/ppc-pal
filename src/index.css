@@ -6,26 +6,26 @@
 
 @layer base {
   :root {
-    /* Windows 98 Classic Colors */
-    --background: 0 0% 75%;        /* Classic gray #C0C0C0 */
-    --foreground: 0 0% 0%;         /* Black text */
+    /* Windows XP Luna Colors */
+    --background: 210 55% 92%;     /* Light blue-gray */
+    --foreground: 0 0% 20%;        /* Dark gray text */
 
-    --card: 0 0% 75%;              /* Classic gray */
-    --card-foreground: 0 0% 0%;
+    --card: 0 0% 100%;             /* White cards */
+    --card-foreground: 0 0% 20%;
 
-    --popover: 0 0% 75%;
-    --popover-foreground: 0 0% 0%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 20%;
 
-    --primary: 210 100% 25%;       /* Windows blue #000080 */
+    --primary: 217 89% 55%;        /* XP Blue #2F7ED6 */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 0 0% 75%;         /* Classic gray */
-    --secondary-foreground: 0 0% 0%;
+    --secondary: 210 55% 92%;      /* Light blue-gray */
+    --secondary-foreground: 0 0% 20%;
 
-    --muted: 0 0% 83%;             /* Light gray */
-    --muted-foreground: 0 0% 35%;
+    --muted: 210 40% 96%;          /* Very light blue */
+    --muted-foreground: 217 10% 40%;
 
-    --accent: 180 100% 35%;        /* Teal accent */
+    --accent: 88 50% 53%;          /* XP Green */
     --accent-foreground: 0 0% 100%;
 
     /* Brand Colors - PPC Pal Professional Design */
@@ -66,20 +66,19 @@
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 0 0% 50%;           /* Dark gray borders */
+    --border: 213 27% 84%;        /* Light blue-gray border */
     --input: 0 0% 100%;           /* White input background */
-    --ring: 210 100% 25%;
+    --ring: 217 89% 55%;
 
-    --radius: 0;                   /* No rounded corners in Win98 */
+    --radius: 0.5rem;              /* Rounded corners XP style */
     
-    /* Windows 98 3D Border Colors */
-    --win98-highlight: 0 0% 100%;  /* White for top-left borders */
-    --win98-light: 0 0% 87%;       /* Light gray */
-    --win98-shadow: 0 0% 50%;      /* Dark gray for bottom-right */
-    --win98-dark-shadow: 0 0% 0%;  /* Black for outer shadow */
-    --win98-face: 0 0% 75%;        /* Button face */
-    --win98-title-bar: 210 100% 25%; /* Title bar blue */
-    --win98-title-bar-gradient: 180 100% 35%; /* Title bar gradient */
+    /* Windows XP Luna Colors */
+    --xp-blue-start: 217 89% 55%;  /* #2F7ED6 */
+    --xp-blue-end: 221 100% 40%;   /* #0054E3 */
+    --xp-green: 88 50% 53%;        /* #73D216 Start button */
+    --xp-orange: 27 98% 54%;       /* #EB6F16 */
+    --xp-title-bar-start: 217 89% 61%; /* Lighter blue */
+    --xp-title-bar-end: 221 100% 48%;  /* Darker blue */
 
     --sidebar-background: 0 0% 98%;
 
