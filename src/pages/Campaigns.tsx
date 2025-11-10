@@ -175,16 +175,69 @@ const Campaigns = () => {
     setSelectedCampaign({ campaign, keywords: [], adGroups: [] });
     
     try {
-      // Fetch ad groups for this campaign
-      const { data: adGroups } = await supabase
-        .from('v_ad_group_daily')
-        .select('*')
-        .eq('campaign_id', campaign.campaign_id)
-        .limit(10);
+      // First, get the campaign UUID from amazon_campaign_id
+      const { data: campaignData, error: campaignError } = await supabase
+        .from('campaigns')
+        .select('id')
+        .eq('amazon_campaign_id', campaign.campaign_id)
+        .single();
+
+      if (campaignError || !campaignData) {
+        toast.error('Campaign not found');
+        return;
+      }
+
+      // Fetch ad groups using the campaign UUID
+      const { data: adGroups, error: adGroupsError } = await supabase
+        .from('ad_groups')
+        .select(`
+          id,
+          name,
+          status,
+          default_bid,
+          impressions,
+          clicks,
+          spend,
+          sales,
+          orders,
+          acos,
+          roas
+        `)
+        .eq('campaign_id', campaignData.id);
+
+      if (adGroupsError) throw adGroupsError;
+
+      // Fetch keywords for all ad groups in this campaign
+      const adGroupIds = (adGroups || []).map(ag => ag.id);
+      let keywords: any[] = [];
+      
+      if (adGroupIds.length > 0) {
+        const { data: keywordData, error: keywordsError } = await supabase
+          .from('keywords')
+          .select(`
+            id,
+            keyword_text,
+            match_type,
+            bid,
+            status,
+            impressions,
+            clicks,
+            spend,
+            sales,
+            orders,
+            acos,
+            roas,
+            adgroup_id
+          `)
+          .in('adgroup_id', adGroupIds);
+
+        if (keywordsError) throw keywordsError;
+        keywords = keywordData || [];
+      }
 
       setSelectedCampaign({
         campaign,
-        keywords: [], // Keywords will be shown in ad group drill-down
+        keywords,
         adGroups: adGroups || [],
       });
     } catch (error) {
