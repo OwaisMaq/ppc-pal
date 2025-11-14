@@ -131,15 +131,36 @@ class EntitySyncer {
       return 'https://advertising-api.amazon.com'; // Default to North America
     }
     
-    const urlParts = endpoint.split('.');
-    if (urlParts.length >= 2) {
-      const region = urlParts[1]; // e.g., 'eu' from 'advertising-api.eu.amazon.com'
-      const baseUrl = `https://advertising-api.${region}.amazon.com`;
+    // Strip protocol if present
+    const cleanEndpoint = endpoint.replace(/^https?:\/\//, '');
+    
+    // Handle hyphen-based format: advertising-api-eu.amazon.com
+    // or dot-based format: advertising-api.eu.amazon.com
+    const hyphenMatch = cleanEndpoint.match(/^advertising-api-([a-z]+)\.amazon\.com$/i);
+    if (hyphenMatch) {
+      const region = hyphenMatch[1];
+      const baseUrl = `https://advertising-api-${region}.amazon.com`;
       console.log(`Using regional API endpoint: ${baseUrl}`);
       return baseUrl;
     }
     
-    console.warn(`Failed to parse region from endpoint: ${endpoint}, using default`);
+    // Handle dot-based format
+    const dotMatch = cleanEndpoint.match(/^advertising-api\.([a-z]+)\.amazon\.com$/i);
+    if (dotMatch) {
+      const region = dotMatch[1];
+      const baseUrl = `https://advertising-api-${region}.amazon.com`;
+      console.log(`Using regional API endpoint: ${baseUrl}`);
+      return baseUrl;
+    }
+    
+    // Handle base domain without region (North America)
+    if (cleanEndpoint === 'advertising-api.amazon.com') {
+      const baseUrl = 'https://advertising-api.amazon.com';
+      console.log(`Using default API endpoint: ${baseUrl}`);
+      return baseUrl;
+    }
+    
+    console.warn(`Failed to parse endpoint: ${endpoint}, using default`);
     return 'https://advertising-api.amazon.com'; // fallback
   }
 
