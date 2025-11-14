@@ -80,20 +80,10 @@ export const useBudgetCopilot = () => {
 
     try {
       // Get campaigns with budgets for this profile
-      const { data: connection } = await supabase
-        .from('amazon_connections')
-        .select('id')
-        .eq('profile_id', profileId)
-        .single();
-
-      if (!connection) {
-        throw new Error('Profile not found');
-      }
-
       const { data: campaigns, error: campaignsError } = await supabase
         .from('campaigns')
         .select('id, amazon_campaign_id, name, daily_budget, status')
-        .eq('connection_id', connection.id)
+        .eq('profile_id', profileId)
         .eq('status', 'enabled')
         .not('daily_budget', 'is', null)
         .gt('daily_budget', 0);
