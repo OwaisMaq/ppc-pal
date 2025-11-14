@@ -120,6 +120,7 @@ export type Database = {
           orders: number | null
           orders_14d: number | null
           orders_7d: number | null
+          profile_id: string
           roas: number | null
           roas_14d: number | null
           roas_7d: number | null
@@ -161,6 +162,7 @@ export type Database = {
           orders?: number | null
           orders_14d?: number | null
           orders_7d?: number | null
+          profile_id: string
           roas?: number | null
           roas_14d?: number | null
           roas_7d?: number | null
@@ -202,6 +204,7 @@ export type Database = {
           orders?: number | null
           orders_14d?: number | null
           orders_7d?: number | null
+          profile_id?: string
           roas?: number | null
           roas_14d?: number | null
           roas_7d?: number | null
@@ -1474,6 +1477,7 @@ export type Database = {
           name: string
           placement_bidding: Json | null
           product_type: string | null
+          profile_id: string
           roas: number | null
           roas_14d: number | null
           roas_7d: number | null
@@ -1531,6 +1535,7 @@ export type Database = {
           name: string
           placement_bidding?: Json | null
           product_type?: string | null
+          profile_id: string
           roas?: number | null
           roas_14d?: number | null
           roas_7d?: number | null
@@ -1588,6 +1593,7 @@ export type Database = {
           name?: string
           placement_bidding?: Json | null
           product_type?: string | null
+          profile_id?: string
           roas?: number | null
           roas_14d?: number | null
           roas_7d?: number | null
@@ -2598,6 +2604,7 @@ export type Database = {
           orders: number | null
           orders_14d: number | null
           orders_7d: number | null
+          profile_id: string
           roas: number | null
           roas_14d: number | null
           roas_7d: number | null
@@ -2643,6 +2650,7 @@ export type Database = {
           orders?: number | null
           orders_14d?: number | null
           orders_7d?: number | null
+          profile_id: string
           roas?: number | null
           roas_14d?: number | null
           roas_7d?: number | null
@@ -2688,6 +2696,7 @@ export type Database = {
           orders?: number | null
           orders_14d?: number | null
           orders_7d?: number | null
+          profile_id?: string
           roas?: number | null
           roas_14d?: number | null
           roas_7d?: number | null
