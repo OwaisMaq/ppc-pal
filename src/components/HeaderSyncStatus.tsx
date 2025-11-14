@@ -8,9 +8,18 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { useState, useEffect } from "react";
 
 export const HeaderSyncStatus = () => {
   const { status, loading, refresh } = useSyncStatus();
+  const [lastAutoSync, setLastAutoSync] = useState<Date | null>(null);
+
+  useEffect(() => {
+    const lastSync = localStorage.getItem('ppcpal_last_login_sync');
+    if (lastSync) {
+      setLastAutoSync(new Date(lastSync));
+    }
+  }, []);
 
   if (loading) {
     return null;
@@ -28,9 +37,12 @@ export const HeaderSyncStatus = () => {
           </TooltipTrigger>
           <TooltipContent>
             <p>All performance data is up to date</p>
-            {status.lastUpdated && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Last sync: {status.lastUpdated.toLocaleString()}
+            <p className="text-xs text-muted-foreground mt-1">
+              Data syncs automatically every 2 hours and on login
+            </p>
+            {lastAutoSync && (
+              <p className="text-xs text-muted-foreground">
+                Last auto-sync: {lastAutoSync.toLocaleString()}
               </p>
             )}
           </TooltipContent>
