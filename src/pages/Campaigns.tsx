@@ -171,18 +171,37 @@ const Campaigns = () => {
   );
 
   const handleCampaignClick = async (campaign: Campaign) => {
+    console.log('🔍 [DEBUG] Campaign clicked:', {
+      campaign_id: campaign.campaign_id,
+      campaign_name: campaign.campaign_name
+    });
+
     setDetailsLoading(true);
     setSelectedCampaign({ campaign, keywords: [], adGroups: [] });
     
     try {
+      // Check authentication state
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log('🔍 [DEBUG] Current session:', {
+        user: session?.user?.email,
+        authenticated: !!session
+      });
+
       // First, get the campaign UUID from amazon_campaign_id
       const { data: campaignData, error: campaignError } = await supabase
         .from('campaigns')
-        .select('id')
+        .select('id, profile_id')
         .eq('amazon_campaign_id', campaign.campaign_id)
         .single();
 
+      console.log('🔍 [DEBUG] Campaign UUID lookup:', {
+        campaignData,
+        campaignError,
+        amazon_campaign_id: campaign.campaign_id
+      });
+
       if (campaignError || !campaignData) {
+        console.error('❌ [DEBUG] Campaign not found in campaigns table');
         toast.error('Campaign not found');
         return;
       }
@@ -201,14 +220,27 @@ const Campaigns = () => {
           sales,
           orders,
           acos,
-          roas
+          roas,
+          profile_id
         `)
         .eq('campaign_id', campaignData.id);
 
-      if (adGroupsError) throw adGroupsError;
+      console.log('🔍 [DEBUG] Ad groups query result:', {
+        adGroups,
+        adGroupsError,
+        count: adGroups?.length || 0,
+        campaign_id: campaignData.id
+      });
+
+      if (adGroupsError) {
+        console.error('❌ [DEBUG] Ad groups error:', adGroupsError);
+        throw adGroupsError;
+      }
 
       // Fetch keywords for all ad groups in this campaign
       const adGroupIds = (adGroups || []).map(ag => ag.id);
+      console.log('🔍 [DEBUG] Ad group IDs for keywords query:', adGroupIds);
+      
       let keywords: any[] = [];
       
       if (adGroupIds.length > 0) {
@@ -227,13 +259,31 @@ const Campaigns = () => {
             orders,
             acos,
             roas,
-            adgroup_id
+            adgroup_id,
+            profile_id
           `)
           .in('adgroup_id', adGroupIds);
 
-        if (keywordsError) throw keywordsError;
+        console.log('🔍 [DEBUG] Keywords query result:', {
+          keywordData,
+          keywordsError,
+          count: keywordData?.length || 0,
+          adGroupIds
+        });
+
+        if (keywordsError) {
+          console.error('❌ [DEBUG] Keywords error:', keywordsError);
+          throw keywordsError;
+        }
         keywords = keywordData || [];
+      } else {
+        console.warn('⚠️ [DEBUG] No ad group IDs found, skipping keywords query');
       }
+
+      console.log('✅ [DEBUG] Final results:', {
+        keywords_count: keywords.length,
+        adGroups_count: adGroups?.length || 0
+      });
 
       setSelectedCampaign({
         campaign,
@@ -241,7 +291,7 @@ const Campaigns = () => {
         adGroups: adGroups || [],
       });
     } catch (error) {
-      console.error('Error fetching campaign details:', error);
+      console.error('❌ [DEBUG] Error fetching campaign details:', error);
       toast.error('Failed to load campaign details');
     } finally {
       setDetailsLoading(false);
