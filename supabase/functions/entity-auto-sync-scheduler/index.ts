@@ -57,17 +57,21 @@ serve(async (req) => {
       try {
         console.log(`🔄 Syncing connection ${connection.profile_id} (${connection.id})`);
         
-        // Call entities-sync-runner for this profile with service role authentication
-        const { data, error } = await supabase.functions.invoke('entities-sync-runner', {
-          body: {
-            profileId: connection.profile_id,
-            entity: 'all',
-            mode: 'incremental'
-          },
-          headers: {
-            Authorization: `Bearer ${serviceRoleKey}`
-          }
+        // Call entities-sync-runner for this profile with query parameters
+        const queryParams = new URLSearchParams({
+          profileId: connection.profile_id,
+          entity: 'all',
+          mode: 'incremental'
         });
+        
+        const { data, error } = await supabase.functions.invoke(
+          `entities-sync-runner?${queryParams.toString()}`,
+          {
+            headers: {
+              Authorization: `Bearer ${serviceRoleKey}`
+            }
+          }
+        );
 
         if (error) {
           console.error(`❌ Sync failed for ${connection.profile_id}:`, error);
