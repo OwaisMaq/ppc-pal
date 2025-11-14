@@ -12,17 +12,6 @@ export const useAmazonData = () => {
   const [targets, setTargets] = useState<Target[]>([]);
   const [loading, setLoading] = useState(false);
   const [lastSyncDiagnostics, setLastSyncDiagnostics] = useState<any | null>(null);
-  
-  // Use localStorage to persist sync attempt across refreshes
-  const getInitialSyncAttempted = () => {
-    try {
-      return localStorage.getItem('ppcpal_initial_sync_attempted') === 'true';
-    } catch {
-      return false;
-    }
-  };
-  
-  const [initialSyncAttempted, setInitialSyncAttempted] = useState(getInitialSyncAttempted());
 
   useEffect(() => {
     console.log('useAmazonData useEffect triggered, user:', user?.id);
@@ -32,78 +21,19 @@ export const useAmazonData = () => {
     }
   }, [user]);
 
-  const fetchAllData = async (skipAutoSync = false) => {
-    console.log('fetchAllData called, skipAutoSync:', skipAutoSync, 'initialSyncAttempted:', initialSyncAttempted);
+  const fetchAllData = async () => {
+    console.log('fetchAllData called');
     setLoading(true);
     try {
-      // Fetch data and get actual counts to avoid stale state issues
-      const [campaignCount] = await Promise.all([
-        fetchCampaigns().then(() => {
-          // Return the actual count by querying directly
-          return supabase
-            .from('campaigns')
-            .select('id', { count: 'exact', head: true })
-            .then(({ count }) => count || 0);
-        }),
+      await Promise.all([
+        fetchCampaigns(),
         fetchAdGroups(),
         fetchKeywords(),
         fetchTargets()
       ]);
-      
-      console.log('Data fetched - actual campaign count:', campaignCount, 'skipAutoSync:', skipAutoSync, 'initialSyncAttempted:', initialSyncAttempted);
-
-      // One-time auto sync if user has a connection but no data yet
-      // Skip if explicitly disabled to prevent loops
-      if (!skipAutoSync && !initialSyncAttempted && campaignCount === 0) {
-        console.log('Checking for auto-sync conditions...');
-        setInitialSyncAttempted(true);
-        try {
-          localStorage.setItem('ppcpal_initial_sync_attempted', 'true');
-        } catch (e) {
-          console.warn('Could not persist sync attempt flag:', e);
-        }
-        
-        try {
-          const { data: conns } = await supabase
-            .from('amazon_connections')
-            .select('id, status, token_expires_at')
-            .eq('user_id', user!.id)
-            .order('created_at', { ascending: false });
-
-          const usable = (conns || []).find((c: any) => {
-            const status = String(c?.status || '').toLowerCase().trim();
-            const tokenOk = c?.token_expires_at ? new Date(c.token_expires_at) > new Date() : true;
-            return status === 'active' || ((status === 'setup_required' || status === 'pending') && tokenOk);
-          });
-
-          console.log('Usable connection found:', !!usable);
-          
-          if (usable) {
-            console.log('Triggering auto-sync for connection:', usable.id);
-            const session = await supabase.auth.getSession();
-            const token = session.data.session?.access_token;
-            if (token) {
-              await supabase.functions.invoke('sync-amazon-data', {
-                body: { connectionId: usable.id, dateRangeDays: 7 },
-                headers: { Authorization: `Bearer ${token}` },
-              });
-              console.log('Auto-sync started, will refetch in 3 seconds with skipAutoSync=true');
-              // Refetch after a delay, but with skipAutoSync=true to prevent loop
-              setTimeout(() => { 
-                console.log('Refetching after auto-sync timeout');
-                fetchAllData(true); 
-              }, 3000);
-            }
-          }
-        } catch (e) {
-          console.warn('Initial sync attempt skipped:', (e as any)?.message || e);
-        }
-      } else {
-        console.log('Skipping auto-sync check - skipAutoSync:', skipAutoSync, 'initialSyncAttempted:', initialSyncAttempted, 'campaignCount:', campaignCount);
-      }
     } catch (error) {
       console.error('Error fetching Amazon data:', error);
-      toast.error('Failed to load Amazon data');
+      toast.error('Failed to fetch Amazon data');
     } finally {
       setLoading(false);
     }

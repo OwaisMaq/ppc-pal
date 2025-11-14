@@ -27,13 +27,20 @@ import Onboarding from "@/pages/Onboarding";
 
 import { DateRangeProvider } from "@/context/DateRangeContext";
 import { OnboardingCheck } from "@/components/OnboardingCheck";
+import { useLoginSync } from "@/hooks/useLoginSync";
 
 const queryClient = new QueryClient();
+
+const AppContent = () => {
+  useLoginSync();
+  return null;
+};
 
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <AppContent />
         <TooltipProvider>
           <Toaster />
           <DateRangeProvider>

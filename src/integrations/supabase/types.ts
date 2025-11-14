@@ -1073,6 +1073,73 @@ export type Database = {
         }
         Relationships: []
       }
+      auto_sync_history: {
+        Row: {
+          completed_at: string | null
+          connection_id: string | null
+          created_at: string | null
+          duration_ms: number | null
+          entities_synced: Json | null
+          error_details: Json | null
+          id: string
+          profile_id: string | null
+          started_at: string
+          status: string
+          trigger_type: string
+          user_id: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          connection_id?: string | null
+          created_at?: string | null
+          duration_ms?: number | null
+          entities_synced?: Json | null
+          error_details?: Json | null
+          id?: string
+          profile_id?: string | null
+          started_at?: string
+          status: string
+          trigger_type: string
+          user_id?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          connection_id?: string | null
+          created_at?: string | null
+          duration_ms?: number | null
+          entities_synced?: Json | null
+          error_details?: Json | null
+          id?: string
+          profile_id?: string | null
+          started_at?: string
+          status?: string
+          trigger_type?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "auto_sync_history_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "amazon_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "auto_sync_history_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "amazon_connections_client"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "auto_sync_history_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "amazon_connections_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       automation_rule_runs: {
         Row: {
           actions_enqueued: number | null

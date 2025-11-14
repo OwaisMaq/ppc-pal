@@ -2,7 +2,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { LinkIcon, RefreshCw, Trash2, CheckCircle, AlertCircle, Clock, ExternalLink, RotateCcw } from "lucide-react";
+import { LinkIcon, RefreshCw, Trash2, CheckCircle, AlertCircle, Clock, ExternalLink, RotateCcw, Info } from "lucide-react";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import AmazonOAuthSetup from "@/components/AmazonOAuthSetup";
 import AmazonConnectionDiagnostics from "@/components/AmazonConnectionDiagnostics";
@@ -148,6 +148,25 @@ const AmazonAccountSetup = () => {
                 </div>
               )}
             </>
+          )}
+          
+          {/* Auto-sync information */}
+          {connections.length > 0 && (
+            <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mt-4">
+              <div className="flex items-start gap-3">
+                <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <h4 className="font-medium text-blue-900 dark:text-blue-100">Automatic Data Sync</h4>
+                  <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                    Your campaign data syncs automatically every 2 hours and each time you log in. 
+                    You can also manually sync anytime using the refresh button above.
+                  </p>
+                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
+                    Next scheduled sync: Within 2 hours • Last login sync: {localStorage.getItem('ppcpal_last_login_sync') ? new Date(localStorage.getItem('ppcpal_last_login_sync')!).toLocaleString() : 'Not yet synced'}
+                  </p>
+                </div>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>
