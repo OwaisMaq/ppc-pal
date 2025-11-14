@@ -4073,17 +4073,15 @@ export type Database = {
         Row: {
           ad_id: string | null
           asset_id: string | null
-          clicks: number | null
-          conv: number | null
-          cost_micros: number | null
-          impr: number | null
+          campaign_id: string | null
+          clicks_30d: number | null
+          conv_30d: number | null
+          cost_30d_micros: number | null
+          impressions_30d: number | null
           profile_id: string | null
-          sales_micros: number | null
-          vcomp: number | null
-          vq25: number | null
-          vq50: number | null
-          vq75: number | null
-          vstarts: number | null
+          sales_30d_micros: number | null
+          vcr_30d: number | null
+          video_completes_30d: number | null
         }
         Relationships: []
       }
@@ -4117,12 +4115,11 @@ export type Database = {
           conv_7d: number | null
           cost_micros: number | null
           date: string | null
-          expression: Json | null
           impressions: number | null
-          match_type: string | null
           profile_id: string | null
           sales_7d_micros: number | null
           target_id: string | null
+          target_type: string | null
         }
         Relationships: []
       }
