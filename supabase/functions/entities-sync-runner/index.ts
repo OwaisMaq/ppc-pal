@@ -502,22 +502,11 @@ class EntitySyncer {
   }
 }
 
-async function refreshTokens(supabase: any, profileId: string): Promise<any> {
-  console.log('Refreshing tokens for profile:', profileId);
-  
-  // Get connection ID from profile ID
-  const { data: connection, error: connectionError } = await supabase
-    .from('amazon_connections')
-    .select('id')
-    .eq('profile_id', profileId)
-    .single();
-  
-  if (connectionError || !connection) {
-    throw new Error(`Failed to find connection for profile ${profileId}`);
-  }
+async function refreshTokens(supabase: any, connectionId: string): Promise<any> {
+  console.log('Refreshing tokens for connection:', connectionId);
   
   const { data, error } = await supabase.functions.invoke('refresh-amazon-token', {
-    body: { connectionId: connection.id }
+    body: { connectionId }
   });
 
   if (error) {
@@ -527,8 +516,21 @@ async function refreshTokens(supabase: any, profileId: string): Promise<any> {
   return data;
 }
 
-async function getConnectionConfig(supabase: any, profileId: string): Promise<SyncConfig> {
-  // First set the encryption key for this session
+async function getConnectionConfig(supabase: any, connectionId: string): Promise<SyncConfig> {
+  // First get the connection to find the profile_id
+  const { data: connection, error: connectionError } = await supabase
+    .from('amazon_connections')
+    .select('profile_id, advertising_api_endpoint, marketplace_id')
+    .eq('id', connectionId)
+    .single();
+
+  if (connectionError || !connection) {
+    throw new Error(`Failed to get connection ${connectionId}: ${connectionError?.message || 'No connection found'}`);
+  }
+
+  const profileId = connection.profile_id;
+
+  // Set the encryption key for this session
   await supabase.rpc('set_config', {
     key: 'app.enc_key',
     value: Deno.env.get('ENCRYPTION_KEY')
@@ -543,21 +545,10 @@ async function getConnectionConfig(supabase: any, profileId: string): Promise<Sy
     throw new Error(`Failed to get tokens for profile ${profileId}: ${tokensError?.message || 'No tokens found'}`);
   }
 
-  // Get connection details including regional endpoint
-  const { data: connection, error: connectionError } = await supabase
-    .from('amazon_connections')
-    .select('advertising_api_endpoint, marketplace_id')
-    .eq('profile_id', profileId)
-    .single();
-
-  if (connectionError || !connection) {
-    throw new Error(`Failed to get connection for profile ${profileId}: ${connectionError?.message || 'No connection found'}`);
-  }
-
   const syncer = new EntitySyncer(supabase);
   const baseUrl = syncer.deriveBaseUrl(connection.advertising_api_endpoint);
   
-  console.log(`Profile ${profileId} using endpoint: ${baseUrl} for marketplace: ${connection.marketplace_id}`);
+  console.log(`Connection ${connectionId} (Profile ${profileId}) using endpoint: ${baseUrl} for marketplace: ${connection.marketplace_id}`);
   
   const clientId = Deno.env.get('AMAZON_CLIENT_ID');
   if (!clientId) {
@@ -712,24 +703,24 @@ Deno.serve(async (req) => {
 
   try {
     const url = new URL(req.url);
-    const profileId = url.searchParams.get('profileId');
+    const connectionId = url.searchParams.get('connectionId');
     const entity = url.searchParams.get('entity') || 'all';
     const mode = url.searchParams.get('mode') || 'incremental';
 
-    if (!profileId) {
+    if (!connectionId) {
       return new Response(
-        JSON.stringify({ error: 'profileId parameter is required' }),
+        JSON.stringify({ error: 'connectionId parameter is required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`Starting sync: profileId=${profileId}, entity=${entity}, mode=${mode}`);
+    console.log(`Starting sync: connectionId=${connectionId}, entity=${entity}, mode=${mode}`);
 
     // Get connection configuration
-    const config = await getConnectionConfig(supabase, profileId);
+    const config = await getConnectionConfig(supabase, connectionId);
 
     // Refresh tokens before sync
-    await refreshTokens(supabase, profileId);
+    await refreshTokens(supabase, connectionId);
 
     const results: Record<string, any> = {};
     const entityTypes = entity === 'all' 
@@ -745,7 +736,8 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        profileId,
+        connectionId,
+        profileId: config.profileId,
         mode,
         results
       }),

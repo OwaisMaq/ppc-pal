@@ -57,9 +57,9 @@ serve(async (req) => {
       try {
         console.log(`🔄 Syncing connection ${connection.profile_id} (${connection.id})`);
         
-        // Call entities-sync-runner for this profile with query parameters
+        // Call entities-sync-runner for this connection with query parameters
         const queryParams = new URLSearchParams({
-          profileId: connection.profile_id,
+          connectionId: connection.id,
           entity: 'all',
           mode: 'incremental'
         });
