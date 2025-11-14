@@ -64,14 +64,25 @@ serve(async (req) => {
           mode: 'incremental'
         });
         
-        const { data, error } = await supabase.functions.invoke(
-          `entities-sync-runner?${queryParams.toString()}`,
-          {
-            headers: {
-              Authorization: `Bearer ${serviceRoleKey}`
-            }
+        const functionUrl = `${supabaseUrl}/functions/v1/entities-sync-runner?${queryParams.toString()}`;
+        
+        const response = await fetch(functionUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${serviceRoleKey}`,
+            'Content-Type': 'application/json'
           }
-        );
+        });
+
+        let data = null;
+        let error = null;
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          error = { message: `Function invocation failed: ${response.status} - ${errorText}` };
+        } else {
+          data = await response.json();
+        }
 
         if (error) {
           console.error(`❌ Sync failed for ${connection.profile_id}:`, error);
