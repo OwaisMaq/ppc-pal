@@ -142,7 +142,7 @@ async function processCompletedReport(
             .from('campaigns')
             .update(updateData)
             .eq('amazon_campaign_id', record.campaignId)
-            .eq('connection_id', connectionId)
+            .eq('profile_id', profileId)
 
           if (!error) updated++
           
@@ -203,7 +203,7 @@ async function processCompletedReport(
             .from('ad_groups')
             .update(updateData)
             .eq('amazon_adgroup_id', record.adGroupId)
-            .eq('connection_id', connectionId)
+            .eq('profile_id', profileId)
 
           if (!error) updated++
           
@@ -266,7 +266,7 @@ async function processCompletedReport(
             .from('targets')
             .update(updateData)
             .eq('amazon_target_id', record.targetId)
-            .eq('connection_id', connectionId)
+            .eq('profile_id', profileId)
 
           if (!error) updated++
           break
@@ -298,7 +298,7 @@ async function processCompletedReport(
             .from('keywords')
             .update(updateData)
             .eq('amazon_keyword_id', keywordId)
-            .eq('connection_id', connectionId)
+            .eq('profile_id', profileId)
 
           if (!error) updated++
           break
