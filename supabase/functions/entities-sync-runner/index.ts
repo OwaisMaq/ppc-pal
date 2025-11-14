@@ -505,15 +505,26 @@ class EntitySyncer {
 async function refreshTokens(supabase: any, connectionId: string): Promise<any> {
   console.log('Refreshing tokens for connection:', connectionId);
   
-  const { data, error } = await supabase.functions.invoke('refresh-amazon-token', {
-    body: { connectionId }
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  
+  const functionUrl = `${supabaseUrl}/functions/v1/refresh-amazon-token`;
+  
+  const response = await fetch(functionUrl, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${serviceRoleKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ connectionId })
   });
 
-  if (error) {
-    throw new Error(`Failed to refresh tokens: ${error.message}`);
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to refresh tokens: ${response.status} - ${errorText}`);
   }
 
-  return data;
+  return await response.json();
 }
 
 async function getConnectionConfig(supabase: any, connectionId: string): Promise<SyncConfig> {
