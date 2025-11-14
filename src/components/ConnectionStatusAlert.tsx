@@ -21,7 +21,7 @@ export const ConnectionStatusAlert = ({
     const now = Date.now();
     const expiresAt = new Date(connection.token_expires_at).getTime();
     const isExpired = now >= expiresAt;
-    const expiresWithin24h = (expiresAt - now) < (24 * 60 * 60 * 1000);
+    const expiresWithin5Min = (expiresAt - now) < (5 * 60 * 1000);
 
     switch (status) {
       case 'active':
@@ -34,12 +34,12 @@ export const ConnectionStatusAlert = ({
             actions: ['refresh', 'reconnect']
           };
         }
-        if (expiresWithin24h) {
+        if (expiresWithin5Min) {
           return {
-            variant: 'default' as const,
-            icon: Clock,
-            title: 'Token Expiring Soon',
-            description: 'Your Amazon token expires within 24 hours. Consider refreshing it.',
+            variant: 'destructive' as const,
+            icon: AlertTriangle,
+            title: 'Token Refresh Issue',
+            description: 'Your token is expiring soon and may not have been automatically refreshed. Try refreshing manually.',
             actions: ['refresh']
           };
         }
