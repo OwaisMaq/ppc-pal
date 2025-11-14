@@ -68,7 +68,7 @@ verify_jwt = true
 verify_jwt = false
 
 [functions.entities-sync-runner]
-verify_jwt = true
+verify_jwt = false
 
 [functions.ams-compact-hourly]
 verify_jwt = false
