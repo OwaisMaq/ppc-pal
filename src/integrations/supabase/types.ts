@@ -3591,6 +3591,7 @@ export type Database = {
           orders: number | null
           orders_14d: number | null
           orders_7d: number | null
+          profile_id: string
           roas: number | null
           roas_14d: number | null
           roas_7d: number | null
@@ -3638,6 +3639,7 @@ export type Database = {
           orders?: number | null
           orders_14d?: number | null
           orders_7d?: number | null
+          profile_id: string
           roas?: number | null
           roas_14d?: number | null
           roas_7d?: number | null
@@ -3685,6 +3687,7 @@ export type Database = {
           orders?: number | null
           orders_14d?: number | null
           orders_7d?: number | null
+          profile_id?: string
           roas?: number | null
           roas_14d?: number | null
           roas_7d?: number | null
