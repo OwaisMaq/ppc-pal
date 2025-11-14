@@ -1,5 +1,8 @@
 project_id = "ucbkcxupzjbblnzyiyui"
 
+[functions.refresh-all-tokens]
+verify_jwt = false
+
 [functions.ams-s3-processor]
 verify_jwt = false
 

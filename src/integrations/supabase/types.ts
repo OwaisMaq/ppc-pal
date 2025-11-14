@@ -3759,6 +3759,58 @@ export type Database = {
         }
         Relationships: []
       }
+      token_refresh_log: {
+        Row: {
+          connection_id: string
+          created_at: string
+          error_message: string | null
+          id: string
+          profile_id: string
+          refreshed_at: string
+          status: string
+        }
+        Insert: {
+          connection_id: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          profile_id: string
+          refreshed_at?: string
+          status: string
+        }
+        Update: {
+          connection_id?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          profile_id?: string
+          refreshed_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "token_refresh_log_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "amazon_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "token_refresh_log_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "amazon_connections_client"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "token_refresh_log_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "amazon_connections_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       usage_limits: {
         Row: {
           created_at: string
@@ -4163,6 +4215,7 @@ export type Database = {
         Returns: string
       }
       generate_path_fingerprint: { Args: { path_json: Json }; Returns: string }
+      generate_token_refresh_hmac: { Args: never; Returns: string }
       get_ams_data_freshness: {
         Args: { connection_uuid: string }
         Returns: {
