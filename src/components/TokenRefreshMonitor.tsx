@@ -63,7 +63,10 @@ export const TokenRefreshMonitor = () => {
           profile_id: conn.profile_id,
           profile_name: conn.profile_name,
           token_expires_at: conn.token_expires_at,
-          last_refresh: latestLog || null,
+          last_refresh: latestLog ? {
+            ...latestLog,
+            status: latestLog.status as 'success' | 'failed'
+          } : null,
           hours_until_expiry: Math.round(hoursUntilExpiry * 10) / 10,
         };
       });
