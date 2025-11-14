@@ -227,55 +227,29 @@ export const useAmazonData = () => {
     }
     
     try {
-      // Step 1: Get user's connection IDs
+      // Get user's profile_ids from connections
       const { data: connections } = await supabase
         .from('amazon_connections')
-        .select('id')
+        .select('profile_id')
         .eq('user_id', user.id);
 
-      const connectionIds = (connections || []).map(c => c.id);
+      const profileIds = (connections || []).map((c: any) => c.profile_id).filter(Boolean);
       
-      if (connectionIds.length === 0) {
+      if (profileIds.length === 0) {
         setTargets([]);
         return;
       }
 
-      // Step 2: Get campaigns for these connections
-      const { data: campaigns } = await supabase
-        .from('campaigns')
-        .select('id')
-        .in('connection_id', connectionIds);
-
-      const campaignIds = (campaigns || []).map(c => c.id);
-      
-      if (campaignIds.length === 0) {
-        setTargets([]);
-        return;
-      }
-
-      // Step 3: Get ad groups for these campaigns
-      const { data: adGroups } = await supabase
-        .from('ad_groups')
-        .select('id')
-        .in('campaign_id', campaignIds);
-
-      const adGroupIds = (adGroups || []).map(ag => ag.id);
-      
-      if (adGroupIds.length === 0) {
-        setTargets([]);
-        return;
-      }
-
-      // Step 4: Get targets for these ad groups
+      // Get targets for these profiles (no need for nested queries with profile_id)
       const { data, error } = await supabase
         .from('targets')
         .select('*')
-        .in('adgroup_id', adGroupIds)
+        .in('profile_id', profileIds)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      setTargets(data || []);
+      setTargets((data as any) || []);
       console.log('Fetched targets for user:', user.id, 'count:', data?.length || 0);
     } catch (error) {
       console.error('Error fetching targets:', error);
