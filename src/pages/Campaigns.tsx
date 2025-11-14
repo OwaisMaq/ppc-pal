@@ -81,12 +81,35 @@ const Campaigns = () => {
   const [selectedCampaign, setSelectedCampaign] = useState<CampaignDetails | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
 
+  // Debug component mount
+  useEffect(() => {
+    console.log('🔍 [CAMPAIGNS PAGE] Component mounted at:', new Date().toISOString());
+  }, []);
+
   const hasConnections = connections.length > 0;
   const primaryConnection = connections[0];
 
   useEffect(() => {
     const fetchCampaigns = async () => {
+      console.log('🔍 [CAMPAIGNS PAGE] Initialization:', {
+        user: user?.email,
+        hasUser: !!user,
+        connections: connections.length,
+        primaryConnection: primaryConnection?.profile_id,
+        window_location: window.location.href
+      });
+
+      // Check auth session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      console.log('🔍 [CAMPAIGNS PAGE] Auth session:', {
+        session: !!session,
+        user: session?.user?.email,
+        sessionError,
+        access_token: session?.access_token ? 'present' : 'missing'
+      });
+
       if (!user || !primaryConnection) {
+        console.warn('⚠️ [CAMPAIGNS PAGE] Missing user or connection, aborting');
         setLoading(false);
         return;
       }
@@ -95,11 +118,21 @@ const Campaigns = () => {
         // Fetch campaigns from campaign daily view
         const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
         
+        console.log('🔍 [CAMPAIGNS PAGE] Fetching campaigns:', {
+          profile_id: primaryConnection.profile_id,
+          date_from: thirtyDaysAgo
+        });
+
         const { data, error } = await supabase
           .from('v_campaign_daily')
           .select('*')
           .eq('profile_id', primaryConnection.profile_id)
           .gte('date', thirtyDaysAgo);
+
+        console.log('🔍 [CAMPAIGNS PAGE] Campaigns query result:', {
+          data: data?.length || 0,
+          error
+        });
 
         if (error) throw error;
 
