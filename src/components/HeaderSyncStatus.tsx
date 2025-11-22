@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 
 export const HeaderSyncStatus = () => {
-  const { status, loading, refresh } = useSyncStatus();
+  const { status, reportStatus, loading, refresh } = useSyncStatus();
   const [lastAutoSync, setLastAutoSync] = useState<Date | null>(null);
 
   useEffect(() => {
@@ -20,6 +20,17 @@ export const HeaderSyncStatus = () => {
       setLastAutoSync(new Date(lastSync));
     }
   }, []);
+
+  const formatTimeUntilNext = (nextTime: Date | null) => {
+    if (!nextTime) return null;
+    const now = new Date();
+    const diff = nextTime.getTime() - now.getTime();
+    if (diff <= 0) return 'Due now';
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    if (hours > 0) return `in ${hours}h ${minutes}m`;
+    return `in ${minutes}m`;
+  };
 
   if (loading) {
     return null;
@@ -38,11 +49,16 @@ export const HeaderSyncStatus = () => {
           <TooltipContent>
             <p>All performance data is up to date</p>
             <p className="text-xs text-muted-foreground mt-1">
-              Data syncs automatically every 2 hours and on login
+              Reports requested automatically every 2 hours
             </p>
-            {lastAutoSync && (
+            {reportStatus.lastRequestedAt && (
               <p className="text-xs text-muted-foreground">
-                Last auto-sync: {lastAutoSync.toLocaleString()}
+                Last request: {reportStatus.lastRequestedAt.toLocaleString()}
+              </p>
+            )}
+            {reportStatus.nextScheduledAt && (
+              <p className="text-xs text-muted-foreground">
+                Next request: {formatTimeUntilNext(reportStatus.nextScheduledAt)}
               </p>
             )}
           </TooltipContent>
@@ -83,8 +99,13 @@ export const HeaderSyncStatus = () => {
             {status.pendingCount} report{status.pendingCount !== 1 ? 's' : ''} pending
           </p>
           <p className="text-xs text-muted-foreground">
-            Data will update automatically when complete
+            Data will update automatically when complete (typically 3-5 min)
           </p>
+          {reportStatus.nextScheduledAt && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Next scheduled request: {formatTimeUntilNext(reportStatus.nextScheduledAt)}
+            </p>
+          )}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
