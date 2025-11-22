@@ -568,12 +568,18 @@ async function getConnectionConfig(supabase: any, connectionId: string): Promise
 
   if (!refreshResponse.ok) {
     const errorText = await refreshResponse.text();
-    console.error(`Token refresh failed: ${refreshResponse.status} - ${errorText}`);
-    throw new Error(`Failed to refresh tokens: ${refreshResponse.status} - ${errorText}`);
+    console.error(`Token refresh failed for connection ${connectionId}: ${refreshResponse.status} - ${errorText.substring(0, 200)}`);
+    
+    // Check if it's an expired refresh token (user needs to reconnect)
+    if (refreshResponse.status === 400 && errorText.includes('refresh_token_expired')) {
+      throw new Error(`Amazon connection expired for ${connectionId}. User must reconnect their Amazon account.`);
+    }
+    
+    throw new Error(`Failed to refresh tokens: ${refreshResponse.status} - ${errorText.substring(0, 100)}`);
   }
 
   const refreshResult = await refreshResponse.json();
-  console.log(`Token refresh successful for connection: ${connectionId}`);
+  console.log(`✓ Token refresh successful for connection ${connectionId}, profile ${profileId}`);
 
   // Set the encryption key for this session
   await supabase.rpc('set_config', {
@@ -582,13 +588,26 @@ async function getConnectionConfig(supabase: any, connectionId: string): Promise
   });
 
   // NOW get the freshly refreshed tokens from private storage
-  const { data: tokens, error: tokensError } = await supabase.rpc('get_tokens', {
+  // CRITICAL: get_tokens returns an ARRAY of rows, not a single object
+  const { data: tokensArray, error: tokensError } = await supabase.rpc('get_tokens', {
     p_profile_id: profileId
   });
 
-  if (tokensError || !tokens) {
-    throw new Error(`Failed to get tokens for profile ${profileId}: ${tokensError?.message || 'No tokens found'}`);
+  if (tokensError) {
+    console.error(`Failed to retrieve tokens for profile ${profileId}:`, tokensError);
+    throw new Error(`Failed to get tokens for profile ${profileId}: ${tokensError.message}`);
   }
+
+  // Extract the first (and should be only) token row from the array
+  const tokens = tokensArray?.[0];
+  
+  if (!tokens || !tokens.access_token) {
+    console.error(`No valid tokens found for profile ${profileId}. Tokens array:`, tokensArray);
+    throw new Error(`No valid access token found for profile ${profileId}. Connection may need to be re-authorized.`);
+  }
+
+  console.log(`Successfully retrieved tokens for profile ${profileId}, expires at: ${tokens.expires_at}`);
+  const accessToken = tokens.access_token;
 
   const syncer = new EntitySyncer(supabase);
   const baseUrl = syncer.deriveBaseUrl(connection.advertising_api_endpoint);
@@ -601,9 +620,14 @@ async function getConnectionConfig(supabase: any, connectionId: string): Promise
   }
 
   return {
+    connectionId,
     profileId,
-    accessToken: tokens.access_token,
+    accessToken, // Using the validated token extracted above
+    clientId,
     baseUrl,
+    marketplaceId: connection.marketplace_id
+  };
+}
     clientId
   };
 }
