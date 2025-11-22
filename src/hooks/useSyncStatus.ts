@@ -8,12 +8,21 @@ export interface SyncStatus {
   lastUpdated: Date | null;
 }
 
+export interface ReportRequestStatus {
+  lastRequestedAt: Date | null;
+  nextScheduledAt: Date | null;
+}
+
 export const useSyncStatus = (autoRefresh = true) => {
   const { user } = useAuth();
   const [status, setStatus] = useState<SyncStatus>({
     isProcessing: false,
     pendingCount: 0,
     lastUpdated: null,
+  });
+  const [reportStatus, setReportStatus] = useState<ReportRequestStatus>({
+    lastRequestedAt: null,
+    nextScheduledAt: null,
   });
   const [loading, setLoading] = useState(true);
 
@@ -35,6 +44,10 @@ export const useSyncStatus = (autoRefresh = true) => {
           isProcessing: false,
           pendingCount: 0,
           lastUpdated: null,
+        });
+        setReportStatus({
+          lastRequestedAt: null,
+          nextScheduledAt: null,
         });
         setLoading(false);
         return;
@@ -64,6 +77,28 @@ export const useSyncStatus = (autoRefresh = true) => {
         pendingCount: count ?? 0,
         lastUpdated: mostRecentSync,
       });
+
+      // Get the most recent report request time
+      const { data: allReports } = await supabase
+        .from('amazon_report_requests')
+        .select('created_at')
+        .in('connection_id', connectionIds)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      const lastRequestedAt = allReports?.[0]?.created_at 
+        ? new Date(allReports[0].created_at) 
+        : null;
+
+      // Calculate next scheduled sync (every 2 hours)
+      const nextScheduledAt = lastRequestedAt 
+        ? new Date(lastRequestedAt.getTime() + 2 * 60 * 60 * 1000)
+        : null;
+
+      setReportStatus({
+        lastRequestedAt,
+        nextScheduledAt,
+      });
     } catch (error) {
       console.error('Error checking sync status:', error);
     } finally {
@@ -86,5 +121,5 @@ export const useSyncStatus = (autoRefresh = true) => {
     }
   }, [user, autoRefresh, status.isProcessing]);
 
-  return { status, loading, refresh: checkStatus };
+  return { status, reportStatus, loading, refresh: checkStatus };
 };

@@ -12,6 +12,9 @@ verify_jwt = false
 [functions.ams-report-poller]
 verify_jwt = false
 
+[functions.performance-sync-scheduler]
+verify_jwt = false
+
 [api]
 enabled = true
 port = 54321
