@@ -135,11 +135,17 @@ class EntitySyncer {
     const cleanEndpoint = endpoint.replace(/^https?:\/\//, '');
     
     // Handle hyphen-based format: advertising-api-eu.amazon.com
-    // or dot-based format: advertising-api.eu.amazon.com
     const hyphenMatch = cleanEndpoint.match(/^advertising-api-([a-z]+)\.amazon\.com$/i);
     if (hyphenMatch) {
       const region = hyphenMatch[1];
       const baseUrl = `https://advertising-api-${region}.amazon.com`;
+      
+      // Validate URL doesn't contain duplicates
+      if (baseUrl.includes('amazon.amazon')) {
+        console.error(`Malformed URL detected: ${baseUrl}, using default`);
+        return 'https://advertising-api.amazon.com';
+      }
+      
       console.log(`Using regional API endpoint: ${baseUrl}`);
       return baseUrl;
     }
@@ -149,6 +155,13 @@ class EntitySyncer {
     if (dotMatch) {
       const region = dotMatch[1];
       const baseUrl = `https://advertising-api-${region}.amazon.com`;
+      
+      // Validate URL doesn't contain duplicates
+      if (baseUrl.includes('amazon.amazon')) {
+        console.error(`Malformed URL detected: ${baseUrl}, using default`);
+        return 'https://advertising-api.amazon.com';
+      }
+      
       console.log(`Using regional API endpoint: ${baseUrl}`);
       return baseUrl;
     }
@@ -523,31 +536,6 @@ class EntitySyncer {
   }
 }
 
-async function refreshTokens(supabase: any, connectionId: string): Promise<any> {
-  console.log('Refreshing tokens for connection:', connectionId);
-  
-  const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  
-  const functionUrl = `${supabaseUrl}/functions/v1/refresh-amazon-token`;
-  
-  const response = await fetch(functionUrl, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${serviceRoleKey}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ connectionId })
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Failed to refresh tokens: ${response.status} - ${errorText}`);
-  }
-
-  return await response.json();
-}
-
 async function getConnectionConfig(supabase: any, connectionId: string): Promise<SyncConfig> {
   // First get the connection to find the profile_id
   const { data: connection, error: connectionError } = await supabase
@@ -562,13 +550,38 @@ async function getConnectionConfig(supabase: any, connectionId: string): Promise
 
   const profileId = connection.profile_id;
 
+  // CRITICAL: Refresh tokens FIRST to ensure we always have fresh tokens
+  console.log(`Refreshing tokens for connection: ${connectionId}`);
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  
+  const functionUrl = `${supabaseUrl}/functions/v1/refresh-amazon-token`;
+  
+  const refreshResponse = await fetch(functionUrl, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${serviceRoleKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ connectionId })
+  });
+
+  if (!refreshResponse.ok) {
+    const errorText = await refreshResponse.text();
+    console.error(`Token refresh failed: ${refreshResponse.status} - ${errorText}`);
+    throw new Error(`Failed to refresh tokens: ${refreshResponse.status} - ${errorText}`);
+  }
+
+  const refreshResult = await refreshResponse.json();
+  console.log(`Token refresh successful for connection: ${connectionId}`);
+
   // Set the encryption key for this session
   await supabase.rpc('set_config', {
     key: 'app.enc_key',
     value: Deno.env.get('ENCRYPTION_KEY')
   });
 
-  // Get tokens from private storage
+  // NOW get the freshly refreshed tokens from private storage
   const { data: tokens, error: tokensError } = await supabase.rpc('get_tokens', {
     p_profile_id: profileId
   });
@@ -748,11 +761,8 @@ Deno.serve(async (req) => {
 
     console.log(`Starting sync: connectionId=${connectionId}, entity=${entity}, mode=${mode}`);
 
-    // Get connection configuration
+    // Get connection configuration (which now includes automatic token refresh)
     const config = await getConnectionConfig(supabase, connectionId);
-
-    // Refresh tokens before sync
-    await refreshTokens(supabase, connectionId);
 
     const results: Record<string, any> = {};
     const entityTypes = entity === 'all' 
