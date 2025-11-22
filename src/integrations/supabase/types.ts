@@ -4282,7 +4282,6 @@ export type Database = {
         Returns: string
       }
       generate_path_fingerprint: { Args: { path_json: Json }; Returns: string }
-      generate_token_refresh_hmac: { Args: never; Returns: string }
       get_ams_data_freshness: {
         Args: { connection_uuid: string }
         Returns: {

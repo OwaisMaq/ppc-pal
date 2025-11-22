@@ -2,41 +2,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-hmac-signature',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-// HMAC signature validation
-async function validateHmacSignature(req: Request): Promise<boolean> {
-  const signature = req.headers.get('x-hmac-signature');
-  const secret = Deno.env.get('TOKEN_REFRESH_SECRET');
-  
-  if (!secret) {
-    console.error('TOKEN_REFRESH_SECRET not configured');
-    return false;
-  }
-  
-  if (!signature) {
-    console.error('No HMAC signature provided');
-    return false;
-  }
-
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign', 'verify']
-  );
-
-  const body = await req.clone().text();
-  const signatureBuffer = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
-  const computedSignature = Array.from(new Uint8Array(signatureBuffer))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-
-  return signature === computedSignature;
-}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -44,10 +11,12 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Validate HMAC signature for security
-    const isValid = await validateHmacSignature(req);
-    if (!isValid) {
-      console.error('Invalid HMAC signature');
+    // Verify service role key authentication
+    const authHeader = req.headers.get('authorization');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    
+    if (!authHeader || !serviceRoleKey || !authHeader.includes(serviceRoleKey.substring(0, 30))) {
+      console.error('Unauthorized: Invalid or missing service role key');
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
