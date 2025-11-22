@@ -11,17 +11,25 @@ Deno.serve(async (req) => {
   }
 
   try {
-    console.log('[performance-sync-scheduler] Starting scheduled performance data sync');
+    const { userId, trigger = 'scheduled' } = await req.json().catch(() => ({}));
+    
+    console.log(`[performance-sync-scheduler] Triggered by: ${trigger}${userId ? `, userId: ${userId}` : ''}`);
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Fetch all active Amazon connections
-    const { data: connections, error: connectionsError } = await supabase
+    // Fetch active Amazon connections, filtered by userId if provided
+    let query = supabase
       .from('amazon_connections')
       .select('id, user_id, profile_id, profile_name, status')
       .eq('status', 'active');
+
+    if (userId) {
+      query = query.eq('user_id', userId);
+    }
+
+    const { data: connections, error: connectionsError } = await query;
 
     if (connectionsError) {
       console.error('[performance-sync-scheduler] Error fetching connections:', connectionsError);
