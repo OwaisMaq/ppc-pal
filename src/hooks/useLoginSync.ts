@@ -52,20 +52,29 @@ export const useLoginSync = () => {
           return;
         }
 
-        console.log(`📊 Found ${connections.length} active connections, triggering sync`);
+        console.log(`📊 Found ${connections.length} active connections, triggering entity and performance syncs`);
 
-        await supabase.functions.invoke('entity-auto-sync-scheduler', {
-          body: { 
-            trigger: 'login',
-            userId: user.id 
-          }
-        });
+        const [entityResult, performanceResult] = await Promise.allSettled([
+          supabase.functions.invoke('entity-auto-sync-scheduler', {
+            body: { 
+              trigger: 'login',
+              userId: user.id 
+            }
+          }),
+          supabase.functions.invoke('performance-sync-scheduler', {
+            body: { 
+              trigger: 'login',
+              userId: user.id 
+            }
+          })
+        ]);
 
         const now = new Date().toISOString();
         localStorage.setItem('ppcpal_last_login_sync', now);
         lastSyncRef.current = sessionKey;
 
-        console.log('✅ Login sync triggered successfully');
+        console.log('✅ Entity sync triggered:', entityResult.status);
+        console.log('✅ Performance sync triggered:', performanceResult.status);
       } catch (error) {
         console.error('❌ Login sync failed:', error);
       } finally {
