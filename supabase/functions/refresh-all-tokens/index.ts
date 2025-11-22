@@ -11,12 +11,12 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Verify service role key authentication
-    const authHeader = req.headers.get('authorization');
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    // Verify shared secret authentication
+    const refreshSecret = req.headers.get('x-token-refresh-secret');
+    const expectedSecret = Deno.env.get('TOKEN_REFRESH_SECRET');
     
-    if (!authHeader || !serviceRoleKey || !authHeader.includes(serviceRoleKey.substring(0, 30))) {
-      console.error('Unauthorized: Invalid or missing service role key');
+    if (!refreshSecret || !expectedSecret || refreshSecret !== expectedSecret) {
+      console.error('Unauthorized: Invalid or missing token refresh secret');
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -24,6 +24,7 @@ Deno.serve(async (req) => {
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     console.log('Starting token refresh job...');
