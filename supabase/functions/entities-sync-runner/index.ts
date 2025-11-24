@@ -628,9 +628,6 @@ async function getConnectionConfig(supabase: any, connectionId: string): Promise
     marketplaceId: connection.marketplace_id
   };
 }
-    clientId
-  };
-}
 
 async function syncEntity(
   syncer: EntitySyncer, 
