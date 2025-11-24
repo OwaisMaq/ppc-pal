@@ -6,40 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// AES-GCM helpers for encrypting/decrypting tokens at rest
-const textEncoder = new TextEncoder();
-const textDecoder = new TextDecoder();
-function toBase64(bytes: Uint8Array): string {
-  let binary = '';
-  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
-  return btoa(binary);
-}
-function fromBase64(str: string): Uint8Array {
-  const binary = atob(str);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
-}
-async function getKey() {
-  const secret = Deno.env.get('ENCRYPTION_KEY');
-  if (!secret) throw new Error('ENCRYPTION_KEY not set');
-  const hash = await crypto.subtle.digest('SHA-256', textEncoder.encode(secret));
-  return crypto.subtle.importKey('raw', hash, 'AES-GCM', false, ['encrypt', 'decrypt']);
-}
-async function encryptText(plain: string): Promise<string> {
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const key = await getKey();
-  const buf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, textEncoder.encode(plain));
-  return `${toBase64(iv)}:${toBase64(new Uint8Array(buf))}`;
-}
-async function decryptText(enc: string): Promise<string> {
-  if (!enc || !enc.includes(':')) throw new Error('Invalid ciphertext format');
-  const [ivB64, dataB64] = enc.split(':');
-  const iv = fromBase64(ivB64);
-  const key = await getKey();
-  const buf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, fromBase64(dataB64));
-  return textDecoder.decode(buf);
-}
+// Encryption is now handled by database functions using pgcrypto 'aes' cipher
+// No client-side encryption helpers needed
 
 
 serve(async (req) => {
