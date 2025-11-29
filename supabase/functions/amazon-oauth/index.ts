@@ -10,6 +10,11 @@ const corsHeaders = {
 // Encryption is now handled by database functions using pgcrypto 'aes' cipher
 // No client-side encryption helpers needed
 
+// Helper function for generating URL-safe state parameters
+function toBase64(bytes: Uint8Array): string {
+  return btoa(String.fromCharCode(...bytes));
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
