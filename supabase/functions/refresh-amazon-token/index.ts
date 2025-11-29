@@ -114,7 +114,7 @@ serve(async (req) => {
           status: 'setup_required',
           setup_required_reason: 'Failed to retrieve tokens - please reconnect your Amazon account' 
         })
-        .eq('id', connectionId)
+        .eq('id', connection.id)
       throw new Error('Failed to retrieve stored tokens')
     }
 
@@ -129,7 +129,7 @@ serve(async (req) => {
           status: 'setup_required', 
           setup_required_reason: 'No refresh token found - please reconnect your Amazon account' 
         })
-        .eq('id', connectionId)
+        .eq('id', connection.id)
       throw new Error('No refresh token available')
     }
 
@@ -162,7 +162,7 @@ serve(async (req) => {
           status: 'expired',
           setup_required_reason: 'Token refresh failed - please reconnect'
         })
-        .eq('id', connectionId)
+        .eq('id', connection.id)
       
       throw new Error('Token refresh failed - please reconnect your account')
     }
@@ -183,7 +183,7 @@ serve(async (req) => {
         health_status: 'healthy',
         updated_at: new Date().toISOString()
       })
-      .eq('id', connectionId)
+      .eq('id', connection.id)
 
     if (connectionUpdateError) {
       console.error('Failed to update connection metadata:', connectionUpdateError)
