@@ -663,6 +663,16 @@ serve(async (req) => {
         }
         
         console.log('Successfully stored tokens for profile:', profile.profileId);
+        
+        // Clear any stale error flags after successful reconnection
+        await supabase
+          .from('amazon_connections')
+          .update({ 
+            setup_required_reason: null,
+            health_status: 'healthy'
+          })
+          .eq('user_id', user.id)
+          .eq('profile_id', profile.profileId.toString());
       }
 
       console.log(`Successfully stored connections for user: ${user.id} across ${validProfiles.length} marketplace(s)`)
@@ -681,20 +691,15 @@ serve(async (req) => {
           
           if (connection?.id) {
             // First trigger entity sync for campaign/ad group names
-            console.log(`🏷️ Triggering entity sync for profile ${profile.profileId}...`)
-            supabase.functions.invoke('entities-sync-runner', {
-              body: { 
-                profileId: profile.profileId.toString(),
-                entity: 'all',
-                mode: 'incremental'
-              },
+            console.log(`🏷️ Triggering entity sync for connection ${connection.id}...`)
+            supabase.functions.invoke(`entities-sync-runner?connectionId=${connection.id}&entity=all&mode=incremental`, {
               headers: {
                 Authorization: authHeader!
               }
             }).then(result => {
-              console.log(`✅ Entity sync triggered for profile ${profile.profileId}:`, result)
+              console.log(`✅ Entity sync triggered for connection ${connection.id}:`, result)
             }).catch(error => {
-              console.log(`⚠️ Entity sync failed for profile ${profile.profileId}:`, error)
+              console.log(`⚠️ Entity sync failed for connection ${connection.id}:`, error)
             })
             
             // Then trigger data sync for 7-day backfill - don't await to avoid timeout
