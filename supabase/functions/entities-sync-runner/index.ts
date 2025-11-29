@@ -186,10 +186,6 @@ class EntitySyncer {
       url.searchParams.set('startIndex', cursor.toString());
       url.searchParams.set('count', '100');
       url.searchParams.set('stateFilter', 'enabled,paused,archived');
-      
-      if (args.since) {
-        url.searchParams.set('lastUpdatedAfter', args.since);
-      }
 
       const response = await this.httpClient.makeRequest(url.toString(), {
         headers: this.getApiHeaders(config)
@@ -215,10 +211,6 @@ class EntitySyncer {
       url.searchParams.set('startIndex', cursor.toString());
       url.searchParams.set('count', '100');
       url.searchParams.set('stateFilter', 'enabled,paused,archived');
-      
-      if (args.since) {
-        url.searchParams.set('lastUpdatedAfter', args.since);
-      }
 
       const response = await this.httpClient.makeRequest(url.toString(), {
         headers: this.getApiHeaders(config)
@@ -244,10 +236,6 @@ class EntitySyncer {
       url.searchParams.set('startIndex', cursor.toString());
       url.searchParams.set('count', '100');
       url.searchParams.set('stateFilter', 'enabled,paused,archived');
-      
-      if (args.since) {
-        url.searchParams.set('lastUpdatedAfter', args.since);
-      }
 
       const response = await this.httpClient.makeRequest(url.toString(), {
         headers: this.getApiHeaders(config)
@@ -279,10 +267,6 @@ class EntitySyncer {
       url.searchParams.set('startIndex', cursor.toString());
       url.searchParams.set('count', '100');
       url.searchParams.set('stateFilter', 'enabled,paused,archived');
-      
-      if (args.since) {
-        url.searchParams.set('lastUpdatedAfter', args.since);
-      }
 
       const response = await this.httpClient.makeRequest(url.toString(), {
         headers: this.getApiHeaders(config)
@@ -318,10 +302,6 @@ class EntitySyncer {
       url.searchParams.set('startIndex', cursor.toString());
       url.searchParams.set('count', '100');
       url.searchParams.set('stateFilter', 'enabled,paused,archived');
-      
-      if (args.since) {
-        url.searchParams.set('lastUpdatedAfter', args.since);
-      }
 
       const response = await this.httpClient.makeRequest(url.toString(), {
         headers: this.getApiHeaders(config)
