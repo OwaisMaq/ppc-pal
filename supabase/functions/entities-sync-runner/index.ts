@@ -537,6 +537,8 @@ class EntitySyncer {
 }
 
 async function getConnectionConfig(supabase: any, connectionId: string): Promise<SyncConfig> {
+  console.log(`📋 [EntitySync] getConnectionConfig called with connectionId: ${connectionId}`);
+  
   // First get the connection to find the profile_id
   const { data: connection, error: connectionError } = await supabase
     .from('amazon_connections')
@@ -545,10 +547,12 @@ async function getConnectionConfig(supabase: any, connectionId: string): Promise
     .single();
 
   if (connectionError || !connection) {
+    console.error(`❌ [EntitySync] Failed to get connection ${connectionId}:`, connectionError);
     throw new Error(`Failed to get connection ${connectionId}: ${connectionError?.message || 'No connection found'}`);
   }
 
   const profileId = connection.profile_id;
+  console.log(`✅ [EntitySync] Found connection: profileId=${profileId}, endpoint=${connection.advertising_api_endpoint}, marketplace=${connection.marketplace_id}`);
 
   // CRITICAL: Refresh tokens FIRST to ensure we always have fresh tokens
   console.log(`Refreshing tokens for connection: ${connectionId}`);
@@ -635,12 +639,16 @@ async function syncEntity(
   entityType: string, 
   mode: string
 ): Promise<{ itemsUpserted: number; pagesFetched: number }> {
+  console.log(`🔄 [EntitySync] syncEntity called: entityType=${entityType}, mode=${mode}, profileId=${config.profileId}`);
+  
   const runId = await syncer.createSyncRun(config.profileId, entityType, mode);
+  console.log(`📝 [EntitySync] Created sync_run record: ${runId} for ${entityType}`);
+  
   let itemsUpserted = 0;
   let pagesFetched = 0;
 
   try {
-    console.log(`Starting ${mode} sync for ${entityType} in profile ${config.profileId}`);
+    console.log(`🚀 [EntitySync] Starting ${mode} sync for ${entityType} in profile ${config.profileId}`);
 
     // Get sync state
     const syncState = await syncer.getSyncState(config.profileId, entityType);
@@ -735,7 +743,10 @@ async function syncEntity(
     return { itemsUpserted, pagesFetched };
 
   } catch (error) {
-    console.error(`Failed to sync ${entityType}:`, error);
+    console.error(`❌ [EntitySync] Failed to sync ${entityType}:`, error);
+    console.error(`❌ [EntitySync] Error type: ${error?.constructor?.name}`);
+    console.error(`❌ [EntitySync] Error message: ${(error as Error)?.message}`);
+    console.error(`❌ [EntitySync] Items upserted before error: ${itemsUpserted}, pages fetched: ${pagesFetched}`);
     
     await syncer.updateSyncRun(runId, {
       status: 'error',
@@ -773,17 +784,25 @@ Deno.serve(async (req) => {
     const entity = url.searchParams.get('entity') || 'all';
     const mode = url.searchParams.get('mode') || 'incremental';
 
+    console.log(`🚀 [EntitySync] Function invoked at ${new Date().toISOString()}`);
+    console.log(`🚀 [EntitySync] Full URL: ${req.url}`);
+    console.log(`🚀 [EntitySync] Query params: connectionId=${connectionId}, entity=${entity}, mode=${mode}`);
+    console.log(`🚀 [EntitySync] Request method: ${req.method}`);
+
     if (!connectionId) {
+      console.error(`❌ [EntitySync] Missing connectionId parameter`);
       return new Response(
         JSON.stringify({ error: 'connectionId parameter is required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`Starting sync: connectionId=${connectionId}, entity=${entity}, mode=${mode}`);
+    console.log(`✅ [EntitySync] Starting sync: connectionId=${connectionId}, entity=${entity}, mode=${mode}`);
 
     // Get connection configuration (which now includes automatic token refresh)
+    console.log(`📋 [EntitySync] Fetching connection configuration...`);
     const config = await getConnectionConfig(supabase, connectionId);
+    console.log(`✅ [EntitySync] Configuration retrieved: profileId=${config.profileId}, baseUrl=${config.baseUrl}, marketplace=${config.marketplaceId}`);
 
     const results: Record<string, any> = {};
     const entityTypes = entity === 'all' 

@@ -691,15 +691,25 @@ serve(async (req) => {
           
           if (connection?.id) {
             // First trigger entity sync for campaign/ad group names
-            console.log(`🏷️ Triggering entity sync for connection ${connection.id}...`)
-            supabase.functions.invoke(`entities-sync-runner?connectionId=${connection.id}&entity=all&mode=incremental`, {
+            const entitySyncUrl = `entities-sync-runner?connectionId=${connection.id}&entity=all&mode=incremental`
+            console.log(`🏷️ [OAuth] Triggering entity sync for connection ${connection.id}`)
+            console.log(`🏷️ [OAuth] Entity sync URL: ${entitySyncUrl}`)
+            console.log(`🏷️ [OAuth] Profile ID: ${profile.profileId}, Marketplace: ${profile.countryCode}`)
+            
+            supabase.functions.invoke(entitySyncUrl, {
               headers: {
                 Authorization: authHeader!
               }
             }).then(result => {
-              console.log(`✅ Entity sync triggered for connection ${connection.id}:`, result)
+              console.log(`✅ [OAuth] Entity sync response for connection ${connection.id}:`, JSON.stringify(result, null, 2))
+              if (result.error) {
+                console.error(`❌ [OAuth] Entity sync error details:`, result.error)
+              }
             }).catch(error => {
-              console.log(`⚠️ Entity sync failed for connection ${connection.id}:`, error)
+              console.error(`⚠️ [OAuth] Entity sync invocation failed for connection ${connection.id}:`)
+              console.error(`⚠️ [OAuth] Error type: ${error?.constructor?.name}`)
+              console.error(`⚠️ [OAuth] Error message: ${error?.message}`)
+              console.error(`⚠️ [OAuth] Full error:`, JSON.stringify(error, null, 2))
             })
             
             // Then trigger data sync for 7-day backfill - don't await to avoid timeout
