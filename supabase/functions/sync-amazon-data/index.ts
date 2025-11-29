@@ -612,8 +612,8 @@ serve(async (req) => {
 
     // Define background sync task
     const backgroundSync = async () => {
+      const syncJobId = newJobId
       try {
-        const syncJobId = newJobId
 
         // Update sync job progress with timeout check
         const updateProgress = async (progress: number, phase?: string) => {
@@ -690,7 +690,7 @@ serve(async (req) => {
     });
 
     // Check if token needs refresh (expires within 5 minutes)
-    const expiresAt = new Date(tokens[0].expires_at)
+    const expiresAt = new Date(tokens.expires_at)
     const now = new Date()
     const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000)
 
