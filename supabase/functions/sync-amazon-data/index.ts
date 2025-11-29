@@ -608,25 +608,14 @@ serve(async (req) => {
           throw new Error('ENCRYPTION_KEY environment variable not found')
         }
 
-        // Set encryption key in session for token decryption
-        const { error: setKeyError } = await supabase
-          .rpc('set_config', {
-            key: 'app.enc_key',
-            value: encryptionKey,
-            is_local: true
-          });
+        // Get tokens using direct encryption key parameter (no session config needed)
+        const { data: tokensArray, error: tokensError } = await supabase.rpc('get_tokens_with_key', {
+          p_profile_id: connection.profile_id,
+          p_encryption_key: encryptionKey
+        });
 
-        if (setKeyError) {
-          console.error('Failed to set encryption key in session:', setKeyError);
-          throw new Error('Failed to configure session for token retrieval');
-        }
-
-        // Get tokens from secure storage using the RPC function
-        let tokensResult;
-        try {
-          tokensResult = await supabase.rpc('get_tokens', { p_profile_id: connection.profile_id });
-        } catch (error) {
-          console.error('RPC get_tokens failed:', error);
+        if (tokensError || !tokensArray || tokensArray.length === 0) {
+          console.error('Failed to retrieve stored tokens:', tokensError)
           
           // Update connection with error status
           await supabase
@@ -637,28 +626,12 @@ serve(async (req) => {
             })
             .eq('id', connectionId)
             
-          throw new Error('Failed to retrieve stored tokens - connection needs to be re-established');
+          throw new Error('Failed to retrieve stored tokens - connection needs to be re-established')
         }
 
-    const { data: tokens, error: tokensError } = tokensResult;
-
-    if (tokensError || !tokens || tokens.length === 0) {
-      console.error('Failed to retrieve stored tokens:', tokensError)
-      
-      // Update connection with error status
-      await supabase
-        .from('amazon_connections')
-        .update({ 
-          setup_required_reason: 'Failed to retrieve tokens - please reconnect your Amazon account',
-          health_status: 'error'
-        })
-        .eq('id', connectionId)
-        
-      throw new Error('Failed to retrieve stored tokens - connection needs to be re-established')
-    }
-
-    let accessToken = tokens[0].access_token
-    const refreshToken = tokens[0].refresh_token
+        const tokens = tokensArray[0];
+        let accessToken = tokens.access_token
+        const refreshToken = tokens.refresh_token
     
     // Debug: Log token info (first and last 10 chars only for security)
     console.log('🔑 Access token format check:', {
