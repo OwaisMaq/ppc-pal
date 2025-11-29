@@ -208,10 +208,20 @@ serve(async (req) => {
           });
         }
 
+        // Get encryption key
+        const encryptionKey = Deno.env.get('ENCRYPTION_KEY');
+        if (!encryptionKey) {
+          return new Response("ENCRYPTION_KEY not configured", { 
+            status: 500, 
+            headers: corsHeaders 
+          });
+        }
+
         // Get tokens from secure storage using RPC with authenticated client
         const { data: tokensArray, error: tokenError } = await auth
-          .rpc('get_tokens', {
-            p_profile_id: conn.profile_id
+          .rpc('get_tokens_with_key', {
+            p_profile_id: conn.profile_id,
+            p_encryption_key: encryptionKey
           });
         
         if (tokenError) {
@@ -378,11 +388,21 @@ serve(async (req) => {
       });
     }
 
+    // Get encryption key
+    const encryptionKey = Deno.env.get('ENCRYPTION_KEY');
+    if (!encryptionKey) {
+      return new Response("ENCRYPTION_KEY not configured", { 
+        status: 500, 
+        headers: corsHeaders 
+      });
+    }
+
     // Get tokens from secure storage using RPC with authenticated client
     console.log("Getting fresh access token...");
     const { data: tokensArray, error: tokenError } = await auth
-      .rpc('get_tokens', {
-        p_profile_id: conn.profile_id
+      .rpc('get_tokens_with_key', {
+        p_profile_id: conn.profile_id,
+        p_encryption_key: encryptionKey
       });
     
     if (tokenError) {

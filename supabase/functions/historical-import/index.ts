@@ -86,21 +86,39 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Get Amazon access token
-    const { data: tokens } = await supabaseAdmin
-      .from('amazon_connections')
-      .select('access_token_encrypted')
-      .eq('id', connection.id)
-      .single()
+    // Get encryption key
+    const encryptionKey = Deno.env.get('ENCRYPTION_KEY')
+    if (!encryptionKey) {
+      return new Response(
+        JSON.stringify({ error: 'ENCRYPTION_KEY not configured' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
-    if (!tokens?.access_token_encrypted) {
+    // Get decrypted Amazon access token using RPC
+    const { data: tokensArray, error: tokenError } = await supabaseAdmin
+      .rpc('get_tokens_with_key', {
+        p_profile_id: profileId,
+        p_encryption_key: encryptionKey
+      })
+
+    if (tokenError || !tokensArray || tokensArray.length === 0) {
+      console.error('Token retrieval error:', tokenError)
       return new Response(
         JSON.stringify({ error: 'Amazon credentials not available' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    const accessToken = tokens.access_token_encrypted
+    const tokens = tokensArray[0]
+    if (!tokens?.access_token) {
+      return new Response(
+        JSON.stringify({ error: 'No valid access token found' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const accessToken = tokens.access_token
     const apiEndpoint = connection.advertising_api_endpoint || 'https://advertising-api.amazon.com'
     const apiVersion = connection.reporting_api_version || 'v3'
 
