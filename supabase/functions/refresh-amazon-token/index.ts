@@ -98,23 +98,12 @@ serve(async (req) => {
       throw new Error('Connection not found')
     }
 
-    // Set encryption key in session for token decryption
-    const { error: setKeyError } = await supabase
-      .rpc('set_config', {
-        key: 'app.enc_key',
-        value: encryptionKey,
-        is_local: true
-      });
-
-    if (setKeyError) {
-      console.error('Failed to set encryption key in session:', setKeyError);
-      throw new Error('Failed to configure session for token retrieval');
-    }
-
-    // Get tokens from secure storage using the RPC function
+    // Get tokens from secure storage using the new function that accepts encryption key directly
+    // This avoids cross-transaction issues with set_config
     const { data: tokensArray, error: tokenError } = await supabase
-      .rpc('get_tokens', {
-        p_profile_id: connection.profile_id
+      .rpc('get_tokens_with_key', {
+        p_profile_id: connection.profile_id,
+        p_encryption_key: encryptionKey
       })
 
     if (tokenError) {

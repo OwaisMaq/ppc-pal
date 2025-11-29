@@ -4321,6 +4321,14 @@ export type Database = {
           refresh_token: string
         }[]
       }
+      get_tokens_with_key: {
+        Args: { p_encryption_key: string; p_profile_id: string }
+        Returns: {
+          access_token: string
+          expires_at: string
+          refresh_token: string
+        }[]
+      }
       grant_admin_role_by_email: {
         Args: { user_email: string }
         Returns: undefined

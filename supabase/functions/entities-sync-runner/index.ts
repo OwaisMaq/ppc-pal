@@ -585,16 +585,12 @@ async function getConnectionConfig(supabase: any, connectionId: string): Promise
   const refreshResult = await refreshResponse.json();
   console.log(`✓ Token refresh successful for connection ${connectionId}, profile ${profileId}`);
 
-  // Set the encryption key for this session
-  await supabase.rpc('set_config', {
-    key: 'app.enc_key',
-    value: Deno.env.get('ENCRYPTION_KEY')
-  });
-
-  // NOW get the freshly refreshed tokens from private storage
-  // CRITICAL: get_tokens returns an ARRAY of rows, not a single object
-  const { data: tokensArray, error: tokensError } = await supabase.rpc('get_tokens', {
-    p_profile_id: profileId
+  // Get the freshly refreshed tokens from private storage
+  // Using get_tokens_with_key to pass encryption key directly and avoid cross-transaction issues
+  // CRITICAL: get_tokens_with_key returns an ARRAY of rows, not a single object
+  const { data: tokensArray, error: tokensError } = await supabase.rpc('get_tokens_with_key', {
+    p_profile_id: profileId,
+    p_encryption_key: Deno.env.get('ENCRYPTION_KEY')
   });
 
   if (tokensError) {
