@@ -526,35 +526,81 @@ serve(async (req) => {
     }
 
     const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-    
-    if (authError || !user) {
-      throw new Error('Invalid authorization')
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
+    let userId: string
+    let isServiceCall = false
+
+    // Parse request body early to get connectionId
+    const { connectionId, dateRangeDays, diagnosticMode, timeUnit } = await req.json()
+
+    // Check if this is a service role call (from schedulers)
+    if (token === serviceRoleKey) {
+      console.log('🔑 Service role authentication detected')
+      isServiceCall = true
+      
+      // For service calls, get user_id from connection
+      if (!connectionId) {
+        throw new Error('connectionId required for service role calls')
+      }
+      
+      const { data: connection, error: connError } = await supabase
+        .from('amazon_connections')
+        .select('user_id')
+        .eq('id', connectionId)
+        .single()
+        
+      if (connError || !connection) {
+        throw new Error('Connection not found')
+      }
+      userId = connection.user_id
+    } else {
+      // User JWT authentication
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+      if (authError || !user) {
+        throw new Error('Invalid authorization')
+      }
+      userId = user.id
     }
 
-    const { connectionId, dateRangeDays, diagnosticMode, timeUnit } = await req.json()
     const dateRange = Number(dateRangeDays) || 7
     const diag = Boolean(diagnosticMode)
     const timeUnitOpt: 'SUMMARY' | 'DAILY' = 'SUMMARY' // Use SUMMARY for faster processing
-    console.log('🚀 Starting sync for user:', user.id, 'connection:', connectionId, 'dateRangeDays:', dateRange, 'diagnosticMode:', diag)
+    console.log('🚀 Starting sync for user:', userId, 'connection:', connectionId, 'dateRangeDays:', dateRange, 'diagnosticMode:', diag, 'isServiceCall:', isServiceCall)
     
-    // Verify connection exists and belongs to user
-    const { data: connection, error: connectionError } = await supabase
-      .from('amazon_connections')
-      .select('*')
-      .eq('id', connectionId)
-      .eq('user_id', user.id)
-      .single()
+    // Verify connection exists and belongs to user (skip ownership check for service calls)
+    let connection
+    if (!isServiceCall) {
+      const { data: conn, error: connectionError } = await supabase
+        .from('amazon_connections')
+        .select('*')
+        .eq('id', connectionId)
+        .eq('user_id', userId)
+        .single()
 
-    if (connectionError || !connection) {
-      throw new Error('Connection not found or not authorized')
+      if (connectionError || !conn) {
+        throw new Error('Connection not found or not authorized')
+      }
+      connection = conn
+    } else {
+      // Service calls can access any connection (already verified it exists above)
+      const { data: conn, error: connectionError } = await supabase
+        .from('amazon_connections')
+        .select('*')
+        .eq('id', connectionId)
+        .single()
+
+      if (connectionError || !conn) {
+        throw new Error('Connection not found')
+      }
+      connection = conn
     }
 
     // Use helper function to clean up existing jobs and create new one
     const { data: newJobId, error: jobError } = await supabase
       .rpc('cleanup_and_create_sync_job', {
         p_connection_id: connectionId,
-        p_user_id: user.id
+        p_user_id: userId
       })
 
     if (jobError || !newJobId) {

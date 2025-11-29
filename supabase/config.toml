@@ -53,7 +53,7 @@ pop3_port = 54326
 verify_jwt = true
 
 [functions.sync-amazon-data]
-verify_jwt = true
+verify_jwt = false
 
 [functions.check-subscription]
 verify_jwt = true
