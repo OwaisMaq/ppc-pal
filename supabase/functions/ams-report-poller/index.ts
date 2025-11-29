@@ -88,8 +88,14 @@ async function downloadAndParseReport(url: string): Promise<any[]> {
  * Get decrypted access token for a connection
  */
 async function getAccessToken(supabase: any, connectionId: string): Promise<string> {
-  const { data, error } = await supabase.rpc('get_tokens', {
-    p_profile_id: connectionId
+  const encryptionKey = Deno.env.get('ENCRYPTION_KEY')
+  if (!encryptionKey) {
+    throw new Error('ENCRYPTION_KEY not configured')
+  }
+
+  const { data, error } = await supabase.rpc('get_tokens_with_key', {
+    p_profile_id: connectionId,
+    p_encryption_key: encryptionKey
   })
 
   if (error || !data || data.length === 0) {
@@ -370,9 +376,15 @@ Deno.serve(async (req) => {
         }
 
         // Get access token - try to refresh if needed
+        const encryptionKey = Deno.env.get('ENCRYPTION_KEY')
+        if (!encryptionKey) {
+          throw new Error('ENCRYPTION_KEY not configured')
+        }
+
         let accessToken: string
-        let tokenData = await supabase.rpc('get_tokens', {
-          p_profile_id: connection.profile_id
+        let tokenData = await supabase.rpc('get_tokens_with_key', {
+          p_profile_id: connection.profile_id,
+          p_encryption_key: encryptionKey
         })
 
         if (tokenData.error || !tokenData.data || tokenData.data.length === 0) {
@@ -414,8 +426,9 @@ Deno.serve(async (req) => {
             }
 
             // Get new token
-            tokenData = await supabase.rpc('get_tokens', {
-              p_profile_id: connection.profile_id
+            tokenData = await supabase.rpc('get_tokens_with_key', {
+              p_profile_id: connection.profile_id,
+              p_encryption_key: encryptionKey
             })
 
             if (tokenData.error || !tokenData.data || tokenData.data.length === 0) {
