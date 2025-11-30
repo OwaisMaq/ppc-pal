@@ -50,6 +50,21 @@ export const useCampaignMetrics = (connectionId?: string) => {
       setLoading(true);
       setError(null);
 
+      // Lookup profile_id from connection
+      const { data: connectionData, error: connectionError } = await supabase
+        .from("amazon_connections")
+        .select("profile_id")
+        .eq("id", connectionId)
+        .single();
+
+      if (connectionError || !connectionData?.profile_id) {
+        console.error("Connection lookup error:", connectionError);
+        setCampaigns([]);
+        setMetrics(null);
+        setLoading(false);
+        return;
+      }
+
       const { data: campaignData, error: campaignError } = await supabase
         .from("campaigns")
         .select(`
@@ -60,7 +75,7 @@ export const useCampaignMetrics = (connectionId?: string) => {
           attributed_conversions_legacy, attributed_conversions_14d, attributed_conversions_7d,
           acos, roas
         `)
-        .eq("connection_id", connectionId)
+        .eq("profile_id", connectionData.profile_id)
         .order("cost_14d", { ascending: false, nullsFirst: false })
         .limit(500);
 

@@ -68,6 +68,23 @@ export const useAmsMetrics = (connectionId?: string, from?: Date, to?: Date) => 
       setLoading(true);
       setError(null);
 
+      // Lookup profile_id from connection
+      const { data: connectionData, error: connectionError } = await supabase
+        .from("amazon_connections")
+        .select("profile_id")
+        .eq("id", connectionId)
+        .single();
+
+      if (connectionError || !connectionData?.profile_id) {
+        console.error("Connection lookup error:", connectionError);
+        setMetrics(null);
+        setEntityData([]);
+        setLoading(false);
+        return;
+      }
+
+      const profileId = connectionData.profile_id;
+
       const startDate = from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
       const endDate = to || new Date();
 
@@ -75,7 +92,7 @@ export const useAmsMetrics = (connectionId?: string, from?: Date, to?: Date) => 
       const { data: trafficData, error: trafficError } = await supabase
         .from("ams_messages_sp_traffic")
         .select("impressions, clicks, cost, hour_start")
-        .eq("connection_id", connectionId)
+        .eq("profile_id", profileId)
         .gte("hour_start", startDate.toISOString())
         .lte("hour_start", endDate.toISOString())
         .order("hour_start", { ascending: false });
@@ -86,7 +103,7 @@ export const useAmsMetrics = (connectionId?: string, from?: Date, to?: Date) => 
       const { data: conversionData, error: conversionError } = await supabase
         .from("ams_messages_sp_conversion")
         .select("attributed_conversions, attributed_sales, hour_start")
-        .eq("connection_id", connectionId)
+        .eq("profile_id", profileId)
         .gte("hour_start", startDate.toISOString())
         .lte("hour_start", endDate.toISOString())
         .order("hour_start", { ascending: false });
@@ -97,7 +114,7 @@ export const useAmsMetrics = (connectionId?: string, from?: Date, to?: Date) => 
       const { data: campaigns, error: campaignError } = await supabase
         .from("campaigns")
         .select("*")
-        .eq("connection_id", connectionId)
+        .eq("profile_id", profileId)
         .order("cost_14d", { ascending: false, nullsFirst: false })
         .limit(100);
 
@@ -169,7 +186,7 @@ export const useAmsMetrics = (connectionId?: string, from?: Date, to?: Date) => 
       const { data: recentMessages } = await supabase
         .from("ams_messages_sp_traffic")
         .select("received_at")
-        .eq("connection_id", connectionId)
+        .eq("profile_id", profileId)
         .gte("received_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
         .order("received_at", { ascending: false })
         .limit(1);
@@ -177,7 +194,7 @@ export const useAmsMetrics = (connectionId?: string, from?: Date, to?: Date) => 
       const { count: messageCount24h } = await supabase
         .from("ams_messages_sp_traffic")
         .select("*", { count: "exact", head: true })
-        .eq("connection_id", connectionId)
+        .eq("profile_id", profileId)
         .gte("received_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
 
       setMetrics({
