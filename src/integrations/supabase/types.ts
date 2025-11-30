@@ -4172,10 +4172,10 @@ export type Database = {
         Row: {
           campaign_id: string | null
           clicks: number | null
-          conv_7d: number | null
           cost_micros: number | null
           date: string | null
           impressions: number | null
+          orders_7d: number | null
           profile_currency: string | null
           profile_id: string | null
           sales_7d_micros: number | null
