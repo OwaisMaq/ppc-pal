@@ -11,7 +11,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton
 } from "@/components/ui/sidebar";
-import { Bot, LayoutDashboard, Settings, Shield, Target, Sparkles, Search, DollarSign, AlertTriangle, GitBranch, Users } from "lucide-react";
+import { Bot, LayoutDashboard, Settings, Shield, Target, Sparkles, Search, DollarSign, AlertTriangle, GitBranch, Users, Wrench } from "lucide-react";
 
 export function AppSidebar() {
   const location = useLocation();
@@ -30,6 +30,7 @@ export function AppSidebar() {
   const settingsItems = [
     { title: "Settings", url: "/settings", icon: Settings },
     { title: "Privacy", url: "/privacy", icon: Shield },
+    { title: "Dev Tools", url: "/dev-tools", icon: Wrench },
   ];
 
   return (

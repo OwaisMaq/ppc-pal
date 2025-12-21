@@ -24,7 +24,7 @@ import AmazonCallback from "@/pages/AmazonCallback";
 import CookieConsent from "@/components/CookieConsent";
 import Settings from "@/pages/Settings";
 import Onboarding from "@/pages/Onboarding";
-
+import DevTools from "@/pages/DevTools";
 import { DateRangeProvider } from "@/context/DateRangeContext";
 import { OnboardingCheck } from "@/components/OnboardingCheck";
 import { useLoginSync } from "@/hooks/useLoginSync";
@@ -114,6 +114,11 @@ const App = () => {
                 <Route path="/multi-account" element={
                   <ProtectedRoute>
                     <MultiAccount />
+                  </ProtectedRoute>
+                } />
+                <Route path="/dev-tools" element={
+                  <ProtectedRoute>
+                    <DevTools />
                   </ProtectedRoute>
                 } />
                 
