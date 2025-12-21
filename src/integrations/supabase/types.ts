@@ -17,6 +17,8 @@ export type Database = {
       action_queue: {
         Row: {
           action_type: string
+          amazon_api_response: Json | null
+          amazon_request_id: string | null
           applied_at: string | null
           created_at: string | null
           error: string | null
@@ -29,6 +31,8 @@ export type Database = {
         }
         Insert: {
           action_type: string
+          amazon_api_response?: Json | null
+          amazon_request_id?: string | null
           applied_at?: string | null
           created_at?: string | null
           error?: string | null
@@ -41,6 +45,8 @@ export type Database = {
         }
         Update: {
           action_type?: string
+          amazon_api_response?: Json | null
+          amazon_request_id?: string | null
           applied_at?: string | null
           created_at?: string | null
           error?: string | null
