@@ -124,6 +124,9 @@ verify_jwt = true
 [functions.ai-insights]
 verify_jwt = true
 
+[functions.ai-insights-scheduler]
+verify_jwt = false
+
 [functions.ml-predictions]
 verify_jwt = true
 

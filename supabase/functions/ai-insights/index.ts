@@ -38,18 +38,34 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
+    // Check if this is a scheduled run from the scheduler
+    const schedulerUserId = req.headers.get('x-scheduler-user-id');
     const authHeader = req.headers.get('Authorization');
-    const supabase = createClient(supabaseUrl, supabaseKey, {
-      global: { headers: { Authorization: authHeader! } },
-    });
+    
+    let user: { id: string } | null = null;
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    if (schedulerUserId) {
+      // Scheduled run - use the provided user ID
+      console.log(`Scheduled run for user: ${schedulerUserId}`);
+      user = { id: schedulerUserId };
+    } else {
+      // Normal authenticated request
+      const supabaseWithAuth = createClient(supabaseUrl, supabaseKey, {
+        global: { headers: { Authorization: authHeader! } },
       });
+
+      const { data: authData, error: userError } = await supabaseWithAuth.auth.getUser();
+      if (userError || !authData.user) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      user = authData.user;
     }
+
+    // Use service role client for all operations
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Fetch user's Amazon connections
     const { data: connections } = await supabase
