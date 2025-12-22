@@ -29,6 +29,8 @@ const AIInsights = () => {
     insights, 
     strategy, 
     autoApply, 
+    autoAppliedCount,
+    autoAppliedInsights,
     isLoading, 
     isApproving,
     toggleAutoApply, 
@@ -152,12 +154,28 @@ const AIInsights = () => {
           </CardContent>
         </Card>
 
-        {autoApply && (
+        {autoAppliedCount > 0 && (
+          <Alert className="mb-6 border-success bg-success/10">
+            <Check className="h-4 w-4 text-success" />
+            <AlertDescription>
+              <span className="font-medium">{autoAppliedCount} recommendation{autoAppliedCount !== 1 ? 's' : ''} auto-applied:</span>
+              <ul className="mt-1 text-sm list-disc list-inside">
+                {autoAppliedInsights.slice(0, 5).map((name, i) => (
+                  <li key={i} className="truncate">{name}</li>
+                ))}
+                {autoAppliedInsights.length > 5 && (
+                  <li className="text-muted-foreground">...and {autoAppliedInsights.length - 5} more</li>
+                )}
+              </ul>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {autoApply && autoAppliedCount === 0 && (
           <Alert className="mb-6">
             <Sparkles className="h-4 w-4" />
             <AlertDescription>
-              Auto-apply is enabled. High-confidence recommendations will be automatically queued for execution.
-              You can review and undo actions in the Actions Queue.
+              Auto-apply is enabled. High-confidence recommendations matching your criteria will be automatically queued for execution.
             </AlertDescription>
           </Alert>
         )}

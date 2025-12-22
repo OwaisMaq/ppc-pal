@@ -285,11 +285,68 @@ ${JSON.stringify(mlPredictions.map(p => ({
       .single();
 
     const autoApply = settings?.auto_apply_enabled || false;
+    let autoAppliedCount = 0;
+    const autoAppliedInsights: string[] = [];
+
+    // Auto-apply high-confidence insights if enabled
+    if (autoApply && insightsToStore.length > 0) {
+      const maxImpact = settings?.auto_apply_max_impact || 'low';
+      const minConfidence = settings?.auto_apply_min_confidence || 0.8;
+      
+      // Define impact priority for comparison (lower = less risk)
+      const impactPriority: Record<string, number> = { low: 1, medium: 2, high: 3 };
+      const maxImpactPriority = impactPriority[maxImpact] || 1;
+
+      // Filter insights that meet auto-apply criteria
+      const eligibleInsights = insightsToStore.filter(insight => {
+        const meetsConfidence = insight.confidence >= minConfidence;
+        const insightImpactPriority = impactPriority[insight.impact] || 3;
+        const meetsImpact = insightImpactPriority <= maxImpactPriority;
+        return meetsConfidence && meetsImpact;
+      });
+
+      console.log(`Auto-apply check: ${eligibleInsights.length} of ${insightsToStore.length} insights meet criteria`);
+
+      // Queue eligible insights
+      for (const insight of eligibleInsights) {
+        const idempotencyKey = `auto_${user.id}_${insight.entity_id}_${insight.action_type}_${Date.now()}`;
+        
+        const { error: queueError } = await supabase.from('action_queue').insert({
+          action_type: insight.action_type,
+          payload: insight.payload,
+          profile_id: profileId,
+          user_id: user.id,
+          idempotency_key: idempotencyKey,
+          status: 'queued',
+        });
+
+        if (queueError) {
+          console.error('Error queuing auto-apply action:', queueError);
+          continue;
+        }
+
+        // Update insight status to approved (auto-applied)
+        await supabase
+          .from('ai_insights')
+          .update({ status: 'approved', applied_at: new Date().toISOString() })
+          .eq('user_id', user.id)
+          .eq('entity_id', insight.entity_id)
+          .eq('action_type', insight.action_type)
+          .eq('status', 'pending');
+
+        autoAppliedCount++;
+        autoAppliedInsights.push(insight.entity_name || insight.entity_id);
+      }
+
+      console.log(`Auto-applied ${autoAppliedCount} high-confidence insights`);
+    }
 
     return new Response(JSON.stringify({
       insights,
       strategy,
       autoApply,
+      autoAppliedCount,
+      autoAppliedInsights,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
