@@ -41,13 +41,16 @@ serve(async (req) => {
     // Check if this is a scheduled run from the scheduler
     const schedulerUserId = req.headers.get('x-scheduler-user-id');
     const authHeader = req.headers.get('Authorization');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     
     let user: { id: string } | null = null;
+    let isScheduledRun = false;
 
-    if (schedulerUserId) {
-      // Scheduled run - use the provided user ID
+    if (schedulerUserId && authHeader?.includes(serviceRoleKey)) {
+      // Scheduled run with service role auth - use the provided user ID
       console.log(`Scheduled run for user: ${schedulerUserId}`);
       user = { id: schedulerUserId };
+      isScheduledRun = true;
     } else {
       // Normal authenticated request
       const supabaseWithAuth = createClient(supabaseUrl, supabaseKey, {
@@ -88,8 +91,12 @@ serve(async (req) => {
 
     // Call ML predictions function to get statistical predictions
     console.log('Calling ml-predictions for statistical analysis...');
+    const mlAuthHeader = isScheduledRun ? `Bearer ${serviceRoleKey}` : authHeader!;
     const { data: mlData, error: mlError } = await supabase.functions.invoke('ml-predictions', {
-      headers: { Authorization: authHeader! }
+      headers: { 
+        Authorization: mlAuthHeader,
+        ...(isScheduledRun ? { 'x-scheduler-user-id': user.id } : {})
+      }
     });
 
     let mlPredictions = [];

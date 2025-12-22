@@ -70,11 +70,12 @@ serve(async (req) => {
         }
 
         // Generate insights for this user by calling the ai-insights function
-        // We need to invoke it with service role and pass user context
+        // We need to invoke it with service role authorization to bypass JWT check
+        const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
         const { data: insightsData, error: insightsError } = await supabase.functions.invoke('ai-insights', {
           headers: {
-            // Create a minimal JWT-like header for the user context
             'x-scheduler-user-id': user_id,
+            'Authorization': `Bearer ${serviceRoleKey}`,
           },
           body: { scheduledRun: true, userId: user_id }
         });
