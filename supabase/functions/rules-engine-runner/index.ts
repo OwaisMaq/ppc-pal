@@ -184,49 +184,231 @@ class RuleEvaluator {
   }
 
   async evaluateSearchTermHarvest(rule: AutomationRule): Promise<{alerts: any[], actions: any[]}> {
-    const { windowDays = 14, minConvs = 2, maxAcos = 0.35, exactTo = "same_ad_group" } = rule.params;
+    const { windowDays = 14, minConvs = 2, maxAcos = 35, exactTo = "same_ad_group" } = rule.params;
     const alerts: any[] = [];
     const actions: any[] = [];
 
-    console.log(`Evaluating search term harvest for profile ${rule.profile_id}`);
+    console.log(`Evaluating search term harvest for profile ${rule.profile_id} (window: ${windowDays}d, minConvs: ${minConvs}, maxAcos: ${maxAcos}%)`);
     
-    // Note: This would require search term data which we don't have in our current schema
-    // For now, return empty results with a placeholder alert
-    const alert = {
-      rule_id: rule.id,
-      profile_id: rule.profile_id,
-      entity_type: 'search_term',
-      entity_id: 'placeholder',
-      level: 'info',
-      title: 'Search Term Harvest Check',
-      message: 'Search term data not available - requires AMS search term reports',
-      data: { note: 'Feature pending search term data integration' }
-    };
-    alerts.push(alert);
+    // Query search terms with good performance that are NOT already exact match keywords
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - windowDays);
 
+    const { data: harvestCandidates, error } = await this.supabase
+      .from('fact_search_term_daily')
+      .select('*')
+      .eq('profile_id', rule.profile_id)
+      .gte('date', startDate.toISOString().split('T')[0])
+      .neq('match_type', 'EXACT');
+
+    if (error) {
+      console.error('Error fetching search terms for harvest:', error);
+      return { alerts, actions };
+    }
+
+    if (!harvestCandidates?.length) {
+      console.log('No search term candidates found for harvest');
+      return { alerts, actions };
+    }
+
+    // Aggregate by search term
+    const termAggregates = new Map<string, {
+      search_term: string;
+      campaign_id: string;
+      ad_group_id: string;
+      total_clicks: number;
+      total_impressions: number;
+      total_cost_micros: number;
+      total_conversions: number;
+      total_sales_micros: number;
+    }>();
+
+    for (const row of harvestCandidates) {
+      const key = `${row.ad_group_id}:${row.search_term}`;
+      const existing = termAggregates.get(key) || {
+        search_term: row.search_term,
+        campaign_id: row.campaign_id,
+        ad_group_id: row.ad_group_id,
+        total_clicks: 0,
+        total_impressions: 0,
+        total_cost_micros: 0,
+        total_conversions: 0,
+        total_sales_micros: 0
+      };
+
+      existing.total_clicks += row.clicks || 0;
+      existing.total_impressions += row.impressions || 0;
+      existing.total_cost_micros += row.cost_micros || 0;
+      existing.total_conversions += (row.attributed_conversions_7d || 0);
+      existing.total_sales_micros += row.attributed_sales_7d_micros || 0;
+      termAggregates.set(key, existing);
+    }
+
+    // Filter for harvest candidates: minConvs and profitable ACoS
+    for (const [key, agg] of termAggregates) {
+      if (agg.total_conversions < minConvs) continue;
+      
+      const acos = agg.total_sales_micros > 0 
+        ? (agg.total_cost_micros / agg.total_sales_micros) * 100 
+        : 100;
+      
+      if (acos > maxAcos) continue;
+
+      // This is a harvest candidate!
+      const alert = {
+        rule_id: rule.id,
+        profile_id: rule.profile_id,
+        entity_type: 'search_term',
+        entity_id: key,
+        level: 'info',
+        title: 'Keyword Harvest Opportunity',
+        message: `"${agg.search_term}" has ${agg.total_conversions} conversions at ${acos.toFixed(1)}% ACoS - recommend adding as exact match`,
+        data: {
+          search_term: agg.search_term,
+          campaign_id: agg.campaign_id,
+          ad_group_id: agg.ad_group_id,
+          conversions: agg.total_conversions,
+          acos: acos,
+          sales: agg.total_sales_micros / 1e6,
+          spend: agg.total_cost_micros / 1e6,
+          clicks: agg.total_clicks
+        }
+      };
+      alerts.push(alert);
+
+      // Create action if in auto mode
+      if (rule.mode === 'auto') {
+        const action = {
+          rule_id: rule.id,
+          profile_id: rule.profile_id,
+          action_type: 'create_keyword',
+          payload: {
+            campaign_id: agg.campaign_id,
+            ad_group_id: agg.ad_group_id,
+            keyword_text: agg.search_term,
+            match_type: 'EXACT',
+            bid_micros: Math.round(agg.total_cost_micros / Math.max(agg.total_clicks, 1)), // CPC as initial bid
+            reason: `harvest_${acos.toFixed(0)}pct_acos_${agg.total_conversions}_convs`
+          },
+          idempotency_key: this.generateIdempotencyKey(rule.profile_id, 'create_keyword', `${agg.ad_group_id}:${agg.search_term}`)
+        };
+        actions.push(action);
+      }
+    }
+
+    console.log(`Search term harvest: found ${alerts.length} candidates`);
     return { alerts, actions };
   }
 
   async evaluateSearchTermPrune(rule: AutomationRule): Promise<{alerts: any[], actions: any[]}> {
-    const { windowDays = 14, minClicks = 20, maxConvs = 0, negateScope = "ad_group" } = rule.params;
+    const { windowDays = 14, minClicks = 20, minSpend = 10, maxConvs = 0, negateScope = "ad_group" } = rule.params;
     const alerts: any[] = [];
     const actions: any[] = [];
 
-    console.log(`Evaluating search term prune for profile ${rule.profile_id}`);
+    console.log(`Evaluating search term prune for profile ${rule.profile_id} (window: ${windowDays}d, minClicks: ${minClicks}, minSpend: $${minSpend}, maxConvs: ${maxConvs})`);
 
-    // Placeholder - would need search term data
-    const alert = {
-      rule_id: rule.id,
-      profile_id: rule.profile_id,
-      entity_type: 'search_term',
-      entity_id: 'placeholder',
-      level: 'info',
-      title: 'Search Term Prune Check',
-      message: 'Search term data not available - requires AMS search term reports',
-      data: { note: 'Feature pending search term data integration' }
-    };
-    alerts.push(alert);
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - windowDays);
 
+    const { data: pruneData, error } = await this.supabase
+      .from('fact_search_term_daily')
+      .select('*')
+      .eq('profile_id', rule.profile_id)
+      .gte('date', startDate.toISOString().split('T')[0]);
+
+    if (error) {
+      console.error('Error fetching search terms for prune:', error);
+      return { alerts, actions };
+    }
+
+    if (!pruneData?.length) {
+      console.log('No search term data found for prune evaluation');
+      return { alerts, actions };
+    }
+
+    // Aggregate by search term
+    const termAggregates = new Map<string, {
+      search_term: string;
+      campaign_id: string;
+      ad_group_id: string;
+      total_clicks: number;
+      total_cost_micros: number;
+      total_conversions: number;
+    }>();
+
+    for (const row of pruneData) {
+      const key = negateScope === 'campaign' 
+        ? `${row.campaign_id}:${row.search_term}`
+        : `${row.ad_group_id}:${row.search_term}`;
+        
+      const existing = termAggregates.get(key) || {
+        search_term: row.search_term,
+        campaign_id: row.campaign_id,
+        ad_group_id: row.ad_group_id,
+        total_clicks: 0,
+        total_cost_micros: 0,
+        total_conversions: 0
+      };
+
+      existing.total_clicks += row.clicks || 0;
+      existing.total_cost_micros += row.cost_micros || 0;
+      existing.total_conversions += (row.attributed_conversions_7d || 0);
+      termAggregates.set(key, existing);
+    }
+
+    // Filter for prune candidates: high spend/clicks but no conversions
+    const minSpendMicros = minSpend * 1e6;
+    
+    for (const [key, agg] of termAggregates) {
+      const meetsClickThreshold = agg.total_clicks >= minClicks;
+      const meetsSpendThreshold = agg.total_cost_micros >= minSpendMicros;
+      const meetsConvThreshold = agg.total_conversions <= maxConvs;
+      
+      if (!meetsConvThreshold) continue;
+      if (!meetsClickThreshold && !meetsSpendThreshold) continue;
+
+      // This is a prune candidate!
+      const spendDollars = agg.total_cost_micros / 1e6;
+      const alert = {
+        rule_id: rule.id,
+        profile_id: rule.profile_id,
+        entity_type: 'search_term',
+        entity_id: key,
+        level: 'warn',
+        title: 'Negative Keyword Candidate',
+        message: `"${agg.search_term}" has ${agg.total_clicks} clicks, $${spendDollars.toFixed(2)} spend, but only ${agg.total_conversions} conversions`,
+        data: {
+          search_term: agg.search_term,
+          campaign_id: agg.campaign_id,
+          ad_group_id: agg.ad_group_id,
+          clicks: agg.total_clicks,
+          spend: spendDollars,
+          conversions: agg.total_conversions,
+          negate_scope: negateScope
+        }
+      };
+      alerts.push(alert);
+
+      // Create action if in auto mode
+      if (rule.mode === 'auto') {
+        const action = {
+          rule_id: rule.id,
+          profile_id: rule.profile_id,
+          action_type: negateScope === 'campaign' ? 'add_campaign_negative' : 'add_adgroup_negative',
+          payload: {
+            campaign_id: agg.campaign_id,
+            ad_group_id: agg.ad_group_id,
+            keyword_text: agg.search_term,
+            match_type: 'NEGATIVE_EXACT',
+            reason: `prune_${agg.total_clicks}_clicks_$${spendDollars.toFixed(0)}_0conv`
+          },
+          idempotency_key: this.generateIdempotencyKey(rule.profile_id, 'add_negative', key)
+        };
+        actions.push(action);
+      }
+    }
+
+    console.log(`Search term prune: found ${alerts.length} candidates`);
     return { alerts, actions };
   }
 
