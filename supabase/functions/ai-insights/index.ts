@@ -6,6 +6,24 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+interface ActionableInsight {
+  type: 'bid_adjustment' | 'keyword_suggestion' | 'negative_keyword' | 'budget_change';
+  campaign: string;
+  action: string;
+  reason: string;
+  impact: 'low' | 'medium' | 'high';
+  timestamp: string;
+  // Actionable payload for action_queue
+  actionable: {
+    action_type: string;
+    payload: Record<string, unknown>;
+    entity_id: string;
+    entity_name: string;
+    confidence: number;
+    reason_code: string;
+  };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -50,15 +68,7 @@ serve(async (req) => {
     }
 
     const primaryConnection = connections[0];
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-
-    // Fetch campaign performance data
-    const { data: campaigns } = await supabase
-      .from('v_campaign_daily')
-      .select('*')
-      .eq('profile_id', primaryConnection.profile_id)
-      .gte('date', thirtyDaysAgo)
-      .limit(100);
+    const profileId = primaryConnection.profile_id;
 
     // Call ML predictions function to get statistical predictions
     console.log('Calling ml-predictions for statistical analysis...');
@@ -66,43 +76,43 @@ serve(async (req) => {
       headers: { Authorization: authHeader! }
     });
 
+    let mlPredictions = [];
+    let mlSummary = { total_campaigns: 0, waste_detected: 0, winners_detected: 0, anomalies_detected: 0 };
+
     if (mlError) {
       console.error('ML predictions error:', mlError);
-      // Fallback to empty predictions if ML service fails
-      mlData.predictions = [];
-      mlData.summary = { total_campaigns: 0, waste_detected: 0, winners_detected: 0, anomalies_detected: 0 };
+    } else {
+      mlPredictions = mlData?.predictions || [];
+      mlSummary = mlData?.summary || mlSummary;
     }
-
-    const mlPredictions = mlData?.predictions || [];
-    const mlSummary = mlData?.summary || { total_campaigns: 0, waste_detected: 0, winners_detected: 0, anomalies_detected: 0 };
 
     console.log(`Received ${mlPredictions.length} statistical predictions`);
 
-    // Use AI only to explain the numeric predictions in human-readable format
-    const systemPrompt = `You are an Amazon PPC advertising expert AI assistant. Your job is to take STATISTICAL PREDICTIONS (calculated using deterministic math: moving averages, Z-scores, waste detection) and explain them in clear, actionable human language.
+    // If no predictions, return early
+    if (mlPredictions.length === 0) {
+      return new Response(JSON.stringify({
+        insights: [],
+        strategy: 'Your campaigns are performing within normal ranges. No immediate optimizations recommended.',
+        autoApply: false
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
-You will receive:
-- Statistical predictions with numeric actions (e.g., "decrease bid by 15%")
-- Reason codes (e.g., "high_acos_anomaly", "waste_keyword")
-- Metrics (CPC, CTR, CVR, ACOS, ROAS for 7d/14d/30d windows)
-- Z-scores showing statistical anomalies
+    // Use AI to explain the numeric predictions in human-readable format
+    const systemPrompt = `You are an Amazon PPC advertising expert AI assistant. Your job is to take STATISTICAL PREDICTIONS and explain them in clear, actionable human language.
 
 Your response must be valid JSON with this structure:
 {
   "insights": [
     {
-      "type": "bid_adjustment" | "keyword_suggestion" | "negative_keyword" | "budget_change",
-      "campaign": "campaign name",
-      "action": "human-readable action (e.g., 'Decrease bid by 15%' or 'Add negative keywords')",
-      "reason": "2-3 sentence explanation referencing the metrics and why this math-based prediction makes sense",
-      "impact": "low" | "medium" | "high",
-      "timestamp": "ISO date string"
+      "explanation": "2-3 sentence explanation of why this optimization is recommended, referencing specific metrics"
     }
   ],
   "strategy": "2-3 sentence summary explaining the overall statistical patterns detected and recommended strategy"
 }
 
-IMPORTANT: You are NOT making decisions. You are only explaining the decisions already made by the statistical engine in plain English.`;
+IMPORTANT: Return exactly ${mlPredictions.length} explanations in the same order as the input predictions.`;
 
     const userPrompt = `Explain these statistical predictions in clear, actionable language:
 
@@ -112,15 +122,23 @@ Statistical Summary:
 - High performers detected: ${mlSummary.winners_detected}
 - Anomalies detected: ${mlSummary.anomalies_detected}
 
-Predictions to explain:
-${JSON.stringify(mlPredictions, null, 2)}
-
-For each prediction:
-1. Convert the numeric action into a clear instruction (e.g., action_numeric: -0.15 → "Decrease bid by 15%")
-2. Explain the reason_code using the provided metrics (reference specific numbers like CPC, CTR, ACOS, Z-scores)
-3. Make it actionable and easy to understand for advertisers
-
-Keep explanations clear, specific, and reference the actual metrics provided.`;
+Predictions to explain (provide one explanation per prediction):
+${JSON.stringify(mlPredictions.map(p => ({
+  campaign_name: p.campaign_name,
+  prediction_type: p.prediction_type,
+  action_numeric: p.action_numeric,
+  reason_code: p.reason_code,
+  metrics: {
+    acos_14d: p.metrics.acos_14d.toFixed(1),
+    roas_14d: p.metrics.roas_14d.toFixed(2),
+    cpc_14d: p.metrics.cpc_14d.toFixed(2),
+    ctr_14d: p.metrics.ctr_14d.toFixed(2),
+  },
+  anomaly_scores: {
+    acos_zscore: p.anomaly_scores.acos_zscore.toFixed(2),
+    cpc_zscore: p.anomaly_scores.cpc_zscore.toFixed(2),
+  }
+})), null, 2)}`;
 
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -134,7 +152,7 @@ Keep explanations clear, specific, and reference the actual metrics provided.`;
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
-        temperature: 0.3, // Lower temperature for more consistent explanations
+        temperature: 0.3,
       }),
     });
 
@@ -157,23 +175,120 @@ Keep explanations clear, specific, and reference the actual metrics provided.`;
     const aiData = await aiResponse.json();
     const content = aiData.choices?.[0]?.message?.content || '{}';
     
-    let parsedInsights;
+    let parsedAI;
     try {
-      parsedInsights = JSON.parse(content);
+      // Handle potential markdown code blocks
+      const jsonContent = content.replace(/```json\n?|\n?```/g, '').trim();
+      parsedAI = JSON.parse(jsonContent);
     } catch {
-      // Fallback if AI doesn't return valid JSON
-      parsedInsights = {
-        insights: [],
-        strategy: 'Unable to generate insights at this time. Please try again later.',
-      };
+      parsedAI = { insights: [], strategy: 'Analysis complete.' };
     }
 
-    // Auto-apply preference is managed on the client side
-    const autoApply = false;
+    const aiExplanations = parsedAI.insights || [];
+    const strategy = parsedAI.strategy || 'Analyzing your campaigns...';
+
+    // Map ML predictions to actionable insights with AI explanations
+    const mapActionType = (predictionType: string): string => {
+      const mapping: Record<string, string> = {
+        'bid_adjustment': 'set_bid',
+        'budget_change': 'set_budget',
+        'negative_keyword': 'add_negative',
+        'keyword_suggestion': 'suggest_keyword',
+      };
+      return mapping[predictionType] || predictionType;
+    };
+
+    const mapAction = (prediction: any): string => {
+      const { prediction_type, action_numeric } = prediction;
+      if (prediction_type === 'bid_adjustment') {
+        const percent = Math.round(action_numeric * 100);
+        return percent < 0 ? `Decrease bid by ${Math.abs(percent)}%` : `Increase bid by ${percent}%`;
+      }
+      if (prediction_type === 'budget_change') {
+        const percent = Math.round(action_numeric * 100);
+        return percent < 0 ? `Decrease budget by ${Math.abs(percent)}%` : `Increase budget by ${percent}%`;
+      }
+      if (prediction_type === 'negative_keyword') {
+        return 'Add negative keywords or pause underperforming targets';
+      }
+      return 'Review and optimize targeting';
+    };
+
+    const confidenceToNumber = (conf: string): number => {
+      return { high: 0.9, medium: 0.7, low: 0.5 }[conf] || 0.5;
+    };
+
+    const insights: ActionableInsight[] = mlPredictions.map((prediction: any, index: number) => {
+      const aiExplanation = aiExplanations[index]?.explanation || prediction.reason_code;
+      
+      return {
+        type: prediction.prediction_type,
+        campaign: prediction.campaign_name,
+        action: mapAction(prediction),
+        reason: aiExplanation,
+        impact: prediction.impact,
+        timestamp: new Date().toISOString(),
+        actionable: {
+          action_type: mapActionType(prediction.prediction_type),
+          payload: {
+            campaign_id: prediction.campaign_id,
+            adjustment_percent: Math.round(prediction.action_numeric * 100),
+            metrics: prediction.metrics,
+          },
+          entity_id: prediction.campaign_id,
+          entity_name: prediction.campaign_name,
+          confidence: confidenceToNumber(prediction.confidence),
+          reason_code: prediction.reason_code,
+        }
+      };
+    });
+
+    // Store insights in the database for persistence
+    const insightsToStore = insights.map(insight => ({
+      user_id: user.id,
+      profile_id: profileId,
+      insight_type: insight.type,
+      entity_id: insight.actionable.entity_id,
+      entity_name: insight.actionable.entity_name,
+      action_type: insight.actionable.action_type,
+      payload: insight.actionable.payload,
+      explanation: insight.reason,
+      reason_code: insight.actionable.reason_code,
+      impact: insight.impact,
+      confidence: insight.actionable.confidence,
+      status: 'pending',
+    }));
+
+    // Upsert insights (delete old pending ones first for this profile)
+    await supabase
+      .from('ai_insights')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('profile_id', profileId)
+      .eq('status', 'pending');
+
+    if (insightsToStore.length > 0) {
+      const { error: insertError } = await supabase
+        .from('ai_insights')
+        .insert(insightsToStore);
+      
+      if (insertError) {
+        console.error('Error storing insights:', insertError);
+      }
+    }
+
+    // Fetch user's auto-apply settings
+    const { data: settings } = await supabase
+      .from('user_ai_settings')
+      .select('*')
+      .eq('user_id', user.id)
+      .single();
+
+    const autoApply = settings?.auto_apply_enabled || false;
 
     return new Response(JSON.stringify({
-      insights: parsedInsights.insights || [],
-      strategy: parsedInsights.strategy || 'Analyzing your campaigns...',
+      insights,
+      strategy,
       autoApply,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

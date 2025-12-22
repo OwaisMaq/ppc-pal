@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAIInsights } from "@/hooks/useAIInsights";
+import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { 
   Sparkles, 
   TrendingDown, 
@@ -15,18 +16,37 @@ import {
   Target,
   AlertCircle,
   RefreshCw,
-  Lightbulb
+  Lightbulb,
+  Check,
+  X,
+  Loader2
 } from "lucide-react";
 import { format } from "date-fns";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const AIInsights = () => {
-  const { insights, strategy, autoApply, isLoading, toggleAutoApply, refetch } = useAIInsights();
+  const { 
+    insights, 
+    strategy, 
+    autoApply, 
+    isLoading, 
+    isApproving,
+    toggleAutoApply, 
+    approveInsight,
+    rejectInsight,
+    refetch 
+  } = useAIInsights();
+  const { connections } = useAmazonConnections();
   const [filter, setFilter] = useState<'all' | 'high' | 'medium' | 'low'>('all');
+
+  const primaryProfileId = connections?.[0]?.profile_id;
 
   const filteredInsights = filter === 'all' 
     ? insights 
     : insights.filter(i => i.impact === filter);
+
+  // Only show pending insights
+  const pendingInsights = filteredInsights.filter(i => i.status === 'pending' || !i.status);
 
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -67,6 +87,18 @@ const AIInsights = () => {
     return labels[type] || type;
   };
 
+  const handleApprove = (insight: typeof insights[0]) => {
+    if (insight.id && primaryProfileId) {
+      approveInsight(insight.id, primaryProfileId);
+    }
+  };
+
+  const handleReject = (insight: typeof insights[0]) => {
+    if (insight.id) {
+      rejectInsight(insight.id);
+    }
+  };
+
   return (
     <DashboardShell>
       <div className="container mx-auto py-6 px-4">
@@ -77,7 +109,7 @@ const AIInsights = () => {
               AI Insights
             </h1>
             <p className="text-muted-foreground">
-              Understand what the AI is optimizing and why
+              Review and approve AI-powered optimizations for your campaigns
             </p>
           </div>
           <div className="flex items-center gap-4">
@@ -124,8 +156,8 @@ const AIInsights = () => {
           <Alert className="mb-6">
             <Sparkles className="h-4 w-4" />
             <AlertDescription>
-              Auto-apply is enabled. AI recommendations will be automatically implemented.
-              You can review all actions in the feed below.
+              Auto-apply is enabled. High-confidence recommendations will be automatically queued for execution.
+              You can review and undo actions in the Actions Queue.
             </AlertDescription>
           </Alert>
         )}
@@ -135,9 +167,9 @@ const AIInsights = () => {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Recommendations Feed</CardTitle>
+                <CardTitle>Pending Recommendations</CardTitle>
                 <CardDescription>
-                  {filteredInsights.length} recommendation{filteredInsights.length !== 1 ? 's' : ''}
+                  {pendingInsights.length} recommendation{pendingInsights.length !== 1 ? 's' : ''} awaiting review
                 </CardDescription>
               </div>
               <div className="flex gap-2">
@@ -176,42 +208,77 @@ const AIInsights = () => {
             {isLoading ? (
               <div className="space-y-3">
                 {[...Array(5)].map((_, i) => (
-                  <Skeleton key={i} className="h-24 w-full" />
+                  <Skeleton key={i} className="h-28 w-full" />
                 ))}
               </div>
-            ) : filteredInsights.length === 0 ? (
+            ) : pendingInsights.length === 0 ? (
               <div className="text-center py-12">
                 <Sparkles className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <p className="text-muted-foreground">
                   {insights.length === 0 
                     ? 'No recommendations yet. The AI is analyzing your campaigns.'
-                    : 'No recommendations match the selected filter.'}
+                    : 'All recommendations have been reviewed!'}
                 </p>
               </div>
             ) : (
               <div className="space-y-4">
-                {filteredInsights.map((insight, index) => (
-                  <Card key={index} className="border-l-4 border-l-brand-accent">
+                {pendingInsights.map((insight, index) => (
+                  <Card key={insight.id || index} className="border-l-4 border-l-brand-accent">
                     <CardContent className="pt-6">
                       <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-2 flex-wrap">
                             {getTypeIcon(insight.type)}
                             <span className="font-medium">{getTypeLabel(insight.type)}</span>
                             {getImpactBadge(insight.impact)}
+                            {insight.actionable?.confidence && (
+                              <Badge variant="outline" className="text-xs">
+                                {Math.round(insight.actionable.confidence * 100)}% confident
+                              </Badge>
+                            )}
                           </div>
-                          <h4 className="font-semibold text-foreground mb-2">
+                          <h4 className="font-semibold text-foreground mb-2 truncate">
                             {insight.campaign}
                           </h4>
                           <p className="text-sm text-muted-foreground mb-2">
                             <span className="font-medium">Action:</span> {insight.action}
                           </p>
-                          <p className="text-sm text-muted-foreground">
+                          <p className="text-sm text-muted-foreground line-clamp-2">
                             <span className="font-medium">Reason:</span> {insight.reason}
                           </p>
                         </div>
-                        <div className="text-xs text-muted-foreground whitespace-nowrap">
-                          {format(new Date(insight.timestamp), 'MMM dd, yyyy')}
+                        
+                        {/* Action Buttons */}
+                        <div className="flex flex-col gap-2 shrink-0">
+                          <Button 
+                            variant="default" 
+                            size="sm"
+                            onClick={() => handleApprove(insight)}
+                            disabled={!insight.id || !primaryProfileId || isApproving === insight.id}
+                            className="min-w-[90px]"
+                          >
+                            {isApproving === insight.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <>
+                                <Check className="h-4 w-4 mr-1" />
+                                Apply
+                              </>
+                            )}
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleReject(insight)}
+                            disabled={!insight.id || isApproving === insight.id}
+                            className="min-w-[90px]"
+                          >
+                            <X className="h-4 w-4 mr-1" />
+                            Dismiss
+                          </Button>
+                          <span className="text-xs text-muted-foreground text-right mt-1">
+                            {format(new Date(insight.timestamp), 'MMM dd')}
+                          </span>
                         </div>
                       </div>
                     </CardContent>
