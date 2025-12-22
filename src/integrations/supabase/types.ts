@@ -26,8 +26,9 @@ export type Database = {
           idempotency_key: string
           payload: Json
           profile_id: string
-          rule_id: string
+          rule_id: string | null
           status: string
+          user_id: string | null
         }
         Insert: {
           action_type: string
@@ -40,8 +41,9 @@ export type Database = {
           idempotency_key: string
           payload: Json
           profile_id: string
-          rule_id: string
+          rule_id?: string | null
           status?: string
+          user_id?: string | null
         }
         Update: {
           action_type?: string
@@ -54,8 +56,9 @@ export type Database = {
           idempotency_key?: string
           payload?: Json
           profile_id?: string
-          rule_id?: string
+          rule_id?: string | null
           status?: string
+          user_id?: string | null
         }
         Relationships: [
           {

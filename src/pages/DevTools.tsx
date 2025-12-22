@@ -32,7 +32,7 @@ const ACTION_TYPES = [
   { value: 'set_placement_adjust', label: 'Set Placement Adjustment' },
 ];
 
-const PLACEHOLDER_RULE_ID = '00000000-0000-0000-0000-000000000000';
+
 
 export default function DevTools() {
   const { connections } = useAmazonConnections();
@@ -85,8 +85,7 @@ export default function DevTools() {
       await insertAction({
         action_type: actionType,
         payload,
-        profile_id: selectedProfileId,
-        rule_id: PLACEHOLDER_RULE_ID
+        profile_id: selectedProfileId
       });
     } catch (err) {
       // Error is handled in hook
