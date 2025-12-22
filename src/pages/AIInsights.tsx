@@ -6,8 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAIInsights } from "@/hooks/useAIInsights";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
+import { useActionsFeed } from "@/hooks/useActionsFeed";
+import ActionsHistory from "@/components/ActionsHistory";
 import { 
   Sparkles, 
   TrendingDown, 
@@ -19,7 +22,8 @@ import {
   Lightbulb,
   Check,
   X,
-  Loader2
+  Loader2,
+  History
 } from "lucide-react";
 import { format } from "date-fns";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -39,6 +43,7 @@ const AIInsights = () => {
     refetch 
   } = useAIInsights();
   const { connections } = useAmazonConnections();
+  const { stats: actionStats } = useActionsFeed(1);
   const [filter, setFilter] = useState<'all' | 'high' | 'medium' | 'low'>('all');
 
   const primaryProfileId = connections?.[0]?.profile_id;
@@ -180,132 +185,174 @@ const AIInsights = () => {
           </Alert>
         )}
 
-        {/* Recommendations Feed */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Pending Recommendations</CardTitle>
-                <CardDescription>
-                  {pendingInsights.length} recommendation{pendingInsights.length !== 1 ? 's' : ''} awaiting review
-                </CardDescription>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant={filter === 'all' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setFilter('all')}
-                >
-                  All
-                </Button>
-                <Button
-                  variant={filter === 'high' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setFilter('high')}
-                >
-                  High
-                </Button>
-                <Button
-                  variant={filter === 'medium' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setFilter('medium')}
-                >
-                  Medium
-                </Button>
-                <Button
-                  variant={filter === 'low' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setFilter('low')}
-                >
-                  Low
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="space-y-3">
-                {[...Array(5)].map((_, i) => (
-                  <Skeleton key={i} className="h-28 w-full" />
-                ))}
-              </div>
-            ) : pendingInsights.length === 0 ? (
-              <div className="text-center py-12">
-                <Sparkles className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">
-                  {insights.length === 0 
-                    ? 'No recommendations yet. The AI is analyzing your campaigns.'
-                    : 'All recommendations have been reviewed!'}
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {pendingInsights.map((insight, index) => (
-                  <Card key={insight.id || index} className="border-l-4 border-l-brand-accent">
-                    <CardContent className="pt-6">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-2 flex-wrap">
-                            {getTypeIcon(insight.type)}
-                            <span className="font-medium">{getTypeLabel(insight.type)}</span>
-                            {getImpactBadge(insight.impact)}
-                            {insight.actionable?.confidence && (
-                              <Badge variant="outline" className="text-xs">
-                                {Math.round(insight.actionable.confidence * 100)}% confident
-                              </Badge>
-                            )}
+        {/* Tabbed Content */}
+        <Tabs defaultValue="recommendations" className="space-y-4">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="recommendations" className="gap-2">
+              <Sparkles className="h-4 w-4" />
+              Recommendations
+              {pendingInsights.length > 0 && (
+                <Badge variant="secondary" className="ml-1 h-5 px-1.5">
+                  {pendingInsights.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="history" className="gap-2">
+              <History className="h-4 w-4" />
+              Actions History
+              {actionStats.total > 0 && (
+                <Badge variant="secondary" className="ml-1 h-5 px-1.5">
+                  {actionStats.total}
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="recommendations">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Pending Recommendations</CardTitle>
+                    <CardDescription>
+                      {pendingInsights.length} recommendation{pendingInsights.length !== 1 ? 's' : ''} awaiting review
+                    </CardDescription>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant={filter === 'all' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setFilter('all')}
+                    >
+                      All
+                    </Button>
+                    <Button
+                      variant={filter === 'high' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setFilter('high')}
+                    >
+                      High
+                    </Button>
+                    <Button
+                      variant={filter === 'medium' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setFilter('medium')}
+                    >
+                      Medium
+                    </Button>
+                    <Button
+                      variant={filter === 'low' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setFilter('low')}
+                    >
+                      Low
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="space-y-3">
+                    {[...Array(5)].map((_, i) => (
+                      <Skeleton key={i} className="h-28 w-full" />
+                    ))}
+                  </div>
+                ) : pendingInsights.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Sparkles className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">
+                      {insights.length === 0 
+                        ? 'No recommendations yet. The AI is analyzing your campaigns.'
+                        : 'All recommendations have been reviewed!'}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {pendingInsights.map((insight, index) => (
+                      <Card key={insight.id || index} className="border-l-4 border-l-brand-accent">
+                        <CardContent className="pt-6">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                {getTypeIcon(insight.type)}
+                                <span className="font-medium">{getTypeLabel(insight.type)}</span>
+                                {getImpactBadge(insight.impact)}
+                                {insight.actionable?.confidence && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {Math.round(insight.actionable.confidence * 100)}% confident
+                                  </Badge>
+                                )}
+                              </div>
+                              <h4 className="font-semibold text-foreground mb-2 truncate">
+                                {insight.campaign}
+                              </h4>
+                              <p className="text-sm text-muted-foreground mb-2">
+                                <span className="font-medium">Action:</span> {insight.action}
+                              </p>
+                              <p className="text-sm text-muted-foreground line-clamp-2">
+                                <span className="font-medium">Reason:</span> {insight.reason}
+                              </p>
+                            </div>
+                            
+                            {/* Action Buttons */}
+                            <div className="flex flex-col gap-2 shrink-0">
+                              <Button 
+                                variant="default" 
+                                size="sm"
+                                onClick={() => handleApprove(insight)}
+                                disabled={!insight.id || !primaryProfileId || isApproving === insight.id}
+                                className="min-w-[90px]"
+                              >
+                                {isApproving === insight.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <>
+                                    <Check className="h-4 w-4 mr-1" />
+                                    Apply
+                                  </>
+                                )}
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                onClick={() => handleReject(insight)}
+                                disabled={!insight.id || isApproving === insight.id}
+                                className="min-w-[90px]"
+                              >
+                                <X className="h-4 w-4 mr-1" />
+                                Dismiss
+                              </Button>
+                              <span className="text-xs text-muted-foreground text-right mt-1">
+                                {format(new Date(insight.timestamp), 'MMM dd')}
+                              </span>
+                            </div>
                           </div>
-                          <h4 className="font-semibold text-foreground mb-2 truncate">
-                            {insight.campaign}
-                          </h4>
-                          <p className="text-sm text-muted-foreground mb-2">
-                            <span className="font-medium">Action:</span> {insight.action}
-                          </p>
-                          <p className="text-sm text-muted-foreground line-clamp-2">
-                            <span className="font-medium">Reason:</span> {insight.reason}
-                          </p>
-                        </div>
-                        
-                        {/* Action Buttons */}
-                        <div className="flex flex-col gap-2 shrink-0">
-                          <Button 
-                            variant="default" 
-                            size="sm"
-                            onClick={() => handleApprove(insight)}
-                            disabled={!insight.id || !primaryProfileId || isApproving === insight.id}
-                            className="min-w-[90px]"
-                          >
-                            {isApproving === insight.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <>
-                                <Check className="h-4 w-4 mr-1" />
-                                Apply
-                              </>
-                            )}
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => handleReject(insight)}
-                            disabled={!insight.id || isApproving === insight.id}
-                            className="min-w-[90px]"
-                          >
-                            <X className="h-4 w-4 mr-1" />
-                            Dismiss
-                          </Button>
-                          <span className="text-xs text-muted-foreground text-right mt-1">
-                            {format(new Date(insight.timestamp), 'MMM dd')}
-                          </span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="history">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <History className="h-5 w-5 text-brand-accent" />
+                  Actions History
+                </CardTitle>
+                <CardDescription>
+                  Track all auto-applied actions and their outcomes
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ActionsHistory />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </DashboardShell>
   );
