@@ -29,6 +29,8 @@ interface AIInsightsResponse {
   insights: AIInsight[];
   strategy: string;
   autoApply: boolean;
+  autoAppliedCount?: number;
+  autoAppliedInsights?: string[];
 }
 
 interface AISettings {
@@ -98,7 +100,14 @@ export const useAIInsights = () => {
         throw error;
       }
       
-      return data as AIInsightsResponse;
+      const response = data as AIInsightsResponse;
+      
+      // Show toast if insights were auto-applied
+      if (response.autoAppliedCount && response.autoAppliedCount > 0) {
+        toast.success(`Auto-applied ${response.autoAppliedCount} high-confidence recommendation${response.autoAppliedCount !== 1 ? 's' : ''}`);
+      }
+      
+      return response;
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
     enabled: !!user,
@@ -258,6 +267,8 @@ export const useAIInsights = () => {
     storedInsights: storedInsights || [],
     strategy: data?.strategy || '',
     autoApply: settings.auto_apply_enabled,
+    autoAppliedCount: data?.autoAppliedCount || 0,
+    autoAppliedInsights: data?.autoAppliedInsights || [],
     settings,
     isLoading,
     isApproving,
