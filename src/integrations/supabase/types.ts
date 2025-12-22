@@ -14,18 +14,75 @@ export type Database = {
   }
   public: {
     Tables: {
+      action_outcomes: {
+        Row: {
+          action_id: string
+          after_captured_at: string | null
+          after_metrics: Json | null
+          after_scheduled_at: string
+          before_captured_at: string
+          before_metrics: Json
+          created_at: string
+          id: string
+          metric_delta: Json | null
+          outcome_score: number | null
+          outcome_status: string | null
+          profile_id: string
+        }
+        Insert: {
+          action_id: string
+          after_captured_at?: string | null
+          after_metrics?: Json | null
+          after_scheduled_at?: string
+          before_captured_at?: string
+          before_metrics?: Json
+          created_at?: string
+          id?: string
+          metric_delta?: Json | null
+          outcome_score?: number | null
+          outcome_status?: string | null
+          profile_id: string
+        }
+        Update: {
+          action_id?: string
+          after_captured_at?: string | null
+          after_metrics?: Json | null
+          after_scheduled_at?: string
+          before_captured_at?: string
+          before_metrics?: Json
+          created_at?: string
+          id?: string
+          metric_delta?: Json | null
+          outcome_score?: number | null
+          outcome_status?: string | null
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "action_outcomes_action_id_fkey"
+            columns: ["action_id"]
+            isOneToOne: true
+            referencedRelation: "action_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       action_queue: {
         Row: {
           action_type: string
           amazon_api_response: Json | null
           amazon_request_id: string | null
           applied_at: string | null
+          before_state: Json | null
           created_at: string | null
           error: string | null
           id: string
           idempotency_key: string
           payload: Json
           profile_id: string
+          revert_action_id: string | null
+          revert_reason: string | null
+          reverted_at: string | null
           rule_id: string | null
           status: string
           user_id: string | null
@@ -35,12 +92,16 @@ export type Database = {
           amazon_api_response?: Json | null
           amazon_request_id?: string | null
           applied_at?: string | null
+          before_state?: Json | null
           created_at?: string | null
           error?: string | null
           id?: string
           idempotency_key: string
           payload: Json
           profile_id: string
+          revert_action_id?: string | null
+          revert_reason?: string | null
+          reverted_at?: string | null
           rule_id?: string | null
           status?: string
           user_id?: string | null
@@ -50,12 +111,16 @@ export type Database = {
           amazon_api_response?: Json | null
           amazon_request_id?: string | null
           applied_at?: string | null
+          before_state?: Json | null
           created_at?: string | null
           error?: string | null
           id?: string
           idempotency_key?: string
           payload?: Json
           profile_id?: string
+          revert_action_id?: string | null
+          revert_reason?: string | null
+          reverted_at?: string | null
           rule_id?: string | null
           status?: string
           user_id?: string | null

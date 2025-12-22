@@ -357,6 +357,121 @@ class ActionProcessor {
 }
 
 /**
+ * Capture before metrics for an action to enable outcome tracking
+ */
+async function captureBeforeMetrics(
+  supabase: any,
+  action: QueuedAction
+): Promise<Record<string, number>> {
+  const metrics: Record<string, number> = {};
+  const payload = action.payload;
+
+  try {
+    if (payload.campaign_id) {
+      const { data } = await supabase
+        .from('campaigns')
+        .select('spend, clicks, impressions, acos_7d, roas_7d, sales_7d, orders_7d, budget')
+        .eq('amazon_campaign_id', payload.campaign_id)
+        .eq('profile_id', action.profile_id)
+        .single();
+
+      if (data) {
+        metrics.spend = data.spend || 0;
+        metrics.clicks = data.clicks || 0;
+        metrics.impressions = data.impressions || 0;
+        metrics.acos = data.acos_7d || 0;
+        metrics.roas = data.roas_7d || 0;
+        metrics.sales = data.sales_7d || 0;
+        metrics.orders = data.orders_7d || 0;
+        if (data.budget) metrics.daily_budget_micros = data.budget * 1000000;
+      }
+    } else if (payload.keyword_id) {
+      const { data } = await supabase
+        .from('keywords')
+        .select('spend, clicks, impressions, acos_7d, roas_7d, sales_7d, orders_7d, bid')
+        .eq('amazon_keyword_id', payload.keyword_id)
+        .eq('profile_id', action.profile_id)
+        .single();
+
+      if (data) {
+        metrics.spend = data.spend || 0;
+        metrics.clicks = data.clicks || 0;
+        metrics.impressions = data.impressions || 0;
+        metrics.acos = data.acos_7d || 0;
+        metrics.roas = data.roas_7d || 0;
+        metrics.sales = data.sales_7d || 0;
+        metrics.orders = data.orders_7d || 0;
+        if (data.bid) metrics.bid_micros = data.bid * 1000000;
+      }
+    } else if (payload.target_id) {
+      const { data } = await supabase
+        .from('targets')
+        .select('spend, clicks, impressions, acos_7d, roas_7d, sales_7d, orders_7d, bid')
+        .eq('amazon_target_id', payload.target_id)
+        .eq('profile_id', action.profile_id)
+        .single();
+
+      if (data) {
+        metrics.spend = data.spend || 0;
+        metrics.clicks = data.clicks || 0;
+        metrics.impressions = data.impressions || 0;
+        metrics.acos = data.acos_7d || 0;
+        metrics.roas = data.roas_7d || 0;
+        metrics.sales = data.sales_7d || 0;
+        metrics.orders = data.orders_7d || 0;
+        if (data.bid) metrics.bid_micros = data.bid * 1000000;
+      }
+    } else if (payload.ad_group_id) {
+      const { data } = await supabase
+        .from('ad_groups')
+        .select('spend, clicks, impressions, acos_7d, roas_7d, sales_7d, orders_7d, default_bid')
+        .eq('amazon_adgroup_id', payload.ad_group_id)
+        .eq('profile_id', action.profile_id)
+        .single();
+
+      if (data) {
+        metrics.spend = data.spend || 0;
+        metrics.clicks = data.clicks || 0;
+        metrics.impressions = data.impressions || 0;
+        metrics.acos = data.acos_7d || 0;
+        metrics.roas = data.roas_7d || 0;
+        metrics.sales = data.sales_7d || 0;
+        metrics.orders = data.orders_7d || 0;
+        if (data.default_bid) metrics.bid_micros = data.default_bid * 1000000;
+      }
+    }
+  } catch (error) {
+    console.error(`[ActionsWorker] Error capturing before metrics:`, error);
+  }
+
+  return metrics;
+}
+
+/**
+ * Create an outcome record for tracking action effectiveness
+ */
+async function createOutcomeRecord(
+  supabase: any,
+  action: QueuedAction,
+  beforeMetrics: Record<string, number>
+): Promise<void> {
+  try {
+    await supabase
+      .from('action_outcomes')
+      .insert({
+        action_id: action.id,
+        profile_id: action.profile_id,
+        before_metrics: beforeMetrics,
+      });
+    
+    console.log(`[ActionsWorker] Created outcome record for action ${action.id}`);
+  } catch (error) {
+    // Don't fail the action if outcome creation fails
+    console.error(`[ActionsWorker] Error creating outcome record:`, error);
+  }
+}
+
+/**
  * Check if user has permission to auto-apply actions based on plan
  */
 async function checkAutoApplyPermission(
@@ -507,12 +622,16 @@ Deno.serve(async (req) => {
             continue;
           }
 
+          // Capture before metrics for tracking outcomes
+          const beforeMetrics = await captureBeforeMetrics(supabase, action);
+          
           // Process the action
           const result = await processor.processAction(action);
           
           // Prepare update data
           const updateData: any = {
             applied_at: new Date().toISOString(),
+            before_state: beforeMetrics,
           };
 
           if (result.success) {
@@ -521,6 +640,9 @@ Deno.serve(async (req) => {
             updateData.amazon_api_response = result.apiResponse;
             results.successful_actions++;
             console.log(`[ActionsWorker] Action ${action.id} applied successfully`);
+
+            // Create outcome record for tracking effectiveness
+            await createOutcomeRecord(supabase, action, beforeMetrics);
           } else {
             updateData.status = 'failed';
             updateData.error = result.error;
