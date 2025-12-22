@@ -319,6 +319,63 @@ export type Database = {
           },
         ]
       }
+      ai_insights: {
+        Row: {
+          action_type: string
+          applied_at: string | null
+          confidence: number
+          created_at: string
+          entity_id: string
+          entity_name: string | null
+          expires_at: string | null
+          explanation: string
+          id: string
+          impact: string
+          insight_type: string
+          payload: Json
+          profile_id: string
+          reason_code: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          action_type: string
+          applied_at?: string | null
+          confidence?: number
+          created_at?: string
+          entity_id: string
+          entity_name?: string | null
+          expires_at?: string | null
+          explanation: string
+          id?: string
+          impact: string
+          insight_type: string
+          payload?: Json
+          profile_id: string
+          reason_code?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          action_type?: string
+          applied_at?: string | null
+          confidence?: number
+          created_at?: string
+          entity_id?: string
+          entity_name?: string | null
+          expires_at?: string | null
+          explanation?: string
+          id?: string
+          impact?: string
+          insight_type?: string
+          payload?: Json
+          profile_id?: string
+          reason_code?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       alerts: {
         Row: {
           acknowledged_at: string | null
@@ -3933,6 +3990,36 @@ export type Database = {
           optimizations_used?: number
           period_end?: string
           period_start?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_ai_settings: {
+        Row: {
+          auto_apply_action_types: string[] | null
+          auto_apply_enabled: boolean
+          auto_apply_max_impact: string
+          auto_apply_min_confidence: number
+          created_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auto_apply_action_types?: string[] | null
+          auto_apply_enabled?: boolean
+          auto_apply_max_impact?: string
+          auto_apply_min_confidence?: number
+          created_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auto_apply_action_types?: string[] | null
+          auto_apply_enabled?: boolean
+          auto_apply_max_impact?: string
+          auto_apply_min_confidence?: number
+          created_at?: string
           updated_at?: string
           user_id?: string
         }
