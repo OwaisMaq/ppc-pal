@@ -56,21 +56,40 @@ export function useActionQueue(profileId?: string) {
     action_type: string;
     payload: Record<string, unknown>;
     profile_id: string;
-    rule_id: string;
+    rule_id?: string | null;
   }) => {
+    if (!user) {
+      toast.error('You must be logged in to queue actions');
+      throw new Error('Not authenticated');
+    }
+    
     try {
       const idempotencyKey = `manual_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
+      const insertData: {
+        action_type: string;
+        payload: Json;
+        profile_id: string;
+        idempotency_key: string;
+        status: string;
+        user_id: string;
+        rule_id?: string;
+      } = {
+        action_type: action.action_type,
+        payload: action.payload as Json,
+        profile_id: action.profile_id,
+        idempotency_key: idempotencyKey,
+        status: 'queued',
+        user_id: user.id
+      };
+      
+      if (action.rule_id) {
+        insertData.rule_id = action.rule_id;
+      }
+      
       const { data, error: insertError } = await supabase
         .from('action_queue')
-        .insert([{
-          action_type: action.action_type,
-          payload: action.payload as Json,
-          profile_id: action.profile_id,
-          rule_id: action.rule_id,
-          idempotency_key: idempotencyKey,
-          status: 'queued'
-        }])
+        .insert([insertData])
         .select()
         .single();
       
@@ -84,7 +103,7 @@ export function useActionQueue(profileId?: string) {
       toast.error(err instanceof Error ? err.message : 'Failed to queue action');
       throw err;
     }
-  }, [fetchActions]);
+  }, [user, fetchActions]);
 
   const triggerWorker = useCallback(async () => {
     try {
