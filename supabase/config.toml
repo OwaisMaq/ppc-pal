@@ -133,3 +133,6 @@ verify_jwt = false
 [functions.budget-forecast]
 verify_jwt = true
 
+[functions.search-term-sync]
+verify_jwt = false
+
