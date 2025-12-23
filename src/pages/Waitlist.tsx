@@ -91,29 +91,29 @@ const Waitlist = () => {
             
             {/* Dashboard content */}
             <div className="p-3 sm:p-6 space-y-3 sm:space-y-6">
-              {/* KPI Row */}
-              <div className="grid grid-cols-5 gap-2 sm:gap-4">
-                <div className="bg-muted/50 rounded-lg p-2 sm:p-4 text-left">
-                  <p className="text-[9px] sm:text-sm text-primary mb-0.5 sm:mb-1">Savings</p>
-                  <p className="text-sm sm:text-2xl font-semibold text-primary">$3.8k</p>
-                </div>
-                <div className="bg-muted/50 rounded-lg p-2 sm:p-4 text-left">
-                  <p className="text-[9px] sm:text-sm text-muted-foreground mb-0.5 sm:mb-1">Spend</p>
-                  <p className="text-sm sm:text-2xl font-semibold text-foreground">$12k</p>
-                </div>
-                <div className="bg-muted/50 rounded-lg p-2 sm:p-4 text-left">
-                  <p className="text-[9px] sm:text-sm text-muted-foreground mb-0.5 sm:mb-1">ACOS</p>
-                  <p className="text-sm sm:text-2xl font-semibold text-foreground">24%</p>
-                </div>
-                <div className="bg-muted/50 rounded-lg p-2 sm:p-4 text-left">
-                  <p className="text-[9px] sm:text-sm text-muted-foreground mb-0.5 sm:mb-1">ROAS</p>
-                  <p className="text-sm sm:text-2xl font-semibold text-foreground">4.1x</p>
-                </div>
-                <div className="bg-muted/50 rounded-lg p-2 sm:p-4 text-left">
-                  <p className="text-[9px] sm:text-sm text-muted-foreground mb-0.5 sm:mb-1">Sales</p>
-                  <p className="text-sm sm:text-2xl font-semibold text-foreground">$50k</p>
-                </div>
+            {/* KPI Rows - 2 rows on mobile, 1 row on desktop */}
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-4">
+              <div className="bg-muted/50 rounded-lg p-3 sm:p-4 text-left">
+                <p className="text-xs sm:text-sm text-primary mb-1">Savings</p>
+                <p className="text-lg sm:text-2xl font-semibold text-primary">$3.8k</p>
               </div>
+              <div className="bg-muted/50 rounded-lg p-3 sm:p-4 text-left">
+                <p className="text-xs sm:text-sm text-muted-foreground mb-1">Spend</p>
+                <p className="text-lg sm:text-2xl font-semibold text-foreground">$12k</p>
+              </div>
+              <div className="bg-muted/50 rounded-lg p-3 sm:p-4 text-left">
+                <p className="text-xs sm:text-sm text-muted-foreground mb-1">ACOS</p>
+                <p className="text-lg sm:text-2xl font-semibold text-foreground">24%</p>
+              </div>
+              <div className="bg-muted/50 rounded-lg p-3 sm:p-4 text-left col-span-1 sm:col-span-1">
+                <p className="text-xs sm:text-sm text-muted-foreground mb-1">ROAS</p>
+                <p className="text-lg sm:text-2xl font-semibold text-foreground">4.1x</p>
+              </div>
+              <div className="bg-muted/50 rounded-lg p-3 sm:p-4 text-left col-span-2 sm:col-span-1">
+                <p className="text-xs sm:text-sm text-muted-foreground mb-1">Sales</p>
+                <p className="text-lg sm:text-2xl font-semibold text-foreground">$50k</p>
+              </div>
+            </div>
 
               {/* Simple chart placeholder */}
               <div className="h-20 sm:h-32 bg-muted/30 rounded-lg flex items-end justify-around px-2 sm:px-4 pb-2 sm:pb-4 gap-1 sm:gap-2">
