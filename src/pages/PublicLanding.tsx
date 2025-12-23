@@ -134,7 +134,7 @@ const PublicLanding = () => {
       </HeroBackground>
 
       {/* Trusted Companies */}
-      <TrustedCompanies />
+      
 
       {/* Clean Value Section */}
       <section className="py-24 bg-black">
