@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { TrendingUp, DollarSign, Target, BarChart3 } from "lucide-react";
+import { TrendingUp, DollarSign, Target, BarChart3, Sparkles } from "lucide-react";
 
 const Waitlist = () => {
   const [email, setEmail] = useState("");
@@ -86,7 +86,7 @@ const Waitlist = () => {
           {/* Dashboard content */}
           <div className="p-6 space-y-6">
             {/* KPI Row */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
               <div className="bg-muted/50 rounded-lg p-4 text-left">
                 <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
                   <DollarSign className="h-4 w-4" />
@@ -118,6 +118,14 @@ const Waitlist = () => {
                 </div>
                 <p className="text-2xl font-semibold text-foreground">$50,234</p>
                 <p className="text-xs text-green-600">↑ 12% vs last month</p>
+              </div>
+              <div className="bg-muted/50 rounded-lg p-4 text-left col-span-2 sm:col-span-1">
+                <div className="flex items-center gap-2 text-primary text-sm mb-1">
+                  <Sparkles className="h-4 w-4" />
+                  <span>AI Savings</span>
+                </div>
+                <p className="text-2xl font-semibold text-primary">$3,847</p>
+                <p className="text-xs text-muted-foreground">142 optimizations</p>
               </div>
             </div>
 
