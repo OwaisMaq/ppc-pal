@@ -60,6 +60,13 @@ const Waitlist = () => {
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 py-12">
       <div className="w-full max-w-3xl mx-auto text-center space-y-8">
+        {/* Logo */}
+        <img 
+          src="/ppcpal-logo.jpg" 
+          alt="PPC Pal" 
+          className="h-16 mx-auto"
+        />
+        
         {/* Headline */}
         <div className="space-y-4">
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-foreground">
