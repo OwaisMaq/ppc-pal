@@ -51,12 +51,15 @@ const Waitlist = () => {
             alt="PPC Pal" 
             className="h-10 sm:h-16 mx-auto"
           />
+          <p className="text-xs sm:text-sm font-medium text-primary tracking-wide uppercase">
+            Private Beta — Limited Access
+          </p>
           <h1 className="text-2xl sm:text-5xl md:text-6xl font-bold tracking-tight text-foreground leading-tight">
             Stop Wasting Money on{" "}
             <span className="text-primary">Amazon Ads</span>
           </h1>
           <p className="text-sm sm:text-xl text-muted-foreground max-w-xl mx-auto">
-            AI-powered PPC optimization that manages your campaigns 24/7.
+            For sellers spending £1k+/month on ads
           </p>
         </div>
 
