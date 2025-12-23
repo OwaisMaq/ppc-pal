@@ -1,24 +1,18 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { TrendingUp, DollarSign, Target, BarChart3, Sparkles } from "lucide-react";
 
 const Waitlist = () => {
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!email || !email.includes("@")) {
-      toast({
-        title: "Invalid email",
-        description: "Please enter a valid email address.",
-        variant: "destructive",
-      });
+      toast.error("Please enter a valid email address.");
       return;
     }
 
@@ -31,27 +25,17 @@ const Waitlist = () => {
 
       if (error) {
         if (error.code === "23505") {
-          toast({
-            title: "Already on the list!",
-            description: "This email is already registered for early access.",
-          });
+          toast.info("This email is already registered for early access.");
         } else {
           throw error;
         }
       } else {
-        toast({
-          title: "You're on the list!",
-          description: "We'll notify you when PPC Pal launches.",
-        });
+        toast.success("You're on the list! We'll notify you when PPC Pal launches.");
         setEmail("");
       }
     } catch (error) {
       console.error("Waitlist error:", error);
-      toast({
-        title: "Something went wrong",
-        description: "Please try again later.",
-        variant: "destructive",
-      });
+      toast.error("Something went wrong. Please try again later.");
     } finally {
       setIsSubmitting(false);
     }
