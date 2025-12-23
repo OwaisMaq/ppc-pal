@@ -20,6 +20,7 @@ import About from "@/pages/About";
 import Contact from "@/pages/Contact";
 import Company from "@/pages/Company";
 import NotFound from "@/pages/NotFound";
+import Waitlist from "@/pages/Waitlist";
 import AmazonCallback from "@/pages/AmazonCallback";
 import CookieConsent from "@/components/CookieConsent";
 import Settings from "@/pages/Settings";
@@ -49,6 +50,7 @@ const App = () => {
                 <Routes>
                 {/* Public routes */}
                 <Route path="/" element={<PublicLanding />} />
+                <Route path="/waitlist" element={<Waitlist />} />
                 <Route path="/about" element={<About />} />
                 <Route path="/contact" element={<Contact />} />
                 <Route path="/company" element={<Company />} />
