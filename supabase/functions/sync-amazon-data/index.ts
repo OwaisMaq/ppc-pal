@@ -565,7 +565,7 @@ serve(async (req) => {
 
     const dateRange = Number(dateRangeDays) || 7
     const diag = Boolean(diagnosticMode)
-    const timeUnitOpt: 'SUMMARY' | 'DAILY' = 'SUMMARY' // Use SUMMARY for faster processing
+    const timeUnitOpt: 'SUMMARY' | 'DAILY' = 'DAILY' // Use DAILY to populate historical fact tables
     console.log('🚀 Starting sync for user:', userId, 'connection:', connectionId, 'dateRangeDays:', dateRange, 'diagnosticMode:', diag, 'isServiceCall:', isServiceCall)
     
     // Verify connection exists and belongs to user (skip ownership check for service calls)
@@ -1644,11 +1644,10 @@ serve(async (req) => {
       }
     }
 
-    // Skip search terms and keyword performance - these timeout frequently
-    console.log('⏭️ Skipping search term/keyword performance to avoid timeouts')
-    await updateProgress(85, 'Finalizing sync...')
+    // Search term sync - queue for async processing to avoid timeouts
+    await updateProgress(85, 'Queueing search term report...')
     
-    if (false) { // Disabled to prevent timeouts
+    if (campaignIds.length > 0) { // Re-enabled search term sync
       console.log('🔍 Syncing search terms performance data...')
       try {
         // For SUMMARY time unit, we cannot include 'date' column per Amazon API restrictions
