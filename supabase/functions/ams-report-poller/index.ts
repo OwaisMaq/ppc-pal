@@ -116,9 +116,12 @@ async function processCompletedReport(
   profileId: string
 ) {
   console.log(`📊 Processing ${reportData.length} records for ${report.report_type}, entityType: ${report.configuration.entityType}`)
+  console.log(`🔍 DEBUG: First 3 records sample:`, reportData.slice(0, 3))
   
   const { timeUnit, entityType } = report.configuration
   let updated = 0
+  let notFound = 0
+  let errors = 0
 
   for (const record of reportData) {
     try {
@@ -144,13 +147,37 @@ async function processCompletedReport(
             updated_at: new Date().toISOString()
           }
 
-          const { error } = await supabase
+          // First check if the campaign exists
+          const { data: existing, error: checkError } = await supabase
+            .from('campaigns')
+            .select('id, amazon_campaign_id')
+            .eq('amazon_campaign_id', record.campaignId)
+            .eq('profile_id', profileId)
+            .maybeSingle()
+
+          if (!existing) {
+            notFound++
+            if (notFound <= 5) {
+              console.warn(`⚠️ Campaign not found: amazon_campaign_id=${record.campaignId}, profile_id=${profileId}`)
+            }
+            break
+          }
+
+          const { data: updateResult, error, count } = await supabase
             .from('campaigns')
             .update(updateData)
             .eq('amazon_campaign_id', record.campaignId)
             .eq('profile_id', profileId)
+            .select('id')
 
-          if (!error) updated++
+          if (error) {
+            errors++
+            if (errors <= 5) {
+              console.error(`❌ Update failed for campaign ${record.campaignId}:`, error)
+            }
+          } else if (updateResult && updateResult.length > 0) {
+            updated++
+          }
           
           // Insert into streaming tables for daily data
           if (timeUnit === 'DAILY' && record.date) {
@@ -316,6 +343,12 @@ async function processCompletedReport(
   }
 
   console.log(`✅ Updated ${updated} of ${reportData.length} ${entityType} records`)
+  console.log(`📊 DEBUG Summary: updated=${updated}, notFound=${notFound}, errors=${errors}`)
+  
+  if (notFound > 0) {
+    console.warn(`⚠️ ${notFound} records had no matching entities - check if entity sync has completed`)
+  }
+  
   return updated
 }
 
