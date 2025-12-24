@@ -26,6 +26,7 @@ import CookieConsent from "@/components/CookieConsent";
 import Settings from "@/pages/Settings";
 import Onboarding from "@/pages/Onboarding";
 import DevTools from "@/pages/DevTools";
+import AccountAudit from "@/pages/AccountAudit";
 import { DateRangeProvider } from "@/context/DateRangeContext";
 import { OnboardingCheck } from "@/components/OnboardingCheck";
 import { useLoginSync } from "@/hooks/useLoginSync";
@@ -121,6 +122,11 @@ const App = () => {
                 <Route path="/dev-tools" element={
                   <ProtectedRoute>
                     <DevTools />
+                  </ProtectedRoute>
+                } />
+                <Route path="/account-audit" element={
+                  <ProtectedRoute>
+                    <AccountAudit />
                   </ProtectedRoute>
                 } />
                 
