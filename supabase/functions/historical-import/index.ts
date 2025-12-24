@@ -46,15 +46,22 @@ Deno.serve(async (req) => {
 
     console.log(`📥 Historical import request from user ${user.id} for profile ${profileId}, dates: ${startDate} to ${endDate}`)
 
-    // Verify user owns this profile
-    const { data: connection, error: connError } = await supabaseClient
+    // Create service role client for admin operations (before RLS-protected queries)
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
+
+    // Verify user owns this profile using service role client
+    const { data: connection, error: connError } = await supabaseAdmin
       .from('amazon_connections')
-      .select('id, profile_id, access_token_encrypted, advertising_api_endpoint, reporting_api_version')
+      .select('id, profile_id, access_token_encrypted, advertising_api_endpoint, reporting_api_version, user_id')
       .eq('profile_id', profileId)
       .eq('user_id', user.id)
       .single()
 
     if (connError || !connection) {
+      console.error('Connection lookup error:', connError)
       return new Response(
         JSON.stringify({ error: 'Profile not found or access denied' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -80,11 +87,7 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Create service role client for admin operations
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    // Service role client already created above
 
     // Get encryption key
     const encryptionKey = Deno.env.get('ENCRYPTION_KEY')
