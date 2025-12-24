@@ -44,6 +44,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DateRangePicker } from "@/components/DateRangePicker";
+import { subDays } from "date-fns";
+import { DateRange } from "react-day-picker";
+
+type DatePreset = '7D' | '14D' | '30D' | '90D' | 'custom';
 
 interface Campaign {
   campaign_id: string;
@@ -80,6 +85,11 @@ const Campaigns = () => {
   const [viewLevel, setViewLevel] = useState<'campaigns' | 'ad-groups'>('campaigns');
   const [selectedCampaign, setSelectedCampaign] = useState<CampaignDetails | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
+  const [selectedPreset, setSelectedPreset] = useState<DatePreset>('30D');
+  const [dateRange, setDateRange] = useState<DateRange>({
+    from: subDays(new Date(), 30),
+    to: new Date(),
+  });
 
   // Debug component mount
   useEffect(() => {
@@ -89,6 +99,29 @@ const Campaigns = () => {
   const hasConnections = connections.length > 0;
   const primaryConnection = connections[0];
 
+  // Calculate day count for dynamic labels and calculations
+  const dayCount = dateRange?.from && dateRange?.to
+    ? Math.ceil((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24)) + 1
+    : 30;
+
+  const handlePresetChange = (preset: DatePreset) => {
+    setSelectedPreset(preset);
+    if (preset !== 'custom') {
+      const days = preset === '7D' ? 7 : preset === '14D' ? 14 : preset === '30D' ? 30 : 90;
+      setDateRange({
+        from: subDays(new Date(), days),
+        to: new Date(),
+      });
+    }
+  };
+
+  const handleDateRangeChange = (range: DateRange | undefined) => {
+    if (range) {
+      setDateRange(range);
+      setSelectedPreset('custom');
+    }
+  };
+
   useEffect(() => {
     const fetchCampaigns = async () => {
       console.log('🔍 [CAMPAIGNS PAGE] Initialization:', {
@@ -96,7 +129,8 @@ const Campaigns = () => {
         hasUser: !!user,
         connections: connections.length,
         primaryConnection: primaryConnection?.profile_id,
-        window_location: window.location.href
+        window_location: window.location.href,
+        dateRange: { from: dateRange?.from, to: dateRange?.to }
       });
 
       // Check auth session
@@ -114,20 +148,31 @@ const Campaigns = () => {
         return;
       }
 
+      if (!dateRange?.from || !dateRange?.to) {
+        console.warn('⚠️ [CAMPAIGNS PAGE] Missing date range, aborting');
+        setLoading(false);
+        return;
+      }
+
       try {
-        // Fetch campaigns from campaign daily view
-        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        setLoading(true);
+        // Fetch campaigns from campaign daily view using selected date range
+        const fromDate = dateRange.from.toISOString().split('T')[0];
+        const toDate = dateRange.to.toISOString().split('T')[0];
         
         console.log('🔍 [CAMPAIGNS PAGE] Fetching campaigns:', {
           profile_id: primaryConnection.profile_id,
-          date_from: thirtyDaysAgo
+          date_from: fromDate,
+          date_to: toDate,
+          dayCount
         });
 
         const { data, error } = await supabase
           .from('v_campaign_daily')
           .select('*')
           .eq('profile_id', primaryConnection.profile_id)
-          .gte('date', thirtyDaysAgo);
+          .gte('date', fromDate)
+          .lte('date', toDate);
 
         console.log('🔍 [CAMPAIGNS PAGE] Campaigns query result:', {
           data: data?.length || 0,
@@ -170,17 +215,18 @@ const Campaigns = () => {
           campaign.sales += row.sales || 0;
         });
 
-        // Calculate averages and ratios
+        // Calculate averages and ratios using dynamic day count
         const campaignsArray = Array.from(campaignMap.values()).map(campaign => {
-          const avgSpend = campaign.daily_spend / 30;
+          const totalSpend = campaign.daily_spend;
+          const avgSpend = totalSpend / dayCount;
           const impressions = campaign.impressions;
           const clicks = campaign.clicks;
           
           return {
             ...campaign,
             daily_spend: avgSpend,
-            acos: campaign.sales > 0 ? (campaign.daily_spend / campaign.sales) * 100 : 0,
-            roas: campaign.daily_spend > 0 ? campaign.sales / campaign.daily_spend : 0,
+            acos: campaign.sales > 0 ? (totalSpend / campaign.sales) * 100 : 0,
+            roas: totalSpend > 0 ? campaign.sales / totalSpend : 0,
             ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
             cpc: clicks > 0 ? avgSpend / clicks : 0,
             conversions: Math.floor(campaign.sales / 25), // Estimate conversions
@@ -197,7 +243,7 @@ const Campaigns = () => {
     };
 
     fetchCampaigns();
-  }, [user, primaryConnection]);
+  }, [user, primaryConnection, dateRange, dayCount]);
 
   const filteredCampaigns = campaigns.filter((campaign) =>
     campaign.campaign_name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -392,37 +438,57 @@ const Campaigns = () => {
         ) : (
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <CardTitle>Campaign Performance</CardTitle>
-                  <CardDescription>
-                    {autoMode && (
-                      <Badge variant="default" className="mt-1">
-                        <Sparkles className="h-3 w-3 mr-1" />
-                        AI Optimization Active
-                      </Badge>
-                    )}
-                  </CardDescription>
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Campaign Performance</CardTitle>
+                    <CardDescription>
+                      {autoMode && (
+                        <Badge variant="default" className="mt-1">
+                          <Sparkles className="h-3 w-3 mr-1" />
+                          AI Optimization Active
+                        </Badge>
+                      )}
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Select value={viewLevel} onValueChange={(value: any) => setViewLevel(value)}>
+                      <SelectTrigger className="w-40">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="campaigns">Campaigns</SelectItem>
+                        <SelectItem value="ad-groups">Ad Groups</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-9 w-64"
+                      />
+                    </div>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Select value={viewLevel} onValueChange={(value: any) => setViewLevel(value)}>
-                    <SelectTrigger className="w-40">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="campaigns">Campaigns</SelectItem>
-                      <SelectItem value="ad-groups">Ad Groups</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-9 w-64"
-                    />
+                  <div className="flex items-center gap-1">
+                    {(['7D', '14D', '30D', '90D'] as DatePreset[]).map((preset) => (
+                      <Button
+                        key={preset}
+                        variant={selectedPreset === preset ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => handlePresetChange(preset)}
+                      >
+                        {preset}
+                      </Button>
+                    ))}
                   </div>
+                  <DateRangePicker
+                    value={dateRange}
+                    onChange={handleDateRangeChange}
+                  />
                 </div>
               </div>
             </CardHeader>
@@ -446,7 +512,7 @@ const Campaigns = () => {
                     <TableRow>
                       <TableHead>Name</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Spend (30d)</TableHead>
+                      <TableHead className="text-right">Spend ({dayCount}d)</TableHead>
                       <TableHead className="text-right">ACOS</TableHead>
                       <TableHead className="w-12"></TableHead>
                     </TableRow>
@@ -465,7 +531,7 @@ const Campaigns = () => {
                           {getStatusBadge(campaign.status)}
                         </TableCell>
                         <TableCell className="text-right">
-                          {formatCurrency(campaign.daily_spend * 30)}
+                          {formatCurrency(campaign.daily_spend * dayCount)}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
