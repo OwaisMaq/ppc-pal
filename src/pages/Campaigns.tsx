@@ -47,6 +47,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { subDays } from "date-fns";
 import { DateRange } from "react-day-picker";
+import { useDataAvailability } from "@/hooks/useDataAvailability";
+import { DataAvailabilityIndicator } from "@/components/DataAvailabilityIndicator";
 
 type DatePreset = '7D' | '14D' | '30D' | '90D' | 'custom';
 
@@ -98,6 +100,15 @@ const Campaigns = () => {
 
   const hasConnections = connections.length > 0;
   const primaryConnection = connections[0];
+  
+  // Data availability hook
+  const { 
+    minDate, 
+    maxDate, 
+    hasData, 
+    loading: availabilityLoading,
+    importProgress 
+  } = useDataAvailability(primaryConnection?.profile_id);
 
   // Calculate day count for dynamic labels and calculations
   const dayCount = dateRange?.from && dateRange?.to
@@ -492,6 +503,21 @@ const Campaigns = () => {
                 </div>
               </div>
             </CardHeader>
+            
+            {/* Data Availability Indicator */}
+            <div className="px-6 pb-4">
+              <DataAvailabilityIndicator
+                minDate={minDate}
+                maxDate={maxDate}
+                hasData={hasData}
+                loading={availabilityLoading}
+                selectedFrom={dateRange?.from}
+                selectedTo={dateRange?.to}
+                profileId={primaryConnection?.profile_id}
+                importProgress={importProgress}
+              />
+            </div>
+            
             <CardContent>
               {loading ? (
                 <div className="space-y-3">

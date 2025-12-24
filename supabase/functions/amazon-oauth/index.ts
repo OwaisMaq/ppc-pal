@@ -712,24 +712,53 @@ serve(async (req) => {
               console.error(`⚠️ [OAuth] Full error:`, JSON.stringify(error, null, 2))
             })
             
-            // Then trigger data sync for 7-day backfill - don't await to avoid timeout
-            console.log(`📊 Triggering data sync for connection ${connection.id}...`)
+            // Then trigger data sync for 90-day backfill (initial connection gets full history)
+            console.log(`📊 Triggering 90-day data sync for connection ${connection.id}...`)
             supabase.functions.invoke('sync-amazon-data', {
               body: { 
                 connectionId: connection.id,
-                dateRangeDays: 7,
-                timeUnit: 'SUMMARY',
+                dateRangeDays: 90,
+                timeUnit: 'DAILY',
                 diagnosticMode: false
               },
               headers: {
-                // Forward the user's auth so the sync function can authorize
                 Authorization: authHeader!
               }
             }).then(result => {
-              console.log(`✅ Auto-sync triggered for connection ${connection.id}:`, result)
+              console.log(`✅ 90-day sync triggered for connection ${connection.id}:`, result)
             }).catch(error => {
-              console.log(`⚠️ Auto-sync failed for connection ${connection.id}:`, error)
+              console.log(`⚠️ 90-day sync failed for connection ${connection.id}:`, error)
             })
+
+            // Queue additional historical imports for older data (90-day chunks going back ~1 year)
+            const profileId = profile.profileId.toString()
+            const historicalRanges = [
+              { startDaysAgo: 180, endDaysAgo: 91 },   // 3-6 months ago
+              { startDaysAgo: 270, endDaysAgo: 181 },  // 6-9 months ago  
+              { startDaysAgo: 365, endDaysAgo: 271 },  // 9-12 months ago
+            ]
+
+            for (const range of historicalRanges) {
+              const endDate = new Date()
+              endDate.setDate(endDate.getDate() - range.endDaysAgo)
+              const startDate = new Date()
+              startDate.setDate(startDate.getDate() - range.startDaysAgo)
+              
+              console.log(`📅 Queuing historical import for ${profileId}: ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`)
+              
+              supabase.functions.invoke('historical-import', {
+                body: {
+                  profileId,
+                  startDate: startDate.toISOString().split('T')[0],
+                  endDate: endDate.toISOString().split('T')[0]
+                },
+                headers: { Authorization: authHeader! }
+              }).then(result => {
+                console.log(`✅ Historical import queued for ${profileId} (${range.startDaysAgo}-${range.endDaysAgo} days ago):`, result)
+              }).catch(error => {
+                console.log(`⚠️ Historical import failed for ${profileId}:`, error)
+              })
+            }
           }
         } catch (error) {
           console.log('Failed to trigger auto-sync for profile:', profile.profileId, (error as Error).message)
