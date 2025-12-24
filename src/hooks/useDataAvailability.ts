@@ -138,10 +138,11 @@ export function useDataAvailability(profileId: string | undefined) {
       const today = new Date();
       const chunks: Array<{ startDate: string; endDate: string }> = [];
 
-      // Create 4 chunks of 90 days each (covers ~1 year)
-      for (let i = 0; i < 4; i++) {
-        const endDate = subDays(today, i * 90);
-        const startDate = subDays(endDate, 89);
+      // Amazon API limits: max 31 days per request, ~90 days data retention
+      // Create 3 chunks of 30 days each (covers ~90 days of available data)
+      for (let i = 0; i < 3; i++) {
+        const endDate = subDays(today, i * 30 + 1); // Start from yesterday
+        const startDate = subDays(endDate, 29); // 30-day chunk
         chunks.push({
           startDate: format(startDate, 'yyyy-MM-dd'),
           endDate: format(endDate, 'yyyy-MM-dd'),
