@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Bot, CheckCircle, Target, TrendingUp, Sparkles } from "lucide-react";
+import { Bot, CheckCircle, Target, TrendingUp, Sparkles, Database, Loader2 } from "lucide-react";
 import AmazonOAuthSetup from "./AmazonOAuthSetup";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 
 interface OnboardingWizardProps {
   onComplete: () => void;
@@ -16,7 +17,48 @@ export const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
   const [currentStep, setCurrentStep] = useState(1);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { connections } = useAmazonConnections();
   const totalSteps = 4;
+  
+  // Import progress state
+  const [importStatus, setImportStatus] = useState({
+    pending: 0,
+    processing: 0,
+    completed: 0,
+    total: 0,
+    isImporting: false,
+  });
+
+  // Poll for import progress when on step 4
+  useEffect(() => {
+    if (currentStep !== 4 || connections.length === 0) return;
+
+    const connectionId = connections[0]?.id;
+    if (!connectionId) return;
+
+    const fetchImportStatus = async () => {
+      const { data: reports } = await supabase
+        .from('pending_amazon_reports')
+        .select('status')
+        .eq('connection_id', connectionId);
+
+      if (!reports) return;
+
+      const counts = {
+        pending: reports.filter(r => r.status === 'pending').length,
+        processing: reports.filter(r => r.status === 'processing').length,
+        completed: reports.filter(r => r.status === 'completed').length,
+        total: reports.length,
+        isImporting: reports.some(r => r.status === 'pending' || r.status === 'processing'),
+      };
+
+      setImportStatus(counts);
+    };
+
+    fetchImportStatus();
+    const interval = setInterval(fetchImportStatus, 5000);
+    return () => clearInterval(interval);
+  }, [currentStep, connections]);
 
   const progress = (currentStep / totalSteps) * 100;
 
@@ -183,12 +225,48 @@ export const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Import Progress Section */}
+              {importStatus.total > 0 && (
+                <div className="p-4 bg-brand/5 rounded-lg border border-brand/20 space-y-3">
+                  <div className="flex items-center gap-2">
+                    {importStatus.isImporting ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin text-brand" />
+                        <h4 className="font-medium">Importing historical data...</h4>
+                      </>
+                    ) : (
+                      <>
+                        <Database className="h-5 w-5 text-success" />
+                        <h4 className="font-medium">Historical data import complete!</h4>
+                      </>
+                    )}
+                  </div>
+                  
+                  <Progress 
+                    value={importStatus.total > 0 ? ((importStatus.completed) / importStatus.total) * 100 : 0} 
+                    className="h-2" 
+                  />
+                  
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>{importStatus.completed} of {importStatus.total} reports processed</span>
+                    {importStatus.isImporting && (
+                      <span>{importStatus.pending + importStatus.processing} remaining</span>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div className="p-4 bg-muted/50 rounded-lg space-y-2">
                 <h4 className="font-medium">What happens next?</h4>
                 <ul className="space-y-2 text-sm text-muted-foreground">
                   <li className="flex items-start gap-2">
                     <span className="text-brand">•</span>
-                    <span>Your campaign data will begin syncing (this may take a few minutes)</span>
+                    <span>
+                      {importStatus.isImporting 
+                        ? "Your historical data is being imported (up to 12 months)"
+                        : "Your campaign data will begin syncing (this may take a few minutes)"
+                      }
+                    </span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-brand">•</span>
