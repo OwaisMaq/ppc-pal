@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { subDays, format } from 'date-fns';
 
 interface DataAvailability {
   minDate: string | null;
@@ -34,59 +36,59 @@ export function useDataAvailability(profileId: string | undefined) {
     isImporting: false,
   });
 
-  useEffect(() => {
+  const [isImportingFullHistory, setIsImportingFullHistory] = useState(false);
+
+  const fetchAvailability = useCallback(async () => {
     if (!profileId) {
       setAvailability({ minDate: null, maxDate: null, loading: false, hasData: false });
       return;
     }
 
-    const fetchAvailability = async () => {
-      try {
-        // Get min/max dates from v_campaign_daily
-        const { data, error } = await supabase
-          .from('v_campaign_daily')
-          .select('date')
-          .eq('profile_id', profileId)
-          .order('date', { ascending: true })
-          .limit(1);
+    try {
+      const { data, error } = await supabase
+        .from('v_campaign_daily')
+        .select('date')
+        .eq('profile_id', profileId)
+        .order('date', { ascending: true })
+        .limit(1);
 
-        const { data: maxData, error: maxError } = await supabase
-          .from('v_campaign_daily')
-          .select('date')
-          .eq('profile_id', profileId)
-          .order('date', { ascending: false })
-          .limit(1);
+      const { data: maxData, error: maxError } = await supabase
+        .from('v_campaign_daily')
+        .select('date')
+        .eq('profile_id', profileId)
+        .order('date', { ascending: false })
+        .limit(1);
 
-        if (error || maxError) {
-          console.error('Error fetching data availability:', error || maxError);
-          setAvailability({ minDate: null, maxDate: null, loading: false, hasData: false });
-          return;
-        }
-
-        const minDate = data?.[0]?.date || null;
-        const maxDate = maxData?.[0]?.date || null;
-
-        setAvailability({
-          minDate,
-          maxDate,
-          loading: false,
-          hasData: !!minDate && !!maxDate,
-        });
-      } catch (err) {
-        console.error('Error in fetchAvailability:', err);
+      if (error || maxError) {
+        console.error('Error fetching data availability:', error || maxError);
         setAvailability({ minDate: null, maxDate: null, loading: false, hasData: false });
+        return;
       }
-    };
 
-    fetchAvailability();
+      const minDate = data?.[0]?.date || null;
+      const maxDate = maxData?.[0]?.date || null;
+
+      setAvailability({
+        minDate,
+        maxDate,
+        loading: false,
+        hasData: !!minDate && !!maxDate,
+      });
+    } catch (err) {
+      console.error('Error in fetchAvailability:', err);
+      setAvailability({ minDate: null, maxDate: null, loading: false, hasData: false });
+    }
   }, [profileId]);
+
+  useEffect(() => {
+    fetchAvailability();
+  }, [fetchAvailability]);
 
   useEffect(() => {
     if (!profileId) return;
 
     const fetchImportProgress = async () => {
       try {
-        // Get connection_id for this profile
         const { data: connection } = await supabase
           .from('amazon_connections')
           .select('id')
@@ -95,7 +97,6 @@ export function useDataAvailability(profileId: string | undefined) {
 
         if (!connection) return;
 
-        // Get pending report counts
         const { data: reports } = await supabase
           .from('pending_amazon_reports')
           .select('status')
@@ -113,39 +114,83 @@ export function useDataAvailability(profileId: string | undefined) {
         };
 
         setImportProgress(counts);
+
+        // Refresh availability when imports complete
+        if (!counts.isImporting && importProgress.isImporting) {
+          fetchAvailability();
+        }
       } catch (err) {
         console.error('Error fetching import progress:', err);
       }
     };
 
     fetchImportProgress();
-
-    // Poll for updates while importing
-    const interval = setInterval(fetchImportProgress, 10000);
+    const interval = setInterval(fetchImportProgress, 5000);
     return () => clearInterval(interval);
-  }, [profileId]);
+  }, [profileId, importProgress.isImporting, fetchAvailability]);
+
+  const importFullHistory = useCallback(async () => {
+    if (!profileId || isImportingFullHistory) return;
+
+    setIsImportingFullHistory(true);
+
+    try {
+      const today = new Date();
+      const chunks: Array<{ startDate: string; endDate: string }> = [];
+
+      // Create 4 chunks of 90 days each (covers ~1 year)
+      for (let i = 0; i < 4; i++) {
+        const endDate = subDays(today, i * 90);
+        const startDate = subDays(endDate, 89);
+        chunks.push({
+          startDate: format(startDate, 'yyyy-MM-dd'),
+          endDate: format(endDate, 'yyyy-MM-dd'),
+        });
+      }
+
+      let totalReports = 0;
+
+      for (const chunk of chunks) {
+        const { data, error } = await supabase.functions.invoke('historical-import', {
+          body: {
+            profileId,
+            startDate: chunk.startDate,
+            endDate: chunk.endDate,
+          },
+        });
+
+        if (error) {
+          console.error('Historical import error for chunk:', chunk, error);
+          continue;
+        }
+
+        totalReports += data?.reportsCreated || 0;
+      }
+
+      toast.success(`Historical import started`, {
+        description: `${totalReports} report requests queued covering the last year. Data will appear within a few minutes.`,
+      });
+    } catch (error) {
+      console.error('Error importing full history:', error);
+      toast.error('Failed to start historical import');
+    } finally {
+      setIsImportingFullHistory(false);
+    }
+  }, [profileId, isImportingFullHistory]);
 
   const isDateInRange = (from: Date | undefined, to: Date | undefined): boolean => {
     if (!from || !to || !availability.minDate || !availability.maxDate) return false;
-    
     const minAvailable = new Date(availability.minDate);
     const maxAvailable = new Date(availability.maxDate);
-    
     return from >= minAvailable && to <= maxAvailable;
   };
 
   const hasDataForRange = (from: Date | undefined, to: Date | undefined): 'full' | 'partial' | 'none' => {
     if (!from || !to || !availability.minDate || !availability.maxDate) return 'none';
-    
     const minAvailable = new Date(availability.minDate);
     const maxAvailable = new Date(availability.maxDate);
-    
-    // Check if range is completely within available data
     if (from >= minAvailable && to <= maxAvailable) return 'full';
-    
-    // Check if there's any overlap
     if (from <= maxAvailable && to >= minAvailable) return 'partial';
-    
     return 'none';
   };
 
@@ -154,5 +199,7 @@ export function useDataAvailability(profileId: string | undefined) {
     importProgress,
     isDateInRange,
     hasDataForRange,
+    importFullHistory,
+    isImportingFullHistory,
   };
 }

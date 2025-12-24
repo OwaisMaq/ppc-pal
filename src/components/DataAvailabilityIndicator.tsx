@@ -1,11 +1,9 @@
 import { format } from 'date-fns';
-import { AlertCircle, Database, Loader2, Download } from 'lucide-react';
+import { AlertCircle, Database, Loader2, Download, History } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import { useState } from 'react';
+import { Progress } from '@/components/ui/progress';
 
 interface DataAvailabilityIndicatorProps {
   minDate: string | null;
@@ -14,13 +12,16 @@ interface DataAvailabilityIndicatorProps {
   loading: boolean;
   selectedFrom?: Date;
   selectedTo?: Date;
-  profileId?: string;
   importProgress?: {
     pending: number;
     processing: number;
     completed: number;
+    failed: number;
+    total: number;
     isImporting: boolean;
   };
+  onImportFullHistory?: () => void;
+  isImportingFullHistory?: boolean;
 }
 
 export function DataAvailabilityIndicator({
@@ -30,11 +31,10 @@ export function DataAvailabilityIndicator({
   loading,
   selectedFrom,
   selectedTo,
-  profileId,
   importProgress,
+  onImportFullHistory,
+  isImportingFullHistory,
 }: DataAvailabilityIndicatorProps) {
-  const [importing, setImporting] = useState(false);
-
   if (loading) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -44,36 +44,10 @@ export function DataAvailabilityIndicator({
     );
   }
 
-  const handleImportRange = async () => {
-    if (!profileId || !selectedFrom || !selectedTo) return;
-    
-    setImporting(true);
-    try {
-      const startDate = selectedFrom.toISOString().split('T')[0];
-      const endDate = selectedTo.toISOString().split('T')[0];
-      
-      const { data, error } = await supabase.functions.invoke('historical-import', {
-        body: { profileId, startDate, endDate }
-      });
-
-      if (error) throw error;
-
-      toast.success(`Historical import started for ${startDate} to ${endDate}`, {
-        description: `${data?.reportsCreated || 0} report requests queued. Data will be available within a few minutes.`
-      });
-    } catch (error) {
-      console.error('Historical import error:', error);
-      toast.error('Failed to start historical import');
-    } finally {
-      setImporting(false);
-    }
-  };
-
-  // Check if selected range is outside available data
-  const isOutsideRange = selectedFrom && selectedTo && minDate && maxDate && 
-    (selectedFrom < new Date(minDate) || selectedTo > new Date(maxDate));
-
   const isBeforeAvailable = selectedFrom && minDate && selectedFrom < new Date(minDate);
+  const progressPercent = importProgress?.total 
+    ? Math.round(((importProgress.completed + importProgress.failed) / importProgress.total) * 100) 
+    : 0;
 
   if (!hasData) {
     return (
@@ -93,50 +67,61 @@ export function DataAvailabilityIndicator({
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-4 text-sm">
-        <div className="flex items-center gap-2 text-muted-foreground">
+    <div className="flex flex-col gap-3 p-4 rounded-lg border bg-card">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Database className="h-4 w-4" />
           <span>
-            Data available: {format(new Date(minDate!), 'MMM d, yyyy')} – {format(new Date(maxDate!), 'MMM d, yyyy')}
+            Data available: <span className="font-medium text-foreground">{format(new Date(minDate!), 'MMM d, yyyy')}</span> – <span className="font-medium text-foreground">{format(new Date(maxDate!), 'MMM d, yyyy')}</span>
           </span>
         </div>
         
-        {importProgress?.isImporting && (
-          <Badge variant="secondary" className="gap-1">
-            <Loader2 className="h-3 w-3 animate-spin" />
-            Importing historical data ({importProgress.pending + importProgress.processing} pending)
-          </Badge>
+        {onImportFullHistory && !importProgress?.isImporting && (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={onImportFullHistory}
+            disabled={isImportingFullHistory}
+            className="gap-2"
+          >
+            {isImportingFullHistory ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Starting import...
+              </>
+            ) : (
+              <>
+                <History className="h-4 w-4" />
+                Import Full Year
+              </>
+            )}
+          </Button>
         )}
       </div>
 
-      {isBeforeAvailable && (
+      {importProgress?.isImporting && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Importing historical data...</span>
+            <span className="font-medium">{progressPercent}%</span>
+          </div>
+          <Progress value={progressPercent} className="h-2" />
+          <div className="flex gap-4 text-xs text-muted-foreground">
+            <span>Pending: {importProgress.pending}</span>
+            <span>Processing: {importProgress.processing}</span>
+            <span className="text-green-600">Completed: {importProgress.completed}</span>
+            {importProgress.failed > 0 && (
+              <span className="text-red-600">Failed: {importProgress.failed}</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {isBeforeAvailable && !importProgress?.isImporting && (
         <Alert variant="default" className="bg-amber-50 border-amber-200">
           <AlertCircle className="h-4 w-4 text-amber-600" />
-          <AlertDescription className="flex items-center justify-between text-amber-800">
-            <span>
-              Selected date range includes dates before available data ({format(new Date(minDate!), 'MMM d, yyyy')}).
-              Historical data for earlier periods hasn't been imported yet.
-            </span>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleImportRange}
-              disabled={importing}
-              className="ml-4 shrink-0"
-            >
-              {importing ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                  Importing...
-                </>
-              ) : (
-                <>
-                  <Download className="h-4 w-4 mr-1" />
-                  Import this range
-                </>
-              )}
-            </Button>
+          <AlertDescription className="text-amber-800">
+            Selected date range includes dates before available data. Click "Import Full Year" to fetch historical data.
           </AlertDescription>
         </Alert>
       )}
