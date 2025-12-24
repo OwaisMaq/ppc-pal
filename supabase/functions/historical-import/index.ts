@@ -127,14 +127,38 @@ Deno.serve(async (req) => {
 
     // Create report requests for each report type
     const reportRequests = []
-    const metrics = {
-      campaign: 'impressions,clicks,cost,purchases7d,sales7d',
-      adgroup: 'impressions,clicks,cost,purchases7d,sales7d',
-      keyword: 'impressions,clicks,cost,purchases7d,sales7d',
-      target: 'impressions,clicks,cost,purchases7d,sales7d'
+    
+    // Amazon Ads API v3 report configuration
+    const reportConfigs: Record<string, { reportTypeId: string; groupBy: string[]; columns: string[] }> = {
+      campaign: {
+        reportTypeId: 'spCampaigns',
+        groupBy: ['campaign'],
+        columns: ['impressions', 'clicks', 'cost', 'purchases7d', 'sales7d', 'campaignId', 'campaignName', 'campaignStatus', 'date']
+      },
+      adgroup: {
+        reportTypeId: 'spAdvertisedProduct',
+        groupBy: ['advertiser'],
+        columns: ['impressions', 'clicks', 'cost', 'purchases7d', 'sales7d', 'campaignId', 'adGroupId', 'adGroupName', 'date']
+      },
+      keyword: {
+        reportTypeId: 'spSearchTerm',
+        groupBy: ['searchTerm'],
+        columns: ['impressions', 'clicks', 'cost', 'purchases7d', 'sales7d', 'campaignId', 'adGroupId', 'keywordId', 'searchTerm', 'date']
+      },
+      target: {
+        reportTypeId: 'spTargeting',
+        groupBy: ['targeting'],
+        columns: ['impressions', 'clicks', 'cost', 'purchases7d', 'sales7d', 'campaignId', 'adGroupId', 'targetId', 'targetingExpression', 'date']
+      }
     }
 
     for (const reportType of reportTypes) {
+      const config = reportConfigs[reportType]
+      if (!config) {
+        console.warn(`Unknown report type: ${reportType}`)
+        continue
+      }
+
       console.log(`📊 Creating ${reportType} performance report for ${startDate} to ${endDate}`)
 
       const reportBody = {
@@ -142,10 +166,10 @@ Deno.serve(async (req) => {
         endDate,
         configuration: {
           adProduct: 'SPONSORED_PRODUCTS',
-          groupBy: [reportType === 'campaign' ? 'campaign' : reportType === 'adgroup' ? 'adGroup' : reportType],
-          columns: metrics[reportType as keyof typeof metrics]?.split(',') || [],
-          reportTypeId: `sp${reportType.charAt(0).toUpperCase() + reportType.slice(1)}`,
-          timeUnit: 'SUMMARY',
+          groupBy: config.groupBy,
+          columns: config.columns,
+          reportTypeId: config.reportTypeId,
+          timeUnit: 'DAILY',
           format: 'GZIP_JSON'
         }
       }
