@@ -148,7 +148,7 @@ Deno.serve(async (req) => {
       target: {
         reportTypeId: 'spTargeting',
         groupBy: ['targeting'],
-        columns: ['impressions', 'clicks', 'cost', 'purchases7d', 'sales7d', 'campaignId', 'adGroupId', 'targetId', 'targetingExpression', 'date']
+        columns: ['impressions', 'clicks', 'cost', 'purchases7d', 'sales7d', 'campaignId', 'adGroupId', 'targeting', 'keywordType', 'date']
       }
     }
 
