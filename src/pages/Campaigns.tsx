@@ -513,7 +513,6 @@ const Campaigns = () => {
                 loading={availabilityLoading}
                 selectedFrom={dateRange?.from}
                 selectedTo={dateRange?.to}
-                profileId={primaryConnection?.profile_id}
                 importProgress={importProgress}
               />
             </div>

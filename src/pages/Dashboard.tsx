@@ -7,12 +7,14 @@ import { ComparisonModeSelector, ComparisonMode } from "@/components/ComparisonM
 import ActionsFeed from "@/components/ActionsFeed";
 import PendingApprovals from "@/components/PendingApprovals";
 import { SavingsKPI } from "@/components/SavingsKPI";
+import { DataAvailabilityIndicator } from "@/components/DataAvailabilityIndicator";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { useAmsMetrics } from "@/hooks/useAmsMetrics";
 import { useSavingsMetric } from "@/hooks/useSavingsMetric";
+import { useDataAvailability } from "@/hooks/useDataAvailability";
 import { useState, useMemo } from "react";
 import { DashboardKPIs as KPIData } from "@/hooks/useDashboardData";
 import { DateRange } from "react-day-picker";
@@ -64,6 +66,17 @@ const Dashboard = () => {
     dateRange?.from,
     dateRange?.to
   );
+
+  // Fetch data availability
+  const { 
+    minDate, 
+    maxDate, 
+    hasData, 
+    loading: availabilityLoading, 
+    importProgress, 
+    importFullHistory, 
+    isImportingFullHistory 
+  } = useDataAvailability(primaryConnection?.profile_id);
   
   // Calculate comparison period based on mode
   const comparisonPeriodRange = useMemo(() => {
@@ -176,6 +189,19 @@ const Dashboard = () => {
               />
             </div>
           )}
+
+          {/* Data Availability Indicator */}
+          <DataAvailabilityIndicator
+            minDate={minDate}
+            maxDate={maxDate}
+            hasData={hasData}
+            loading={availabilityLoading}
+            selectedFrom={dateRange?.from}
+            selectedTo={dateRange?.to}
+            importProgress={importProgress}
+            onImportFullHistory={importFullHistory}
+            isImportingFullHistory={isImportingFullHistory}
+          />
         </div>
 
         {/* Savings KPI - Prominent Display */}
