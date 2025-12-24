@@ -2706,6 +2706,48 @@ export type Database = {
         }
         Relationships: []
       }
+      historical_audits: {
+        Row: {
+          audit_month: string
+          created_at: string
+          error: string | null
+          estimated_savings: number | null
+          id: string
+          insights: Json
+          profile_id: string
+          status: string
+          summary: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          audit_month: string
+          created_at?: string
+          error?: string | null
+          estimated_savings?: number | null
+          id?: string
+          insights?: Json
+          profile_id: string
+          status?: string
+          summary?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          audit_month?: string
+          created_at?: string
+          error?: string | null
+          estimated_savings?: number | null
+          id?: string
+          insights?: Json
+          profile_id?: string
+          status?: string
+          summary?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       keyword_performance_history: {
         Row: {
           acos: number | null

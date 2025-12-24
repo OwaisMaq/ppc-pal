@@ -11,13 +11,14 @@ import {
   SidebarMenuItem,
   SidebarMenuButton
 } from "@/components/ui/sidebar";
-import { Bot, LayoutDashboard, Settings, Shield, Target, Sparkles, Search, DollarSign, AlertTriangle, GitBranch, Users, Wrench } from "lucide-react";
+import { Bot, LayoutDashboard, Settings, Shield, Target, Sparkles, Search, DollarSign, AlertTriangle, GitBranch, Users, Wrench, ClipboardList } from "lucide-react";
 
 export function AppSidebar() {
   const location = useLocation();
 
   const items = [
     { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+    { title: "Account Audit", url: "/account-audit", icon: ClipboardList },
     { title: "Campaigns", url: "/campaigns", icon: Target },
     { title: "Search Terms", url: "/search-terms", icon: Search },
     { title: "AI Insights", url: "/ai-insights", icon: Sparkles },
