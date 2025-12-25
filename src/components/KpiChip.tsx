@@ -1,19 +1,21 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { TrendingUp, TrendingDown } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { LineChart, Line, ResponsiveContainer } from "recharts";
+import { ResponsiveContainer, Area, AreaChart } from "recharts";
 
 interface KpiChipProps {
   label: string;
   value: string | number;
   change?: {
     value: string;
-    direction: 'up' | 'down';
+    direction: 'up' | 'down' | 'neutral';
   };
   className?: string;
   primary?: boolean;
   compact?: boolean;
   sparklineData?: Array<{ value: number }>;
+  icon?: React.ReactNode;
+  trend?: 'positive' | 'negative' | 'neutral'; // For ACOS, lower is better
 }
 
 const KpiChip: React.FC<KpiChipProps> = ({ 
@@ -23,65 +25,129 @@ const KpiChip: React.FC<KpiChipProps> = ({
   className,
   primary = false,
   compact = false,
-  sparklineData
+  sparklineData,
+  icon,
+  trend = 'positive'
 }) => {
+  // Determine if the change direction is good or bad based on the metric type
+  const isPositiveChange = change ? (
+    trend === 'negative' 
+      ? change.direction === 'down'  // For metrics like ACOS, down is good
+      : change.direction === 'up'     // For metrics like Sales, up is good
+  ) : null;
+
+  const getChangeColor = () => {
+    if (!change || change.direction === 'neutral') return 'text-muted-foreground bg-muted/50';
+    if (isPositiveChange) return 'text-success bg-success-muted';
+    return 'text-error bg-error-muted';
+  };
+
+  const getSparklineColor = () => {
+    if (!change) return 'hsl(var(--primary))';
+    if (isPositiveChange) return 'hsl(var(--success))';
+    return 'hsl(var(--error))';
+  };
+
+  const getSparklineGradient = () => {
+    if (!change) return 'url(#primaryGradient)';
+    if (isPositiveChange) return 'url(#successGradient)';
+    return 'url(#errorGradient)';
+  };
+
   return (
     <Card className={cn(
-      "transition-all duration-200",
-      primary ? "border-primary/20 bg-primary/5" : "border-muted",
+      "group relative overflow-hidden transition-all duration-300",
+      "bg-card/50 backdrop-blur-sm",
+      "border border-border/50",
+      "hover:border-border hover:bg-card/80",
+      "hover:shadow-lg hover:shadow-black/10",
+      primary && "border-primary/20 bg-primary/5 hover:border-primary/40",
       className
     )}>
+      {/* Subtle top accent line for primary cards */}
+      {primary && (
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-primary/60 via-primary to-primary/60" />
+      )}
+      
       <CardContent className={cn(
-        "flex flex-col",
-        compact ? "p-3" : "p-4"
+        "relative flex flex-col justify-between h-full",
+        compact ? "p-3" : "p-4 md:p-5"
       )}>
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <div className="flex-1 min-w-0">
-            <p className={cn(
-              "text-muted-foreground font-medium mb-1",
-              compact ? "text-xs" : "text-sm"
+        {/* Header with label and change indicator */}
+        <div className="flex items-start justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2">
+            {icon && (
+              <div className="flex-shrink-0 p-1.5 rounded-md bg-muted/50 text-muted-foreground">
+                {icon}
+              </div>
+            )}
+            <span className={cn(
+              "font-medium text-muted-foreground tracking-wide uppercase",
+              compact ? "text-[10px]" : "text-xs"
             )}>
               {label}
-            </p>
-            <p className={cn(
-              "font-bold truncate",
-              compact ? "text-lg" : primary ? "text-2xl" : "text-xl"
-            )}>
-              {value}
-            </p>
+            </span>
           </div>
           
           {change && (
             <div className={cn(
-              "flex items-center gap-1 rounded-full px-2 py-0.5",
-              change.direction === 'up' 
-                ? "bg-success/10 text-success" 
-                : "bg-destructive/10 text-destructive"
+              "flex items-center gap-1 rounded-full px-2 py-0.5 transition-colors",
+              getChangeColor()
             )}>
               {change.direction === 'up' ? (
                 <TrendingUp className="h-3 w-3" />
-              ) : (
+              ) : change.direction === 'down' ? (
                 <TrendingDown className="h-3 w-3" />
+              ) : (
+                <Minus className="h-3 w-3" />
               )}
-              <span className="text-xs font-semibold">
+              <span className="text-[11px] font-semibold tabular-nums">
                 {change.value}
               </span>
             </div>
           )}
         </div>
+
+        {/* Value */}
+        <div className="flex-1 flex items-end">
+          <p className={cn(
+            "font-semibold tracking-tight tabular-nums",
+            compact ? "text-xl" : primary ? "text-3xl md:text-4xl" : "text-2xl md:text-3xl"
+          )}>
+            {value}
+          </p>
+        </div>
         
-        {sparklineData && sparklineData.length > 0 && (
-          <div className="h-8 -mx-2 -mb-2 mt-1">
+        {/* Sparkline with gradient fill */}
+        {sparklineData && sparklineData.length > 1 && (
+          <div className={cn(
+            "absolute bottom-0 left-0 right-0 opacity-40 group-hover:opacity-60 transition-opacity",
+            compact ? "h-10" : "h-14"
+          )}>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={sparklineData}>
-                <Line 
+              <AreaChart data={sparklineData} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+                <defs>
+                  <linearGradient id="primaryGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.4} />
+                    <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="successGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsl(var(--success))" stopOpacity={0.4} />
+                    <stop offset="100%" stopColor="hsl(var(--success))" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="errorGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsl(var(--error))" stopOpacity={0.4} />
+                    <stop offset="100%" stopColor="hsl(var(--error))" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <Area 
                   type="monotone" 
                   dataKey="value" 
-                  stroke="hsl(var(--primary))" 
+                  stroke={getSparklineColor()}
                   strokeWidth={1.5}
-                  dot={false}
+                  fill={getSparklineGradient()}
                 />
-              </LineChart>
+              </AreaChart>
             </ResponsiveContainer>
           </div>
         )}
