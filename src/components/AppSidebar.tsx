@@ -16,61 +16,20 @@ import {
   LayoutDashboard, 
   Settings, 
   Target, 
-  Search, 
   BarChart3, 
-  Sparkles,
-  Zap,
-  ListChecks,
-  History,
-  Users
+  Zap
 } from "lucide-react";
 
 export function AppSidebar() {
   const location = useLocation();
 
-  const overviewItems = [
+  const menuItems = [
     { title: "Overview", url: "/overview", icon: LayoutDashboard },
-  ];
-
-  const campaignItems = [
     { title: "Campaigns", url: "/campaigns", icon: Target },
-    { title: "Search Terms", url: "/campaigns/search-terms", icon: Search },
-  ];
-
-  const automateItems = [
-    { title: "Automation", url: "/automate", icon: Zap },
-    { title: "Actions Queue", url: "/automate/queue", icon: ListChecks },
-    { title: "History", url: "/automate/history", icon: History },
-  ];
-
-  const reportsItems = [
+    { title: "Automate", url: "/automate", icon: Zap },
     { title: "Reports", url: "/reports", icon: BarChart3 },
-    { title: "AI Insights", url: "/reports/ai-insights", icon: Sparkles },
-  ];
-
-  const settingsItems = [
     { title: "Settings", url: "/settings", icon: Settings },
-    { title: "Multi-Account", url: "/settings/accounts", icon: Users },
   ];
-
-  const renderMenuItems = (items: { title: string; url: string; icon: React.ComponentType<{ className?: string }> }[]) => (
-    <SidebarMenu>
-      {items.map((item) => {
-        const isActive = location.pathname === item.url || 
-          (item.url !== '/overview' && location.pathname.startsWith(item.url) && item.url.split('/').length === location.pathname.split('/').length);
-        return (
-          <SidebarMenuItem key={item.title}>
-            <SidebarMenuButton asChild isActive={isActive} tooltip={item.title}>
-              <NavLink to={item.url} end className="flex items-center gap-2">
-                <item.icon className="h-4 w-4" />
-                <span>{item.title}</span>
-              </NavLink>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        );
-      })}
-    </SidebarMenu>
-  );
 
   return (
     <Sidebar collapsible="icon" className="border-r">
@@ -83,43 +42,25 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
       <SidebarContent>
-        {/* Overview */}
         <SidebarGroup>
-          <SidebarGroupLabel>Overview</SidebarGroupLabel>
+          <SidebarGroupLabel>Menu</SidebarGroupLabel>
           <SidebarGroupContent>
-            {renderMenuItems(overviewItems)}
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        {/* Campaigns */}
-        <SidebarGroup>
-          <SidebarGroupLabel>Campaigns</SidebarGroupLabel>
-          <SidebarGroupContent>
-            {renderMenuItems(campaignItems)}
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        {/* Automate */}
-        <SidebarGroup>
-          <SidebarGroupLabel>Automate</SidebarGroupLabel>
-          <SidebarGroupContent>
-            {renderMenuItems(automateItems)}
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        {/* Reports */}
-        <SidebarGroup>
-          <SidebarGroupLabel>Reports</SidebarGroupLabel>
-          <SidebarGroupContent>
-            {renderMenuItems(reportsItems)}
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        {/* Settings */}
-        <SidebarGroup>
-          <SidebarGroupLabel>Settings</SidebarGroupLabel>
-          <SidebarGroupContent>
-            {renderMenuItems(settingsItems)}
+            <SidebarMenu>
+              {menuItems.map((item) => {
+                const isActive = location.pathname === item.url || 
+                  (item.url !== '/overview' && location.pathname.startsWith(item.url));
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild isActive={isActive} tooltip={item.title}>
+                      <NavLink to={item.url} end={item.url === '/overview'} className="flex items-center gap-2">
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>

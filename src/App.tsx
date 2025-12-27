@@ -16,8 +16,8 @@ const Auth = lazy(() => import("@/pages/Auth"));
 const Overview = lazy(() => import("@/pages/Overview"));
 const Feedback = lazy(() => import("@/pages/Feedback"));
 const Campaigns = lazy(() => import("@/pages/Campaigns"));
-const AIInsights = lazy(() => import("@/pages/AIInsights"));
-const SearchTerms = lazy(() => import("@/pages/SearchTerms"));
+// AIInsights and SearchTerms now embedded in their parent pages
+
 const Privacy = lazy(() => import("@/pages/Privacy"));
 const Automate = lazy(() => import("@/pages/Automate"));
 const Reports = lazy(() => import("@/pages/Reports"));
@@ -99,11 +99,8 @@ const App = () => {
                           <Campaigns />
                         </ProtectedRoute>
                       } />
-                      <Route path="/campaigns/search-terms" element={
-                        <ProtectedRoute>
-                          <SearchTerms />
-                        </ProtectedRoute>
-                      } />
+                      <Route path="/campaigns/search-terms" element={<Navigate to="/campaigns" replace />} />
+
                       
                       {/* Automate routes */}
                       <Route path="/automate" element={
@@ -128,11 +125,8 @@ const App = () => {
                           <Reports />
                         </ProtectedRoute>
                       } />
-                      <Route path="/reports/ai-insights" element={
-                        <ProtectedRoute>
-                          <AIInsights />
-                        </ProtectedRoute>
-                      } />
+                      <Route path="/reports/ai-insights" element={<Navigate to="/reports" replace />} />
+
                       
                       {/* Settings routes */}
                       <Route path="/settings" element={
@@ -140,11 +134,8 @@ const App = () => {
                           <Settings />
                         </ProtectedRoute>
                       } />
-                      <Route path="/settings/accounts" element={
-                        <ProtectedRoute>
-                          <MultiAccount />
-                        </ProtectedRoute>
-                      } />
+                      <Route path="/settings/accounts" element={<Navigate to="/settings" replace />} />
+
                       
                       {/* Other protected routes */}
                       <Route path="/feedback" element={
