@@ -1,18 +1,9 @@
-import { Carousel, CarouselContent, CarouselItem } from "@/components/ui/carousel";
+import infiniteWorldLogo from "@/assets/infinite-world-logo.jpg";
+import wishAndWillowLogo from "@/assets/wish-and-willow-logo.jpg";
 
 const companies = [
-  "Amazon",
-  "Microsoft", 
-  "Google",
-  "Meta",
-  "Apple",
-  "Tesla",
-  "Netflix",
-  "Spotify",
-  "Uber",
-  "Airbnb",
-  "Shopify",
-  "Salesforce"
+  { name: "Infinite World", logo: infiniteWorldLogo },
+  { name: "Wish & Willow", logo: wishAndWillowLogo },
 ];
 
 const TrustedCompanies = () => {
@@ -21,29 +12,21 @@ const TrustedCompanies = () => {
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
           <p className="text-sm font-medium text-muted-foreground mb-4">
-            Trusted by leading brands
+            Powering top brands globally
           </p>
         </div>
         
-        <Carousel
-          opts={{
-            align: "start",
-            loop: true,
-          }}
-          className="w-full max-w-5xl mx-auto"
-        >
-          <CarouselContent className="-ml-2 md:-ml-4">
-            {companies.map((company, index) => (
-              <CarouselItem key={index} className="pl-2 md:pl-4 basis-1/3 md:basis-1/5 lg:basis-1/6">
-                <div className="flex items-center justify-center h-16 px-4">
-                  <span className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors duration-200">
-                    {company}
-                  </span>
-                </div>
-              </CarouselItem>
-            ))}
-          </CarouselContent>
-        </Carousel>
+        <div className="flex items-center justify-center gap-16 md:gap-24">
+          {companies.map((company, index) => (
+            <div key={index} className="flex items-center justify-center h-16">
+              <img 
+                src={company.logo} 
+                alt={company.name} 
+                className="h-12 md:h-16 w-auto object-contain opacity-80 hover:opacity-100 transition-opacity duration-200"
+              />
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );
