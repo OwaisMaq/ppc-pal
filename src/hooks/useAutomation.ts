@@ -236,12 +236,20 @@ export function useAlerts(profileId?: string) {
     setError(null);
 
     try {
+      const { data: authData } = await supabase.auth.getSession();
+      const token = authData.session?.access_token;
+
+      if (!token) {
+        throw new Error('No authentication token');
+      }
+
       const url = new URL(`https://ucbkcxupzjbblnzyiyui.supabase.co/functions/v1/rules-api/alerts`);
       if (profileId) url.searchParams.set('profileId', profileId);
       if (state) url.searchParams.set('state', state);
 
       const response = await fetch(url.toString(), {
         headers: {
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
