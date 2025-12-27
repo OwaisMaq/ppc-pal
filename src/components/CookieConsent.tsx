@@ -35,6 +35,7 @@ const CookieConsent = () => {
 
   const savePreferences = (prefs: CookiePreferences) => {
     localStorage.setItem('cookie-consent', JSON.stringify(prefs));
+    window.dispatchEvent(new CustomEvent("cookie-consent-updated"));
     setPreferences(prefs);
     setShowBanner(false);
   };

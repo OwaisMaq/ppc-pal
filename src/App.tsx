@@ -24,6 +24,8 @@ const Anomalies = lazy(() => import("@/pages/Anomalies"));
 const Attribution = lazy(() => import("@/pages/Attribution"));
 const MultiAccount = lazy(() => import("@/pages/MultiAccount"));
 const PublicLanding = lazy(() => import("@/pages/PublicLanding"));
+const PublicPrivacy = lazy(() => import("@/pages/PublicPrivacy"));
+const PublicTerms = lazy(() => import("@/pages/PublicTerms"));
 const About = lazy(() => import("@/pages/About"));
 const Contact = lazy(() => import("@/pages/Contact"));
 const Company = lazy(() => import("@/pages/Company"));
@@ -72,6 +74,8 @@ const App = () => {
                     <Routes>
                 {/* Public routes */}
                 <Route path="/" element={<PublicLanding />} />
+                <Route path="/privacy" element={<PublicPrivacy />} />
+                <Route path="/terms" element={<PublicTerms />} />
                 <Route path="/waitlist" element={<Waitlist />} />
                 <Route path="/about" element={<About />} />
                 <Route path="/contact" element={<Contact />} />
