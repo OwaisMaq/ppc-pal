@@ -1,161 +1,304 @@
 # PPC Pal - Branding Guidelines
 
-## Brand Philosophy
+## Brand Philosophy: "The Watchful Guardian"
 
-PPC Pal embodies clean, minimalistic, and modern design principles. Our interface prioritizes clarity, usability, and professional aesthetics over flashy effects and vibrant colors. We believe in creating a sophisticated, functional experience that helps users focus on their Amazon PPC optimization without visual distractions.
+PPC Pal embodies **Intentional Clarity** over mere minimalism. Our interface communicates safety, bounded automation, and explainable decisions. Every element reinforces the promise: your campaigns are protected by a vigilant governor that operates within your defined limits.
 
-## Core Design Principles
+### Core Principles
 
-### 1. Minimalism First
-- Remove unnecessary visual elements
-- Focus on essential functionality
-- Use whitespace effectively
-- Avoid decorative gradients and glows
+#### 1. The Guardrail Effect
+Design elements emphasize safety and boundaries. Use "framed" layouts and containerized data to visually represent that automation is "bounded" and under control.
 
-### 2. Professional Aesthetics
-- Clean typography hierarchy
-- Subtle shadows and borders
-- Consistent spacing and alignment
-- Professional color palette
+#### 2. Explainable Automation
+Never show an automated change without a reasoning tooltip or log. The UI must answer **"Why did the Pal do this?"** at a glance.
 
-### 3. Modern Functionality
-- Intuitive user interactions
-- Responsive design across all devices
-- Accessible components
-- Performance-optimized animations
+#### 3. Hands-Off Confidence
+Prioritize high-level outcomes over granular tweaks. The largest numbers should be "Wasted Spend Saved" and "Time Reclaimed"—metrics that validate the user's decision to step back.
 
-## Color Palette
+---
+
+## Color Palette: "Trust & Growth"
+
+Our colors reflect the dual nature of protection (reducing wasted spend) and growth (protecting performance).
 
 ### Primary Colors
+
 ```css
---primary: 222.2 47.4% 11.2%;           /* Deep navy for primary actions */
+/* The Governor - Authority & Control */
+--primary: 222.2 47.4% 11.2%;           /* Deep Navy */
 --primary-foreground: 210 40% 98%;      /* Clean white text */
---secondary: 210 40% 96.1%;             /* Light neutral backgrounds */
---secondary-foreground: 222.2 47.4% 11.2%;
+
+/* The Growth - Profit & Success */
+--accent-emerald: 158 64% 52%;          /* Emerald green */
+
+/* The Pal - Calm & Hands-off */
+--muted: 210 40% 96.1%;                 /* Soft Slate */
+--muted-foreground: 215.4 16.3% 46.9%;  /* Cool grey text */
 ```
 
-### Professional Accent Colors
+### Semantic Status Colors
+
 ```css
---accent: 214 84% 56%;                  /* Clean blue - primary accent */
---accent-blue: 214 84% 56%;             /* Professional blue */
---accent-emerald: 158 64% 52%;          /* Success green */
---accent-amber: 38 92% 50%;             /* Warning amber */
---accent-purple: 262 52% 47%;           /* Secondary accent purple */
+/* Standard Status */
+--success: 158 64% 52%;                 /* Emerald - Positive outcomes */
+--warning: 38 92% 50%;                  /* Amber - Standard warnings */
+--error: 0 84% 60%;                     /* Red - Errors */
+--info: 199 89% 48%;                    /* Sky blue - Information */
+
+/* Special: Manual Intervention Required */
+--intervention-amber: 45 93% 47%;       /* Distinct from standard warning */
 ```
 
-### Neutral Colors
-```css
---background: 0 0% 100%;                /* Pure white background */
---foreground: 222.2 84% 4.9%;          /* Dark text */
---muted: 210 40% 96.1%;                /* Subtle backgrounds */
---muted-foreground: 215.4 16.3% 46.9%; /* Secondary text */
---border: 214.3 31.8% 91.4%;           /* Clean borders */
-```
+### Neutral Palette
 
-### Brand Colors (Professional)
 ```css
---brand: 220 14% 96%;                   /* Clean brand background */
---brand-foreground: 220 9% 46%;        /* Professional brand text */
+--background: 0 0% 100%;                /* Pure white */
+--foreground: 222.2 84% 4.9%;           /* Deep text */
+--card: 0 0% 100%;                      /* White cards */
+--border: 214.3 31.8% 91.4%;            /* Cool grey borders */
 ```
 
 ### Shadow System
+
 ```css
 --shadow-sm: 0 1px 2px 0 hsl(var(--foreground) / 0.05);
 --shadow-md: 0 4px 6px -1px hsl(var(--foreground) / 0.1), 0 2px 4px -1px hsl(var(--foreground) / 0.06);
 --shadow-lg: 0 10px 15px -3px hsl(var(--foreground) / 0.1), 0 4px 6px -2px hsl(var(--foreground) / 0.05);
---shadow-xl: 0 20px 25px -5px hsl(var(--foreground) / 0.1), 0 10px 10px -5px hsl(var(--foreground) / 0.04);
 ```
 
-## Typography
+---
+
+## Typography: "The Modern Analyst"
+
+A tech-forward, precise typographic system that feels professional yet approachable.
 
 ### Font Stack
-- **Primary**: Inter (clean, modern sans-serif)
-- **Display**: Playfair Display (elegant serif for headings)
+
+```css
+/* Display - Headlines & Titles */
+--font-display: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+
+/* Body - Content & Data */
+--font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+```
 
 ### Typography Scale
-- **Hero Text**: 5xl-8xl (80px-128px) - Bold, clean headlines
-- **Headings**: 2xl-4xl (24px-36px) - Professional hierarchy
-- **Body**: base-lg (16px-18px) - Readable content
-- **Small**: sm (14px) - Labels, captions
+
+| Use Case | Size | Weight | Font |
+|----------|------|--------|------|
+| Hero Headlines | 5xl-8xl | Bold (700) | Plus Jakarta Sans |
+| Section Headings | 2xl-4xl | Semi-bold (600) | Plus Jakarta Sans |
+| Body Text | base-lg | Regular (400) | Inter |
+| Data/Tables | sm-base | Regular (400) | Inter |
+| Labels/Captions | sm | Medium (500) | Inter |
 
 ### Usage Guidelines
-- Use consistent font weights (400, 500, 600, 700)
+
+- Use Plus Jakarta Sans for all headings (h1-h6)
+- Use Inter for body text, data tables, and UI elements
 - Maintain proper line height ratios (1.2-1.6)
-- Ensure sufficient color contrast
-- Avoid gradient text effects
+- Ensure sufficient color contrast (WCAG AA minimum)
+
+---
 
 ## Component Guidelines
 
-### Buttons
+### The "Bounded System" Visual Metaphor
+
+#### The Frame
+Use subtle 1px borders for all data modules. This creates a sense of "order" and "containment."
+
 ```tsx
-// Clean button variants
-<Button variant="default">Primary Action</Button>
-<Button variant="secondary">Secondary Action</Button>
-<Button variant="outline">Outline Style</Button>
-<Button variant="ghost">Ghost Style</Button>
-<Button variant="translucent">Glass-inspired Style</Button>
+<Card className="border border-border bg-card">
+  {/* Content is visually contained */}
+</Card>
+```
+
+#### The Guardrail
+Whenever an automated action is displayed, visually "anchor" it to the rule that triggered it.
+
+---
+
+### The "Logic Chip"
+
+A small, pill-shaped badge next to every automated action that shows the triggering logic.
+
+```tsx
+// Design: Pill-shaped badge with muted background
+<Badge variant="secondary" className="text-xs font-mono">
+  [ACOS > 40%] → [Bid -10%]
+</Badge>
+```
+
+**Rules:**
+- Must appear next to every automated change
+- Contains simple If/Then statement
+- Uses muted background from palette
+- On hover, expands to show full reasoning
+
+---
+
+### The "Reasoning Row"
+
+Expands action details to show the complete logic path.
+
+```tsx
+<div className="text-sm text-muted-foreground">
+  <span className="font-medium">Why:</span> Campaign exceeded 40% ACOS 
+  for 3 consecutive days. Bid reduced by 10% to protect margin.
+</div>
+```
+
+**Rules:**
+- Always available on hover or click
+- Links action to specific metric thresholds
+- Uses calm, explanatory language
+
+---
+
+### Activity Feed
+
+A vertical timeline of "Pal Actions" for quick scanning.
+
+**Design Rules:**
+- High-contrast status dots for instant recognition
+- Each action linked to triggering rule
+- Group by time period (Today, Yesterday, This Week)
+- Use status colors: Emerald (protected), Amber (warning), Navy (info)
+
+```tsx
+<div className="flex items-start gap-3">
+  <div className="w-2 h-2 rounded-full bg-accent-emerald mt-2" />
+  <div>
+    <p className="text-sm font-medium">Protected margin on Campaign #102</p>
+    <p className="text-xs text-muted-foreground">
+      Lowered bid to $0.80 after 5 non-converting clicks
+    </p>
+  </div>
+</div>
+```
+
+---
+
+### Confidence Meters
+
+Visual indicators for "Automation Health" and "Budget Safety."
+
+```tsx
+// Simple progress bar showing automation confidence
+<div className="space-y-1">
+  <div className="flex justify-between text-sm">
+    <span>Automation Confidence</span>
+    <span className="font-medium">87%</span>
+  </div>
+  <Progress value={87} className="h-2" />
+</div>
+```
+
+---
+
+### Buttons
+
+```tsx
+// Primary - Authoritative actions
+<Button variant="default">Apply Changes</Button>
+
+// Secondary - Supporting actions
+<Button variant="secondary">View Details</Button>
+
+// Outline - Tertiary actions
+<Button variant="outline">Configure</Button>
+
+// Ghost - Minimal actions
+<Button variant="ghost">Dismiss</Button>
 ```
 
 **Design Rules:**
 - No gradient backgrounds
-- Subtle hover effects
-- Clean border radius (rounded-md)
+- Subtle hover effects (opacity or background shift)
 - Consistent padding and heights
-- Professional color palette only
-- Translucent variant uses glass-inspired styling with subtle transparency
+- Rounded-md border radius
+
+---
 
 ### Cards
+
 ```tsx
-// Modern card styling
 <Card className="border bg-card shadow-sm">
   <CardHeader>
-    <CardTitle>Clean Title</CardTitle>
+    <CardTitle className="font-display">Clean Title</CardTitle>
     <CardDescription>Professional description</CardDescription>
   </CardHeader>
-  <CardContent>Content here</CardContent>
+  <CardContent>
+    {/* Content with clear hierarchy */}
+  </CardContent>
 </Card>
 ```
 
 **Design Rules:**
-- Clean white backgrounds
+- 1px border for containment effect
+- Clean white/card backgrounds
 - Subtle shadows (shadow-sm to shadow-md)
-- No backdrop blur effects
 - Consistent border radius
-- Professional spacing
 
-### Data Display (KPI Chips)
-```tsx
-// Clean metric display
-<KpiChip 
-  label="ROAS" 
-  value="4.1x" 
-  change={{ value: '3.0%', direction: 'up' }}
-/>
-```
+---
 
-**Design Rules:**
-- Remove animated accents
-- Clean borders and backgrounds
-- Professional color indicators
-- Consistent spacing and typography
+### "Safe Zone" Visualizations
 
-## Layout Guidelines
+For charts, use shaded bands to represent target ranges.
 
-### Spacing System
-- Use consistent spacing scale (4px, 8px, 16px, 24px, 32px, 48px)
-- Maintain proper visual hierarchy
-- Apply generous whitespace
-- Ensure balanced compositions
+**Design:**
+- Horizontal shaded band represents "Target ACOS" or "Target Spend"
+- When data stays in band = Governor is silent
+- When data hits edge = Governor acts (show action marker)
 
-### Grid and Alignment
-- Use CSS Grid and Flexbox properly
-- Maintain consistent alignment
-- Responsive breakpoints (sm, md, lg, xl)
-- Clean gutters and margins
+---
+
+## Brand Voice: "The Calm Expert"
+
+The voice eliminates anxiety about "What is the bot doing?" It is reassuring, transparent, and steady.
+
+### Voice Examples
+
+| Scenario | Traditional SaaS | PPC Pal (The Governor) |
+|----------|-----------------|------------------------|
+| Bid Change | "Bid decreased to $0.80." | "PPC Pal lowered the bid on Campaign #102 to protect your margin after 5 non-converting clicks." |
+| Daily Summary | "Your campaigns are running." | "PPC Pal performed 14 actions today to prevent $120 in wasted spend." |
+| Error | "API Connection Lost." | "We've lost the connection to Amazon. PPC Pal has paused automation to ensure no incorrect changes are made." |
+| Success | "Campaign optimized." | "Protected $450 in potential wasted spend this week while maintaining your ROAS target." |
+
+### Key Traits
+
+- **Proactive:** Uses action verbs (Protected, Saved, Optimized, Filtered)
+- **Transparent:** Always links an action to a result
+- **Steady:** Avoids alarmist language; warnings feel like routine check-ins
+- **Outcome-focused:** Emphasizes what was achieved, not just what happened
+
+---
+
+## Visual Hierarchy: "Hands-Off" Principle
+
+### Priority Metrics (Largest Display)
+1. **Wasted Spend Saved** - Primary validation metric
+2. **Time Reclaimed** - Quantifies hands-off benefit
+3. **Protection Events** - Actions taken by the Governor
+
+### Secondary Metrics (Standard Display)
+- ROAS / ACOS
+- Total Spend
+- Conversions
+
+### Tertiary Metrics (Available on Drill-down)
+- Clicks
+- Impressions
+- CTR
+
+---
 
 ## Animation Guidelines
 
 ### Approved Animations
+
 ```css
 /* Subtle, functional animations only */
 transition-colors duration-200    /* Color transitions */
@@ -163,94 +306,74 @@ hover:shadow-md                   /* Shadow changes */
 animate-fade-in                   /* Content appearance */
 ```
 
+### Interaction Patterns
+
+- **Action Indicators:** Brief pulse when automation takes action
+- **Logic Reveal:** Smooth expand for reasoning tooltips
+- **Status Updates:** Fade transitions for metric changes
+
 ### Forbidden Effects
+
 - ❌ Pulse glows and electric effects
 - ❌ Floating decorative shapes
 - ❌ Gradient animations
 - ❌ Complex 3D transforms
-- ❌ Overly bouncy animations
+- ❌ Bouncy or playful animations
 
-## Dark Mode Considerations
+---
+
+## Dark Mode
 
 ### Dark Mode Palette
+
 ```css
---background: 222.2 84% 4.9%;     /* Dark background */
+--background: 222.2 84% 4.9%;     /* Deep background */
 --foreground: 210 40% 98%;        /* Light text */
---card: 222.2 84% 4.9%;          /* Dark cards */
---border: 217.2 32.6% 17.5%;     /* Dark borders */
+--card: 222.2 47% 11%;            /* Dark cards */
+--border: 217.2 32.6% 17.5%;      /* Dark borders */
+--muted: 217.2 32.6% 17.5%;       /* Muted surfaces */
 ```
 
-**Implementation:**
-- Maintain contrast ratios
+**Rules:**
+- Maintain contrast ratios (WCAG AA)
 - Test all components in both modes
-- Ensure professional appearance
-- Avoid overly bright accents
+- Emerald and Amber should remain vibrant
+- Reduce pure whites to prevent eye strain
+
+---
 
 ## Implementation Checklist
 
 ### ✅ Completed
-- [x] Removed electric color palette
-- [x] Simplified button variants
+- [x] Professional color palette
 - [x] Clean card styling
-- [x] Professional navigation
-- [x] Minimalist hero section
-- [x] Clean KPI chips
-- [x] Removed floating shapes
+- [x] Minimalist navigation
 - [x] Professional footer
 
-### Component Audit
-- [x] Landing page - Simplified and professional
-- [x] Button component - Removed pill and hero variants
-- [x] Card component - Clean styling
-- [x] KPI chips - Professional display
-- [x] Feature tiles - Minimal design
-- [x] Navigation - Clean header
+### 🔄 In Progress
+- [ ] Plus Jakarta Sans font integration
+- [ ] Logic Chip component
+- [ ] Reasoning tooltips on automated actions
+- [ ] Outcome-first metric ordering on Overview
 
-## Usage Examples
-
-### Landing Page Hero
-```tsx
-// Clean, professional hero
-<h1 className="text-5xl font-bold">
-  Smarter Amazon PPC.
-  <br />
-  <span className="text-muted-foreground">Cinematic simplicity.</span>
-</h1>
-```
-
-### Professional CTA
-```tsx
-// Simple, effective call-to-action
-<Button size="lg" className="px-8 py-3">
-  <Zap className="mr-2 h-5 w-5" /> Start optimizing
-</Button>
-```
-
-### Clean Data Visualization
-```tsx
-// Professional metrics display
-<div className="grid gap-4 md:grid-cols-4">
-  <KpiChip label="Spend" value="$12.3k" />
-  <KpiChip label="Clicks" value="48,921" />
-  <KpiChip label="ACOS" value="24.6%" />
-  <KpiChip label="ROAS" value="4.1x" />
-</div>
-```
-
-## Brand Voice
-
-### Tone
-- Professional yet approachable
-- Confident without being arrogant
-- Clear and direct communication
-- Focus on user benefits
-
-### Messaging Principles
-- Emphasize simplicity and efficiency
-- Highlight professional capabilities
-- Use clean, jargon-free language
-- Focus on measurable results
+### 📋 Planned
+- [ ] Safe Zone chart variants
+- [ ] Confidence Meters component
+- [ ] Activity Feed with logic anchoring
+- [ ] "Hands-off" visual hierarchy
 
 ---
 
-*This document serves as the definitive guide for maintaining PPC Pal's clean, minimalistic, and professional brand identity across all touchpoints.*
+## Quick Reference
+
+| Element | Current | Target |
+|---------|---------|--------|
+| Display Font | Playfair Display | Plus Jakarta Sans |
+| Primary Focus | Feature lists | "Wasted Spend Saved" metrics |
+| Action Display | Simple text | Action + Reasoning (Logic Chip) |
+| Table Style | Open & Airy | Compact & High-Density |
+| Chart Style | Standard lines | Safe Zone visualization |
+
+---
+
+*This document serves as the definitive guide for maintaining PPC Pal's "Watchful Guardian" identity—a calm, explainable, and boundary-respecting automation platform.*
