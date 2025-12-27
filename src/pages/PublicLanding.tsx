@@ -8,23 +8,25 @@ import HeroBackground from "@/components/HeroBackground";
 import AppPreviewFrame from "@/components/AppPreviewFrame";
 import KpiChip from "@/components/KpiChip";
 import DynamicGridCard from "@/components/DynamicGridCard";
-import FeatureTile from "@/components/FeatureTile";
-import TrustSection from "@/components/TrustSection";
-import TrustedCompanies from "@/components/TrustedCompanies";
+import InlineBetaSignup from "@/components/InlineBetaSignup";
+import { track } from "@/lib/analytics";
+
 const PublicLanding = () => {
-  const {
-    user,
-    loading
-  } = useAuth();
+  const { user, loading } = useAuth();
+
   useEffect(() => {
-    console.log('PublicLanding: Component mounted');
-    console.log('PublicLanding: Current URL:', window.location.href);
-    console.log('PublicLanding: Current pathname:', window.location.pathname);
-    console.log('PublicLanding: User:', user?.email || 'No user', 'Loading:', loading);
-    console.log('PublicLanding: This is a public page, no redirects should happen');
     document.title = 'PPC Pal — AI Amazon PPC Optimizer';
-  }, [user, loading]);
-  return <div className="min-h-screen bg-background text-foreground">
+  }, []);
+
+  const scrollToSignup = () => {
+    const el = document.getElementById("beta-signup");
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background text-foreground">
       {/* Clean navbar */}
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
@@ -40,11 +42,20 @@ const PublicLanding = () => {
             <Link to="/contact" className="transition-colors hover:text-primary">Contact</Link>
           </nav>
           <div className="flex items-center gap-3">
-            {user ? <Link to="/dashboard">
+            {user ? (
+              <Link to="/dashboard">
                 <Button>Go to Dashboard</Button>
-              </Link> : <Link to="/auth">
-                <Button>Join the beta</Button>
-              </Link>}
+              </Link>
+            ) : (
+              <Button
+                onClick={() => {
+                  track("mvp_cta_click", { location: "header" });
+                  scrollToSignup();
+                }}
+              >
+                Join the beta
+              </Button>
+            )}
           </div>
         </div>
       </header>
@@ -57,18 +68,29 @@ const PublicLanding = () => {
             <br />
             <span className="text-gray-400 text-5xl">Delegate your Amazon ads to AI</span>
           </h1>
-          <p className="mt-8 text-muted-foreground leading-relaxed max-w-2xl mx-auto text-lg">AI-driven bids | campaign management| keyword harvesting| day parting  </p>
+          <p className="mt-8 text-muted-foreground leading-relaxed max-w-2xl mx-auto text-lg">
+            AI-driven bids | campaign management | keyword harvesting | day parting
+          </p>
           
           <div className="mt-12 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            {user ? <Link to="/dashboard">
+            {user ? (
+              <Link to="/dashboard">
                 <Button size="lg" className="px-8 py-3">
                   <Zap className="mr-2 h-5 w-5" /> Go to Dashboard
                 </Button>
-              </Link> : <Link to="/auth">
-                <Button size="lg" className="px-8 py-3">
-                  <Zap className="mr-2 h-5 w-5" /> Start optimizing
-                </Button>
-              </Link>}
+              </Link>
+            ) : (
+              <Button
+                size="lg"
+                className="px-8 py-3"
+                onClick={() => {
+                  track("mvp_cta_click", { location: "hero" });
+                  scrollToSignup();
+                }}
+              >
+                <Zap className="mr-2 h-5 w-5" /> Start optimizing
+              </Button>
+            )}
             <Link to="/about">
               <Button variant="outline" size="lg" className="px-8 py-3">
                 Learn more
@@ -81,27 +103,15 @@ const PublicLanding = () => {
         <div className="mx-auto mt-20 max-w-6xl animate-fade-in">
           <AppPreviewFrame>
             <div className="flex flex-wrap items-center gap-3 sm:gap-4 mb-8">
-              <KpiChip label="Spend" value="$12.3k" change={{
-              value: '2.1%',
-              direction: 'down'
-            }} />
-              <KpiChip label="Clicks" value="48,921" change={{
-              value: '5.4%',
-              direction: 'up'
-            }} />
-              <KpiChip label="ACOS" value="24.6%" change={{
-              value: '1.2%',
-              direction: 'down'
-            }} />
-              <KpiChip label="ROAS" value="4.1x" change={{
-              value: '3.0%',
-              direction: 'up'
-            }} />
+              <KpiChip label="Spend" value="$12.3k" change={{ value: '2.1%', direction: 'down' }} />
+              <KpiChip label="Clicks" value="48,921" change={{ value: '5.4%', direction: 'up' }} />
+              <KpiChip label="ACOS" value="24.6%" change={{ value: '1.2%', direction: 'down' }} />
+              <KpiChip label="ROAS" value="4.1x" change={{ value: '3.0%', direction: 'up' }} />
             </div>
             <div className="grid gap-6 lg:grid-cols-3">
               <Card className="p-6 lg:col-span-2">
                 <div className="flex items-center gap-2 mb-4 text-sm text-muted-foreground">
-                  <CalendarDays className="h-4 w-4" /> 
+                  <CalendarDays className="h-4 w-4" />
                   <span className="font-medium">Last 7 days</span>
                 </div>
                 <div className="h-48 rounded-lg bg-muted/30 flex items-center justify-center" aria-hidden>
@@ -110,7 +120,7 @@ const PublicLanding = () => {
               </Card>
               <Card className="p-6">
                 <div className="flex items-center gap-2 mb-4 text-sm text-muted-foreground">
-                  <BarChart3 className="h-4 w-4" /> 
+                  <BarChart3 className="h-4 w-4" />
                   <span className="font-medium">Top keywords</span>
                 </div>
                 <div className="space-y-3 text-sm">
@@ -132,9 +142,6 @@ const PublicLanding = () => {
           </AppPreviewFrame>
         </div>
       </HeroBackground>
-
-      {/* Trusted Companies */}
-      
 
       {/* Clean Value Section */}
       <section className="py-24 bg-black">
@@ -159,7 +166,9 @@ const PublicLanding = () => {
                   </div>
                   <div className="space-y-1">
                     <div className="font-semibold text-lg">Dynamic Bids</div>
-                    <p className="text-muted-foreground leading-relaxed">Continuous bid adjustments based on performance signals and market conditions.</p>
+                    <p className="text-muted-foreground leading-relaxed">
+                      Continuous bid adjustments based on performance signals and market conditions.
+                    </p>
                   </div>
                 </li>
                 <li className="flex items-start gap-4">
@@ -168,7 +177,9 @@ const PublicLanding = () => {
                   </div>
                   <div className="space-y-1">
                     <div className="font-semibold text-lg">Keyword Harvesting</div>
-                    <p className="text-muted-foreground leading-relaxed">Automatically promote winning search terms while eliminating wasteful spend.</p>
+                    <p className="text-muted-foreground leading-relaxed">
+                      Automatically promote winning search terms while eliminating wasteful spend.
+                    </p>
                   </div>
                 </li>
                 <li className="flex items-start gap-4">
@@ -177,7 +188,9 @@ const PublicLanding = () => {
                   </div>
                   <div className="space-y-1">
                     <div className="font-semibold text-lg bg-transparent">Budget Pacing</div>
-                    <p className="leading-relaxed text-gray-300">Smart budget distribution prevents mid-day drop-offs and overspend scenarios.</p>
+                    <p className="leading-relaxed text-gray-300">
+                      Smart budget distribution prevents mid-day drop-offs and overspend scenarios.
+                    </p>
                   </div>
                 </li>
               </ul>
@@ -189,8 +202,41 @@ const PublicLanding = () => {
         </div>
       </section>
 
-      {/* Time Saver Section */}
-      
+      {/* MVP Trust Block + Inline Signup */}
+      <section className="py-20 bg-muted/30" id="join-beta">
+        <div className="container mx-auto px-4">
+          <div className="max-w-4xl mx-auto">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl sm:text-4xl font-bold mb-4">Join the PPC Pal beta</h2>
+              <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+                PPC Pal is designed to reduce wasted Amazon ad spend with data-driven optimisation. 
+                AI explains the "why" behind changes—no black box.
+              </p>
+            </div>
+
+            <div className="grid gap-8 lg:grid-cols-2 items-start">
+              <div className="space-y-6">
+                <h3 className="text-xl font-semibold">Trust & control (MVP)</h3>
+                <ul className="space-y-4 text-muted-foreground">
+                  <li className="flex items-start gap-3">
+                    <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                    <span><strong className="text-foreground">Clear boundaries:</strong> what we read, what we change, and why.</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                    <span><strong className="text-foreground">You remain in control:</strong> pause/stop at any time.</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                    <span><strong className="text-foreground">We prioritise transparency:</strong> every change is explainable.</span>
+                  </li>
+                </ul>
+              </div>
+              <InlineBetaSignup />
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Clean CTA Section */}
       <section className="py-20 border-t bg-muted/30">
@@ -201,18 +247,27 @@ const PublicLanding = () => {
             </h3>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
               <div className="flex items-center gap-3 text-muted-foreground">
-                <Shield className="h-5 w-5" /> 
+                <Shield className="h-5 w-5" />
                 <span>Enterprise security & Amazon OAuth</span>
               </div>
               <div className="flex gap-4">
                 <Link to="/about">
                   <Button variant="outline">Learn more</Button>
                 </Link>
-                {user ? <Link to="/dashboard">
+                {user ? (
+                  <Link to="/dashboard">
                     <Button>Open dashboard</Button>
-                  </Link> : <Link to="/auth">
-                    <Button>Join the beta</Button>
-                  </Link>}
+                  </Link>
+                ) : (
+                  <Button
+                    onClick={() => {
+                      track("mvp_cta_click", { location: "bottom" });
+                      scrollToSignup();
+                    }}
+                  >
+                    Join the beta
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -235,10 +290,17 @@ const PublicLanding = () => {
             <div className="text-center sm:text-right">
               <div className="font-medium">© 2024 WISH AND WILLOW LTD</div>
               <div className="text-xs">All rights reserved</div>
+              <div className="flex items-center gap-4 mt-2 text-xs">
+                <Link to="/privacy" className="hover:text-foreground">Privacy</Link>
+                <Link to="/terms" className="hover:text-foreground">Terms</Link>
+                <a href="mailto:hello@ppcpal.co.uk" className="hover:text-foreground">Contact</a>
+              </div>
             </div>
           </div>
         </div>
       </footer>
-    </div>;
+    </div>
+  );
 };
+
 export default PublicLanding;
