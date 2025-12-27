@@ -106,7 +106,8 @@ const Overview = () => {
       refetchAlerts();
       fetchAnomalies({ profileId, state: 'new' });
     }
-  }, [profileId, refetchAlerts, fetchAnomalies]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileId]);
 
   // Derive health status from metrics
   const healthStatus: HealthStatus = useMemo(() => {
