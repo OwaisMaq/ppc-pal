@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Heart, DollarSign, TrendingUp, Target, Bot, ChevronRight, AlertTriangle, CheckCircle, Info } from "lucide-react";
+import { Shield, DollarSign, TrendingUp, Target, Bot, ChevronRight, AlertTriangle, CheckCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
@@ -23,20 +23,20 @@ interface AccountHealthCardProps {
 
 const healthConfig = {
   healthy: {
-    label: 'Healthy',
-    color: 'bg-success/10 text-success border-success/20',
+    label: 'Protected',
+    color: 'bg-success/10 text-success border-success/30',
     icon: CheckCircle,
-    description: 'All metrics are within normal ranges'
+    description: 'PPC Pal is actively protecting your margins'
   },
   watch: {
-    label: 'Watch',
-    color: 'bg-warning/10 text-warning border-warning/20',
+    label: 'Monitoring',
+    color: 'bg-warning/10 text-warning border-warning/30',
     icon: AlertTriangle,
     description: 'Some metrics require monitoring'
   },
   at_risk: {
-    label: 'At Risk',
-    color: 'bg-destructive/10 text-destructive border-destructive/20',
+    label: 'Attention Needed',
+    color: 'bg-error/10 text-error border-error/30',
     icon: AlertTriangle,
     description: 'Immediate attention required'
   }
@@ -44,18 +44,18 @@ const healthConfig = {
 
 const automationConfig = {
   on: {
-    label: 'On',
-    color: 'bg-success/10 text-success border-success/20',
-    description: 'Automation is running fully'
+    label: 'Active',
+    color: 'bg-success/10 text-success border-success/30',
+    description: 'PPC Pal is actively protecting your account'
   },
   limited: {
     label: 'Limited',
-    color: 'bg-warning/10 text-warning border-warning/20',
-    description: 'Some rules are disabled'
+    color: 'bg-warning/10 text-warning border-warning/30',
+    description: 'Some protection rules are disabled'
   },
   paused: {
     label: 'Paused',
-    color: 'bg-muted text-muted-foreground border-muted',
+    color: 'bg-muted text-muted-foreground border-border',
     description: 'Automation is paused'
   }
 };
@@ -96,7 +96,7 @@ export const AccountHealthCard = ({
             <div className="h-8 bg-muted rounded w-1/3" />
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[...Array(4)].map((_, i) => (
-                <div key={i} className="h-20 bg-muted rounded" />
+                <div key={i} className="h-24 bg-muted rounded" />
               ))}
             </div>
           </div>
@@ -111,12 +111,12 @@ export const AccountHealthCard = ({
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg flex items-center gap-2">
-              <Heart className="h-5 w-5 text-primary" />
-              Account Health
+              <Shield className="h-5 w-5 text-primary" />
+              Account Protection
             </CardTitle>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Badge variant="outline" className={cn("gap-1", healthInfo.color)}>
+                <Badge variant="outline" className={cn("gap-1.5", healthInfo.color)}>
                   <HealthIcon className="h-3.5 w-3.5" />
                   {healthInfo.label}
                 </Badge>
@@ -135,25 +135,26 @@ export const AccountHealthCard = ({
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* OUTCOME-FIRST: Wasted Spend Saved is the hero metric */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Savings */}
+            {/* Savings - PRIMARY OUTCOME METRIC */}
             <Tooltip>
               <TooltipTrigger asChild>
-                <Link to="/reports" className="block group">
-                  <div className="p-4 rounded-lg border bg-card hover:bg-accent/5 transition-colors">
+                <Link to="/reports" className="block group col-span-2 lg:col-span-1">
+                  <div className="p-4 rounded-lg border-2 border-success/30 bg-success/5 hover:bg-success/10 transition-colors">
                     <div className="flex items-center justify-between mb-2">
-                      <div className="p-1.5 rounded-md bg-primary/10">
-                        <DollarSign className="h-4 w-4 text-primary" />
+                      <div className="p-1.5 rounded-md bg-success/20">
+                        <DollarSign className="h-4 w-4 text-success" />
                       </div>
                       <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
-                    <p className="text-2xl font-bold">{formatCurrency(savings)}</p>
-                    <p className="text-xs text-muted-foreground">Savings</p>
+                    <p className="text-3xl font-display font-bold text-success">{formatCurrency(savings)}</p>
+                    <p className="text-xs text-muted-foreground font-medium">Wasted Spend Saved</p>
                   </div>
                 </Link>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Total estimated savings from automations</p>
+                <p>Total savings from PPC Pal protection actions</p>
               </TooltipContent>
             </Tooltip>
 
@@ -161,14 +162,14 @@ export const AccountHealthCard = ({
             <Tooltip>
               <TooltipTrigger asChild>
                 <Link to="/reports" className="block group">
-                  <div className="p-4 rounded-lg border bg-card hover:bg-accent/5 transition-colors">
+                  <div className="p-4 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors">
                     <div className="flex items-center justify-between mb-2">
-                      <div className="p-1.5 rounded-md bg-primary/10">
-                        <TrendingUp className="h-4 w-4 text-primary" />
+                      <div className="p-1.5 rounded-md bg-muted">
+                        <TrendingUp className="h-4 w-4 text-muted-foreground" />
                       </div>
                       <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
-                    <p className="text-2xl font-bold">{formatCurrency(sales)}</p>
+                    <p className="text-2xl font-display font-bold">{formatCurrency(sales)}</p>
                     <p className="text-xs text-muted-foreground">
                       Sales <span className="text-muted-foreground/70">({formatCurrency(spend)} spend)</span>
                     </p>
@@ -186,19 +187,19 @@ export const AccountHealthCard = ({
             <Tooltip>
               <TooltipTrigger asChild>
                 <Link to="/settings" className="block group">
-                  <div className="p-4 rounded-lg border bg-card hover:bg-accent/5 transition-colors">
+                  <div className="p-4 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors">
                     <div className="flex items-center justify-between mb-2">
-                      <div className="p-1.5 rounded-md bg-primary/10">
-                        <Target className="h-4 w-4 text-primary" />
+                      <div className="p-1.5 rounded-md bg-muted">
+                        <Target className="h-4 w-4 text-muted-foreground" />
                       </div>
                       <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
                     <div className="flex items-baseline gap-2">
-                      <p className="text-2xl font-bold">{currentAcos.toFixed(1)}%</p>
+                      <p className="text-2xl font-display font-bold">{currentAcos.toFixed(1)}%</p>
                       <span className={cn(
                         "text-xs font-medium",
                         acosStatus === 'good' ? 'text-success' :
-                        acosStatus === 'warning' ? 'text-warning' : 'text-destructive'
+                        acosStatus === 'warning' ? 'text-warning' : 'text-error'
                       )}>
                         / {targetAcos}%
                       </span>
@@ -218,24 +219,24 @@ export const AccountHealthCard = ({
             <Tooltip>
               <TooltipTrigger asChild>
                 <Link to="/automate" className="block group">
-                  <div className="p-4 rounded-lg border bg-card hover:bg-accent/5 transition-colors">
+                  <div className="p-4 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors">
                     <div className="flex items-center justify-between mb-2">
-                      <div className="p-1.5 rounded-md bg-primary/10">
-                        <Bot className="h-4 w-4 text-primary" />
+                      <div className="p-1.5 rounded-md bg-muted">
+                        <Bot className="h-4 w-4 text-muted-foreground" />
                       </div>
                       <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
                     <Badge variant="outline" className={cn("text-sm", automationInfo.color)}>
                       {automationInfo.label}
                     </Badge>
-                    <p className="text-xs text-muted-foreground mt-1">Automation</p>
+                    <p className="text-xs text-muted-foreground mt-1">Protection Status</p>
                   </div>
                 </Link>
               </TooltipTrigger>
               <TooltipContent>
                 <p>{automationInfo.description}</p>
                 {automationReason && <p className="text-xs text-muted-foreground mt-1">{automationReason}</p>}
-                <p className="text-xs text-muted-foreground mt-1">Click to manage in Settings</p>
+                <p className="text-xs text-muted-foreground mt-1">Click to manage settings</p>
               </TooltipContent>
             </Tooltip>
           </div>
