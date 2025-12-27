@@ -7,16 +7,6 @@ import {
   Bot, 
   ChevronRight, 
   ChevronDown,
-  Shield, 
-  Zap, 
-  Search,
-  BarChart3,
-  DollarSign,
-  TrendingUp,
-  Clock,
-  Link2,
-  Eye,
-  Settings2,
   Star,
   Check,
   ArrowRight,
@@ -25,6 +15,16 @@ import {
 } from "lucide-react";
 import { track } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
+import {
+  DashboardPreview,
+  AutomationPreview,
+  KeywordsPreview,
+  AnalyticsPreview,
+  SavingsPreview,
+  ConnectPreview,
+  AnalyzePreview,
+  OptimizePreview
+} from "@/components/landing";
 
 const PublicLanding = () => {
   const { user } = useAuth();
@@ -97,16 +97,9 @@ const PublicLanding = () => {
               </div>
             </div>
             
-            {/* Hero Image Placeholder */}
+            {/* Hero Image - Dashboard Preview */}
             <div className="relative">
-              <div className="aspect-[4/3] rounded-lg border border-border bg-muted flex items-center justify-center">
-                <div className="text-center p-8">
-                  <div className="inline-flex h-16 w-16 items-center justify-center rounded-lg bg-muted-foreground/10 mb-4">
-                    <BarChart3 className="h-8 w-8 text-muted-foreground" />
-                  </div>
-                  <p className="text-muted-foreground">Dashboard Preview</p>
-                </div>
-              </div>
+              <DashboardPreview />
             </div>
           </div>
         </div>
@@ -126,64 +119,47 @@ const PublicLanding = () => {
           </div>
           
           <div className="grid md:grid-cols-3 gap-6">
-            {/* Automation Card - Large */}
-            <Card className="md:col-span-1 md:row-span-1 overflow-hidden">
-              <div className="grid md:grid-rows-2 h-full">
-                <CardContent className="p-6 flex flex-col justify-end">
-                  <p className="text-xs font-medium text-muted-foreground mb-2">Automation</p>
-                  <h3 className="text-xl font-display font-semibold mb-3">
-                    Intelligent bid optimization that never sleeps
-                  </h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Your bids adjust automatically based on performance data. No more manual tweaking at midnight.
-                  </p>
-                  <a href="#" className="inline-flex items-center text-sm font-medium hover:underline">
-                    Explore <ChevronRight className="h-4 w-4 ml-1" />
-                  </a>
-                </CardContent>
-                <div className="bg-muted flex items-center justify-center min-h-[160px]">
-                  <Zap className="h-12 w-12 text-muted-foreground/30" />
-                </div>
+            {/* Automation Card */}
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2">Automation</p>
+                <h3 className="text-xl font-display font-semibold mb-2">
+                  Intelligent bid optimization that never sleeps
+                </h3>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Your bids adjust automatically based on performance data. No more manual tweaking at midnight.
+                </p>
               </div>
-            </Card>
+              <AutomationPreview />
+            </div>
             
             {/* Keywords Card */}
-            <Card className="overflow-hidden">
-              <CardContent className="p-6">
+            <div className="space-y-4">
+              <div>
                 <p className="text-xs font-medium text-muted-foreground mb-2">Keywords</p>
-                <h3 className="text-xl font-display font-semibold mb-3">
+                <h3 className="text-xl font-display font-semibold mb-2">
                   Smart keyword management
                 </h3>
-                <p className="text-sm text-muted-foreground mb-4">
+                <p className="text-sm text-muted-foreground mb-3">
                   Identify winners and eliminate losers before they drain your budget.
                 </p>
-                <a href="#" className="inline-flex items-center text-sm font-medium hover:underline">
-                  Explore <ChevronRight className="h-4 w-4 ml-1" />
-                </a>
-              </CardContent>
-              <div className="bg-muted flex items-center justify-center h-40">
-                <Search className="h-12 w-12 text-muted-foreground/30" />
               </div>
-            </Card>
+              <KeywordsPreview />
+            </div>
             
             {/* Analytics Card */}
-            <Card className="overflow-hidden">
-              <CardContent className="p-6">
+            <div className="space-y-4">
+              <div>
                 <p className="text-xs font-medium text-muted-foreground mb-2">Analytics</p>
-                <h3 className="text-xl font-display font-semibold mb-3">
+                <h3 className="text-xl font-display font-semibold mb-2">
                   Clear performance insights
                 </h3>
-                <p className="text-sm text-muted-foreground mb-4">
+                <p className="text-sm text-muted-foreground mb-3">
                   See exactly where your money goes and what it brings back.
                 </p>
-                <a href="#" className="inline-flex items-center text-sm font-medium hover:underline">
-                  Explore <ChevronRight className="h-4 w-4 ml-1" />
-                </a>
-              </CardContent>
-              <div className="bg-muted flex items-center justify-center h-40">
-                <BarChart3 className="h-12 w-12 text-muted-foreground/30" />
               </div>
-            </Card>
+              <AnalyticsPreview />
+            </div>
           </div>
         </div>
       </section>
@@ -203,63 +179,46 @@ const PublicLanding = () => {
           
           <div className="grid md:grid-cols-3 gap-6">
             {/* Savings */}
-            <Card className="overflow-hidden">
-              <div className="grid md:grid-rows-2 h-full">
-                <CardContent className="p-6 flex flex-col justify-end">
-                  <p className="text-xs font-medium text-muted-foreground mb-2">Savings</p>
-                  <h3 className="text-xl font-display font-semibold mb-3">
-                    Cut ad spend without cutting sales
-                  </h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Reduce wasted clicks and improve your cost per acquisition immediately.
-                  </p>
-                  <a href="#" className="inline-flex items-center text-sm font-medium hover:underline">
-                    Discover <ChevronRight className="h-4 w-4 ml-1" />
-                  </a>
-                </CardContent>
-                <div className="bg-muted flex items-center justify-center min-h-[160px]">
-                  <DollarSign className="h-12 w-12 text-muted-foreground/30" />
-                </div>
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2">Savings</p>
+                <h3 className="text-xl font-display font-semibold mb-2">
+                  Cut ad spend without cutting sales
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Reduce wasted clicks and improve your cost per acquisition immediately.
+                </p>
               </div>
-            </Card>
+              <SavingsPreview />
+            </div>
             
-            {/* Returns */}
-            <Card className="overflow-hidden">
-              <CardContent className="p-6">
+            {/* Returns - reuse Analytics for ROI view */}
+            <div className="space-y-4">
+              <div>
                 <p className="text-xs font-medium text-muted-foreground mb-2">Returns</p>
-                <h3 className="text-xl font-display font-semibold mb-3">
+                <h3 className="text-xl font-display font-semibold mb-2">
                   Better ROI from day one
                 </h3>
-                <p className="text-sm text-muted-foreground mb-4">
+                <p className="text-sm text-muted-foreground">
                   Every dollar works harder when optimization runs continuously.
                 </p>
-                <a href="#" className="inline-flex items-center text-sm font-medium hover:underline">
-                  Discover <ChevronRight className="h-4 w-4 ml-1" />
-                </a>
-              </CardContent>
-              <div className="bg-muted flex items-center justify-center h-40">
-                <TrendingUp className="h-12 w-12 text-muted-foreground/30" />
               </div>
-            </Card>
+              <AnalyticsPreview />
+            </div>
             
-            {/* Time */}
-            <Card className="overflow-hidden">
-              <CardContent className="p-6">
+            {/* Time - show automation working overnight */}
+            <div className="space-y-4">
+              <div>
                 <p className="text-xs font-medium text-muted-foreground mb-2">Time</p>
-                <h3 className="text-xl font-display font-semibold mb-3">
+                <h3 className="text-xl font-display font-semibold mb-2">
                   Get your hours back
                 </h3>
-                <p className="text-sm text-muted-foreground mb-4">
+                <p className="text-sm text-muted-foreground">
                   Stop managing campaigns manually and start managing your business.
                 </p>
-                <a href="#" className="inline-flex items-center text-sm font-medium hover:underline">
-                  Discover <ChevronRight className="h-4 w-4 ml-1" />
-                </a>
-              </CardContent>
-              <div className="bg-muted flex items-center justify-center h-40">
-                <Clock className="h-12 w-12 text-muted-foreground/30" />
               </div>
-            </Card>
+              <OptimizePreview />
+            </div>
           </div>
         </div>
       </section>
@@ -279,61 +238,46 @@ const PublicLanding = () => {
           
           <div className="grid md:grid-cols-3 gap-6">
             {/* Connect */}
-            <Card className="overflow-hidden">
-              <div className="bg-muted flex items-center justify-center h-56">
-                <Link2 className="h-12 w-12 text-muted-foreground/30" />
-              </div>
-              <CardContent className="p-6">
-                <p className="text-xs font-medium text-muted-foreground mb-2">Connect</p>
-                <h3 className="text-xl font-display font-semibold mb-3">
+            <div className="space-y-4">
+              <ConnectPreview />
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2">Step 1: Connect</p>
+                <h3 className="text-xl font-display font-semibold mb-2">
                   Link your Amazon seller account
                 </h3>
-                <p className="text-sm text-muted-foreground mb-4">
+                <p className="text-sm text-muted-foreground">
                   PPC Pal connects directly to your campaigns in minutes.
                 </p>
-                <a href="#" className="inline-flex items-center text-sm font-medium hover:underline">
-                  Learn <ChevronRight className="h-4 w-4 ml-1" />
-                </a>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
             
             {/* Analyze */}
-            <Card className="overflow-hidden">
-              <div className="bg-muted flex items-center justify-center h-56">
-                <Eye className="h-12 w-12 text-muted-foreground/30" />
-              </div>
-              <CardContent className="p-6">
-                <p className="text-xs font-medium text-muted-foreground mb-2">Analyze</p>
-                <h3 className="text-xl font-display font-semibold mb-3">
+            <div className="space-y-4">
+              <AnalyzePreview />
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2">Step 2: Analyze</p>
+                <h3 className="text-xl font-display font-semibold mb-2">
                   Watch the data flow in real time
                 </h3>
-                <p className="text-sm text-muted-foreground mb-4">
+                <p className="text-sm text-muted-foreground">
                   Performance metrics arrive instantly so you see what matters.
                 </p>
-                <a href="#" className="inline-flex items-center text-sm font-medium hover:underline">
-                  Learn <ChevronRight className="h-4 w-4 ml-1" />
-                </a>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
             
             {/* Optimize */}
-            <Card className="overflow-hidden">
-              <div className="bg-muted flex items-center justify-center h-56">
-                <Settings2 className="h-12 w-12 text-muted-foreground/30" />
-              </div>
-              <CardContent className="p-6">
-                <p className="text-xs font-medium text-muted-foreground mb-2">Optimize</p>
-                <h3 className="text-xl font-display font-semibold mb-3">
+            <div className="space-y-4">
+              <OptimizePreview />
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2">Step 3: Optimize</p>
+                <h3 className="text-xl font-display font-semibold mb-2">
                   Let automation handle the heavy lifting
                 </h3>
-                <p className="text-sm text-muted-foreground mb-4">
+                <p className="text-sm text-muted-foreground">
                   Bids adjust, keywords shift, waste disappears while you sleep.
                 </p>
-                <a href="#" className="inline-flex items-center text-sm font-medium hover:underline">
-                  Learn <ChevronRight className="h-4 w-4 ml-1" />
-                </a>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
         </div>
       </section>
