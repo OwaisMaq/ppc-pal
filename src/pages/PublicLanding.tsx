@@ -11,7 +11,9 @@ import {
   Check,
   ArrowRight,
   Briefcase,
-  User
+  User,
+  TrendingUp,
+  Sparkles
 } from "lucide-react";
 import { track } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
@@ -73,34 +75,133 @@ const PublicLanding = () => {
       </header>
 
       {/* Hero Section */}
-      <section className="py-20 lg:py-28">
+      <section className="py-20 lg:py-28 overflow-hidden">
         <div className="container mx-auto px-4">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
+          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
             <div className="space-y-8">
+              {/* Playful Badge */}
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-100 dark:bg-amber-900/30 rounded-full text-sm font-medium text-amber-800 dark:text-amber-200 animate-fade-in">
+                <span>👋</span> Bye-bye, messy spreadsheets
+              </div>
+              
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-display font-bold tracking-tight leading-[1.1]">
-                Stop wasting money on Amazon ads
+                Amazon Ads,{" "}
+                <span className="relative inline-block">
+                  Simplified.
+                  <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 200 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M2 8C50 2 150 2 198 8" stroke="hsl(var(--primary))" strokeWidth="4" strokeLinecap="round" className="animate-[draw_1s_ease-out_forwards]" strokeDasharray="200" strokeDashoffset="200" style={{ animation: 'draw 1s ease-out 0.5s forwards' }}/>
+                  </svg>
+                </span>
               </h1>
+              
               <p className="text-lg text-muted-foreground max-w-lg leading-relaxed">
-                PPC Pal automates your campaign optimization. Let your bids work smarter while you focus on growing your business.
+                We optimize your bids 24/7 so you can focus on growing your brand (or sleeping).
               </p>
-              <div className="flex flex-wrap gap-4">
+              
+              <div className="flex flex-wrap items-center gap-4">
                 <Link to="/auth">
-                  <Button size="lg" className="gap-2">
-                    Start <ArrowRight className="h-4 w-4" />
+                  <Button size="lg" className="gap-2 rounded-full px-8 shadow-lg hover:shadow-xl transition-shadow">
+                    Start Free Trial <ArrowRight className="h-4 w-4" />
                   </Button>
                 </Link>
-                <a href="#features">
-                  <Button variant="outline" size="lg">
-                    Learn
+                <a href="#features" className="group">
+                  <Button variant="outline" size="lg" className="gap-2 rounded-full px-6">
+                    <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                      <svg className="w-3 h-3 text-primary" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z"/>
+                      </svg>
+                    </span>
+                    Watch Demo
                   </Button>
                 </a>
               </div>
+              
+              {/* Social Proof */}
+              <div className="flex items-center gap-4 pt-4">
+                <div className="flex -space-x-2">
+                  {[
+                    "bg-blue-500", "bg-emerald-500", "bg-purple-500", "bg-amber-500"
+                  ].map((color, i) => (
+                    <div 
+                      key={i}
+                      className={`w-10 h-10 rounded-full ${color} border-2 border-background flex items-center justify-center text-white text-xs font-medium`}
+                      style={{ animationDelay: `${i * 100}ms` }}
+                    >
+                      {['M', 'S', 'J', 'A'][i]}
+                    </div>
+                  ))}
+                  <div className="w-10 h-10 rounded-full bg-muted border-2 border-background flex items-center justify-center text-xs font-medium text-muted-foreground">
+                    +2k
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Trusted by <span className="font-semibold text-foreground">2,000+</span> sellers
+                </p>
+              </div>
             </div>
             
-            {/* Hero Image - Dashboard Preview */}
+            {/* Hero Image - Dashboard Preview with Floating Cards */}
             <div className="relative">
-              <DashboardPreview />
+              {/* Floating Metric Card - Top Right */}
+              <div className="absolute -top-4 -right-4 lg:right-0 z-10 animate-fade-in" style={{ animationDelay: '0.3s' }}>
+                <div className="bg-background rounded-xl shadow-xl border border-border p-4 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center">
+                    <TrendingUp className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Daily Profit</p>
+                    <p className="text-lg font-display font-bold text-emerald-600">+$452.20</p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Main Dashboard */}
+              <div className="transform lg:rotate-1 hover:rotate-0 transition-transform duration-500">
+                <DashboardPreview />
+              </div>
+              
+              {/* Floating Status Card - Bottom Left */}
+              <div className="absolute -bottom-4 -left-4 lg:left-8 z-10 animate-fade-in" style={{ animationDelay: '0.5s' }}>
+                <div className="bg-background rounded-xl shadow-xl border border-border p-4 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Auto-Optimization</p>
+                    <p className="text-xs text-emerald-600 flex items-center gap-1">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                      </span>
+                      Active
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Trusted By Section */}
+      <section className="py-12 border-y border-border bg-muted/20">
+        <div className="container mx-auto px-4">
+          <p className="text-center text-xs font-medium text-muted-foreground tracking-widest uppercase mb-8">
+            Powering Top Brands Globally
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-8 lg:gap-16">
+            {[
+              { icon: "🏪", name: "ShopMax" },
+              { icon: "⚡", name: "Volted" },
+              { icon: "📦", name: "PrimeLogistics" },
+              { icon: "🐾", name: "PetWiz" },
+              { icon: "🎯", name: "AdScale" },
+            ].map((brand, i) => (
+              <div key={i} className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+                <span className="text-lg">{brand.icon}</span>
+                <span className="font-display font-semibold">{brand.name}</span>
+              </div>
+            ))}
           </div>
         </div>
       </section>
