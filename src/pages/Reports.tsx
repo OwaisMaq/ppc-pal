@@ -10,6 +10,7 @@ import { BudgetCopilotPanel } from "@/components/BudgetCopilotPanel";
 import { BudgetForecastPanel } from "@/components/BudgetForecastPanel";
 import { AuditSummary } from "@/components/AuditSummary";
 import { AuditMonthCard } from "@/components/AuditMonthCard";
+import { AIInsightsPanel } from "@/components/AIInsightsPanel";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { useHistoricalAudit } from "@/hooks/useHistoricalAudit";
 import { 
@@ -18,9 +19,11 @@ import {
   AlertTriangle, 
   DollarSign, 
   ClipboardList,
+  Sparkles,
   RefreshCw 
 } from "lucide-react";
 import { useEffect } from "react";
+
 
 const Reports = () => {
   const [activeTab, setActiveTab] = useState("performance");
@@ -61,7 +64,7 @@ const Reports = () => {
         </div>
 
         {/* Quick Stats */}
-        <div className="grid gap-4 md:grid-cols-5">
+        <div className="grid gap-4 md:grid-cols-6">
           <Card 
             className={`cursor-pointer transition-colors ${activeTab === 'performance' ? 'border-primary' : 'hover:border-muted-foreground/50'}`}
             onClick={() => setActiveTab('performance')}
@@ -131,17 +134,34 @@ const Reports = () => {
               <p className="text-xs text-muted-foreground">Account analysis</p>
             </CardContent>
           </Card>
+
+          <Card 
+            className={`cursor-pointer transition-colors ${activeTab === 'ai-insights' ? 'border-primary' : 'hover:border-muted-foreground/50'}`}
+            onClick={() => setActiveTab('ai-insights')}
+          >
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">AI Insights</CardTitle>
+              <Sparkles className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">Smart</div>
+              <p className="text-xs text-muted-foreground">AI recommendations</p>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Tabs Content */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="performance">Performance</TabsTrigger>
             <TabsTrigger value="attribution">Attribution</TabsTrigger>
             <TabsTrigger value="anomalies">Anomalies</TabsTrigger>
             <TabsTrigger value="budget">Budget</TabsTrigger>
             <TabsTrigger value="audit">Audit</TabsTrigger>
+            <TabsTrigger value="ai-insights">AI Insights</TabsTrigger>
           </TabsList>
+
+
 
           <TabsContent value="performance">
             <Card>
@@ -277,6 +297,11 @@ const Reports = () => {
               </div>
             )}
           </TabsContent>
+
+          <TabsContent value="ai-insights">
+            <AIInsightsPanel />
+          </TabsContent>
+
         </Tabs>
       </div>
     </DashboardShell>
