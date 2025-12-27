@@ -13,5 +13,5 @@ export { ConfidenceSignalsCard } from './ConfidenceSignalsCard';
 
 export { OnboardingGuidanceCard, getDefaultSetupItems } from './OnboardingGuidanceCard';
 
-export { OverviewFilters } from './OverviewFilters';
-export type { DatePreset } from './OverviewFilters';
+export { OverviewFilters, getMarketplaceName } from './OverviewFilters';
+export type { DatePreset, MarketplaceOption, BrandOption } from './OverviewFilters';

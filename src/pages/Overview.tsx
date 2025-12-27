@@ -11,7 +11,8 @@ import { useDataAvailability } from "@/hooks/useDataAvailability";
 import { useAutomationRules, useAlerts } from "@/hooks/useAutomation";
 import { useAnomalies } from "@/hooks/useAnomalies";
 import { useActionQueue } from "@/hooks/useActionQueue";
-import { useState, useMemo, useEffect } from "react";
+import { useSearchStudio } from "@/hooks/useSearchStudio";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { DateRange } from "react-day-picker";
 import { subDays, differenceInDays } from "date-fns";
 
@@ -25,11 +26,14 @@ import {
   OnboardingGuidanceCard,
   OverviewFilters,
   getDefaultSetupItems,
+  getMarketplaceName,
   type HealthStatus,
   type AutomationStatus,
   type MatterItem,
   type ActiveAlert,
-  type DatePreset
+  type DatePreset,
+  type MarketplaceOption,
+  type BrandOption
 } from "@/components/overview";
 
 const Overview = () => {
@@ -43,6 +47,8 @@ const Overview = () => {
   });
   
   const [selectedASIN, setSelectedASIN] = useState<string | null>(null);
+  const [selectedMarketplace, setSelectedMarketplace] = useState<string | null>(null);
+  const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
   const [datePreset, setDatePreset] = useState<DatePreset>('last_month');
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: subDays(new Date(), 30),
@@ -51,6 +57,35 @@ const Overview = () => {
   
   const primaryConnection = connections[0];
   const profileId = primaryConnection?.profile_id;
+  
+  // Derive marketplaces from connections
+  const marketplaceOptions: MarketplaceOption[] = useMemo(() => {
+    const uniqueMarketplaces = new Map<string, string>();
+    connections.forEach(conn => {
+      if (conn.marketplace_id) {
+        uniqueMarketplaces.set(conn.marketplace_id, getMarketplaceName(conn.marketplace_id));
+      }
+    });
+    return Array.from(uniqueMarketplaces.entries()).map(([id, name]) => ({ id, name }));
+  }, [connections]);
+  
+  // Fetch brand terms
+  const { brandTerms, fetchBrandTerms } = useSearchStudio();
+  
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const memoizedFetchBrandTerms = useCallback(fetchBrandTerms, []);
+  
+  useEffect(() => {
+    if (profileId) {
+      memoizedFetchBrandTerms(profileId);
+    }
+  }, [profileId, memoizedFetchBrandTerms]);
+  
+  // Map brand terms to options
+  const brandOptions: BrandOption[] = useMemo(() => {
+    return brandTerms.map(bt => ({ id: bt.id, term: bt.term }));
+  }, [brandTerms]);
+
   
   // Fetch metrics
   const { metrics, loading: metricsLoading, error: metricsError } = useAmsMetrics(
@@ -335,7 +370,14 @@ const Overview = () => {
             onDatePresetChange={setDatePreset}
             selectedASIN={selectedASIN}
             onASINChange={setSelectedASIN}
+            marketplaces={marketplaceOptions}
+            selectedMarketplace={selectedMarketplace}
+            onMarketplaceChange={setSelectedMarketplace}
+            brands={brandOptions}
+            selectedBrand={selectedBrand}
+            onBrandChange={setSelectedBrand}
           />
+
         )}
 
         {/* Data Availability */}
