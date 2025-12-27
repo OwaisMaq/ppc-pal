@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useActionsFeed } from "@/hooks/useActionsFeed";
 import { formatDistanceToNow } from "date-fns";
+import { LogicChip } from "@/components/ui/LogicChip";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -11,8 +12,10 @@ import {
   Activity,
   CheckCircle2,
   XCircle,
-  Clock
+  Clock,
+  ShieldCheck
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const ActionsFeed = () => {
   const { actions, loading } = useActionsFeed(15);
@@ -52,18 +55,81 @@ const ActionsFeed = () => {
     }
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusConfig = (status: string) => {
     switch (status) {
       case 'applied':
-        return <Badge variant="default" className="gap-1"><CheckCircle2 className="h-3 w-3" />Applied</Badge>;
+        return { 
+          icon: CheckCircle2, 
+          label: 'Protected', 
+          color: 'text-success',
+          dotColor: 'bg-success'
+        };
       case 'queued':
-        return <Badge variant="secondary" className="gap-1"><Clock className="h-3 w-3" />Queued</Badge>;
+        return { 
+          icon: Clock, 
+          label: 'Queued', 
+          color: 'text-muted-foreground',
+          dotColor: 'bg-muted-foreground'
+        };
       case 'failed':
-        return <Badge variant="destructive" className="gap-1"><XCircle className="h-3 w-3" />Failed</Badge>;
+        return { 
+          icon: XCircle, 
+          label: 'Failed', 
+          color: 'text-error',
+          dotColor: 'bg-error'
+        };
       case 'skipped':
-        return <Badge variant="outline">Skipped</Badge>;
+        return { 
+          icon: Activity, 
+          label: 'Skipped', 
+          color: 'text-muted-foreground',
+          dotColor: 'bg-muted-foreground'
+        };
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return { 
+          icon: Activity, 
+          label: status, 
+          color: 'text-muted-foreground',
+          dotColor: 'bg-muted-foreground'
+        };
+    }
+  };
+
+  // Extract logic trigger and action from action data
+  const getLogicContext = (action: any) => {
+    const { action_type, payload } = action;
+    
+    switch (action_type) {
+      case 'set_bid':
+        return {
+          trigger: payload.reason || 'Performance threshold',
+          action: `Bid → $${payload.new_bid || 'N/A'}`,
+          details: `PPC Pal adjusted bid to protect your margin based on ${payload.reason || 'performance metrics'}.`
+        };
+      case 'negative_keyword':
+        return {
+          trigger: payload.reason || 'High ACOS',
+          action: `Negative: "${payload.keyword_text}"`,
+          details: `Added "${payload.keyword_text}" as negative to prevent wasted spend on non-converting traffic.`
+        };
+      case 'negative_product':
+        return {
+          trigger: payload.reason || 'Non-converting',
+          action: `Exclude ASIN`,
+          details: `Excluded ASIN ${payload.asin} from targeting to reduce wasted spend.`
+        };
+      case 'pause_target':
+        return {
+          trigger: payload.reason || 'Underperforming',
+          action: 'Paused',
+          details: `Paused target to protect your budget from continued poor performance.`
+        };
+      default:
+        return {
+          trigger: 'Rule triggered',
+          action: action_type,
+          details: undefined
+        };
     }
   };
 
@@ -90,7 +156,10 @@ const ActionsFeed = () => {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Actions Taken by AI</CardTitle>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <ShieldCheck className="h-5 w-5 text-primary" />
+            Protection Actions
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
@@ -109,10 +178,17 @@ const ActionsFeed = () => {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Actions Taken by AI</CardTitle>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <ShieldCheck className="h-5 w-5 text-primary" />
+            Protection Actions
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">No actions taken yet.</p>
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <ShieldCheck className="h-12 w-12 text-muted-foreground/30 mb-3" />
+            <p className="text-sm text-muted-foreground">No protection actions taken yet.</p>
+            <p className="text-xs text-muted-foreground mt-1">PPC Pal will act when your rules trigger.</p>
+          </div>
         </CardContent>
       </Card>
     );
@@ -120,36 +196,72 @@ const ActionsFeed = () => {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-lg">Actions Taken by AI</CardTitle>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg flex items-center gap-2">
+          <ShieldCheck className="h-5 w-5 text-primary" />
+          Protection Actions
+        </CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Actions taken by PPC Pal to protect your margins
+        </p>
       </CardHeader>
       <CardContent>
         <ScrollArea className="h-[400px] pr-4">
-          <div className="space-y-3">
-            {actions.map((action) => (
-              <div
-                key={action.id}
-                className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
-              >
-                <div className="mt-1 p-2 rounded-full bg-primary/10 text-primary">
-                  {getActionIcon(action.action_type)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-sm font-medium">
-                      {getActionLabel(action.action_type)}
-                    </span>
-                    {getStatusBadge(action.status)}
+          {/* Activity Timeline */}
+          <div className="activity-timeline">
+            {actions.map((action) => {
+              const statusConfig = getStatusConfig(action.status);
+              const StatusIcon = statusConfig.icon;
+              const logic = getLogicContext(action);
+              
+              return (
+                <div
+                  key={action.id}
+                  className="activity-item"
+                  data-status={action.status === 'applied' ? 'applied' : action.status === 'failed' ? 'error' : undefined}
+                >
+                  <div className="p-3 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors">
+                    {/* Header: Action type & status */}
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className={cn("p-1.5 rounded-md bg-muted", statusConfig.color)}>
+                          {getActionIcon(action.action_type)}
+                        </div>
+                        <span className="text-sm font-medium">
+                          {getActionLabel(action.action_type)}
+                        </span>
+                      </div>
+                      <Badge 
+                        variant="outline" 
+                        className={cn("gap-1 text-xs", statusConfig.color)}
+                      >
+                        <StatusIcon className="h-3 w-3" />
+                        {statusConfig.label}
+                      </Badge>
+                    </div>
+                    
+                    {/* Logic Chip: Explainable reasoning */}
+                    <LogicChip 
+                      trigger={logic.trigger}
+                      action={logic.action}
+                      details={logic.details}
+                      variant="compact"
+                      className="mb-2"
+                    />
+                    
+                    {/* Details */}
+                    <p className="text-sm text-muted-foreground">
+                      {formatActionDetails(action)}
+                    </p>
+                    
+                    {/* Timestamp */}
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {formatDistanceToNow(new Date(action.created_at), { addSuffix: true })}
+                    </p>
                   </div>
-                  <p className="text-sm text-muted-foreground truncate">
-                    {formatActionDetails(action)}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {formatDistanceToNow(new Date(action.created_at), { addSuffix: true })}
-                  </p>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </ScrollArea>
       </CardContent>

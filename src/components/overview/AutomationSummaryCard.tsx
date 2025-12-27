@@ -2,10 +2,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Link } from "react-router-dom";
-import { Bot, CheckCircle2, XCircle, SkipForward, ChevronDown, ChevronRight, Clock } from "lucide-react";
+import { Bot, CheckCircle2, XCircle, SkipForward, ChevronDown, ChevronRight, Clock, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
+import { LogicChip } from "@/components/ui/LogicChip";
 
 interface AutomationCycleSummary {
   lastRunAt?: string;
@@ -52,10 +53,10 @@ export const AutomationSummaryCard = ({ summary, loading }: AutomationSummaryCar
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-col items-center justify-center py-6 text-center">
-            <Bot className="h-8 w-8 text-muted-foreground mb-2" />
-            <p className="text-sm text-muted-foreground">No automation runs yet</p>
+            <ShieldCheck className="h-8 w-8 text-muted-foreground/30 mb-2" />
+            <p className="text-sm text-muted-foreground">No protection runs yet</p>
             <Link to="/automate" className="text-sm text-primary hover:underline mt-1">
-              Configure automation
+              Configure protection rules
             </Link>
           </div>
         </CardContent>
@@ -70,8 +71,8 @@ export const AutomationSummaryCard = ({ summary, loading }: AutomationSummaryCar
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg flex items-center gap-2">
-            <Bot className="h-5 w-5 text-primary" />
-            Automation Summary
+            <ShieldCheck className="h-5 w-5 text-primary" />
+            Protection Summary
           </CardTitle>
           {summary.lastRunAt && (
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -83,36 +84,36 @@ export const AutomationSummaryCard = ({ summary, loading }: AutomationSummaryCar
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-3 gap-3">
-          {/* Applied */}
-          <div className="p-3 rounded-lg border bg-success/5 border-success/20">
+          {/* Protected - Primary outcome */}
+          <div className="p-3 rounded-lg border border-success/30 bg-success/5">
             <div className="flex items-center gap-1.5 mb-1">
               <CheckCircle2 className="h-4 w-4 text-success" />
-              <span className="text-xs font-medium text-muted-foreground">Applied</span>
+              <span className="text-xs font-medium text-muted-foreground">Protected</span>
             </div>
-            <p className="text-2xl font-bold text-success">{summary.actionsApplied}</p>
+            <p className="text-2xl font-display font-bold text-success">{summary.actionsApplied}</p>
           </div>
           
           {/* Prevented */}
-          <div className="p-3 rounded-lg border bg-warning/5 border-warning/20">
+          <div className="p-3 rounded-lg border border-warning/30 bg-warning/5">
             <div className="flex items-center gap-1.5 mb-1">
               <XCircle className="h-4 w-4 text-warning" />
               <span className="text-xs font-medium text-muted-foreground">Prevented</span>
             </div>
-            <p className="text-2xl font-bold text-warning">{summary.actionsPrevented}</p>
+            <p className="text-2xl font-display font-bold text-warning">{summary.actionsPrevented}</p>
           </div>
           
           {/* Skipped */}
-          <div className="p-3 rounded-lg border bg-muted">
+          <div className="p-3 rounded-lg border border-border bg-muted/50">
             <div className="flex items-center gap-1.5 mb-1">
               <SkipForward className="h-4 w-4 text-muted-foreground" />
               <span className="text-xs font-medium text-muted-foreground">Skipped</span>
             </div>
-            <p className="text-2xl font-bold text-muted-foreground">{summary.actionsSkipped}</p>
+            <p className="text-2xl font-display font-bold text-muted-foreground">{summary.actionsSkipped}</p>
           </div>
         </div>
 
         <p className="text-xs text-muted-foreground text-center">
-          {summary.rulesEvaluated} rules evaluated in last cycle
+          {summary.rulesEvaluated} protection rules evaluated
         </p>
 
         {hasRecentActions && (
@@ -128,22 +129,31 @@ export const AutomationSummaryCard = ({ summary, loading }: AutomationSummaryCar
               <div className="mt-2 space-y-2">
                 {summary.recentActions?.map((action) => {
                   const statusConfig = {
-                    applied: { icon: CheckCircle2, color: 'text-success' },
-                    prevented: { icon: XCircle, color: 'text-warning' },
-                    skipped: { icon: SkipForward, color: 'text-muted-foreground' }
+                    applied: { icon: CheckCircle2, color: 'text-success', dotColor: 'bg-success' },
+                    prevented: { icon: XCircle, color: 'text-warning', dotColor: 'bg-warning' },
+                    skipped: { icon: SkipForward, color: 'text-muted-foreground', dotColor: 'bg-muted-foreground' }
                   };
-                  const { icon: StatusIcon, color } = statusConfig[action.status];
+                  const { icon: StatusIcon, color, dotColor } = statusConfig[action.status];
                   
                   return (
-                    <div key={action.id} className="flex items-start gap-2 p-2 rounded-md bg-muted/50 text-sm">
-                      <StatusIcon className={cn("h-4 w-4 mt-0.5 shrink-0", color)} />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium">{action.type}</p>
-                        <p className="text-xs text-muted-foreground truncate">{action.target}</p>
-                        {action.reason && (
-                          <p className="text-xs text-muted-foreground mt-0.5 italic">{action.reason}</p>
-                        )}
+                    <div key={action.id} className="p-3 rounded-lg border border-border bg-card text-sm">
+                      <div className="flex items-start gap-2 mb-2">
+                        <div className={cn("status-dot mt-1.5", dotColor)} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="font-medium">{action.type}</p>
+                            <StatusIcon className={cn("h-4 w-4 flex-shrink-0", color)} />
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate">{action.target}</p>
+                        </div>
                       </div>
+                      {action.reason && (
+                        <LogicChip
+                          trigger="Rule"
+                          action={action.reason}
+                          variant="compact"
+                        />
+                      )}
                     </div>
                   );
                 })}

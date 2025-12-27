@@ -2,116 +2,122 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. */
+/* ============================================
+   PPC Pal Design System - "The Watchful Guardian"
+   Philosophy: Intentional Clarity, Explainable Automation
+   ============================================ */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* === CORE: The Governor (Authority) === */
+    --background: 210 20% 98%;          /* Cool off-white */
+    --foreground: 222.2 47.4% 11.2%;    /* Deep navy text */
 
+    /* === Cards: Bounded System === */
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 222.2 47.4% 11.2%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 222.2 47.4% 11.2%;
 
-    --primary: 214 84% 56%;        /* Clean blue - primary actions */
+    /* === Primary: The Governor (Authority Blue) === */
+    --primary: 214 84% 56%;
     --primary-foreground: 210 40% 98%;
 
-    --secondary: 210 17% 98%;      /* Off-white - backgrounds */
+    /* === Secondary: Soft Slate (Calm/Hands-off) === */
+    --secondary: 214.3 31.8% 91.4%;
     --secondary-foreground: 222.2 47.4% 11.2%;
 
+    /* === Muted: The Pal (Calm Support) === */
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 158 64% 52%;         /* Emerald - success/highlights */
+    /* === Accent: The Growth (Emerald) === */
+    --accent: 158 64% 42%;
     --accent-foreground: 210 40% 98%;
 
-    /* Brand Colors - PPC Pal Professional Design */
-    --brand-primary: 214 84% 56%;        /* Clean blue - primary actions */
-    --brand-primary-foreground: 210 40% 98%;
+    /* === Brand Semantic Tokens === */
+    --brand-navy: 222.2 47.4% 11.2%;        /* Deep navy - authority */
+    --brand-emerald: 158 64% 42%;           /* Emerald - growth/profit */
+    --brand-slate: 214.3 31.8% 91.4%;       /* Soft slate - calm */
+    --brand-slate-foreground: 215.4 16.3% 46.9%;
     
-    --brand-secondary: 210 17% 98%;      /* Off-white - backgrounds */
-    --brand-secondary-foreground: 222.2 47.4% 11.2%;
+    /* === Status Colors: Calm & Clear === */
+    --success: 158 64% 42%;                 /* Emerald - protection achieved */
+    --success-foreground: 210 40% 98%;
+    --success-muted: 158 64% 42% / 0.1;
     
-    --brand-accent: 158 64% 52%;         /* Emerald - success/highlights */
-    --brand-accent-foreground: 210 40% 98%;
+    --warning: 38 92% 50%;                  /* Amber - attention needed */
+    --warning-foreground: 222.2 47.4% 11.2%;
+    --warning-muted: 38 92% 50% / 0.1;
+    
+    /* Safety Amber: Manual Intervention Required (distinct) */
+    --intervention: 25 95% 53%;
+    --intervention-foreground: 210 40% 98%;
+    
+    --error: 0 72% 51%;                     /* Red - critical */
+    --error-foreground: 210 40% 98%;
+    --error-muted: 0 72% 51% / 0.1;
+    
+    --info: 199 89% 48%;                    /* Sky - informational */
+    --info-foreground: 210 40% 98%;
 
-    /* Neutral Palette - Sophisticated Grays */
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 40% 98%;
+
+    /* === Neutral Palette: Sophisticated Grays === */
     --neutral-50: 210 20% 98%;
-    --neutral-100: 210 14% 89%;
-    --neutral-200: 214 13% 80%;
+    --neutral-100: 214.3 31.8% 91.4%;
+    --neutral-200: 214 13% 82%;
     --neutral-300: 213 10% 71%;
     --neutral-400: 215 9% 61%;
     --neutral-500: 215 8% 51%;
     --neutral-600: 215 12% 42%;
     --neutral-700: 215 16% 32%;
     --neutral-800: 215 20% 22%;
-    --neutral-900: 215 24% 15%;
+    --neutral-900: 222.2 47.4% 11.2%;
 
-    /* Status Colors - Subtle & Clear */
-    --success: 142 76% 36%;     /* Forest green */
-    --success-foreground: 210 40% 98%;
-    
-    --warning: 38 92% 50%;      /* Amber */
-    --warning-foreground: 222.2 47.4% 11.2%;
-    
-    --error: 0 84% 60%;         /* Red */
-    --error-foreground: 210 40% 98%;
-    
-    --info: 199 89% 48%;        /* Sky blue */
-    --info-foreground: 210 40% 98%;
-
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 214 13% 80%;        /* Using neutral-200 */
-    --input: 214 13% 80%;
-    --ring: 214 84% 56%;          /* Using brand-primary */
+    /* === Borders: The Bounded System (1px containment) === */
+    --border: 214 13% 82%;
+    --border-subtle: 214 13% 90%;
+    --input: 214 13% 82%;
+    --ring: 214 84% 56%;
 
     --radius: 0.5rem;
 
-    --sidebar-background: 0 0% 98%;
+    /* === Sidebar === */
+    --sidebar-background: 210 20% 98%;
+    --sidebar-foreground: 222.2 47.4% 11.2%;
+    --sidebar-primary: 214 84% 56%;
+    --sidebar-primary-foreground: 210 40% 98%;
+    --sidebar-accent: 214.3 31.8% 91.4%;
+    --sidebar-accent-foreground: 222.2 47.4% 11.2%;
+    --sidebar-border: 214 13% 88%;
+    --sidebar-ring: 214 84% 56%;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
-
-    /* Brand colors - clean and professional */
-    --brand: 220 14% 96%;
-    --brand-foreground: 220 9% 46%;
+    /* === Clean Shadow System === */
+    --shadow-sm: 0 1px 2px 0 hsl(222.2 47.4% 11.2% / 0.04);
+    --shadow-md: 0 4px 6px -1px hsl(222.2 47.4% 11.2% / 0.06), 0 2px 4px -1px hsl(222.2 47.4% 11.2% / 0.04);
+    --shadow-lg: 0 10px 15px -3px hsl(222.2 47.4% 11.2% / 0.08), 0 4px 6px -2px hsl(222.2 47.4% 11.2% / 0.04);
     
-    /* Clean shadow system */
-    --shadow-sm: 0 1px 2px 0 hsl(var(--foreground) / 0.05);
-    --shadow-md: 0 4px 6px -1px hsl(var(--foreground) / 0.1), 0 2px 4px -1px hsl(var(--foreground) / 0.06);
-    --shadow-lg: 0 10px 15px -3px hsl(var(--foreground) / 0.1), 0 4px 6px -2px hsl(var(--foreground) / 0.05);
-    --shadow-xl: 0 20px 25px -5px hsl(var(--foreground) / 0.1), 0 10px 10px -5px hsl(var(--foreground) / 0.04);
-    
-    /* Clean easing */
+    /* === Transitions: Calm & Deliberate === */
     --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-fast: 150ms var(--ease-standard);
+    --transition-normal: 200ms var(--ease-standard);
+    --transition-slow: 300ms var(--ease-standard);
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
+    --background: 222.2 47.4% 6%;
     --foreground: 210 40% 98%;
 
-    --card: 222.2 84% 4.9%;
+    --card: 222.2 47.4% 8%;
     --card-foreground: 210 40% 98%;
 
-    --popover: 222.2 84% 4.9%;
+    --popover: 222.2 47.4% 8%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 210 40% 98%;
+    --primary: 214 84% 56%;
     --primary-foreground: 222.2 47.4% 11.2%;
 
     --secondary: 217.2 32.6% 17.5%;
@@ -120,36 +126,41 @@
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
 
-    --accent: 214 84% 56%;
+    --accent: 158 64% 42%;
     --accent-foreground: 210 40% 98%;
 
-    /* Professional accent colors for dark mode */
-    --accent-blue: 214 84% 56%;
-    --accent-blue-foreground: 210 40% 98%;
+    /* Dark mode status colors */
+    --success: 158 64% 42%;
+    --success-foreground: 210 40% 98%;
+    --success-muted: 158 64% 42% / 0.15;
     
-    --accent-emerald: 158 64% 52%;
-    --accent-emerald-foreground: 210 40% 98%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 222.2 47.4% 11.2%;
+    --warning-muted: 38 92% 50% / 0.15;
     
-    --accent-amber: 38 92% 50%;
-    --accent-amber-foreground: 222.2 47.4% 11.2%;
+    --intervention: 25 95% 53%;
+    --intervention-foreground: 210 40% 98%;
     
-    --accent-purple: 262 52% 47%;
-    --accent-purple-foreground: 210 40% 98%;
+    --error: 0 72% 51%;
+    --error-foreground: 210 40% 98%;
+    --error-muted: 0 72% 51% / 0.15;
 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 217.2 32.6% 17.5%;
+    --border: 217.2 32.6% 20%;
+    --border-subtle: 217.2 32.6% 15%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --ring: 214 84% 56%;
+    
+    --sidebar-background: 222.2 47.4% 6%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 214 84% 56%;
+    --sidebar-primary-foreground: 210 40% 98%;
+    --sidebar-accent: 217.2 32.6% 17.5%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217.2 32.6% 17.5%;
+    --sidebar-ring: 214 84% 56%;
   }
 }
 
@@ -159,6 +170,132 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans;
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+  
+  /* Typography: The Modern Analyst */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display font-semibold tracking-tight;
+  }
+}
+
+@layer components {
+  /* === Logic Chip: Explainable Automation === */
+  .logic-chip {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium;
+    @apply bg-secondary text-muted-foreground border border-border;
+    @apply transition-colors duration-200;
+  }
+  
+  .logic-chip:hover {
+    @apply bg-muted border-border;
+  }
+  
+  .logic-chip-trigger {
+    @apply text-primary;
+  }
+  
+  .logic-chip-action {
+    @apply text-success;
+  }
+  
+  /* === Bounded Card: The Containment System === */
+  .card-bounded {
+    @apply rounded-lg bg-card border border-border;
+    @apply shadow-sm transition-shadow duration-200;
+  }
+  
+  .card-bounded:hover {
+    @apply shadow-md;
+  }
+  
+  /* === Status Indicator Dots === */
+  .status-dot {
+    @apply w-2 h-2 rounded-full flex-shrink-0;
+  }
+  
+  .status-dot-success {
+    @apply bg-success;
+  }
+  
+  .status-dot-warning {
+    @apply bg-warning;
+  }
+  
+  .status-dot-error {
+    @apply bg-error;
+  }
+  
+  .status-dot-muted {
+    @apply bg-muted-foreground;
+  }
+  
+  /* === Outcome Metric: Hands-off Priority === */
+  .outcome-metric {
+    @apply text-center p-4 rounded-lg border border-border bg-card;
+  }
+  
+  .outcome-metric-value {
+    @apply text-3xl md:text-4xl font-bold font-display tracking-tight;
+  }
+  
+  .outcome-metric-label {
+    @apply text-sm text-muted-foreground mt-1;
+  }
+  
+  /* === Activity Timeline === */
+  .activity-timeline {
+    @apply relative pl-6 space-y-4;
+  }
+  
+  .activity-timeline::before {
+    @apply absolute left-[7px] top-2 bottom-2 w-px bg-border;
+    content: '';
+  }
+  
+  .activity-item {
+    @apply relative;
+  }
+  
+  .activity-item::before {
+    @apply absolute -left-6 top-1.5 w-2 h-2 rounded-full bg-border;
+    content: '';
+  }
+  
+  .activity-item[data-status="applied"]::before {
+    @apply bg-success;
+  }
+  
+  .activity-item[data-status="prevented"]::before {
+    @apply bg-warning;
+  }
+  
+  .activity-item[data-status="error"]::before {
+    @apply bg-error;
+  }
+}
+
+@layer utilities {
+  /* === Calm Transitions === */
+  .transition-calm {
+    transition: all var(--transition-normal);
+  }
+  
+  /* === Text Styles === */
+  .text-display {
+    @apply font-display font-semibold tracking-tight;
+  }
+  
+  .text-body {
+    @apply font-sans text-base leading-relaxed;
+  }
+  
+  .text-caption {
+    @apply text-xs text-muted-foreground;
+  }
+  
+  /* === Safe Zone Visualization Helper === */
+  .safe-zone-band {
+    @apply bg-success/10;
   }
 }

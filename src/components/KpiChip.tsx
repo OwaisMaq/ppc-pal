@@ -37,9 +37,9 @@ const KpiChip: React.FC<KpiChipProps> = ({
   ) : null;
 
   const getChangeColor = () => {
-    if (!change || change.direction === 'neutral') return 'text-muted-foreground bg-muted/50';
-    if (isPositiveChange) return 'text-success bg-success-muted';
-    return 'text-error bg-error-muted';
+    if (!change || change.direction === 'neutral') return 'text-muted-foreground bg-muted';
+    if (isPositiveChange) return 'text-success bg-success/10';
+    return 'text-error bg-error/10';
   };
 
   const getSparklineColor = () => {
@@ -56,17 +56,16 @@ const KpiChip: React.FC<KpiChipProps> = ({
 
   return (
     <Card className={cn(
-      "group relative overflow-hidden transition-all duration-300",
-      "bg-card/50 backdrop-blur-sm",
-      "border border-border/50",
-      "hover:border-border hover:bg-card/80",
-      "hover:shadow-lg hover:shadow-black/10",
-      primary && "border-primary/20 bg-primary/5 hover:border-primary/40",
+      "group relative overflow-hidden",
+      "border border-border",
+      "transition-shadow duration-200",
+      "hover:shadow-md",
+      primary && "border-primary/30 bg-primary/5",
       className
     )}>
       {/* Subtle top accent line for primary cards */}
       {primary && (
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-primary/60 via-primary to-primary/60" />
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-primary" />
       )}
       
       <CardContent className={cn(
@@ -77,7 +76,7 @@ const KpiChip: React.FC<KpiChipProps> = ({
         <div className="flex items-start justify-between gap-2 mb-3">
           <div className="flex items-center gap-2">
             {icon && (
-              <div className="flex-shrink-0 p-1.5 rounded-md bg-muted/50 text-muted-foreground">
+              <div className="flex-shrink-0 p-1.5 rounded-md bg-muted text-muted-foreground">
                 {icon}
               </div>
             )}
@@ -91,7 +90,7 @@ const KpiChip: React.FC<KpiChipProps> = ({
           
           {change && (
             <div className={cn(
-              "flex items-center gap-1 rounded-full px-2 py-0.5 transition-colors",
+              "flex items-center gap-1 rounded-full px-2 py-0.5",
               getChangeColor()
             )}>
               {change.direction === 'up' ? (
@@ -111,7 +110,7 @@ const KpiChip: React.FC<KpiChipProps> = ({
         {/* Value */}
         <div className="flex-1 flex items-end">
           <p className={cn(
-            "font-semibold tracking-tight tabular-nums",
+            "font-display font-semibold tracking-tight tabular-nums",
             compact ? "text-xl" : primary ? "text-3xl md:text-4xl" : "text-2xl md:text-3xl"
           )}>
             {value}
@@ -121,22 +120,22 @@ const KpiChip: React.FC<KpiChipProps> = ({
         {/* Sparkline with gradient fill */}
         {sparklineData && sparklineData.length > 1 && (
           <div className={cn(
-            "absolute bottom-0 left-0 right-0 opacity-40 group-hover:opacity-60 transition-opacity",
+            "absolute bottom-0 left-0 right-0 opacity-30 group-hover:opacity-50 transition-opacity",
             compact ? "h-10" : "h-14"
           )}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={sparklineData} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
                 <defs>
                   <linearGradient id="primaryGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.4} />
+                    <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
                     <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="successGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsl(var(--success))" stopOpacity={0.4} />
+                    <stop offset="0%" stopColor="hsl(var(--success))" stopOpacity={0.3} />
                     <stop offset="100%" stopColor="hsl(var(--success))" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="errorGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsl(var(--error))" stopOpacity={0.4} />
+                    <stop offset="0%" stopColor="hsl(var(--error))" stopOpacity={0.3} />
                     <stop offset="100%" stopColor="hsl(var(--error))" stopOpacity={0} />
                   </linearGradient>
                 </defs>
