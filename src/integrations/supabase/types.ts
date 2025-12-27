@@ -4206,19 +4206,37 @@ export type Database = {
       }
       waitlist: {
         Row: {
+          ad_spend_range: string | null
           created_at: string
+          current_tool: string | null
           email: string
+          full_name: string | null
           id: string
+          marketplace: string | null
+          primary_goal: string | null
+          source_page: string | null
         }
         Insert: {
+          ad_spend_range?: string | null
           created_at?: string
+          current_tool?: string | null
           email: string
+          full_name?: string | null
           id?: string
+          marketplace?: string | null
+          primary_goal?: string | null
+          source_page?: string | null
         }
         Update: {
+          ad_spend_range?: string | null
           created_at?: string
+          current_tool?: string | null
           email?: string
+          full_name?: string | null
           id?: string
+          marketplace?: string | null
+          primary_goal?: string | null
+          source_page?: string | null
         }
         Relationships: []
       }
