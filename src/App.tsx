@@ -2,7 +2,7 @@ import { Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -13,15 +13,14 @@ import { useLoginSync } from "@/hooks/useLoginSync";
 
 // Lazy load pages for better performance
 const Auth = lazy(() => import("@/pages/Auth"));
-const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const Overview = lazy(() => import("@/pages/Overview"));
 const Feedback = lazy(() => import("@/pages/Feedback"));
 const Campaigns = lazy(() => import("@/pages/Campaigns"));
 const AIInsights = lazy(() => import("@/pages/AIInsights"));
 const SearchTerms = lazy(() => import("@/pages/SearchTerms"));
 const Privacy = lazy(() => import("@/pages/Privacy"));
-const BudgetCopilot = lazy(() => import("@/pages/BudgetCopilot"));
-const Anomalies = lazy(() => import("@/pages/Anomalies"));
-const Attribution = lazy(() => import("@/pages/Attribution"));
+const Automate = lazy(() => import("@/pages/Automate"));
+const Reports = lazy(() => import("@/pages/Reports"));
 const MultiAccount = lazy(() => import("@/pages/MultiAccount"));
 const PublicLanding = lazy(() => import("@/pages/PublicLanding"));
 const PublicPrivacy = lazy(() => import("@/pages/PublicPrivacy"));
@@ -35,7 +34,6 @@ const AmazonCallback = lazy(() => import("@/pages/AmazonCallback"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const Onboarding = lazy(() => import("@/pages/Onboarding"));
 const DevTools = lazy(() => import("@/pages/DevTools"));
-const AccountAudit = lazy(() => import("@/pages/AccountAudit"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -72,91 +70,106 @@ const App = () => {
                 <OnboardingCheck>
                   <Suspense fallback={<PageLoader />}>
                     <Routes>
-                {/* Public routes */}
-                <Route path="/" element={<PublicLanding />} />
-                <Route path="/privacy" element={<PublicPrivacy />} />
-                <Route path="/terms" element={<PublicTerms />} />
-                <Route path="/waitlist" element={<Waitlist />} />
-                <Route path="/about" element={<About />} />
-                <Route path="/contact" element={<Contact />} />
-                <Route path="/company" element={<Company />} />
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/auth/amazon/callback" element={<AmazonCallback />} />
-                <Route path="/onboarding" element={
-                  <ProtectedRoute>
-                    <Onboarding />
-                  </ProtectedRoute>
-                } />
-                
-                {/* Protected routes */}
-                <Route path="/dashboard" element={
-                  <ProtectedRoute>
-                    <Dashboard />
-                  </ProtectedRoute>
-                } />
-                <Route path="/feedback" element={
-                  <ProtectedRoute>
-                    <Feedback />
-                  </ProtectedRoute>
-                } />
-                <Route path="/privacy" element={
-                  <ProtectedRoute>
-                    <Privacy />
-                  </ProtectedRoute>
-                } />
-                <Route path="/settings" element={
-                  <ProtectedRoute>
-                    <Settings />
-                  </ProtectedRoute>
-                } />
-                <Route path="/campaigns" element={
-                  <ProtectedRoute>
-                    <Campaigns />
-                  </ProtectedRoute>
-                } />
-                <Route path="/ai-insights" element={
-                  <ProtectedRoute>
-                    <AIInsights />
-                  </ProtectedRoute>
-                } />
-                <Route path="/search-terms" element={
-                  <ProtectedRoute>
-                    <SearchTerms />
-                  </ProtectedRoute>
-                } />
-                <Route path="/budget-copilot" element={
-                  <ProtectedRoute>
-                    <BudgetCopilot />
-                  </ProtectedRoute>
-                } />
-                <Route path="/anomalies" element={
-                  <ProtectedRoute>
-                    <Anomalies />
-                  </ProtectedRoute>
-                } />
-                <Route path="/attribution" element={
-                  <ProtectedRoute>
-                    <Attribution />
-                  </ProtectedRoute>
-                } />
-                <Route path="/multi-account" element={
-                  <ProtectedRoute>
-                    <MultiAccount />
-                  </ProtectedRoute>
-                } />
-                <Route path="/dev-tools" element={
-                  <ProtectedRoute>
-                    <DevTools />
-                  </ProtectedRoute>
-                } />
-                <Route path="/account-audit" element={
-                  <ProtectedRoute>
-                    <AccountAudit />
-                  </ProtectedRoute>
-                } />
-                
-                {/* 404 */}
-                <Route path="*" element={<NotFound />} />
+                      {/* Public routes */}
+                      <Route path="/" element={<PublicLanding />} />
+                      <Route path="/privacy" element={<PublicPrivacy />} />
+                      <Route path="/terms" element={<PublicTerms />} />
+                      <Route path="/waitlist" element={<Waitlist />} />
+                      <Route path="/about" element={<About />} />
+                      <Route path="/contact" element={<Contact />} />
+                      <Route path="/company" element={<Company />} />
+                      <Route path="/auth" element={<Auth />} />
+                      <Route path="/auth/amazon/callback" element={<AmazonCallback />} />
+                      <Route path="/onboarding" element={
+                        <ProtectedRoute>
+                          <Onboarding />
+                        </ProtectedRoute>
+                      } />
+                      
+                      {/* New routes - Overview */}
+                      <Route path="/overview" element={
+                        <ProtectedRoute>
+                          <Overview />
+                        </ProtectedRoute>
+                      } />
+                      
+                      {/* Campaigns routes */}
+                      <Route path="/campaigns" element={
+                        <ProtectedRoute>
+                          <Campaigns />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="/campaigns/search-terms" element={
+                        <ProtectedRoute>
+                          <SearchTerms />
+                        </ProtectedRoute>
+                      } />
+                      
+                      {/* Automate routes */}
+                      <Route path="/automate" element={
+                        <ProtectedRoute>
+                          <Automate />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="/automate/queue" element={
+                        <ProtectedRoute>
+                          <Automate />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="/automate/history" element={
+                        <ProtectedRoute>
+                          <Automate />
+                        </ProtectedRoute>
+                      } />
+                      
+                      {/* Reports routes */}
+                      <Route path="/reports" element={
+                        <ProtectedRoute>
+                          <Reports />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="/reports/ai-insights" element={
+                        <ProtectedRoute>
+                          <AIInsights />
+                        </ProtectedRoute>
+                      } />
+                      
+                      {/* Settings routes */}
+                      <Route path="/settings" element={
+                        <ProtectedRoute>
+                          <Settings />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="/settings/accounts" element={
+                        <ProtectedRoute>
+                          <MultiAccount />
+                        </ProtectedRoute>
+                      } />
+                      
+                      {/* Other protected routes */}
+                      <Route path="/feedback" element={
+                        <ProtectedRoute>
+                          <Feedback />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="/dev-tools" element={
+                        <ProtectedRoute>
+                          <DevTools />
+                        </ProtectedRoute>
+                      } />
+                      
+                      {/* Redirects from old routes */}
+                      <Route path="/dashboard" element={<Navigate to="/overview" replace />} />
+                      <Route path="/search-terms" element={<Navigate to="/campaigns/search-terms" replace />} />
+                      <Route path="/ai-insights" element={<Navigate to="/reports/ai-insights" replace />} />
+                      <Route path="/account-audit" element={<Navigate to="/reports" replace />} />
+                      <Route path="/attribution" element={<Navigate to="/reports" replace />} />
+                      <Route path="/anomalies" element={<Navigate to="/reports" replace />} />
+                      <Route path="/budget-copilot" element={<Navigate to="/reports" replace />} />
+                      <Route path="/multi-account" element={<Navigate to="/settings/accounts" replace />} />
+                      
+                      {/* 404 */}
+                      <Route path="*" element={<NotFound />} />
                     </Routes>
                   </Suspense>
                 </OnboardingCheck>
