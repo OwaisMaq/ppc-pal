@@ -1,35 +1,41 @@
 import DashboardShell from "@/components/DashboardShell";
-import { ASINFilter } from "@/components/ASINFilter";
-import { DashboardKPIs } from "@/components/DashboardKPIs";
 import { DashboardChart } from "@/components/DashboardChart";
-import { DateRangePicker } from "@/components/DateRangePicker";
-import { ComparisonModeSelector, ComparisonMode } from "@/components/ComparisonModeSelector";
-import { SavingsKPI } from "@/components/SavingsKPI";
 import { DataAvailabilityIndicator } from "@/components/DataAvailabilityIndicator";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { useAmsMetrics } from "@/hooks/useAmsMetrics";
 import { useSavingsMetric } from "@/hooks/useSavingsMetric";
 import { useDataAvailability } from "@/hooks/useDataAvailability";
-import { useState, useMemo } from "react";
-import { DashboardKPIs as KPIData } from "@/hooks/useDashboardData";
+import { useAutomationRules, useAlerts } from "@/hooks/useAutomation";
+import { useAnomalies } from "@/hooks/useAnomalies";
+import { useActionQueue } from "@/hooks/useActionQueue";
+import { useState, useMemo, useEffect } from "react";
 import { DateRange } from "react-day-picker";
-import { subDays, differenceInDays, subYears } from "date-fns";
-import { CheckCircle, AlertTriangle, Bot, TrendingUp, TrendingDown } from "lucide-react";
+import { subDays, differenceInDays } from "date-fns";
+
+// Import overview components
+import {
+  AccountHealthCard,
+  WhatMattersNow,
+  ActiveAlertsCard,
+  AutomationSummaryCard,
+  ConfidenceSignalsCard,
+  OnboardingGuidanceCard,
+  OverviewFilters,
+  getDefaultSetupItems,
+  type HealthStatus,
+  type AutomationStatus,
+  type MatterItem,
+  type ActiveAlert,
+  type DatePreset
+} from "@/components/overview";
 
 const Overview = () => {
   const { connections } = useAmazonConnections();
   
   const hasConnections = connections.length > 0;
-  
-  const hasHealthyTokens = connections.some(c => {
-    const status = typeof c?.status === 'string' ? c.status.toLowerCase().trim() : String(c?.status ?? '');
-    const tokenOk = c?.token_expires_at ? new Date(c.token_expires_at) > new Date() : true;
-    return tokenOk && (status === 'active' || status === 'setup_required' || status === 'pending');
-  });
   
   const hasExpiredTokens = connections.some(c => {
     const tokenOk = c?.token_expires_at ? new Date(c.token_expires_at) > new Date() : true;
@@ -37,29 +43,46 @@ const Overview = () => {
   });
   
   const [selectedASIN, setSelectedASIN] = useState<string | null>(null);
-  
+  const [datePreset, setDatePreset] = useState<DatePreset>('last_month');
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: subDays(new Date(), 30),
     to: new Date(),
   });
   
-  const [comparisonMode, setComparisonMode] = useState<ComparisonMode>("previous");
-  const [customComparisonRange, setCustomComparisonRange] = useState<DateRange | undefined>();
-  
   const primaryConnection = connections[0];
+  const profileId = primaryConnection?.profile_id;
   
+  // Fetch metrics
   const { metrics, loading: metricsLoading, error: metricsError } = useAmsMetrics(
     primaryConnection?.id,
     dateRange?.from,
     dateRange?.to
   );
   
+  // Fetch comparison metrics (previous period)
+  const comparisonRange = useMemo(() => {
+    if (!dateRange?.from || !dateRange?.to) return undefined;
+    const daysDiff = differenceInDays(dateRange.to, dateRange.from);
+    return {
+      from: subDays(dateRange.from, daysDiff + 1),
+      to: subDays(dateRange.from, 1),
+    };
+  }, [dateRange]);
+  
+  const { metrics: comparisonMetrics } = useAmsMetrics(
+    primaryConnection?.id,
+    comparisonRange?.from,
+    comparisonRange?.to
+  );
+  
+  // Fetch savings
   const { savings, loading: savingsLoading } = useSavingsMetric(
-    primaryConnection?.profile_id,
+    profileId,
     dateRange?.from,
     dateRange?.to
   );
 
+  // Fetch data availability
   const { 
     minDate, 
     maxDate, 
@@ -68,156 +91,254 @@ const Overview = () => {
     importProgress, 
     importFullHistory, 
     isImportingFullHistory 
-  } = useDataAvailability(primaryConnection?.profile_id);
+  } = useDataAvailability(profileId);
   
-  const comparisonPeriodRange = useMemo(() => {
-    if (!dateRange?.from || !dateRange?.to) return undefined;
-    
-    const daysDiff = differenceInDays(dateRange.to, dateRange.from);
-    
-    switch (comparisonMode) {
-      case "previous":
-        return {
-          from: subDays(dateRange.from, daysDiff + 1),
-          to: subDays(dateRange.from, 1),
-        };
-      
-      case "last-year":
-        return {
-          from: subYears(dateRange.from, 1),
-          to: subYears(dateRange.to, 1),
-        };
-      
-      case "custom":
-        return customComparisonRange;
-      
-      default:
-        return undefined;
+  // Fetch automation data
+  const { rules, loading: rulesLoading } = useAutomationRules(profileId);
+  const { alerts, loading: alertsLoading, refetch: refetchAlerts } = useAlerts(profileId);
+  const { actions, loading: actionsLoading } = useActionQueue(profileId);
+  
+  // Fetch anomalies
+  const { anomalies, loading: anomaliesLoading, fetchAnomalies } = useAnomalies();
+  
+  useEffect(() => {
+    if (profileId) {
+      refetchAlerts();
+      fetchAnomalies({ profileId, state: 'new' });
     }
-  }, [dateRange, comparisonMode, customComparisonRange]);
-  
-  const { metrics: comparisonMetrics } = useAmsMetrics(
-    primaryConnection?.id,
-    comparisonPeriodRange?.from,
-    comparisonPeriodRange?.to
-  );
-  
-  const kpiData: KPIData | null = useMemo(() => {
-    if (!metrics) return null;
-    return {
-      spend: metrics.totalSpend || 0,
-      sales: metrics.totalSales || 0,
-      acos: metrics.acos || 0,
-      roas: metrics.roas || 0,
-      clicks: metrics.totalClicks || 0,
-      impressions: metrics.totalImpressions || 0,
-      cpc: metrics.cpc || 0,
-      ctr: metrics.ctr || 0,
-      cvr: metrics.conversionRate || 0,
-      conversions: metrics.totalOrders || 0
-    };
-  }, [metrics]);
-  
-  const comparisonKpiData: KPIData | null = useMemo(() => {
-    if (!comparisonMetrics) return null;
-    return {
-      spend: comparisonMetrics.totalSpend || 0,
-      sales: comparisonMetrics.totalSales || 0,
-      acos: comparisonMetrics.acos || 0,
-      roas: comparisonMetrics.roas || 0,
-      clicks: comparisonMetrics.totalClicks || 0,
-      impressions: comparisonMetrics.totalImpressions || 0,
-      cpc: comparisonMetrics.cpc || 0,
-      ctr: comparisonMetrics.ctr || 0,
-      cvr: comparisonMetrics.conversionRate || 0,
-      conversions: comparisonMetrics.totalOrders || 0
-    };
-  }, [comparisonMetrics]);
+  }, [profileId, refetchAlerts, fetchAnomalies]);
 
-  // Determine what matters now based on metrics
-  const getWhatMattersNow = () => {
-    const items: { type: 'positive' | 'attention'; title: string; description: string }[] = [];
+  // Derive health status from metrics
+  const healthStatus: HealthStatus = useMemo(() => {
+    if (!metrics) return 'healthy';
+    
+    const acosHigh = metrics.acos > 40;
+    const spendSpike = comparisonMetrics && metrics.totalSpend > comparisonMetrics.totalSpend * 1.5;
+    const hasErrors = alerts?.filter(a => a.level === 'critical').length > 0;
+    
+    if (acosHigh || hasErrors) return 'at_risk';
+    if (spendSpike || alerts?.filter(a => a.level === 'warn').length > 2) return 'watch';
+    return 'healthy';
+  }, [metrics, comparisonMetrics, alerts]);
+  
+  const healthReasons = useMemo(() => {
+    const reasons: string[] = [];
+    if (!metrics) return reasons;
+    
+    if (metrics.acos > 40) reasons.push('ACoS is above 40%');
+    if (comparisonMetrics && metrics.totalSpend > comparisonMetrics.totalSpend * 1.5) {
+      reasons.push('Spend increased >50% vs previous period');
+    }
+    if (alerts?.filter(a => a.level === 'critical').length > 0) {
+      reasons.push('Critical alerts detected');
+    }
+    return reasons;
+  }, [metrics, comparisonMetrics, alerts]);
+
+  // Derive automation status
+  const automationStatus: AutomationStatus = useMemo(() => {
+    if (!rules || rules.length === 0) return 'paused';
+    const enabledRules = rules.filter(r => r.enabled);
+    if (enabledRules.length === 0) return 'paused';
+    if (enabledRules.length < rules.length) return 'limited';
+    return 'on';
+  }, [rules]);
+
+  // Build What Matters Now items
+  const whatMattersNowItems: MatterItem[] = useMemo(() => {
+    const items: MatterItem[] = [];
     
     if (savings && savings.totalSavings > 0) {
       items.push({
+        id: 'savings',
         type: 'positive',
         title: 'Savings Generated',
-        description: `$${savings.totalSavings.toFixed(2)} saved through optimizations`
+        description: `$${savings.totalSavings.toFixed(2)} saved through optimizations`,
+        details: `From ${savings.actionCount} AI actions in this period`,
+        link: { label: 'View details', to: '/reports' }
       });
     }
     
-    if (kpiData && comparisonKpiData) {
-      if (kpiData.acos < comparisonKpiData.acos) {
+    if (metrics && comparisonMetrics) {
+      if (metrics.acos < comparisonMetrics.acos) {
+        const improvement = ((comparisonMetrics.acos - metrics.acos) / comparisonMetrics.acos * 100).toFixed(0);
         items.push({
+          id: 'acos-improved',
           type: 'positive',
           title: 'ACoS Improved',
-          description: `ACoS decreased from ${comparisonKpiData.acos.toFixed(1)}% to ${kpiData.acos.toFixed(1)}%`
+          description: `Decreased ${improvement}% from ${comparisonMetrics.acos.toFixed(1)}% to ${metrics.acos.toFixed(1)}%`,
+          link: { label: 'View trends', to: '/reports' }
         });
-      } else if (kpiData.acos > comparisonKpiData.acos * 1.1) {
+      } else if (metrics.acos > comparisonMetrics.acos * 1.1) {
         items.push({
+          id: 'acos-increased',
           type: 'attention',
           title: 'ACoS Increased',
-          description: `ACoS rose from ${comparisonKpiData.acos.toFixed(1)}% to ${kpiData.acos.toFixed(1)}%`
+          description: `Rose from ${comparisonMetrics.acos.toFixed(1)}% to ${metrics.acos.toFixed(1)}%`,
+          details: 'Consider reviewing your targeting and bids',
+          link: { label: 'Review campaigns', to: '/campaigns' }
         });
       }
       
-      if (kpiData.sales > comparisonKpiData.sales * 1.1) {
+      if (metrics.totalSales > comparisonMetrics.totalSales * 1.1) {
+        const growth = ((metrics.totalSales - comparisonMetrics.totalSales) / comparisonMetrics.totalSales * 100).toFixed(0);
         items.push({
+          id: 'sales-growing',
           type: 'positive',
           title: 'Sales Growing',
-          description: `Sales up ${(((kpiData.sales - comparisonKpiData.sales) / comparisonKpiData.sales) * 100).toFixed(0)}% vs previous period`
+          description: `Up ${growth}% vs previous period`,
+          link: { label: 'View report', to: '/reports' }
+        });
+      }
+      
+      if (metrics.totalSpend > comparisonMetrics.totalSpend * 1.5) {
+        items.push({
+          id: 'spend-spike',
+          type: 'attention',
+          title: 'Spend Spike Detected',
+          description: `Spend increased significantly vs previous period`,
+          details: 'This may be intentional or indicate a bidding issue',
+          link: { label: 'Check anomalies', to: '/reports' }
         });
       }
     }
     
+    // Add anomaly alerts
+    const newAnomalies = anomalies?.filter(a => a.state === 'new' && a.severity !== 'info').slice(0, 2);
+    newAnomalies?.forEach(anomaly => {
+      items.push({
+        id: `anomaly-${anomaly.id}`,
+        type: 'attention',
+        title: `${anomaly.metric} ${anomaly.direction === 'spike' ? 'Spike' : 'Dip'}`,
+        description: `${anomaly.severity === 'critical' ? 'Critical' : 'Warning'}: ${anomaly.metric} ${anomaly.direction}`,
+        details: `Current: ${anomaly.value.toFixed(2)}, Baseline: ${anomaly.baseline.toFixed(2)}`,
+        link: { label: 'View anomalies', to: '/reports' }
+      });
+    });
+    
     return items;
-  };
+  }, [savings, metrics, comparisonMetrics, anomalies]);
 
-  const whatMattersNow = getWhatMattersNow();
-  const positiveItems = whatMattersNow.filter(i => i.type === 'positive').slice(0, 3);
-  const attentionItems = whatMattersNow.filter(i => i.type === 'attention').slice(0, 3);
+  // Build active alerts
+  const activeAlerts: ActiveAlert[] = useMemo(() => {
+    if (!alerts) return [];
+    return alerts
+      .filter(a => a.state === 'new')
+      .slice(0, 5)
+      .map(a => ({
+        id: a.id,
+        type: a.title.toLowerCase().includes('acos') ? 'acos' as const :
+              a.title.toLowerCase().includes('spend') ? 'spend' as const : 'other' as const,
+        level: a.level as 'info' | 'warn' | 'critical',
+        title: a.title,
+        message: a.message,
+        entityName: a.entity_id || undefined,
+        createdAt: a.created_at
+      }));
+  }, [alerts]);
+
+  // Build automation summary
+  const automationSummary = useMemo(() => {
+    if (!actions || actions.length === 0) return null;
+    
+    const appliedActions = actions.filter(a => a.status === 'applied');
+    const preventedActions = actions.filter(a => a.status === 'prevented' || a.status === 'rejected');
+    const skippedActions = actions.filter(a => a.status === 'skipped');
+    
+    const lastRun = actions[0]?.created_at;
+    
+    return {
+      lastRunAt: lastRun,
+      rulesEvaluated: rules?.length || 0,
+      actionsApplied: appliedActions.length,
+      actionsPrevented: preventedActions.length,
+      actionsSkipped: skippedActions.length,
+      recentActions: actions.slice(0, 5).map(a => ({
+        id: a.id,
+        type: a.action_type,
+        target: (a.payload as any)?.targetName || (a.payload as any)?.campaignName || 'Unknown',
+        status: (a.status === 'applied' ? 'applied' : 
+                a.status === 'prevented' || a.status === 'rejected' ? 'prevented' : 'skipped') as 'applied' | 'prevented' | 'skipped',
+        reason: a.error || undefined
+      }))
+    };
+  }, [actions, rules]);
+
+  // Calculate confidence signals
+  const confidenceSignals = useMemo(() => {
+    const riskScore = healthStatus === 'healthy' ? 20 : healthStatus === 'watch' ? 50 : 80;
+    const riskLevel = healthStatus === 'healthy' ? 'low' as const : 
+                      healthStatus === 'watch' ? 'medium' as const : 'high' as const;
+    
+    // Confidence based on data availability and consistency
+    const hasEnoughData = hasData && minDate;
+    const dataAge = minDate ? differenceInDays(new Date(), new Date(minDate)) : 0;
+    const confidenceScore = hasEnoughData ? Math.min(90, 50 + dataAge * 2) : 30;
+    
+    // Days since manual intervention (placeholder - would need actual tracking)
+    const daysSinceManualIntervention = actions?.some(a => a.status === 'reverted') 
+      ? 2 
+      : null;
+    
+    return { riskLevel, riskScore, confidenceScore, daysSinceManualIntervention };
+  }, [healthStatus, hasData, minDate, actions]);
+
+  // Setup items for onboarding
+  const setupItems = useMemo(() => {
+    return getDefaultSetupItems({
+      hasConnection: hasConnections,
+      hasRules: (rules?.filter(r => r.enabled).length || 0) > 0,
+      hasTarget: true, // Would need actual target ACoS check
+      hasHistoricalData: hasData
+    });
+  }, [hasConnections, rules, hasData]);
+
+  // Automation explainer
+  const automationExplainer = useMemo(() => {
+    if (!rules || rules.length === 0) return undefined;
+    const enabledRules = rules.filter(r => r.enabled);
+    if (enabledRules.length === 0) return undefined;
+    
+    const ruleTypes = enabledRules.map(r => r.rule_type);
+    const hasNegativeKw = ruleTypes.some(t => t.includes('negative'));
+    const hasBidOpt = ruleTypes.some(t => t.includes('bid'));
+    const hasPause = ruleTypes.some(t => t.includes('pause'));
+    
+    const descriptions: string[] = [];
+    if (hasNegativeKw) descriptions.push('adding negative keywords to reduce wasted spend');
+    if (hasBidOpt) descriptions.push('optimizing bids based on performance');
+    if (hasPause) descriptions.push('pausing underperforming targets');
+    
+    if (descriptions.length === 0) return `Running ${enabledRules.length} automation rules`;
+    return `PPC Pal is ${descriptions.join(', ')}.`;
+  }, [rules]);
+
+  const isLoading = metricsLoading || savingsLoading || rulesLoading || alertsLoading;
+  const showOnboarding = !hasConnections || setupItems.some(i => !i.completed);
 
   return (
     <DashboardShell>
-      <div className="container mx-auto py-6 px-4">
-        <div className="mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground mb-2">
-              Overview
-            </h1>
-            <p className="text-muted-foreground">
-              Your Amazon Advertising performance at a glance
-            </p>
-          </div>
-          
-          {hasConnections && (
-            <div className="mt-4 space-y-4">
-              <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-medium text-muted-foreground">Date Range:</span>
-                  <DateRangePicker 
-                    value={dateRange}
-                    onChange={setDateRange}
-                  />
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-medium text-muted-foreground">Filter by ASIN:</span>
-                  <ASINFilter 
-                    selectedASIN={selectedASIN}
-                    onASINChange={setSelectedASIN}
-                  />
-                </div>
-              </div>
-              
-              <ComparisonModeSelector 
-                mode={comparisonMode}
-                onModeChange={setComparisonMode}
-                customRange={customComparisonRange}
-                onCustomRangeChange={setCustomComparisonRange}
-              />
-            </div>
-          )}
+      <div className="container mx-auto py-6 px-4 space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Overview</h1>
+          <p className="text-muted-foreground">Immediate situational awareness for your Amazon Advertising</p>
+        </div>
 
+        {/* Filters */}
+        {hasConnections && (
+          <OverviewFilters
+            dateRange={dateRange}
+            onDateRangeChange={setDateRange}
+            datePreset={datePreset}
+            onDatePresetChange={setDatePreset}
+            selectedASIN={selectedASIN}
+            onASINChange={setSelectedASIN}
+          />
+        )}
+
+        {/* Data Availability */}
+        {hasConnections && (
           <DataAvailabilityIndicator
             minDate={minDate}
             maxDate={maxDate}
@@ -229,160 +350,103 @@ const Overview = () => {
             onImportFullHistory={importFullHistory}
             isImportingFullHistory={isImportingFullHistory}
           />
-        </div>
-
-        {/* What Matters Now */}
-        {hasConnections && (positiveItems.length > 0 || attentionItems.length > 0) && (
-          <div className="mb-6">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg font-semibold">What Matters Now</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 md:grid-cols-2">
-                  {positiveItems.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                        <TrendingUp className="h-4 w-4 text-success" />
-                        Positive Outcomes
-                      </div>
-                      {positiveItems.map((item, i) => (
-                        <div key={i} className="flex items-start gap-2 p-2 rounded-md bg-success/10 border border-success/20">
-                          <CheckCircle className="h-4 w-4 text-success mt-0.5 shrink-0" />
-                          <div>
-                            <p className="text-sm font-medium">{item.title}</p>
-                            <p className="text-xs text-muted-foreground">{item.description}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  
-                  {attentionItems.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                        <TrendingDown className="h-4 w-4 text-warning" />
-                        Requires Attention
-                      </div>
-                      {attentionItems.map((item, i) => (
-                        <div key={i} className="flex items-start gap-2 p-2 rounded-md bg-warning/10 border border-warning/20">
-                          <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
-                          <div>
-                            <p className="text-sm font-medium">{item.title}</p>
-                            <p className="text-xs text-muted-foreground">{item.description}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  
-                  {positiveItems.length === 0 && attentionItems.length === 0 && (
-                    <div className="col-span-2 flex items-center gap-2 p-4 rounded-md bg-muted/50 text-center justify-center">
-                      <CheckCircle className="h-5 w-5 text-success" />
-                      <span className="text-sm text-muted-foreground">Everything looks good! No action required.</span>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
         )}
 
-        {/* Automation Status */}
-        {hasConnections && (
-          <div className="mb-6">
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-full bg-primary/10">
-                      <Bot className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="font-medium">Automation Status</p>
-                      <p className="text-sm text-muted-foreground">Manage your automation rules and actions</p>
-                    </div>
-                  </div>
-                  <Button variant="outline" asChild>
-                    <Link to="/automate">Manage Automation</Link>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+        {/* Main Grid */}
+        {hasConnections ? (
+          <div className="grid gap-6 lg:grid-cols-3">
+            {/* Left Column - Main Content */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Account Health */}
+              <AccountHealthCard
+                healthStatus={healthStatus}
+                healthReasons={healthReasons}
+                savings={savings?.totalSavings || 0}
+                spend={metrics?.totalSpend || 0}
+                sales={metrics?.totalSales || 0}
+                currentAcos={metrics?.acos || 0}
+                targetAcos={30}
+                automationStatus={automationStatus}
+                loading={isLoading}
+              />
+
+              {/* What Matters Now */}
+              <WhatMattersNow 
+                items={whatMattersNowItems}
+                loading={isLoading}
+              />
+
+              {/* Graphs/Trends */}
+              <DashboardChart
+                data={{ points: metrics?.timeseries || [] }}
+                loading={metricsLoading}
+                error={metricsError}
+                granularity="day"
+              />
+            </div>
+
+            {/* Right Column - Secondary Content */}
+            <div className="space-y-6">
+              {/* Active Alerts */}
+              <ActiveAlertsCard
+                alerts={activeAlerts}
+                loading={alertsLoading}
+              />
+
+              {/* Automation Summary */}
+              <AutomationSummaryCard
+                summary={automationSummary}
+                loading={actionsLoading || rulesLoading}
+              />
+
+              {/* Confidence Signals */}
+              <ConfidenceSignalsCard
+                riskLevel={confidenceSignals.riskLevel}
+                riskScore={confidenceSignals.riskScore}
+                confidenceScore={confidenceSignals.confidenceScore}
+                daysSinceManualIntervention={confidenceSignals.daysSinceManualIntervention}
+                loading={isLoading}
+              />
+
+              {/* Onboarding & Guidance */}
+              {showOnboarding && (
+                <OnboardingGuidanceCard
+                  items={setupItems}
+                  automationExplainer={automationExplainer}
+                  loading={rulesLoading}
+                />
+              )}
+            </div>
           </div>
+        ) : (
+          /* No Connection State */
+          <Card className="border-warning/20 bg-warning/5">
+            <CardContent className="pt-6">
+              <p className="text-sm text-warning-foreground mb-4">
+                No Amazon connections found. Please connect your account to get started.
+              </p>
+              <Button asChild>
+                <Link to="/settings">Connect Amazon Account</Link>
+              </Button>
+            </CardContent>
+          </Card>
         )}
 
-        {/* Savings KPI */}
-        {hasConnections && savings && (
-          <div className="mb-6">
-            <SavingsKPI
-              totalSavings={savings.totalSavings}
-              negativeKeywordsSavings={savings.negativeKeywordsSavings}
-              pausedTargetsSavings={savings.pausedTargetsSavings}
-              bidOptimizationSavings={savings.bidOptimizationSavings}
-              acosImprovementSavings={savings.acosImprovementSavings}
-              actionCount={savings.actionCount}
-              loading={savingsLoading}
-            />
-          </div>
+        {/* Expired Token Warning */}
+        {hasConnections && hasExpiredTokens && (
+          <Card className="border-warning/20 bg-warning/5">
+            <CardContent className="pt-6">
+              <p className="text-sm text-warning-foreground">
+                Your Amazon connection has expired. You can still view historical data, but you'll need to refresh your connection to sync new data.
+              </p>
+              <div className="mt-3">
+                <Button asChild variant="outline">
+                  <Link to="/settings">Refresh Connection</Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         )}
-
-        {/* KPI Summary Cards */}
-        {hasConnections && (
-          <div className="mb-6">
-            <DashboardKPIs 
-              data={kpiData}
-              loading={metricsLoading}
-              error={metricsError}
-              previousData={comparisonKpiData}
-              timeseries={metrics?.timeseries}
-            />
-          </div>
-        )}
-
-        {/* Trend Charts */}
-        {hasConnections && (
-          <div className="mb-6">
-            <DashboardChart
-              data={{ points: metrics?.timeseries || [] }}
-              loading={metricsLoading}
-              error={metricsError}
-              granularity="day"
-            />
-          </div>
-        )}
-
-        <div className="space-y-6">
-          {!hasConnections && (
-            <Card className="border-amber-200 bg-amber-50">
-              <CardContent className="pt-6">
-                <p className="text-sm text-amber-800">
-                  No Amazon connections found. Please connect your account in Settings.
-                </p>
-                <div className="mt-3">
-                  <Button asChild>
-                    <Link to="/settings">Go to Settings</Link>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-          
-          {hasConnections && hasExpiredTokens && (
-            <Card className="border-amber-200 bg-amber-50">
-              <CardContent className="pt-6">
-                <p className="text-sm text-amber-800">
-                  Your Amazon connection has expired. You can still view historical data, but you'll need to refresh your connection to sync new data.
-                </p>
-                <div className="mt-3">
-                  <Button asChild variant="outline">
-                    <Link to="/settings">Refresh Connection</Link>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
       </div>
     </DashboardShell>
   );
