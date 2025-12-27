@@ -1,300 +1,605 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Bot, CheckCircle2, Zap, Shield, CalendarDays, BarChart3 } from "lucide-react";
-import HeroBackground from "@/components/HeroBackground";
-import AppPreviewFrame from "@/components/AppPreviewFrame";
-import KpiChip from "@/components/KpiChip";
-import DynamicGridCard from "@/components/DynamicGridCard";
-import InlineBetaSignup from "@/components/InlineBetaSignup";
+import { Card, CardContent } from "@/components/ui/card";
+import { 
+  Bot, 
+  ChevronRight, 
+  ChevronDown,
+  Shield, 
+  Zap, 
+  Search,
+  BarChart3,
+  DollarSign,
+  TrendingUp,
+  Clock,
+  Link2,
+  Eye,
+  Settings2,
+  Star,
+  Check,
+  ArrowRight,
+  Briefcase,
+  User
+} from "lucide-react";
 import { track } from "@/lib/analytics";
+import { cn } from "@/lib/utils";
 
 const PublicLanding = () => {
-  const { user, loading } = useAuth();
+  const { user } = useAuth();
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
 
   useEffect(() => {
-    document.title = 'PPC Pal — AI Amazon PPC Optimizer';
+    document.title = "PPC Pal — Stop Wasting Money on Amazon Ads";
   }, []);
-
-  const scrollToSignup = () => {
-    const el = document.getElementById("beta-signup");
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-  };
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {/* Clean navbar */}
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      {/* Navigation */}
+      <header className="sticky top-0 z-50 w-full border-b border-border bg-background">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <Link to="/" className="flex items-center gap-3">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+          <Link to="/" className="flex items-center gap-2">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-foreground text-background">
               <Bot className="h-5 w-5" />
             </span>
-            <span className="font-semibold text-lg">PPC Pal</span>
+            <span className="font-display font-semibold text-lg">PPC Pal</span>
           </Link>
+          
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium">
-            <Link to="/company" className="transition-colors hover:text-primary">Company</Link>
-            <Link to="/about" className="transition-colors hover:text-primary">About</Link>
-            <Link to="/contact" className="transition-colors hover:text-primary">Contact</Link>
+            <a href="#features" className="text-muted-foreground hover:text-foreground transition-colors">Features</a>
+            <a href="#pricing" className="text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
+            <a href="#faq" className="text-muted-foreground hover:text-foreground transition-colors">FAQ</a>
+            <Link to="/about" className="text-muted-foreground hover:text-foreground transition-colors">About</Link>
           </nav>
+          
           <div className="flex items-center gap-3">
             {user ? (
-              <Link to="/dashboard">
-                <Button>Go to Dashboard</Button>
+              <Link to="/overview">
+                <Button variant="outline">Go to Dashboard</Button>
               </Link>
             ) : (
-              <Button
-                onClick={() => {
-                  track("mvp_cta_click", { location: "header" });
-                  scrollToSignup();
-                }}
-              >
-                Join the beta
-              </Button>
+              <>
+                <Link to="/auth">
+                  <Button variant="outline">Sign in</Button>
+                </Link>
+                <Link to="/auth">
+                  <Button>Start free</Button>
+                </Link>
+              </>
             )}
           </div>
         </div>
       </header>
 
-      {/* Enhanced Hero */}
-      <HeroBackground imageUrl="/lovable-uploads/4b093e39-3730-4f0a-974c-c04971fa5913.png">
-        <div className="mx-auto max-w-4xl text-center relative z-10">
-          <h1 className="text-5xl sm:text-6xl font-bold tracking-tight mb-6 md:text-8xl">
-            PPC Re-imagined.
-            <br />
-            <span className="text-gray-400 text-5xl">Delegate your Amazon ads to AI</span>
-          </h1>
-          <p className="mt-8 text-muted-foreground leading-relaxed max-w-2xl mx-auto text-lg">
-            AI-driven bids | campaign management | keyword harvesting | day parting
-          </p>
+      {/* Hero Section */}
+      <section className="py-20 lg:py-28">
+        <div className="container mx-auto px-4">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            <div className="space-y-8">
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-display font-bold tracking-tight leading-[1.1]">
+                Stop wasting money on Amazon ads
+              </h1>
+              <p className="text-lg text-muted-foreground max-w-lg leading-relaxed">
+                PPC Pal automates your campaign optimization. Let your bids work smarter while you focus on growing your business.
+              </p>
+              <div className="flex flex-wrap gap-4">
+                <Link to="/auth">
+                  <Button size="lg" className="gap-2">
+                    Start <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </Link>
+                <a href="#features">
+                  <Button variant="outline" size="lg">
+                    Learn
+                  </Button>
+                </a>
+              </div>
+            </div>
+            
+            {/* Hero Image Placeholder */}
+            <div className="relative">
+              <div className="aspect-[4/3] rounded-lg border border-border bg-muted flex items-center justify-center">
+                <div className="text-center p-8">
+                  <div className="inline-flex h-16 w-16 items-center justify-center rounded-lg bg-muted-foreground/10 mb-4">
+                    <BarChart3 className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                  <p className="text-muted-foreground">Dashboard Preview</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Capabilities Section */}
+      <section id="features" className="py-20 lg:py-28 bg-muted/30">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-16">
+            <p className="text-sm font-medium text-muted-foreground mb-3">Capabilities</p>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold mb-4">
+              What makes us different
+            </h2>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+              Real tools for real sellers who want real results.
+            </p>
+          </div>
           
-          <div className="mt-12 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            {user ? (
-              <Link to="/dashboard">
-                <Button size="lg" className="px-8 py-3">
-                  <Zap className="mr-2 h-5 w-5" /> Go to Dashboard
-                </Button>
-              </Link>
-            ) : (
-              <Button
-                size="lg"
-                className="px-8 py-3"
-                onClick={() => {
-                  track("mvp_cta_click", { location: "hero" });
-                  scrollToSignup();
-                }}
+          <div className="grid md:grid-cols-3 gap-6">
+            {/* Automation Card - Large */}
+            <Card className="md:col-span-1 md:row-span-1 overflow-hidden">
+              <div className="grid md:grid-rows-2 h-full">
+                <CardContent className="p-6 flex flex-col justify-end">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Automation</p>
+                  <h3 className="text-xl font-display font-semibold mb-3">
+                    Intelligent bid optimization that never sleeps
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Your bids adjust automatically based on performance data. No more manual tweaking at midnight.
+                  </p>
+                  <a href="#" className="inline-flex items-center text-sm font-medium hover:underline">
+                    Explore <ChevronRight className="h-4 w-4 ml-1" />
+                  </a>
+                </CardContent>
+                <div className="bg-muted flex items-center justify-center min-h-[160px]">
+                  <Zap className="h-12 w-12 text-muted-foreground/30" />
+                </div>
+              </div>
+            </Card>
+            
+            {/* Keywords Card */}
+            <Card className="overflow-hidden">
+              <CardContent className="p-6">
+                <p className="text-xs font-medium text-muted-foreground mb-2">Keywords</p>
+                <h3 className="text-xl font-display font-semibold mb-3">
+                  Smart keyword management
+                </h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Identify winners and eliminate losers before they drain your budget.
+                </p>
+                <a href="#" className="inline-flex items-center text-sm font-medium hover:underline">
+                  Explore <ChevronRight className="h-4 w-4 ml-1" />
+                </a>
+              </CardContent>
+              <div className="bg-muted flex items-center justify-center h-40">
+                <Search className="h-12 w-12 text-muted-foreground/30" />
+              </div>
+            </Card>
+            
+            {/* Analytics Card */}
+            <Card className="overflow-hidden">
+              <CardContent className="p-6">
+                <p className="text-xs font-medium text-muted-foreground mb-2">Analytics</p>
+                <h3 className="text-xl font-display font-semibold mb-3">
+                  Clear performance insights
+                </h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  See exactly where your money goes and what it brings back.
+                </p>
+                <a href="#" className="inline-flex items-center text-sm font-medium hover:underline">
+                  Explore <ChevronRight className="h-4 w-4 ml-1" />
+                </a>
+              </CardContent>
+              <div className="bg-muted flex items-center justify-center h-40">
+                <BarChart3 className="h-12 w-12 text-muted-foreground/30" />
+              </div>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* Results Section */}
+      <section className="py-20 lg:py-28">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-16">
+            <p className="text-sm font-medium text-muted-foreground mb-3">Results</p>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold mb-4">
+              Why sellers choose PPC Pal
+            </h2>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+              The numbers speak for themselves when waste disappears.
+            </p>
+          </div>
+          
+          <div className="grid md:grid-cols-3 gap-6">
+            {/* Savings */}
+            <Card className="overflow-hidden">
+              <div className="grid md:grid-rows-2 h-full">
+                <CardContent className="p-6 flex flex-col justify-end">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Savings</p>
+                  <h3 className="text-xl font-display font-semibold mb-3">
+                    Cut ad spend without cutting sales
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Reduce wasted clicks and improve your cost per acquisition immediately.
+                  </p>
+                  <a href="#" className="inline-flex items-center text-sm font-medium hover:underline">
+                    Discover <ChevronRight className="h-4 w-4 ml-1" />
+                  </a>
+                </CardContent>
+                <div className="bg-muted flex items-center justify-center min-h-[160px]">
+                  <DollarSign className="h-12 w-12 text-muted-foreground/30" />
+                </div>
+              </div>
+            </Card>
+            
+            {/* Returns */}
+            <Card className="overflow-hidden">
+              <CardContent className="p-6">
+                <p className="text-xs font-medium text-muted-foreground mb-2">Returns</p>
+                <h3 className="text-xl font-display font-semibold mb-3">
+                  Better ROI from day one
+                </h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Every dollar works harder when optimization runs continuously.
+                </p>
+                <a href="#" className="inline-flex items-center text-sm font-medium hover:underline">
+                  Discover <ChevronRight className="h-4 w-4 ml-1" />
+                </a>
+              </CardContent>
+              <div className="bg-muted flex items-center justify-center h-40">
+                <TrendingUp className="h-12 w-12 text-muted-foreground/30" />
+              </div>
+            </Card>
+            
+            {/* Time */}
+            <Card className="overflow-hidden">
+              <CardContent className="p-6">
+                <p className="text-xs font-medium text-muted-foreground mb-2">Time</p>
+                <h3 className="text-xl font-display font-semibold mb-3">
+                  Get your hours back
+                </h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Stop managing campaigns manually and start managing your business.
+                </p>
+                <a href="#" className="inline-flex items-center text-sm font-medium hover:underline">
+                  Discover <ChevronRight className="h-4 w-4 ml-1" />
+                </a>
+              </CardContent>
+              <div className="bg-muted flex items-center justify-center h-40">
+                <Clock className="h-12 w-12 text-muted-foreground/30" />
+              </div>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works Section */}
+      <section className="py-20 lg:py-28 bg-muted/30">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-16">
+            <p className="text-sm font-medium text-muted-foreground mb-3">Process</p>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold mb-4">
+              How it works
+            </h2>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+              Three simple steps to smarter campaign management.
+            </p>
+          </div>
+          
+          <div className="grid md:grid-cols-3 gap-6">
+            {/* Connect */}
+            <Card className="overflow-hidden">
+              <div className="bg-muted flex items-center justify-center h-56">
+                <Link2 className="h-12 w-12 text-muted-foreground/30" />
+              </div>
+              <CardContent className="p-6">
+                <p className="text-xs font-medium text-muted-foreground mb-2">Connect</p>
+                <h3 className="text-xl font-display font-semibold mb-3">
+                  Link your Amazon seller account
+                </h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  PPC Pal connects directly to your campaigns in minutes.
+                </p>
+                <a href="#" className="inline-flex items-center text-sm font-medium hover:underline">
+                  Learn <ChevronRight className="h-4 w-4 ml-1" />
+                </a>
+              </CardContent>
+            </Card>
+            
+            {/* Analyze */}
+            <Card className="overflow-hidden">
+              <div className="bg-muted flex items-center justify-center h-56">
+                <Eye className="h-12 w-12 text-muted-foreground/30" />
+              </div>
+              <CardContent className="p-6">
+                <p className="text-xs font-medium text-muted-foreground mb-2">Analyze</p>
+                <h3 className="text-xl font-display font-semibold mb-3">
+                  Watch the data flow in real time
+                </h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Performance metrics arrive instantly so you see what matters.
+                </p>
+                <a href="#" className="inline-flex items-center text-sm font-medium hover:underline">
+                  Learn <ChevronRight className="h-4 w-4 ml-1" />
+                </a>
+              </CardContent>
+            </Card>
+            
+            {/* Optimize */}
+            <Card className="overflow-hidden">
+              <div className="bg-muted flex items-center justify-center h-56">
+                <Settings2 className="h-12 w-12 text-muted-foreground/30" />
+              </div>
+              <CardContent className="p-6">
+                <p className="text-xs font-medium text-muted-foreground mb-2">Optimize</p>
+                <h3 className="text-xl font-display font-semibold mb-3">
+                  Let automation handle the heavy lifting
+                </h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Bids adjust, keywords shift, waste disappears while you sleep.
+                </p>
+                <a href="#" className="inline-flex items-center text-sm font-medium hover:underline">
+                  Learn <ChevronRight className="h-4 w-4 ml-1" />
+                </a>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials Section */}
+      <section className="py-20 lg:py-28">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold mb-4">
+              Real sellers
+            </h2>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+              Sellers trust PPC Pal with their budgets.
+            </p>
+          </div>
+          
+          <div className="grid md:grid-cols-3 gap-6">
+            {[
+              {
+                stars: 4,
+                quote: "I stopped losing money the moment I started using PPC Pal. My campaigns run better without me.",
+                name: "Marcus Chen",
+                role: "Amazon seller, electronics"
+              },
+              {
+                stars: 5,
+                quote: "The time I saved alone paid for the subscription. The money I saved paid for everything else.",
+                name: "Sarah Williams",
+                role: "Amazon seller, home goods"
+              },
+              {
+                stars: 5,
+                quote: "Finally, a tool that actually understands what sellers need. No fluff, just results.",
+                name: "James Rodriguez",
+                role: "Amazon seller, supplements"
+              }
+            ].map((testimonial, i) => (
+              <Card key={i} className="p-6">
+                <div className="flex gap-1 mb-4">
+                  {[...Array(5)].map((_, j) => (
+                    <Star 
+                      key={j} 
+                      className={cn(
+                        "h-4 w-4",
+                        j < testimonial.stars ? "fill-foreground text-foreground" : "text-muted-foreground"
+                      )} 
+                    />
+                  ))}
+                </div>
+                <p className="text-sm mb-6 leading-relaxed">
+                  "{testimonial.quote}"
+                </p>
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+                    <User className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">{testimonial.name}</p>
+                    <p className="text-xs text-muted-foreground">{testimonial.role}</p>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Section */}
+      <section id="pricing" className="py-20 lg:py-28 bg-muted/30">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <p className="text-sm font-medium text-muted-foreground mb-3">Plans</p>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold mb-4">
+              Simple pricing
+            </h2>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto mb-8">
+              Pick the plan that matches your operation.
+            </p>
+            
+            {/* Billing Toggle */}
+            <div className="inline-flex items-center rounded-lg border border-border p-1 bg-background">
+              <button
+                onClick={() => setBillingCycle('monthly')}
+                className={cn(
+                  "px-4 py-2 text-sm font-medium rounded-md transition-colors",
+                  billingCycle === 'monthly' ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"
+                )}
               >
-                <Zap className="mr-2 h-5 w-5" /> Start optimizing
-              </Button>
-            )}
-            <Link to="/about">
-              <Button variant="outline" size="lg" className="px-8 py-3">
-                Learn more
-              </Button>
+                Monthly
+              </button>
+              <button
+                onClick={() => setBillingCycle('yearly')}
+                className={cn(
+                  "px-4 py-2 text-sm font-medium rounded-md transition-colors",
+                  billingCycle === 'yearly' ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Yearly
+              </button>
+            </div>
+          </div>
+          
+          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            {[
+              {
+                name: "Starter",
+                price: billingCycle === 'monthly' ? 19 : 15,
+                icon: ArrowRight,
+                features: [
+                  "Automated bid optimization",
+                  "Up to five campaigns",
+                  "Daily performance reports"
+                ]
+              },
+              {
+                name: "Professional",
+                price: billingCycle === 'monthly' ? 49 : 39,
+                icon: User,
+                features: [
+                  "Unlimited campaign management",
+                  "Advanced keyword analysis",
+                  "Real-time bid adjustments",
+                  "Priority email support"
+                ]
+              },
+              {
+                name: "Enterprise",
+                price: billingCycle === 'monthly' ? 99 : 79,
+                icon: Briefcase,
+                features: [
+                  "White-label dashboard access",
+                  "Custom integration support",
+                  "Dedicated account manager",
+                  "API access included",
+                  "Phone and email support"
+                ]
+              }
+            ].map((plan, i) => (
+              <Card key={i} className="p-6 flex flex-col">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-display font-semibold">{plan.name}</h3>
+                  <plan.icon className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <div className="mb-6">
+                  <span className="text-4xl font-display font-bold">${plan.price}</span>
+                  <span className="text-muted-foreground text-sm">/{billingCycle === 'monthly' ? 'mo' : 'mo'}</span>
+                </div>
+                <div className="mb-6">
+                  <p className="text-xs font-medium text-muted-foreground mb-3">Includes</p>
+                  <ul className="space-y-3">
+                    {plan.features.map((feature, j) => (
+                      <li key={j} className="flex items-start gap-2 text-sm">
+                        <Check className="h-4 w-4 text-foreground flex-shrink-0 mt-0.5" />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="mt-auto">
+                  <Link to="/auth">
+                    <Button className="w-full" variant={i === 1 ? "default" : "outline"}>
+                      Start free
+                    </Button>
+                  </Link>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="py-20 lg:py-28">
+        <div className="container mx-auto px-4 text-center">
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold mb-6">
+            Ready to cut the waste?
+          </h2>
+          <p className="text-muted-foreground text-lg mb-8">
+            Start your free trial today. No credit card required.
+          </p>
+          <div className="flex flex-wrap justify-center gap-4">
+            <Link to="/auth">
+              <Button size="lg">Try free</Button>
+            </Link>
+            <Link to="/contact">
+              <Button variant="outline" size="lg">Schedule demo</Button>
             </Link>
           </div>
         </div>
+      </section>
 
-        {/* Enhanced app preview */}
-        <div className="mx-auto mt-20 max-w-6xl animate-fade-in">
-          <AppPreviewFrame>
-            <div className="flex flex-wrap items-center gap-3 sm:gap-4 mb-8">
-              <KpiChip label="Spend" value="$12.3k" change={{ value: '2.1%', direction: 'down' }} />
-              <KpiChip label="Clicks" value="48,921" change={{ value: '5.4%', direction: 'up' }} />
-              <KpiChip label="ACOS" value="24.6%" change={{ value: '1.2%', direction: 'down' }} />
-              <KpiChip label="ROAS" value="4.1x" change={{ value: '3.0%', direction: 'up' }} />
-            </div>
-            <div className="grid gap-6 lg:grid-cols-3">
-              <Card className="p-6 lg:col-span-2">
-                <div className="flex items-center gap-2 mb-4 text-sm text-muted-foreground">
-                  <CalendarDays className="h-4 w-4" />
-                  <span className="font-medium">Last 7 days</span>
-                </div>
-                <div className="h-48 rounded-lg bg-muted/30 flex items-center justify-center" aria-hidden>
-                  <div className="text-muted-foreground text-sm">Performance Analytics Preview</div>
-                </div>
-              </Card>
-              <Card className="p-6">
-                <div className="flex items-center gap-2 mb-4 text-sm text-muted-foreground">
-                  <BarChart3 className="h-4 w-4" />
-                  <span className="font-medium">Top keywords</span>
-                </div>
-                <div className="space-y-3 text-sm">
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                    <span className="font-medium">organic vitamin c</span>
-                    <span className="font-semibold">ROAS 6.2x</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                    <span className="font-medium">kids gummies</span>
-                    <span className="font-semibold">ROAS 4.9x</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                    <span className="font-medium">beauty serum</span>
-                    <span className="font-semibold">ROAS 3.8x</span>
-                  </div>
-                </div>
-              </Card>
-            </div>
-          </AppPreviewFrame>
-        </div>
-      </HeroBackground>
-
-      {/* Clean Value Section */}
-      <section className="py-24 bg-black">
+      {/* FAQ Section */}
+      <section id="faq" className="py-20 lg:py-28 bg-muted/30">
         <div className="container mx-auto px-4">
-          <div className="grid items-center gap-16 lg:grid-cols-2">
-            <div className="space-y-8 bg-transparent rounded-md">
-              <div>
-                <h2 className="text-4xl sm:text-5xl font-bold mb-6 leading-tight text-gray-300">
-                  Maximise ROAS,
-                  <br />
-                  every single day
-                </h2>
-                <p className="text-lg text-gray-300">
-                  Our AI-powered optimization engine works 24/7 to ensure your campaigns perform at their peak.
-                </p>
+          <div className="mb-16">
+            <h2 className="text-3xl sm:text-4xl font-display font-bold mb-4">FAQ</h2>
+            <p className="text-muted-foreground">Answers to the questions sellers ask most.</p>
+          </div>
+          
+          <div className="grid md:grid-cols-3 gap-x-12 gap-y-10">
+            {[
+              {
+                q: "Does PPC Pal work with all Amazon categories?",
+                a: "Yes. PPC Pal integrates with every Amazon seller category and marketplace region. Whether you sell electronics, supplements, or home goods, the automation works the same way."
+              },
+              {
+                q: "How quickly will I see results?",
+                a: "Most sellers notice improved metrics within the first week. Bid optimization starts immediately, and keyword analysis runs continuously. Real savings typically appear within two to four weeks."
+              },
+              {
+                q: "Can I pause or adjust the automation?",
+                a: "Absolutely. You control everything. Set spending limits, pause campaigns, or adjust optimization aggressiveness anytime. The tool works for you, not against you."
+              },
+              {
+                q: "What if I have multiple seller accounts?",
+                a: "Professional and Enterprise plans support unlimited accounts. Manage them all from one dashboard. Starter plan handles one account, but you can upgrade anytime."
+              },
+              {
+                q: "Is my data secure with PPC Pal?",
+                a: "Your data is encrypted and stored securely. We never access your inventory or customer information. We only read campaign performance data needed for optimization."
+              },
+              {
+                q: "Do you offer customer support?",
+                a: "Yes. Starter and Professional plans get email support. Enterprise customers get a dedicated account manager and phone support. Response times are fast because we understand your business moves quickly."
+              }
+            ].map((faq, i) => (
+              <div key={i}>
+                <h3 className="font-semibold mb-2">{faq.q}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">{faq.a}</p>
               </div>
-              
-              <ul className="space-y-6 text-base">
-                <li className="flex items-start gap-4">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="space-y-1">
-                    <div className="font-semibold text-lg">Dynamic Bids</div>
-                    <p className="text-muted-foreground leading-relaxed">
-                      Continuous bid adjustments based on performance signals and market conditions.
-                    </p>
-                  </div>
-                </li>
-                <li className="flex items-start gap-4">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="space-y-1">
-                    <div className="font-semibold text-lg">Keyword Harvesting</div>
-                    <p className="text-muted-foreground leading-relaxed">
-                      Automatically promote winning search terms while eliminating wasteful spend.
-                    </p>
-                  </div>
-                </li>
-                <li className="flex items-start gap-4">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="space-y-1">
-                    <div className="font-semibold text-lg bg-transparent">Budget Pacing</div>
-                    <p className="leading-relaxed text-gray-300">
-                      Smart budget distribution prevents mid-day drop-offs and overspend scenarios.
-                    </p>
-                  </div>
-                </li>
-              </ul>
-            </div>
-            <div className="relative">
-              <DynamicGridCard />
-            </div>
+            ))}
+          </div>
+          
+          <div className="mt-16 pt-16 border-t border-border">
+            <h3 className="text-2xl font-display font-bold mb-2">Need more help?</h3>
+            <p className="text-muted-foreground mb-6">Our team is ready to answer anything else.</p>
+            <Link to="/contact">
+              <Button variant="outline">Contact us</Button>
+            </Link>
           </div>
         </div>
       </section>
 
-      {/* MVP Trust Block + Inline Signup */}
-      <section className="py-20 bg-muted/30" id="join-beta">
+      {/* Footer */}
+      <footer className="border-t border-border py-12">
         <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl sm:text-4xl font-bold mb-4">Join the PPC Pal beta</h2>
-              <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-                PPC Pal is designed to reduce wasted Amazon ad spend with data-driven optimisation. 
-                AI explains the "why" behind changes—no black box.
-              </p>
-            </div>
-
-            <div className="grid gap-8 lg:grid-cols-2 items-start">
-              <div className="space-y-6">
-                <h3 className="text-xl font-semibold">Trust & control (MVP)</h3>
-                <ul className="space-y-4 text-muted-foreground">
-                  <li className="flex items-start gap-3">
-                    <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
-                    <span><strong className="text-foreground">Clear boundaries:</strong> what we read, what we change, and why.</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
-                    <span><strong className="text-foreground">You remain in control:</strong> pause/stop at any time.</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
-                    <span><strong className="text-foreground">We prioritise transparency:</strong> every change is explainable.</span>
-                  </li>
-                </ul>
-              </div>
-              <InlineBetaSignup />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Clean CTA Section */}
-      <section className="py-20 border-t bg-muted/30">
-        <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto text-center">
-            <h3 className="text-2xl sm:text-3xl font-bold mb-6">
-              Ready to transform your Amazon PPC?
-            </h3>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-              <div className="flex items-center gap-3 text-muted-foreground">
-                <Shield className="h-5 w-5" />
-                <span>Enterprise security & Amazon OAuth</span>
-              </div>
-              <div className="flex gap-4">
-                <Link to="/about">
-                  <Button variant="outline">Learn more</Button>
-                </Link>
-                {user ? (
-                  <Link to="/dashboard">
-                    <Button>Open dashboard</Button>
-                  </Link>
-                ) : (
-                  <Button
-                    onClick={() => {
-                      track("mvp_cta_click", { location: "bottom" });
-                      scrollToSignup();
-                    }}
-                  >
-                    Join the beta
-                  </Button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Clean Footer */}
-      <footer className="border-t">
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-3">
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-foreground text-background">
                 <Bot className="h-5 w-5" />
               </span>
               <div>
-                <div className="font-semibold text-foreground text-base">PPC Pal</div>
-                <div className="text-xs">AI-Powered PPC Optimization</div>
+                <div className="font-display font-semibold">PPC Pal</div>
+                <div className="text-xs text-muted-foreground">AI-Powered PPC Optimization</div>
               </div>
             </div>
-            <div className="text-center sm:text-right">
-              <div className="font-medium">© 2024 WISH AND WILLOW LTD</div>
+            
+            <div className="flex items-center gap-6 text-sm text-muted-foreground">
+              <Link to="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
+              <Link to="/terms" className="hover:text-foreground transition-colors">Terms</Link>
+              <Link to="/contact" className="hover:text-foreground transition-colors">Contact</Link>
+            </div>
+            
+            <div className="text-sm text-muted-foreground text-center md:text-right">
+              <div>© 2024 WISH AND WILLOW LTD</div>
               <div className="text-xs">All rights reserved</div>
-              <div className="flex items-center gap-4 mt-2 text-xs">
-                <Link to="/privacy" className="hover:text-foreground">Privacy</Link>
-                <Link to="/terms" className="hover:text-foreground">Terms</Link>
-                <a href="mailto:hello@ppcpal.co.uk" className="hover:text-foreground">Contact</a>
-              </div>
             </div>
           </div>
         </div>
