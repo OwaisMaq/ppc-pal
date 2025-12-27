@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { track } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
+import infiniteWorldLogo from "@/assets/infinite-world-logo.jpg";
+import wishAndWillowLogo from "@/assets/wish-and-willow-logo.jpg";
 import {
   DashboardPreview,
   AutomationPreview,
@@ -189,19 +191,21 @@ const PublicLanding = () => {
           <p className="text-center text-xs font-medium text-muted-foreground tracking-widest uppercase mb-8">
             Powering Top Brands Globally
           </p>
-          <div className="flex flex-wrap items-center justify-center gap-8 lg:gap-16">
-            {[
-              { icon: "🏪", name: "ShopMax" },
-              { icon: "⚡", name: "Volted" },
-              { icon: "📦", name: "PrimeLogistics" },
-              { icon: "🐾", name: "PetWiz" },
-              { icon: "🎯", name: "AdScale" },
-            ].map((brand, i) => (
-              <div key={i} className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
-                <span className="text-lg">{brand.icon}</span>
-                <span className="font-display font-semibold">{brand.name}</span>
-              </div>
-            ))}
+          <div className="flex items-center justify-center gap-16 md:gap-24">
+            <div className="flex items-center justify-center h-16">
+              <img 
+                src={infiniteWorldLogo} 
+                alt="Infinite World" 
+                className="h-12 md:h-16 w-auto object-contain opacity-80 hover:opacity-100 transition-opacity duration-200"
+              />
+            </div>
+            <div className="flex items-center justify-center h-16">
+              <img 
+                src={wishAndWillowLogo} 
+                alt="Wish & Willow" 
+                className="h-12 md:h-16 w-auto object-contain opacity-80 hover:opacity-100 transition-opacity duration-200"
+              />
+            </div>
           </div>
         </div>
       </section>
