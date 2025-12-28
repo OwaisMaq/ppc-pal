@@ -11,6 +11,49 @@ export interface AuditInsight {
   campaigns: string[];
   estimatedSavings: number;
   impact: string;
+  level: "campaign" | "search_term" | "keyword" | "target";
+  entities?: string[];
+}
+
+export interface SearchTermBreakdown {
+  searchTerm: string;
+  keywordText: string;
+  matchType: string;
+  campaignId: string;
+  spend: number;
+  sales: number;
+  clicks: number;
+  impressions: number;
+  orders: number;
+  acos: number;
+  roas: number;
+}
+
+export interface TargetBreakdown {
+  targetId: string;
+  targetType: string;
+  expression: string;
+  campaignId: string;
+  spend: number;
+  sales: number;
+  clicks: number;
+  impressions: number;
+  orders: number;
+  acos: number;
+  roas: number;
+}
+
+export interface AuditBreakdown {
+  searchTerms: {
+    topWasters: SearchTermBreakdown[];
+    topPerformers: SearchTermBreakdown[];
+    highVolume: SearchTermBreakdown[];
+  };
+  targets: {
+    topWasters: TargetBreakdown[];
+    topPerformers: TargetBreakdown[];
+    highVolume: TargetBreakdown[];
+  };
 }
 
 export interface AuditSummary {
@@ -21,6 +64,8 @@ export interface AuditSummary {
   avgAcos: number;
   avgRoas: number;
   campaignCount: number;
+  searchTermCount?: number;
+  targetCount?: number;
   aiSummary?: string;
 }
 
@@ -31,6 +76,7 @@ export interface HistoricalAudit {
   audit_month: string;
   insights: AuditInsight[];
   summary: AuditSummary;
+  breakdown?: AuditBreakdown;
   estimated_savings: number;
   status: string;
   created_at: string;
@@ -79,7 +125,7 @@ export function useHistoricalAudit(profileId: string | null) {
 
       const data = await response.json();
       
-      // Parse the insights and summary from JSONB
+      // Parse the insights, summary, and breakdown from JSONB
       const parsedAudits: HistoricalAudit[] = (data.audits || []).map((audit: any) => ({
         ...audit,
         insights: typeof audit.insights === 'string' 
@@ -88,6 +134,9 @@ export function useHistoricalAudit(profileId: string | null) {
         summary: typeof audit.summary === 'string' 
           ? JSON.parse(audit.summary) 
           : audit.summary || {},
+        breakdown: typeof audit.breakdown === 'string'
+          ? JSON.parse(audit.breakdown)
+          : audit.breakdown || null,
       }));
 
       setAudits(parsedAudits);
@@ -125,6 +174,12 @@ export function useHistoricalAudit(profileId: string | null) {
     }, 0);
   }, [audits]);
 
+  const getInsightsByLevel = useCallback((level: AuditInsight["level"]) => {
+    return audits.flatMap(audit => 
+      (audit.insights || []).filter(i => i.level === level)
+    );
+  }, [audits]);
+
   return {
     audits,
     loading,
@@ -134,5 +189,6 @@ export function useHistoricalAudit(profileId: string | null) {
     getTotalSavings,
     getTotalInsightsCount,
     getCriticalIssuesCount,
+    getInsightsByLevel,
   };
 }
