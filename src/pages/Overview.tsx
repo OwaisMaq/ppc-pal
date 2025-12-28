@@ -12,6 +12,7 @@ import { useAutomationRules, useAlerts } from "@/hooks/useAutomation";
 import { useAnomalies } from "@/hooks/useAnomalies";
 import { useActionQueue } from "@/hooks/useActionQueue";
 import { useSearchStudio } from "@/hooks/useSearchStudio";
+import { useActionOutcomes } from "@/hooks/useActionOutcomes";
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { DateRange } from "react-day-picker";
 import { subDays, differenceInDays } from "date-fns";
@@ -27,6 +28,8 @@ import {
   OverviewFilters,
   getDefaultSetupItems,
   getMarketplaceName,
+  TrustReportCard,
+  OutcomeAttributionPanel,
   type HealthStatus,
   type AutomationStatus,
   type MatterItem,
@@ -132,6 +135,9 @@ const Overview = () => {
   const { rules, loading: rulesLoading } = useAutomationRules(profileId);
   const { alerts, loading: alertsLoading, refetch: refetchAlerts } = useAlerts(profileId);
   const { actions, loading: actionsLoading } = useActionQueue(profileId);
+  
+  // Fetch action outcomes for trust report
+  const { outcomes, stats: outcomeStats, loading: outcomesLoading } = useActionOutcomes();
   
   // Fetch anomalies
   const { anomalies, loading: anomaliesLoading, fetchAnomalies } = useAnomalies();
@@ -425,6 +431,20 @@ const Overview = () => {
                 loading={metricsLoading}
                 error={metricsError}
                 granularity="day"
+              />
+
+              {/* Trust Report */}
+              <TrustReportCard
+                stats={outcomeStats}
+                totalSavings={savings?.totalSavings || 0}
+                actionCount={savings?.actionCount || 0}
+                loading={outcomesLoading || savingsLoading}
+              />
+
+              {/* Outcome Attribution */}
+              <OutcomeAttributionPanel
+                outcomes={outcomes}
+                loading={outcomesLoading}
               />
             </div>
 
