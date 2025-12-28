@@ -92,7 +92,7 @@ export function DataAvailabilityIndicator({
             ) : (
               <>
                 <History className="h-4 w-4" />
-                Import Full Year
+                Re-import Last 90 Days
               </>
             )}
           </Button>
@@ -121,7 +121,7 @@ export function DataAvailabilityIndicator({
         <Alert variant="default" className="bg-amber-50 border-amber-200">
           <AlertCircle className="h-4 w-4 text-amber-600" />
           <AlertDescription className="text-amber-800">
-            Selected date range includes dates before available data. Click "Import Full Year" to fetch historical data.
+            Selected date range includes dates before available data. Amazon retains approximately 60-90 days of historical data.
           </AlertDescription>
         </Alert>
       )}

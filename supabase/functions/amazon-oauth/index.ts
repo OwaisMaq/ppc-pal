@@ -742,35 +742,9 @@ serve(async (req) => {
               console.log(`⚠️ 90-day sync failed for connection ${connection.id}:`, error)
             })
 
-            // Queue additional historical imports for older data (90-day chunks going back ~1 year)
-            const profileId = profile.profileId.toString()
-            const historicalRanges = [
-              { startDaysAgo: 180, endDaysAgo: 91 },   // 3-6 months ago
-              { startDaysAgo: 270, endDaysAgo: 181 },  // 6-9 months ago  
-              { startDaysAgo: 365, endDaysAgo: 271 },  // 9-12 months ago
-            ]
-
-            for (const range of historicalRanges) {
-              const endDate = new Date()
-              endDate.setDate(endDate.getDate() - range.endDaysAgo)
-              const startDate = new Date()
-              startDate.setDate(startDate.getDate() - range.startDaysAgo)
-              
-              console.log(`📅 Queuing historical import for ${profileId}: ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`)
-              
-              supabase.functions.invoke('historical-import', {
-                body: {
-                  profileId,
-                  startDate: startDate.toISOString().split('T')[0],
-                  endDate: endDate.toISOString().split('T')[0]
-                },
-                headers: { Authorization: authHeader! }
-              }).then(result => {
-                console.log(`✅ Historical import queued for ${profileId} (${range.startDaysAgo}-${range.endDaysAgo} days ago):`, result)
-              }).catch(error => {
-                console.log(`⚠️ Historical import failed for ${profileId}:`, error)
-              })
-            }
+            // Note: Amazon Ads API only retains ~60-90 days of historical data
+            // The 90-day sync above covers all available data
+            console.log(`✅ 90-day historical sync initiated for profile ${profile.profileId} - this is the maximum data Amazon retains`)
           }
         } catch (error) {
           console.log('Failed to trigger auto-sync for profile:', profile.profileId, (error as Error).message)
