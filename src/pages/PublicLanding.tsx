@@ -80,7 +80,7 @@ const PublicLanding = () => {
       </header>
 
       {/* Hero Section - includes trusted brands on mobile */}
-      <section className="min-h-[calc(100dvh-4rem)] md:min-h-0 md:py-20 lg:py-28 py-6 overflow-hidden flex items-center snap-start">
+      <section className="h-[calc(100dvh-4rem)] md:h-auto md:min-h-0 md:py-20 lg:py-28 py-8 overflow-hidden flex items-center snap-start">
         <div className="container mx-auto px-4">
           <div className="grid lg:grid-cols-2 gap-6 lg:gap-16 items-center">
             <div className="space-y-4 md:space-y-8">
@@ -233,7 +233,7 @@ const PublicLanding = () => {
       </section>
 
       {/* Capabilities Section */}
-      <section id="features" className="min-h-[calc(100dvh-4rem)] md:min-h-0 md:py-20 lg:py-28 py-6 relative overflow-hidden flex items-center snap-start">
+      <section id="features" className="h-[calc(100dvh-4rem)] md:h-auto md:min-h-0 md:py-20 lg:py-28 py-8 relative overflow-hidden flex items-center snap-start">
         {/* Section background with subtle pattern */}
         <div className="absolute inset-0 bg-muted/40" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,hsl(var(--primary)/0.08),transparent)]" />
@@ -335,7 +335,7 @@ const PublicLanding = () => {
       </section>
 
       {/* Results Section */}
-      <section className="min-h-[calc(100dvh-4rem)] md:min-h-0 md:py-20 lg:py-28 py-6 relative border-t border-border flex items-center snap-start">
+      <section className="h-[calc(100dvh-4rem)] md:h-auto md:min-h-0 md:py-20 lg:py-28 py-8 relative border-t border-border flex items-center snap-start">
         <div className="container mx-auto px-4">
           {/* Section header */}
           <div className="text-center mb-4 md:mb-16 lg:mb-20">
@@ -435,7 +435,7 @@ const PublicLanding = () => {
       </section>
 
       {/* How It Works Section */}
-      <section className="min-h-[calc(100dvh-4rem)] md:min-h-0 md:py-20 lg:py-28 py-8 relative overflow-hidden flex items-center snap-start">
+      <section className="h-[calc(100dvh-4rem)] md:h-auto md:min-h-0 md:py-20 lg:py-28 py-8 relative overflow-hidden flex items-center snap-start">
         {/* Section background */}
         <div className="absolute inset-0 bg-muted/40" />
         <div className="absolute inset-0 bg-[linear-gradient(to_right,hsl(var(--border)/0.3)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border)/0.3)_1px,transparent_1px)] bg-[size:4rem_4rem]" />
@@ -536,7 +536,7 @@ const PublicLanding = () => {
       </section>
 
       {/* Testimonials Section */}
-      <section className="min-h-[calc(100dvh-4rem)] md:min-h-0 md:py-20 lg:py-28 py-6 relative border-t border-border flex items-center snap-start">
+      <section className="h-[calc(100dvh-4rem)] md:h-auto md:min-h-0 md:py-20 lg:py-28 py-8 relative border-t border-border flex items-center snap-start">
         <div className="container mx-auto px-4">
           {/* Section header */}
           <div className="text-center mb-4 md:mb-16 lg:mb-20">
