@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -28,7 +27,6 @@ const Contact = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real application, you would send this to your backend
     toast.success("Thank you for your message! We'll get back to you soon.");
     setFormData({
       name: "",
@@ -40,53 +38,53 @@ const Contact = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50">
+    <div className="min-h-screen bg-background text-foreground">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-4 py-3">
-        <div className="container mx-auto flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-3">
-            <div className="bg-blue-600 rounded-full p-2">
-              <Bot className="h-6 w-6 text-white" />
-            </div>
-            <h1 className="text-2xl font-bold text-gray-900">PPC Pal</h1>
+      <header className="sticky top-0 z-50 w-full border-b border-border bg-background">
+        <div className="container mx-auto flex h-16 items-center justify-between px-4">
+          <Link to="/" className="flex items-center gap-2">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-foreground text-background">
+              <Bot className="h-5 w-5" />
+            </span>
+            <span className="font-display font-semibold text-lg">PPC Pal</span>
           </Link>
           
-          <nav className="hidden md:flex items-center gap-6">
-            <Link to="/" className="text-gray-600 hover:text-blue-600 transition-colors">
-              Home
-            </Link>
-            <Link to="/company" className="text-gray-600 hover:text-blue-600 transition-colors">
-              Company
-            </Link>
-            <Link to="/about" className="text-gray-600 hover:text-blue-600 transition-colors">
-              About
+          <nav className="hidden md:flex items-center gap-8 text-sm font-medium">
+            <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">Home</Link>
+            <Link to="/about" className="text-muted-foreground hover:text-foreground transition-colors">About</Link>
+            <Link to="/company" className="text-muted-foreground hover:text-foreground transition-colors">Company</Link>
+          </nav>
+          
+          <div className="flex items-center gap-3">
+            <Link to="/auth" className="hidden md:block">
+              <Button variant="outline">Sign in</Button>
             </Link>
             <Link to="/auth">
-              <Button>Sign In</Button>
+              <Button>Start free</Button>
             </Link>
-          </nav>
+          </div>
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-16">
+      <div className="container mx-auto px-4 py-16 lg:py-24">
         {/* Hero Section */}
         <div className="text-center mb-16">
-          <MessageSquare className="h-16 w-16 text-blue-600 mx-auto mb-6" />
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Contact Us
+          <p className="text-xs font-semibold text-primary uppercase tracking-[0.2em] mb-4">Contact</p>
+          <h1 className="text-3xl md:text-4xl lg:text-5xl font-display font-bold text-foreground mb-4">
+            Get in touch
           </h1>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
             Have questions about PPC Pal? Want to learn more about our AI-powered optimization platform? 
             We'd love to hear from you.
           </p>
         </div>
 
-        <div className="max-w-6xl mx-auto">
-          <div className="grid lg:grid-cols-2 gap-12">
+        <div className="max-w-5xl mx-auto">
+          <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
             {/* Contact Form */}
-            <Card>
+            <Card className="bg-card border-border">
               <CardHeader>
-                <CardTitle>Send us a message</CardTitle>
+                <CardTitle className="text-foreground">Send us a message</CardTitle>
                 <CardDescription>
                   Fill out the form below and we'll get back to you as soon as possible.
                 </CardDescription>
@@ -169,26 +167,30 @@ const Contact = () => {
 
             {/* Contact Information */}
             <div className="space-y-6">
-              <Card>
+              <Card className="bg-card border-border">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Building2 className="h-5 w-5 text-blue-600" />
+                  <CardTitle className="flex items-center gap-3 text-foreground">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <Building2 className="h-4 w-4 text-primary" />
+                    </div>
                     Company Information
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <h3 className="font-semibold text-gray-900 mb-2">WISH AND WILLOW LTD</h3>
-                    <p className="text-gray-600">
+                    <h3 className="font-semibold text-foreground mb-2">WISH AND WILLOW LTD</h3>
+                    <p className="text-muted-foreground text-sm">
                       UK Private Limited Company specializing in AI-powered e-commerce optimization tools.
                     </p>
                   </div>
                   
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-4 w-4 text-blue-600" />
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <Mail className="h-4 w-4 text-primary" />
+                    </div>
                     <a 
                       href="mailto:info@ppcpal.online" 
-                      className="text-blue-600 hover:text-blue-700 transition-colors"
+                      className="text-primary hover:underline transition-colors"
                     >
                       info@ppcpal.online
                     </a>
@@ -196,54 +198,57 @@ const Contact = () => {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="bg-card border-border">
                 <CardHeader>
-                  <CardTitle>Frequently Asked Questions</CardTitle>
+                  <CardTitle className="flex items-center gap-3 text-foreground">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <MessageSquare className="h-4 w-4 text-primary" />
+                    </div>
+                    Quick Answers
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">How does PPC Pal work?</h4>
-                    <p className="text-gray-600 text-sm">
-                      PPC Pal analyzes your Amazon PPC campaign data using AI algorithms to identify 
-                      optimization opportunities and provide actionable recommendations.
+                    <h4 className="font-semibold text-foreground mb-1">How does PPC Pal work?</h4>
+                    <p className="text-muted-foreground text-sm">
+                      Connect your Amazon Ads account, and our AI optimizes your bids 24/7 automatically.
                     </p>
                   </div>
                   
                   <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">Is my data secure?</h4>
-                    <p className="text-gray-600 text-sm">
-                      Yes, we use enterprise-grade encryption and follow industry best practices 
-                      to ensure your campaign data is secure and protected.
+                    <h4 className="font-semibold text-foreground mb-1">Is my data secure?</h4>
+                    <p className="text-muted-foreground text-sm">
+                      Yes—bank-level encryption, OAuth integration, and we never store your Amazon password.
                     </p>
                   </div>
                   
                   <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">Do you offer API integration?</h4>
-                    <p className="text-gray-600 text-sm">
-                      We are working on official Amazon Advertising API integration to provide 
-                      seamless campaign optimization directly within the Amazon platform.
+                    <h4 className="font-semibold text-foreground mb-1">How fast will I see results?</h4>
+                    <p className="text-muted-foreground text-sm">
+                      Most sellers see improvements within 72 hours of connecting their account.
                     </p>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="bg-card border-border">
                 <CardHeader>
-                  <CardTitle>Business Hours</CardTitle>
+                  <CardTitle className="text-foreground">Response Times</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-2 text-sm">
+                  <div className="space-y-3 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Monday - Friday:</span>
-                      <span className="text-gray-900">9:00 AM - 6:00 PM GMT</span>
+                      <span className="text-muted-foreground">Email inquiries:</span>
+                      <span className="text-foreground font-medium">Within 24 hours</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Saturday - Sunday:</span>
-                      <span className="text-gray-900">Closed</span>
+                      <span className="text-muted-foreground">Technical support:</span>
+                      <span className="text-foreground font-medium">Within 4 hours</span>
                     </div>
-                    <p className="text-gray-500 text-xs mt-3">
-                      We typically respond to emails within 24 hours during business days.
-                    </p>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Sales inquiries:</span>
+                      <span className="text-foreground font-medium">Same business day</span>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -253,19 +258,27 @@ const Contact = () => {
       </div>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-white">
+      <footer className="bg-muted border-t border-border">
         <div className="container mx-auto px-4 py-8">
           <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="flex items-center gap-3 mb-4 md:mb-0">
-              <div className="bg-blue-600 rounded-full p-2">
-                <Bot className="h-6 w-6 text-white" />
-              </div>
-              <span className="text-lg font-semibold">PPC Pal</span>
+            <div className="flex items-center gap-2 mb-4 md:mb-0">
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-foreground text-background">
+                <Bot className="h-4 w-4" />
+              </span>
+              <span className="font-semibold text-foreground">PPC Pal</span>
+            </div>
+            
+            <div className="flex items-center gap-6 mb-4 md:mb-0">
+              <Link to="/privacy" className="text-muted-foreground hover:text-foreground transition-colors text-sm">
+                Privacy
+              </Link>
+              <Link to="/terms" className="text-muted-foreground hover:text-foreground transition-colors text-sm">
+                Terms
+              </Link>
             </div>
             
             <div className="text-center md:text-right">
-              <p className="text-gray-400 mb-1">© 2024 WISH AND WILLOW LTD</p>
-              <p className="text-gray-400">All rights reserved</p>
+              <p className="text-muted-foreground text-sm">© 2024 WISH AND WILLOW LTD. All rights reserved.</p>
             </div>
           </div>
         </div>
