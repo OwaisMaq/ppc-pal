@@ -33,28 +33,28 @@ const DashboardShell = ({ children }: PropsWithChildren) => {
       <div className="min-h-screen flex w-full bg-background">
         <AppSidebar />
         <SidebarInset className="flex flex-col">
-          {/* Premium Header */}
-          <header className="sticky top-0 z-40 border-b border-border/50 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
-            <div className="flex h-14 items-center gap-4 px-4 md:px-6">
+          {/* Clean Header - matches landing page aesthetic */}
+          <header className="sticky top-0 z-40 border-b border-border bg-background">
+            <div className="flex h-16 items-center gap-4 px-4 md:px-6">
               {/* Sidebar trigger */}
               <SidebarTrigger className="h-8 w-8 shrink-0" />
               
-              {/* Search bar - premium styling */}
+              {/* Search bar - clean minimal styling */}
               <div className="relative flex-1 max-w-md">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input 
                   placeholder="Search campaigns, keywords, ASINs..." 
                   className={cn(
                     "pl-9 pr-12 h-9",
-                    "bg-muted/50 border-transparent",
-                    "focus:bg-background focus:border-border",
-                    "placeholder:text-muted-foreground/50",
-                    "transition-all duration-200"
+                    "bg-muted/40 border-border/50",
+                    "focus:bg-background focus:border-primary/50",
+                    "placeholder:text-muted-foreground/60",
+                    "transition-all duration-200 rounded-lg"
                   )}
                 />
                 {/* Keyboard shortcut hint */}
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 hidden md:flex items-center gap-1">
-                  <kbd className="pointer-events-none h-5 select-none items-center gap-1 rounded border border-border/50 bg-muted/50 px-1.5 font-mono text-[10px] font-medium text-muted-foreground inline-flex">
+                  <kbd className="pointer-events-none h-5 select-none items-center gap-1 rounded-md border border-border bg-muted/50 px-1.5 font-mono text-[10px] font-medium text-muted-foreground inline-flex">
                     <Command className="h-3 w-3" />K
                   </kbd>
                 </div>
@@ -69,11 +69,11 @@ const DashboardShell = ({ children }: PropsWithChildren) => {
                 <Button 
                   variant="ghost" 
                   size="icon" 
-                  className="relative h-9 w-9"
+                  className="relative h-9 w-9 rounded-lg hover:bg-muted"
                 >
                   <Bell className="h-4 w-4" />
                   {/* Notification badge */}
-                  <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-primary animate-pulse" />
+                  <span className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-primary" />
                 </Button>
 
                 {/* User menu */}
@@ -83,14 +83,14 @@ const DashboardShell = ({ children }: PropsWithChildren) => {
                       <Button 
                         variant="ghost" 
                         className={cn(
-                          "h-9 gap-2 px-2",
-                          "hover:bg-muted/50",
+                          "h-9 gap-2 px-2 rounded-lg",
+                          "hover:bg-muted",
                           "data-[state=open]:bg-muted"
                         )}
                       >
-                        {/* Avatar */}
-                        <div className="h-7 w-7 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center">
-                          <span className="text-xs font-semibold text-primary-foreground">
+                        {/* Avatar - matches landing page style */}
+                        <div className="h-7 w-7 rounded-lg bg-foreground flex items-center justify-center">
+                          <span className="text-xs font-semibold text-background">
                             {user.email?.charAt(0).toUpperCase()}
                           </span>
                         </div>
@@ -151,15 +151,12 @@ const DashboardShell = ({ children }: PropsWithChildren) => {
             </div>
           </header>
 
-          {/* Main content area with subtle background pattern */}
-          <main className="flex-1 overflow-auto">
+          {/* Main content area */}
+          <main className="flex-1 overflow-auto bg-muted/30">
             <div className="relative min-h-full">
-              {/* Subtle grid background */}
-              <div className="absolute inset-0 dot-pattern opacity-30 pointer-events-none" />
-              
               {/* Content */}
               <div className="relative p-4 md:p-6 lg:p-8">
-                <div className="animate-in max-w-[1600px] mx-auto">
+                <div className="animate-fade-in max-w-[1600px] mx-auto">
                   {children}
                 </div>
               </div>

@@ -32,13 +32,13 @@ export function AppSidebar() {
   ];
 
   return (
-    <Sidebar collapsible="icon" className="border-r">
-      <SidebarHeader>
-        <div className="flex items-center gap-2 px-2 py-1">
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
+    <Sidebar collapsible="icon" className="border-r border-border">
+      <SidebarHeader className="border-b border-border/50">
+        <div className="flex items-center gap-2.5 px-2 py-2">
+          <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-foreground text-background shadow-sm">
             <Bot className="h-5 w-5" />
           </span>
-          <span className="font-semibold tracking-tight">PPC Pal</span>
+          <span className="font-display font-semibold text-lg tracking-tight">PPC Pal</span>
         </div>
       </SidebarHeader>
       <SidebarContent>
@@ -64,8 +64,8 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter>
-        <div className="px-2 py-2 text-xs text-muted-foreground">
+      <SidebarFooter className="border-t border-border/50">
+        <div className="px-3 py-3 text-xs text-muted-foreground/70">
           © {new Date().getFullYear()} PPC Pal
         </div>
       </SidebarFooter>

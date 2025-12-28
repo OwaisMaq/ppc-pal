@@ -15,24 +15,25 @@ const Header = () => {
   if (!user) return null;
 
   return (
-    <header className="bg-white border-b border-gray-200 px-4 py-3">
+    <header className="bg-background border-b border-border px-4 py-3">
       <div className="container mx-auto flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link to="/dashboard" className="flex items-center">
-            <div className="bg-blue-600 rounded-full p-2">
-              <Bot className="h-6 w-6 text-white" />
+          <Link to="/dashboard" className="flex items-center gap-2">
+            <div className="h-9 w-9 rounded-lg bg-foreground flex items-center justify-center">
+              <Bot className="h-5 w-5 text-background" />
             </div>
+            <span className="font-display font-semibold text-lg">PPC Pal</span>
           </Link>
           
           <div className="flex items-center gap-2">
-            <User className="h-5 w-5 text-gray-500" />
-            <span className="text-sm text-gray-700">{user.email}</span>
+            <User className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">{user.email}</span>
           </div>
           
           {!loading && subscription && (
             <Badge 
               variant={subscription.plan_type === 'pro' ? 'default' : 'outline'}
-              className={subscription.plan_type === 'pro' ? 'bg-yellow-500 hover:bg-yellow-600' : ''}
+              className={subscription.plan_type === 'pro' ? 'bg-accent text-accent-foreground' : ''}
             >
               {subscription.plan_type === 'pro' && <Crown className="h-3 w-3 mr-1" />}
               {subscription.plan_type === 'pro' ? 'Pro Plan' : 'Free Plan'}
@@ -46,10 +47,10 @@ const Header = () => {
             
             <Link 
               to="/data-management"
-              className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 location.pathname === '/data-management' 
-                  ? 'bg-blue-100 text-blue-700' 
-                  : 'text-gray-600 hover:text-blue-600 hover:bg-gray-100'
+                  ? 'bg-muted text-foreground' 
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
               }`}
             >
               <Database className="h-4 w-4" />
@@ -59,10 +60,10 @@ const Header = () => {
             
             <Link 
               to="/privacy"
-              className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 location.pathname === '/privacy' 
-                  ? 'bg-blue-100 text-blue-700' 
-                  : 'text-gray-600 hover:text-blue-600 hover:bg-gray-100'
+                  ? 'bg-muted text-foreground' 
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
               }`}
             >
               <Shield className="h-4 w-4" />
@@ -71,10 +72,10 @@ const Header = () => {
 
             <Link 
               to="/settings"
-              className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 location.pathname === '/settings' 
-                  ? 'bg-blue-100 text-blue-700' 
-                  : 'text-gray-600 hover:text-blue-600 hover:bg-gray-100'
+                  ? 'bg-muted text-foreground' 
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
               }`}
             >
               <SettingsIcon className="h-4 w-4" />
