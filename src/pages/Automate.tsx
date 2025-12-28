@@ -23,9 +23,12 @@ import { AutomationRulesList } from "@/components/AutomationRulesList";
 import { AlertsPanel } from "@/components/AlertsPanel";
 import PendingApprovals from "@/components/PendingApprovals";
 import ActionsFeed from "@/components/ActionsFeed";
+import { TrustReportCard, OutcomeAttributionPanel } from "@/components/overview";
 import { useAutomationRules, useAlerts } from "@/hooks/useAutomation";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { useSubscription } from "@/hooks/useSubscription";
+import { useActionOutcomes } from "@/hooks/useActionOutcomes";
+import { useSavingsMetric } from "@/hooks/useSavingsMetric";
 import { toast } from "sonner";
 
 const Automate: React.FC = () => {
@@ -52,6 +55,10 @@ const Automate: React.FC = () => {
     acknowledgeAlerts,
     refetch: refetchAlerts
   } = useAlerts(selectedProfile);
+
+  // Fetch action outcomes and savings for trust report
+  const { outcomes, stats: outcomeStats, loading: outcomesLoading } = useActionOutcomes();
+  const { savings, loading: savingsLoading } = useSavingsMetric(selectedProfile);
 
   const plan = subscription?.plan_type || 'free';
 
@@ -221,7 +228,7 @@ const Automate: React.FC = () => {
 
         {selectedProfile ? (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="rules" className="gap-2">
                 <Zap className="h-4 w-4" />
                 Rules ({rules.length})
@@ -242,6 +249,10 @@ const Automate: React.FC = () => {
               <TabsTrigger value="history" className="gap-2">
                 <History className="h-4 w-4" />
                 History
+              </TabsTrigger>
+              <TabsTrigger value="trust" className="gap-2">
+                <Shield className="h-4 w-4" />
+                Trust Report
               </TabsTrigger>
             </TabsList>
 
@@ -314,6 +325,28 @@ const Automate: React.FC = () => {
                 </p>
               </div>
               <ActionsFeed />
+            </TabsContent>
+
+            <TabsContent value="trust" className="space-y-6">
+              <div>
+                <h2 className="text-xl font-semibold mb-2">Automation Trust Report</h2>
+                <p className="text-muted-foreground text-sm">
+                  See how automation is performing and track outcome attribution
+                </p>
+              </div>
+              
+              <div className="grid gap-6 lg:grid-cols-2">
+                <TrustReportCard
+                  stats={outcomeStats}
+                  totalSavings={savings?.totalSavings || 0}
+                  actionCount={savings?.actionCount || 0}
+                  loading={outcomesLoading || savingsLoading}
+                />
+                <OutcomeAttributionPanel
+                  outcomes={outcomes}
+                  loading={outcomesLoading}
+                />
+              </div>
             </TabsContent>
           </Tabs>
         ) : (
