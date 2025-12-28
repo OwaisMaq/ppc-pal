@@ -67,17 +67,24 @@ export const AmazonPartnerBadge = ({ className }: { className?: string }) => (
 );
 
 // Live Stats Badge
-export const LiveStatsBadge = ({ actionsToday = 247 }: { actionsToday?: number }) => (
-  <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-    <span className="relative flex h-2 w-2">
-      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-    </span>
-    <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
-      {actionsToday.toLocaleString()} optimizations today
-    </span>
-  </div>
-);
+export const LiveStatsBadge = ({ actionsToday = 0, loading = false }: { actionsToday?: number; loading?: boolean }) => {
+  // Show nothing if no actions yet
+  if (!loading && actionsToday === 0) {
+    return null;
+  }
+  
+  return (
+    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+      <span className="relative flex h-2 w-2">
+        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+      </span>
+      <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+        {loading ? "..." : `${actionsToday.toLocaleString()} optimizations today`}
+      </span>
+    </div>
+  );
+};
 
 // Managed Spend Badge
 export const ManagedSpendBadge = ({ amount = "$2M+" }: { amount?: string }) => (
