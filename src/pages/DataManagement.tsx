@@ -318,9 +318,9 @@ const DataManagement = () => {
                 If you have questions about your data or need assistance with your privacy rights, contact us:
               </p>
               <div className="space-y-2 text-gray-700">
-                <p><strong>Privacy Officer:</strong> privacy@ppcpal.com</p>
-                <p><strong>Data Protection Officer:</strong> dpo@ppcpal.com</p>
-                <p><strong>Support:</strong> support@ppcpal.com</p>
+                <p><strong>Privacy Officer:</strong> info@ppcpal.online</p>
+                <p><strong>Data Protection Officer:</strong> info@ppcpal.online</p>
+                <p><strong>Support:</strong> info@ppcpal.online</p>
               </div>
             </CardContent>
           </Card>

@@ -52,8 +52,8 @@ export default function PublicPrivacy() {
             <h2 className="text-xl font-semibold mb-3">Data Deletion</h2>
             <p className="text-muted-foreground leading-relaxed">
               You can request deletion of your data at any time by contacting us at{" "}
-              <a href="mailto:privacy@ppcpal.co.uk" className="text-primary hover:underline">
-                privacy@ppcpal.co.uk
+              <a href="mailto:info@ppcpal.online" className="text-primary hover:underline">
+                info@ppcpal.online
               </a>
             </p>
           </section>
@@ -62,8 +62,8 @@ export default function PublicPrivacy() {
             <h2 className="text-xl font-semibold mb-3">Contact</h2>
             <p className="text-muted-foreground leading-relaxed">
               For privacy-related questions, contact us at{" "}
-              <a href="mailto:privacy@ppcpal.co.uk" className="text-primary hover:underline">
-                privacy@ppcpal.co.uk
+              <a href="mailto:info@ppcpal.online" className="text-primary hover:underline">
+                info@ppcpal.online
               </a>
             </p>
           </section>
