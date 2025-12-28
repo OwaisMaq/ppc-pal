@@ -2706,6 +2706,60 @@ export type Database = {
         }
         Relationships: []
       }
+      governance_settings: {
+        Row: {
+          automation_paused: boolean | null
+          automation_paused_at: string | null
+          automation_paused_reason: string | null
+          created_at: string
+          daily_spend_cap_micros: number | null
+          id: string
+          max_actions_per_day: number | null
+          max_bid_change_percent: number | null
+          max_bid_micros: number | null
+          min_bid_micros: number | null
+          monthly_spend_cap_micros: number | null
+          profile_id: string
+          require_approval_above_micros: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          automation_paused?: boolean | null
+          automation_paused_at?: string | null
+          automation_paused_reason?: string | null
+          created_at?: string
+          daily_spend_cap_micros?: number | null
+          id?: string
+          max_actions_per_day?: number | null
+          max_bid_change_percent?: number | null
+          max_bid_micros?: number | null
+          min_bid_micros?: number | null
+          monthly_spend_cap_micros?: number | null
+          profile_id: string
+          require_approval_above_micros?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          automation_paused?: boolean | null
+          automation_paused_at?: string | null
+          automation_paused_reason?: string | null
+          created_at?: string
+          daily_spend_cap_micros?: number | null
+          id?: string
+          max_actions_per_day?: number | null
+          max_bid_change_percent?: number | null
+          max_bid_micros?: number | null
+          min_bid_micros?: number | null
+          monthly_spend_cap_micros?: number | null
+          profile_id?: string
+          require_approval_above_micros?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       historical_audits: {
         Row: {
           audit_month: string
@@ -3447,6 +3501,39 @@ export type Database = {
           id?: string
           onboarding_completed?: boolean | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      protected_entities: {
+        Row: {
+          created_at: string
+          entity_id: string
+          entity_name: string | null
+          entity_type: string
+          id: string
+          profile_id: string
+          reason: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          entity_id: string
+          entity_name?: string | null
+          entity_type: string
+          id?: string
+          profile_id: string
+          reason?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          entity_id?: string
+          entity_name?: string | null
+          entity_type?: string
+          id?: string
+          profile_id?: string
+          reason?: string | null
+          user_id?: string
         }
         Relationships: []
       }
