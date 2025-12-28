@@ -5,6 +5,7 @@ import { useActionsFeed } from "@/hooks/useActionsFeed";
 import { supabase } from "@/integrations/supabase/client";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ConfidenceBadge } from "@/components/automation";
 import { 
   AlertCircle,
   TrendingUp, 
@@ -13,7 +14,8 @@ import {
   Activity,
   DollarSign,
   Check,
-  X
+  X,
+  Brain
 } from "lucide-react";
 
 const PendingApprovals = () => {
@@ -75,6 +77,28 @@ const PendingApprovals = () => {
       default:
         return JSON.stringify(payload).substring(0, 50);
     }
+  };
+
+  // Extract confidence data from action payload (for Bayesian bid actions)
+  const getConfidenceData = (action: any) => {
+    const { payload } = action;
+    if (payload?.confidence !== undefined) {
+      return {
+        confidence: Math.round(payload.confidence * 100),
+        observations: payload.observations,
+        confidenceInterval: payload.confidence_interval ? {
+          lower: payload.confidence_interval.lower,
+          upper: payload.confidence_interval.upper,
+        } : undefined,
+      };
+    }
+    return null;
+  };
+
+  // Check if action is from Bayesian optimizer
+  const isBayesianAction = (action: any) => {
+    return action.payload?.source === 'bayesian_optimizer' || 
+           action.payload?.confidence !== undefined;
   };
 
   const handleApprove = async (actionId: string) => {
@@ -148,10 +172,22 @@ const PendingApprovals = () => {
 
   if (loading) return null;
   
-  if (pendingActions.length === 0) return null;
+  if (pendingActions.length === 0) {
+    return (
+      <Card className="text-center py-8">
+        <CardContent>
+          <Check className="h-12 w-12 mx-auto mb-4 text-success/50" />
+          <h3 className="text-lg font-semibold mb-2">No Pending Actions</h3>
+          <p className="text-muted-foreground text-sm">
+            All automation actions have been processed or are awaiting generation.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <Card className="border-amber-500 bg-amber-50 dark:bg-amber-950/20">
+    <Card className="border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/10">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -177,48 +213,66 @@ const PendingApprovals = () => {
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
-          {pendingActions.map((action) => (
-            <div
-              key={action.id}
-              className="flex items-start gap-3 p-3 rounded-lg border bg-card"
-            >
-              <div className="mt-1 p-2 rounded-full bg-primary/10 text-primary">
-                {getActionIcon(action.action_type)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-sm font-medium">
-                    {getActionLabel(action.action_type)}
-                  </span>
+          {pendingActions.map((action) => {
+            const confidenceData = getConfidenceData(action);
+            const isBayesian = isBayesianAction(action);
+            
+            return (
+              <div
+                key={action.id}
+                className="flex items-start gap-3 p-3 rounded-lg border bg-card"
+              >
+                <div className={`mt-1 p-2 rounded-full ${isBayesian ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
+                  {isBayesian ? <Brain className="h-4 w-4" /> : getActionIcon(action.action_type)}
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  {formatActionDetails(action)}
-                </p>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-medium">
+                      {getActionLabel(action.action_type)}
+                    </span>
+                    {confidenceData && (
+                      <ConfidenceBadge 
+                        confidence={confidenceData.confidence}
+                        observations={confidenceData.observations}
+                        confidenceInterval={confidenceData.confidenceInterval}
+                      />
+                    )}
+                    {isBayesian && !confidenceData && (
+                      <Badge variant="outline" className="text-xs bg-primary/5 text-primary border-primary/20">
+                        <Brain className="h-3 w-3 mr-1" />
+                        AI Optimized
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {formatActionDetails(action)}
+                  </p>
+                </div>
+                <div className="flex gap-2 ml-auto">
+                  <Button
+                    size="sm"
+                    variant="default"
+                    onClick={() => handleApprove(action.id)}
+                    disabled={processing.includes(action.id)}
+                    className="gap-1"
+                  >
+                    <Check className="h-3 w-3" />
+                    Approve
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleReject(action.id)}
+                    disabled={processing.includes(action.id)}
+                    className="gap-1"
+                  >
+                    <X className="h-3 w-3" />
+                    Reject
+                  </Button>
+                </div>
               </div>
-              <div className="flex gap-2 ml-auto">
-                <Button
-                  size="sm"
-                  variant="default"
-                  onClick={() => handleApprove(action.id)}
-                  disabled={processing.includes(action.id)}
-                  className="gap-1"
-                >
-                  <Check className="h-3 w-3" />
-                  Approve
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleReject(action.id)}
-                  disabled={processing.includes(action.id)}
-                  className="gap-1"
-                >
-                  <X className="h-3 w-3" />
-                  Reject
-                </Button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </CardContent>
     </Card>
