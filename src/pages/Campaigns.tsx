@@ -20,13 +20,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -49,6 +42,7 @@ import { subDays } from "date-fns";
 import { DateRange } from "react-day-picker";
 import { useDataAvailability } from "@/hooks/useDataAvailability";
 import { DataAvailabilityIndicator } from "@/components/DataAvailabilityIndicator";
+import { CampaignLevelSelector, CampaignLevel } from "@/components/campaigns/CampaignLevelSelector";
 
 type DatePreset = '7D' | '14D' | '30D' | '90D' | 'custom';
 
@@ -84,7 +78,7 @@ const Campaigns = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [autoMode, setAutoMode] = useState(false);
-  const [viewLevel, setViewLevel] = useState<'campaigns' | 'ad-groups'>('campaigns');
+  const [viewLevel, setViewLevel] = useState<CampaignLevel>('campaigns');
   const [selectedCampaign, setSelectedCampaign] = useState<CampaignDetails | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState<DatePreset>('30D');
@@ -463,15 +457,6 @@ const Campaigns = () => {
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Select value={viewLevel} onValueChange={(value: any) => setViewLevel(value)}>
-                      <SelectTrigger className="w-40">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="campaigns">Campaigns</SelectItem>
-                        <SelectItem value="ad-groups">Ad Groups</SelectItem>
-                      </SelectContent>
-                    </Select>
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
@@ -483,6 +468,16 @@ const Campaigns = () => {
                     </div>
                   </div>
                 </div>
+                
+                {/* Campaign Level Selector Tabs */}
+                <CampaignLevelSelector
+                  value={viewLevel}
+                  onChange={setViewLevel}
+                  counts={{
+                    campaigns: campaigns.length,
+                  }}
+                />
+                
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-1">
                     {(['7D', '14D', '30D', '90D'] as DatePreset[]).map((preset) => (
