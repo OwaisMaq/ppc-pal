@@ -615,14 +615,26 @@ serve(async (req) => {
       for (const profile of validProfiles) {
         const expiresAt = new Date(Date.now() + (tokenData.expires_in * 1000))
         
-        console.log('Storing UK connection for profile:', profile.profileId)
+        // Get the marketplace from profile analysis
+        const detectedMarketplace = profile._analysis?.marketplace || 'US';
+        const marketplaceId = profile.countryCode || profile.country || detectedMarketplace;
+        
+        console.log(`[${timestamp}] Storing connection for profile:`, {
+          profileId: profile.profileId,
+          marketplace: detectedMarketplace,
+          marketplaceId: marketplaceId,
+          region: profile.region,
+          countryCode: profile.countryCode,
+          currency: profile.currencyCode,
+          endpoint: profile.advertisingApiEndpoint
+        });
         
         // Store connection data (without tokens)
         const connectionData = {
           user_id: user.id,
           profile_id: profile.profileId.toString(),
           profile_name: profile.accountInfo?.name || `Profile ${profile.profileId}`,
-          marketplace_id: 'GB',
+          marketplace_id: marketplaceId.toUpperCase(),
           token_expires_at: expiresAt.toISOString(),
           status: 'active' as const,
           advertising_api_endpoint: profile.advertisingApiEndpoint || 'https://advertising-api.amazon.com',
