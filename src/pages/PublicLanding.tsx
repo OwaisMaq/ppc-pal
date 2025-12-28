@@ -211,143 +211,174 @@ const PublicLanding = () => {
       </section>
 
       {/* Capabilities Section */}
-      <section id="features" className="py-20 lg:py-28 bg-muted/30">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <p className="text-sm font-medium text-muted-foreground mb-3">Capabilities</p>
+      <section id="features" className="py-20 lg:py-28 relative overflow-hidden">
+        {/* Section background with subtle pattern */}
+        <div className="absolute inset-0 bg-muted/40" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,hsl(var(--primary)/0.03),transparent_50%)]" />
+        
+        <div className="container mx-auto px-4 relative">
+          {/* Section header with badge */}
+          <div className="text-center mb-12 lg:mb-16">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 mb-4">
+              <span className="text-xs font-semibold text-primary uppercase tracking-wider">Capabilities</span>
+            </div>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold mb-4">
               What makes us different
             </h2>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+            <p className="text-muted-foreground text-base sm:text-lg max-w-2xl mx-auto">
               Real tools for real sellers who want real results.
             </p>
           </div>
           
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6 lg:gap-8">
             {/* Automation Card */}
-            <div className="space-y-4">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-2">Automation</p>
-                <h3 className="text-xl font-display font-semibold mb-2">
+            <div className="flex flex-col space-y-4">
+              <div className="flex-shrink-0">
+                <p className="text-xs font-medium text-primary mb-2 uppercase tracking-wide">Automation</p>
+                <h3 className="text-lg lg:text-xl font-display font-semibold mb-2">
                   Intelligent bid optimization that never sleeps
                 </h3>
                 <p className="text-sm text-muted-foreground mb-3">
                   Your bids adjust automatically based on performance data. No more manual tweaking at midnight.
                 </p>
               </div>
-              <AutomationPreview />
+              <div className="flex-1 min-h-0">
+                <AutomationPreview />
+              </div>
             </div>
             
             {/* Keywords Card */}
-            <div className="space-y-4">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-2">Keywords</p>
-                <h3 className="text-xl font-display font-semibold mb-2">
+            <div className="flex flex-col space-y-4">
+              <div className="flex-shrink-0">
+                <p className="text-xs font-medium text-primary mb-2 uppercase tracking-wide">Keywords</p>
+                <h3 className="text-lg lg:text-xl font-display font-semibold mb-2">
                   Smart keyword management
                 </h3>
                 <p className="text-sm text-muted-foreground mb-3">
                   Identify winners and eliminate losers before they drain your budget.
                 </p>
               </div>
-              <KeywordsPreview />
+              <div className="flex-1 min-h-0">
+                <KeywordsPreview />
+              </div>
             </div>
             
             {/* Analytics Card */}
-            <div className="space-y-4">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-2">Analytics</p>
-                <h3 className="text-xl font-display font-semibold mb-2">
+            <div className="flex flex-col space-y-4 sm:col-span-2 md:col-span-1">
+              <div className="flex-shrink-0">
+                <p className="text-xs font-medium text-primary mb-2 uppercase tracking-wide">Analytics</p>
+                <h3 className="text-lg lg:text-xl font-display font-semibold mb-2">
                   Clear performance insights
                 </h3>
                 <p className="text-sm text-muted-foreground mb-3">
                   See exactly where your money goes and what it brings back.
                 </p>
               </div>
-              <AnalyticsPreview />
+              <div className="flex-1 min-h-0">
+                <AnalyticsPreview />
+              </div>
             </div>
           </div>
         </div>
       </section>
 
       {/* Results Section */}
-      <section className="py-20 lg:py-28">
+      <section className="py-20 lg:py-28 relative border-t border-border">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <p className="text-sm font-medium text-muted-foreground mb-3">Results</p>
+          {/* Section header with badge */}
+          <div className="text-center mb-12 lg:mb-16">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-success/10 border border-success/20 mb-4">
+              <span className="text-xs font-semibold text-success uppercase tracking-wider">Results</span>
+            </div>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold mb-4">
               Why sellers choose PPC Pal
             </h2>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+            <p className="text-muted-foreground text-base sm:text-lg max-w-2xl mx-auto">
               The numbers speak for themselves when waste disappears.
             </p>
           </div>
           
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6 lg:gap-8">
             {/* Savings */}
-            <div className="space-y-4">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-2">Savings</p>
-                <h3 className="text-xl font-display font-semibold mb-2">
+            <div className="flex flex-col space-y-4">
+              <div className="flex-shrink-0">
+                <p className="text-xs font-medium text-success mb-2 uppercase tracking-wide">Savings</p>
+                <h3 className="text-lg lg:text-xl font-display font-semibold mb-2">
                   Cut ad spend without cutting sales
                 </h3>
                 <p className="text-sm text-muted-foreground">
                   Reduce wasted clicks and improve your cost per acquisition immediately.
                 </p>
               </div>
-              <SavingsPreview />
+              <div className="flex-1 min-h-0">
+                <SavingsPreview />
+              </div>
             </div>
             
-            {/* Returns - reuse Analytics for ROI view */}
-            <div className="space-y-4">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-2">Returns</p>
-                <h3 className="text-xl font-display font-semibold mb-2">
+            {/* Returns */}
+            <div className="flex flex-col space-y-4">
+              <div className="flex-shrink-0">
+                <p className="text-xs font-medium text-success mb-2 uppercase tracking-wide">Returns</p>
+                <h3 className="text-lg lg:text-xl font-display font-semibold mb-2">
                   Better ROI from day one
                 </h3>
                 <p className="text-sm text-muted-foreground">
                   Every dollar works harder when optimization runs continuously.
                 </p>
               </div>
-              <AnalyticsPreview />
+              <div className="flex-1 min-h-0">
+                <AnalyticsPreview />
+              </div>
             </div>
             
-            {/* Time - show automation working overnight */}
-            <div className="space-y-4">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-2">Time</p>
-                <h3 className="text-xl font-display font-semibold mb-2">
+            {/* Time */}
+            <div className="flex flex-col space-y-4 sm:col-span-2 md:col-span-1">
+              <div className="flex-shrink-0">
+                <p className="text-xs font-medium text-success mb-2 uppercase tracking-wide">Time</p>
+                <h3 className="text-lg lg:text-xl font-display font-semibold mb-2">
                   Get your hours back
                 </h3>
                 <p className="text-sm text-muted-foreground">
                   Stop managing campaigns manually and start managing your business.
                 </p>
               </div>
-              <OptimizePreview />
+              <div className="flex-1 min-h-0">
+                <OptimizePreview />
+              </div>
             </div>
           </div>
         </div>
       </section>
 
       {/* How It Works Section */}
-      <section className="py-20 lg:py-28 bg-muted/30">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <p className="text-sm font-medium text-muted-foreground mb-3">Process</p>
+      <section className="py-20 lg:py-28 relative overflow-hidden">
+        {/* Section background */}
+        <div className="absolute inset-0 bg-muted/40" />
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,hsl(var(--border)/0.3)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border)/0.3)_1px,transparent_1px)] bg-[size:4rem_4rem]" />
+        
+        <div className="container mx-auto px-4 relative">
+          {/* Section header with badge */}
+          <div className="text-center mb-12 lg:mb-16">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 mb-4">
+              <span className="text-xs font-semibold text-primary uppercase tracking-wider">Process</span>
+            </div>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold mb-4">
               How it works
             </h2>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+            <p className="text-muted-foreground text-base sm:text-lg max-w-2xl mx-auto">
               Three simple steps to smarter campaign management.
             </p>
           </div>
           
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6 lg:gap-8">
             {/* Connect */}
-            <div className="space-y-4">
-              <ConnectPreview />
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-2">Step 1: Connect</p>
-                <h3 className="text-xl font-display font-semibold mb-2">
+            <div className="flex flex-col space-y-4">
+              <div className="flex-1 min-h-0">
+                <ConnectPreview />
+              </div>
+              <div className="flex-shrink-0">
+                <p className="text-xs font-medium text-primary mb-2 uppercase tracking-wide">Step 1: Connect</p>
+                <h3 className="text-lg lg:text-xl font-display font-semibold mb-2">
                   Link your Amazon seller account
                 </h3>
                 <p className="text-sm text-muted-foreground">
@@ -357,11 +388,13 @@ const PublicLanding = () => {
             </div>
             
             {/* Analyze */}
-            <div className="space-y-4">
-              <AnalyzePreview />
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-2">Step 2: Analyze</p>
-                <h3 className="text-xl font-display font-semibold mb-2">
+            <div className="flex flex-col space-y-4">
+              <div className="flex-1 min-h-0">
+                <AnalyzePreview />
+              </div>
+              <div className="flex-shrink-0">
+                <p className="text-xs font-medium text-primary mb-2 uppercase tracking-wide">Step 2: Analyze</p>
+                <h3 className="text-lg lg:text-xl font-display font-semibold mb-2">
                   Watch the data flow in real time
                 </h3>
                 <p className="text-sm text-muted-foreground">
@@ -371,11 +404,13 @@ const PublicLanding = () => {
             </div>
             
             {/* Optimize */}
-            <div className="space-y-4">
-              <OptimizePreview />
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-2">Step 3: Optimize</p>
-                <h3 className="text-xl font-display font-semibold mb-2">
+            <div className="flex flex-col space-y-4 sm:col-span-2 md:col-span-1">
+              <div className="flex-1 min-h-0">
+                <OptimizePreview />
+              </div>
+              <div className="flex-shrink-0">
+                <p className="text-xs font-medium text-primary mb-2 uppercase tracking-wide">Step 3: Optimize</p>
+                <h3 className="text-lg lg:text-xl font-display font-semibold mb-2">
                   Let automation handle the heavy lifting
                 </h3>
                 <p className="text-sm text-muted-foreground">
@@ -388,18 +423,22 @@ const PublicLanding = () => {
       </section>
 
       {/* Testimonials Section */}
-      <section className="py-20 lg:py-28">
+      <section className="py-20 lg:py-28 relative border-t border-border">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
+          {/* Section header with badge */}
+          <div className="text-center mb-12 lg:mb-16">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-warning/10 border border-warning/20 mb-4">
+              <span className="text-xs font-semibold text-warning uppercase tracking-wider">Testimonials</span>
+            </div>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold mb-4">
               Real sellers
             </h2>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+            <p className="text-muted-foreground text-base sm:text-lg max-w-2xl mx-auto">
               Sellers trust PPC Pal with their budgets.
             </p>
           </div>
           
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6">
             {[
               {
                 stars: 4,
@@ -451,14 +490,20 @@ const PublicLanding = () => {
       </section>
 
       {/* Pricing Section */}
-      <section id="pricing" className="py-20 lg:py-28 bg-muted/30">
-        <div className="container mx-auto px-4">
+      <section id="pricing" className="py-20 lg:py-28 relative overflow-hidden">
+        {/* Section background */}
+        <div className="absolute inset-0 bg-muted/40" />
+        
+        <div className="container mx-auto px-4 relative">
+          {/* Section header with badge */}
           <div className="text-center mb-12">
-            <p className="text-sm font-medium text-muted-foreground mb-3">Plans</p>
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 mb-4">
+              <span className="text-xs font-semibold text-primary uppercase tracking-wider">Plans</span>
+            </div>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold mb-4">
               Simple pricing
             </h2>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto mb-8">
+            <p className="text-muted-foreground text-base sm:text-lg max-w-2xl mx-auto mb-8">
               Pick the plan that matches your operation.
             </p>
             
@@ -485,7 +530,7 @@ const PublicLanding = () => {
             </div>
           </div>
           
-          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
             {[
               {
                 name: "Starter",
@@ -555,34 +600,41 @@ const PublicLanding = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 lg:py-28">
+      <section className="py-20 lg:py-28 relative border-t border-border">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold mb-6">
             Ready to cut the waste?
           </h2>
-          <p className="text-muted-foreground text-lg mb-8">
+          <p className="text-muted-foreground text-base sm:text-lg mb-8">
             Start your free trial today. No credit card required.
           </p>
-          <div className="flex flex-wrap justify-center gap-4">
+          <div className="flex flex-col sm:flex-row justify-center gap-4">
             <Link to="/auth">
-              <Button size="lg">Try free</Button>
+              <Button size="lg" className="w-full sm:w-auto">Try free</Button>
             </Link>
             <Link to="/contact">
-              <Button variant="outline" size="lg">Schedule demo</Button>
+              <Button variant="outline" size="lg" className="w-full sm:w-auto">Schedule demo</Button>
             </Link>
           </div>
         </div>
       </section>
 
       {/* FAQ Section */}
-      <section id="faq" className="py-20 lg:py-28 bg-muted/30">
-        <div className="container mx-auto px-4">
-          <div className="mb-16">
-            <h2 className="text-3xl sm:text-4xl font-display font-bold mb-4">FAQ</h2>
+      <section id="faq" className="py-20 lg:py-28 relative overflow-hidden">
+        {/* Section background */}
+        <div className="absolute inset-0 bg-muted/40" />
+        
+        <div className="container mx-auto px-4 relative">
+          {/* Section header with badge */}
+          <div className="mb-12 lg:mb-16">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 mb-4">
+              <span className="text-xs font-semibold text-primary uppercase tracking-wider">FAQ</span>
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-display font-bold mb-4">Frequently Asked Questions</h2>
             <p className="text-muted-foreground">Answers to the questions sellers ask most.</p>
           </div>
           
-          <div className="grid md:grid-cols-3 gap-x-12 gap-y-10">
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-x-8 lg:gap-x-12 gap-y-8 lg:gap-y-10">
             {[
               {
                 q: "Does PPC Pal work with all Amazon categories?",
@@ -616,7 +668,7 @@ const PublicLanding = () => {
             ))}
           </div>
           
-          <div className="mt-16 pt-16 border-t border-border">
+          <div className="mt-12 lg:mt-16 pt-12 lg:pt-16 border-t border-border">
             <h3 className="text-2xl font-display font-bold mb-2">Need more help?</h3>
             <p className="text-muted-foreground mb-6">Our team is ready to answer anything else.</p>
             <Link to="/contact">
