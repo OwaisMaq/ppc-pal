@@ -42,7 +42,7 @@ const PublicLanding = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground md:snap-none snap-y snap-mandatory overflow-y-auto">
       {/* Navigation */}
       <header className="sticky top-0 z-50 w-full border-b border-border bg-background">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
@@ -80,7 +80,7 @@ const PublicLanding = () => {
       </header>
 
       {/* Hero Section */}
-      <section className="py-20 lg:py-28 overflow-hidden">
+      <section className="min-h-[calc(100dvh-4rem)] md:min-h-0 md:py-20 lg:py-28 py-8 overflow-hidden flex items-center snap-start">
         <div className="container mx-auto px-4">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
             <div className="space-y-8">
@@ -146,7 +146,7 @@ const PublicLanding = () => {
             </div>
             
             {/* Hero Image - Dashboard Preview with Floating Cards */}
-            <div className="relative">
+            <div className="relative scale-75 md:scale-100 origin-top">
               {/* Floating Metric Card - Top Right */}
               <div className="absolute -top-4 -right-4 lg:right-0 z-10 animate-fade-in" style={{ animationDelay: '0.3s' }}>
                 <div className="bg-background rounded-xl shadow-xl border border-border p-4 flex items-center gap-3">
@@ -189,7 +189,7 @@ const PublicLanding = () => {
       </section>
 
       {/* Trusted By Section */}
-      <section className="py-12 border-y border-border bg-muted/20">
+      <section className="min-h-[100dvh] md:min-h-0 md:py-12 py-8 border-y border-border bg-muted/20 flex items-center snap-start">
         <div className="container mx-auto px-4">
           <p className="text-center text-xs font-medium text-muted-foreground tracking-widest uppercase mb-8">
             Powering Top Brands Globally
@@ -214,7 +214,7 @@ const PublicLanding = () => {
       </section>
 
       {/* Capabilities Section */}
-      <section id="features" className="py-20 lg:py-28 relative overflow-hidden">
+      <section id="features" className="min-h-[100dvh] md:min-h-0 md:py-20 lg:py-28 py-12 relative overflow-hidden flex items-center snap-start">
         {/* Section background with subtle pattern */}
         <div className="absolute inset-0 bg-muted/40" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,hsl(var(--primary)/0.08),transparent)]" />
@@ -299,7 +299,7 @@ const PublicLanding = () => {
       </section>
 
       {/* Results Section */}
-      <section className="py-20 lg:py-28 relative border-t border-border">
+      <section className="min-h-[100dvh] md:min-h-0 md:py-20 lg:py-28 py-12 relative border-t border-border flex items-center snap-start">
         <div className="container mx-auto px-4">
           {/* Section header */}
           <div className="text-center mb-16 lg:mb-20">
@@ -383,7 +383,7 @@ const PublicLanding = () => {
       </section>
 
       {/* How It Works Section */}
-      <section className="py-20 lg:py-28 relative overflow-hidden">
+      <section className="min-h-[100dvh] md:min-h-0 md:py-20 lg:py-28 py-12 relative overflow-hidden flex items-center snap-start">
         {/* Section background */}
         <div className="absolute inset-0 bg-muted/40" />
         <div className="absolute inset-0 bg-[linear-gradient(to_right,hsl(var(--border)/0.3)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border)/0.3)_1px,transparent_1px)] bg-[size:4rem_4rem]" />
@@ -465,7 +465,7 @@ const PublicLanding = () => {
       </section>
 
       {/* Testimonials Section */}
-      <section className="py-20 lg:py-28 relative border-t border-border">
+      <section className="min-h-[100dvh] md:min-h-0 md:py-20 lg:py-28 py-12 relative border-t border-border flex items-center snap-start">
         <div className="container mx-auto px-4">
           {/* Section header */}
           <div className="text-center mb-16 lg:mb-20">
@@ -554,11 +554,11 @@ const PublicLanding = () => {
                   </div>
                 ))}
                 <div className="w-10 h-10 rounded-full bg-muted border-2 border-background flex items-center justify-center text-xs font-medium text-muted-foreground">
-                  +2k
+                  +{displayCount.replace('+', '')}
                 </div>
               </div>
               <div className="text-left">
-                <p className="text-sm font-medium text-foreground">2,000+ sellers</p>
+                <p className="text-sm font-medium text-foreground">{displayCount} sellers</p>
                 <p className="text-xs text-muted-foreground">trust PPC Pal with their budgets</p>
               </div>
             </div>
@@ -567,7 +567,7 @@ const PublicLanding = () => {
       </section>
 
       {/* Pricing Section */}
-      <section id="pricing" className="py-20 lg:py-28 relative overflow-hidden">
+      <section id="pricing" className="min-h-[100dvh] md:min-h-0 md:py-20 lg:py-28 py-12 relative overflow-hidden flex items-center snap-start">
         {/* Section background */}
         <div className="absolute inset-0 bg-muted/40" />
         
@@ -677,7 +677,7 @@ const PublicLanding = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 lg:py-28 relative border-t border-border">
+      <section className="min-h-[100dvh] md:min-h-0 md:py-20 lg:py-28 py-12 relative border-t border-border flex items-center snap-start">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold mb-6">
             Ready to cut the waste?
@@ -697,7 +697,7 @@ const PublicLanding = () => {
       </section>
 
       {/* FAQ Section */}
-      <section id="faq" className="py-20 lg:py-28 relative overflow-hidden">
+      <section id="faq" className="min-h-[100dvh] md:min-h-0 md:py-20 lg:py-28 py-12 relative overflow-hidden flex items-center snap-start">
         {/* Section background */}
         <div className="absolute inset-0 bg-muted/40" />
         
@@ -756,7 +756,7 @@ const PublicLanding = () => {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border py-12">
+      <footer className="border-t border-border py-12 snap-start">
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-3">
