@@ -5,40 +5,31 @@ import { Link } from "react-router-dom";
 
 const About = () => {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background text-foreground">
       {/* Header */}
-      <header className="bg-background/95 backdrop-blur-sm border-b border-border px-4 py-3 sticky top-0 z-50">
-        <div className="container mx-auto flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-3">
-            <img 
-              src="/ppcpal-logo.jpg" 
-              alt="PPC Pal" 
-              className="h-8 w-8 rounded-full object-cover"
-            />
-            <span className="text-xl font-semibold text-foreground">PPC Pal</span>
+      <header className="sticky top-0 z-50 w-full border-b border-border bg-background">
+        <div className="container mx-auto flex h-16 items-center justify-between px-4">
+          <Link to="/" className="flex items-center gap-2">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-foreground text-background">
+              <Bot className="h-5 w-5" />
+            </span>
+            <span className="font-display font-semibold text-lg">PPC Pal</span>
           </Link>
           
-          <nav className="hidden md:flex items-center gap-6">
-            <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">
-              Home
-            </Link>
-            <Link to="/company" className="text-muted-foreground hover:text-foreground transition-colors">
-              Company
-            </Link>
-            <Link to="/contact" className="text-muted-foreground hover:text-foreground transition-colors">
-              Contact
-            </Link>
-            <Link to="/auth">
-              <Button>Sign In</Button>
-            </Link>
+          <nav className="hidden md:flex items-center gap-8 text-sm font-medium">
+            <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">Home</Link>
+            <Link to="/company" className="text-muted-foreground hover:text-foreground transition-colors">Company</Link>
+            <Link to="/contact" className="text-muted-foreground hover:text-foreground transition-colors">Contact</Link>
           </nav>
           
-          <Link to="/" className="md:hidden">
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link to="/auth" className="hidden md:block">
+              <Button variant="outline">Sign in</Button>
+            </Link>
+            <Link to="/auth">
+              <Button>Start free</Button>
+            </Link>
+          </div>
         </div>
       </header>
 
