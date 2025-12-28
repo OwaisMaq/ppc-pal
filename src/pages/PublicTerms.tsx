@@ -66,8 +66,8 @@ export default function PublicTerms() {
             <h2 className="text-xl font-semibold mb-3">Contact</h2>
             <p className="text-muted-foreground leading-relaxed">
               For questions about these terms, contact us at{" "}
-              <a href="mailto:legal@ppcpal.co.uk" className="text-primary hover:underline">
-                legal@ppcpal.co.uk
+              <a href="mailto:info@ppcpal.online" className="text-primary hover:underline">
+                info@ppcpal.online
               </a>
             </p>
           </section>
