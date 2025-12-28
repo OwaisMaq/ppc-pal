@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useUserCount, formatUserCount } from "@/hooks/useUserCount";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { 
@@ -32,7 +33,9 @@ import {
 
 const PublicLanding = () => {
   const { user } = useAuth();
+  const { data: userCount } = useUserCount();
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+  const displayCount = formatUserCount(userCount || 0);
 
   useEffect(() => {
     document.title = "PPC Pal — Stop Wasting Money on Amazon Ads";
@@ -133,11 +136,11 @@ const PublicLanding = () => {
                     </div>
                   ))}
                   <div className="w-10 h-10 rounded-full bg-muted border-2 border-background flex items-center justify-center text-xs font-medium text-muted-foreground">
-                    +2k
+                    +{displayCount.replace('+', '')}
                   </div>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Trusted by <span className="font-semibold text-foreground">2,000+</span> sellers
+                  Trusted by <span className="font-semibold text-foreground">{displayCount}</span> sellers
                 </p>
               </div>
             </div>
