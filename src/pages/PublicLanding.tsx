@@ -90,8 +90,10 @@ const PublicLanding = () => {
             <div className="space-y-4 md:space-y-6">
               {/* Trust Badges Row */}
               <div className="flex flex-wrap items-center gap-2 animate-fade-in">
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-amber-100 dark:bg-amber-900/30 rounded-full text-xs md:text-sm font-medium text-amber-800 dark:text-amber-200">
+                  <span>👋</span> Bye-bye, messy spreadsheets
+                </div>
                 <AmazonPartnerBadge />
-                <ManagedSpendBadge amount="$2M+" />
               </div>
               
               <h1 className="text-3xl sm:text-5xl lg:text-6xl font-display font-bold tracking-tight leading-[1.1]">
@@ -263,11 +265,11 @@ const PublicLanding = () => {
             <div>
               <p className="text-xs font-semibold text-primary uppercase tracking-[0.2em] mb-3">Real-Time Optimization</p>
               <h2 className="text-2xl lg:text-3xl font-display font-bold mb-4">
-                Watch AI work for you
+                Automation that never sleeps
               </h2>
               <p className="text-muted-foreground mb-6">
-                Every second, our AI scans your campaigns and makes intelligent decisions. 
-                No manual work required — just results.
+                Our rule-based engine scans your campaigns around the clock, making data-driven 
+                adjustments to bids, budgets, and keywords. No guesswork — just proven optimization logic.
               </p>
               <Link to="/auth">
                 <Button className="gap-2">

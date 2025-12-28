@@ -101,7 +101,7 @@ const LiveAutomationFeed = () => {
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
           <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
         </span>
-        <span className="text-xs font-medium text-muted-foreground">Live AI Actions</span>
+        <span className="text-xs font-medium text-muted-foreground">Live Optimizations</span>
         <span className="ml-auto text-[10px] text-muted-foreground/70">Updated in real-time</span>
       </div>
       <div className={cn(
