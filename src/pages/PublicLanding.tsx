@@ -14,7 +14,8 @@ import {
   Briefcase,
   User,
   TrendingUp,
-  Sparkles
+  Sparkles,
+  Crown
 } from "lucide-react";
 import { track } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
@@ -30,6 +31,9 @@ import {
   AnalyzePreview,
   OptimizePreview
 } from "@/components/landing";
+import TrustBadges, { AmazonPartnerBadge, LiveStatsBadge, ManagedSpendBadge } from "@/components/landing/TrustBadges";
+import LiveAutomationFeed from "@/components/landing/LiveAutomationFeed";
+import ROICalculator from "@/components/landing/ROICalculator";
 
 const PublicLanding = () => {
   const { user } = useAuth();
@@ -83,10 +87,11 @@ const PublicLanding = () => {
       <section className="h-[calc(100dvh-4rem)] md:h-auto md:min-h-0 md:py-20 lg:py-28 py-8 overflow-hidden flex items-center snap-start">
         <div className="container mx-auto px-4">
           <div className="grid lg:grid-cols-2 gap-6 lg:gap-16 items-center">
-            <div className="space-y-4 md:space-y-8">
-              {/* Playful Badge */}
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-amber-100 dark:bg-amber-900/30 rounded-full text-xs md:text-sm font-medium text-amber-800 dark:text-amber-200 animate-fade-in">
-                <span>👋</span> Bye-bye, messy spreadsheets
+            <div className="space-y-4 md:space-y-6">
+              {/* Trust Badges Row */}
+              <div className="flex flex-wrap items-center gap-2 animate-fade-in">
+                <AmazonPartnerBadge />
+                <ManagedSpendBadge amount="$2M+" />
               </div>
               
               <h1 className="text-3xl sm:text-5xl lg:text-6xl font-display font-bold tracking-tight leading-[1.1]">
@@ -105,8 +110,11 @@ const PublicLanding = () => {
               
               <div className="flex flex-wrap items-center gap-3 md:gap-4">
                 <Link to="/auth">
-                  <Button size="lg" className="gap-2 rounded-full px-6 md:px-8 shadow-lg hover:shadow-xl transition-shadow text-sm md:text-base">
-                    Start Free Trial <ArrowRight className="h-4 w-4" />
+                  <Button size="lg" className="gap-2 rounded-full px-6 md:px-8 shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] text-sm md:text-base group relative overflow-hidden">
+                    <span className="relative z-10 flex items-center gap-2">
+                      Start Free Trial <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                    </span>
+                    <span className="absolute inset-0 bg-gradient-to-r from-primary via-primary/90 to-primary opacity-0 group-hover:opacity-100 transition-opacity" />
                   </Button>
                 </Link>
                 <a href="#features" className="group hidden sm:block">
@@ -121,8 +129,13 @@ const PublicLanding = () => {
                 </a>
               </div>
               
+              {/* Risk Reduction Badges */}
+              <div className="pt-2">
+                <TrustBadges variant="compact" />
+              </div>
+              
               {/* Social Proof */}
-              <div className="flex items-center gap-3 md:gap-4 pt-2 md:pt-4">
+              <div className="flex items-center gap-3 md:gap-4 pt-2">
                 <div className="flex -space-x-2">
                   {[
                     "bg-blue-500", "bg-emerald-500", "bg-purple-500", "bg-amber-500"
@@ -208,26 +221,61 @@ const PublicLanding = () => {
       </section>
 
       {/* Trusted By Section - Desktop only */}
-      <section className="hidden md:flex md:py-12 border-y border-border bg-muted/20 items-center">
+      <section className="hidden md:block md:py-12 border-y border-border bg-muted/20">
         <div className="container mx-auto px-4">
-          <p className="text-center text-xs font-medium text-muted-foreground tracking-widest uppercase mb-8">
-            Powering Top Brands Globally
-          </p>
-          <div className="flex items-center justify-center gap-16 md:gap-24">
-            <div className="flex items-center justify-center h-16">
-              <img 
-                src={infiniteWorldLogo} 
-                alt="Infinite World" 
-                className="h-12 md:h-16 w-auto object-contain opacity-80 hover:opacity-100 transition-opacity duration-200"
-              />
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
+            {/* Left: Brand logos */}
+            <div className="flex-1">
+              <p className="text-xs font-medium text-muted-foreground tracking-widest uppercase mb-6 lg:mb-0 lg:hidden text-center">
+                Powering Top Brands Globally
+              </p>
+              <div className="flex items-center justify-center lg:justify-start gap-12">
+                <p className="hidden lg:block text-xs font-medium text-muted-foreground tracking-widest uppercase">
+                  Trusted By
+                </p>
+                <div className="flex items-center gap-10">
+                  <img 
+                    src={infiniteWorldLogo} 
+                    alt="Infinite World" 
+                    className="h-12 w-auto object-contain opacity-80 hover:opacity-100 transition-opacity"
+                  />
+                  <img 
+                    src={wishAndWillowLogo} 
+                    alt="Wish & Willow" 
+                    className="h-12 w-auto object-contain opacity-80 hover:opacity-100 transition-opacity"
+                  />
+                </div>
+              </div>
             </div>
-            <div className="flex items-center justify-center h-16">
-              <img 
-                src={wishAndWillowLogo} 
-                alt="Wish & Willow" 
-                className="h-12 md:h-16 w-auto object-contain opacity-80 hover:opacity-100 transition-opacity duration-200"
-              />
+            
+            {/* Right: Live Stats */}
+            <div className="flex items-center gap-4">
+              <LiveStatsBadge actionsToday={1247} />
             </div>
+          </div>
+        </div>
+      </section>
+      
+      {/* Live Automation Feed Section */}
+      <section className="hidden md:block py-12 bg-muted/30">
+        <div className="container mx-auto px-4">
+          <div className="grid lg:grid-cols-2 gap-8 items-center">
+            <div>
+              <p className="text-xs font-semibold text-primary uppercase tracking-[0.2em] mb-3">Real-Time Optimization</p>
+              <h2 className="text-2xl lg:text-3xl font-display font-bold mb-4">
+                Watch AI work for you
+              </h2>
+              <p className="text-muted-foreground mb-6">
+                Every second, our AI scans your campaigns and makes intelligent decisions. 
+                No manual work required — just results.
+              </p>
+              <Link to="/auth">
+                <Button className="gap-2">
+                  See it in action <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+            <LiveAutomationFeed />
           </div>
         </div>
       </section>
@@ -575,33 +623,43 @@ const PublicLanding = () => {
                 stars: 5,
                 quote: "I used to spend Sunday nights tweaking bids. Now I spend them with my kids. Same revenue, 10x better life.",
                 name: "Marcus Chen",
-                role: "6-figure electronics seller",
+                role: "Electronics Brand Owner",
+                company: "TechFlow Products",
                 metric: "10x",
-                metricLabel: "better life"
+                metricLabel: "better life",
+                beforeAfter: "20h → 2h/week",
+                avatarColor: "bg-blue-500"
               },
               {
                 stars: 5,
                 quote: "Cut my ACoS from 42% to 18% in three weeks. My CFO asked what changed. I just smiled.",
                 name: "Sarah Williams",
-                role: "Home goods brand owner",
+                role: "CEO & Founder",
+                company: "HomeNest Co.",
                 metric: "42%→18%",
-                metricLabel: "ACoS"
+                metricLabel: "ACoS",
+                beforeAfter: "-24% ACoS",
+                avatarColor: "bg-emerald-500"
               },
               {
                 stars: 5,
                 quote: "Finally, a PPC tool that doesn't require a PhD to use. Connected in 3 minutes, saw savings in 3 days.",
                 name: "James Rodriguez",
-                role: "Supplements entrepreneur",
+                role: "Supplements Entrepreneur",
+                company: "VitaPure Labs",
                 metric: "3 min",
-                metricLabel: "setup"
+                metricLabel: "setup",
+                beforeAfter: "$2.4K saved/mo",
+                avatarColor: "bg-purple-500"
               }
             ].map((testimonial, i) => (
               <Card key={i} className="group relative p-6 lg:p-8 hover:shadow-lg transition-all duration-300 overflow-hidden">
-                {/* Metric highlight */}
+                {/* Before/After Badge */}
                 <div className="absolute top-4 right-4">
-                  <div className="text-right">
-                    <p className="text-2xl font-display font-bold text-primary">{testimonial.metric}</p>
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{testimonial.metricLabel}</p>
+                  <div className="px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                    <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                      {testimonial.beforeAfter}
+                    </span>
                   </div>
                 </div>
                 
@@ -620,12 +678,16 @@ const PublicLanding = () => {
                   "{testimonial.quote}"
                 </blockquote>
                 <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-full bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center">
-                    <span className="text-lg font-semibold text-muted-foreground">{testimonial.name.charAt(0)}</span>
+                  <div className={cn(
+                    "h-12 w-12 rounded-full flex items-center justify-center text-white font-semibold",
+                    testimonial.avatarColor
+                  )}>
+                    {testimonial.name.charAt(0)}
                   </div>
                   <div>
                     <p className="font-semibold text-sm">{testimonial.name}</p>
                     <p className="text-xs text-muted-foreground">{testimonial.role}</p>
+                    <p className="text-[10px] text-primary font-medium">{testimonial.company}</p>
                   </div>
                 </div>
               </Card>
@@ -698,71 +760,97 @@ const PublicLanding = () => {
             </div>
           </div>
           
-          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            {[
-              {
-                name: "Starter",
-                price: billingCycle === 'monthly' ? 19 : 15,
-                icon: ArrowRight,
-                features: [
-                  "Automated bid optimization",
-                  "Up to five campaigns",
-                  "Daily performance reports"
-                ]
-              },
-              {
-                name: "Professional",
-                price: billingCycle === 'monthly' ? 49 : 39,
-                icon: User,
-                features: [
-                  "Unlimited campaign management",
-                  "Advanced keyword analysis",
-                  "Real-time bid adjustments",
-                  "Priority email support"
-                ]
-              },
-              {
-                name: "Enterprise",
-                price: billingCycle === 'monthly' ? 99 : 79,
-                icon: Briefcase,
-                features: [
-                  "White-label dashboard access",
-                  "Custom integration support",
-                  "Dedicated account manager",
-                  "API access included",
-                  "Phone and email support"
-                ]
-              }
-            ].map((plan, i) => (
-              <Card key={i} className="p-6 flex flex-col">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-display font-semibold">{plan.name}</h3>
-                  <plan.icon className="h-5 w-5 text-muted-foreground" />
-                </div>
-                <div className="mb-6">
-                  <span className="text-4xl font-display font-bold">${plan.price}</span>
-                  <span className="text-muted-foreground text-sm">/{billingCycle === 'monthly' ? 'mo' : 'mo'}</span>
-                </div>
-                <div className="mb-6">
-                  <p className="text-xs font-medium text-muted-foreground mb-3">Includes</p>
-                  <ul className="space-y-3">
-                    {plan.features.map((feature, j) => (
-                      <li key={j} className="flex items-start gap-2 text-sm">
-                        <Check className="h-4 w-4 text-foreground flex-shrink-0 mt-0.5" />
-                        <span>{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <div className="mt-auto">
-                  <Link to="/auth">
-                    <Button className="w-full" variant={i === 1 ? "default" : "outline"}>
-                      Start free
-                    </Button>
-                  </Link>
-                </div>
-              </Card>
-            ))}
+          <div className="grid md:grid-cols-4 gap-6 max-w-6xl mx-auto">
+            {/* ROI Calculator */}
+            <div className="md:col-span-1 order-last md:order-first">
+              <ROICalculator />
+            </div>
+            
+            {/* Pricing Cards */}
+            <div className="md:col-span-3 grid sm:grid-cols-2 md:grid-cols-3 gap-6">
+              {[
+                {
+                  name: "Starter",
+                  price: billingCycle === 'monthly' ? 19 : 15,
+                  icon: ArrowRight,
+                  popular: false,
+                  features: [
+                    "Automated bid optimization",
+                    "Up to five campaigns",
+                    "Daily performance reports"
+                  ]
+                },
+                {
+                  name: "Professional",
+                  price: billingCycle === 'monthly' ? 49 : 39,
+                  icon: User,
+                  popular: true,
+                  features: [
+                    "Unlimited campaign management",
+                    "Advanced keyword analysis",
+                    "Real-time bid adjustments",
+                    "Priority email support"
+                  ]
+                },
+                {
+                  name: "Enterprise",
+                  price: billingCycle === 'monthly' ? 99 : 79,
+                  icon: Briefcase,
+                  popular: false,
+                  features: [
+                    "White-label dashboard access",
+                    "Custom integration support",
+                    "Dedicated account manager",
+                    "API access included",
+                    "Phone and email support"
+                  ]
+                }
+              ].map((plan, i) => (
+                <Card key={i} className={cn(
+                  "p-6 flex flex-col relative",
+                  plan.popular && "border-primary shadow-lg ring-1 ring-primary/20"
+                )}>
+                  {/* Most Popular Badge */}
+                  {plan.popular && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary text-primary-foreground text-xs font-semibold">
+                        <Crown className="h-3 w-3" /> Most Popular
+                      </span>
+                    </div>
+                  )}
+                  
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-display font-semibold">{plan.name}</h3>
+                    <plan.icon className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                  <div className="mb-6">
+                    <span className="text-4xl font-display font-bold">${plan.price}</span>
+                    <span className="text-muted-foreground text-sm">/{billingCycle === 'monthly' ? 'mo' : 'mo'}</span>
+                    {billingCycle === 'yearly' && (
+                      <p className="text-xs text-emerald-600 font-medium mt-1">Save 20%</p>
+                    )}
+                  </div>
+                  <div className="mb-6">
+                    <p className="text-xs font-medium text-muted-foreground mb-3">Includes</p>
+                    <ul className="space-y-3">
+                      {plan.features.map((feature, j) => (
+                        <li key={j} className="flex items-start gap-2 text-sm">
+                          <Check className="h-4 w-4 text-foreground flex-shrink-0 mt-0.5" />
+                          <span>{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="mt-auto">
+                    <Link to="/auth">
+                      <Button className="w-full" variant={plan.popular ? "default" : "outline"}>
+                        Start free
+                      </Button>
+                    </Link>
+                  </div>
+                </Card>
+              ))}
+            </div>
           </div>
         </div>
       </section>
