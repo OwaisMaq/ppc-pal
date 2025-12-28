@@ -5,40 +5,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// AES-GCM helpers for token encryption
-const textEncoder = new TextEncoder();
-const textDecoder = new TextDecoder();
-
-function toBase64(bytes: Uint8Array): string {
-  let binary = '';
-  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
-  return btoa(binary);
-}
-
-function fromBase64(str: string): Uint8Array {
-  const binary = atob(str);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
-}
-
-async function getKey() {
-  const secret = Deno.env.get('ENCRYPTION_KEY') || '';
-  const hash = await crypto.subtle.digest('SHA-256', textEncoder.encode(secret));
-  return crypto.subtle.importKey('raw', hash, 'AES-GCM', false, ['encrypt', 'decrypt']);
-}
-
-async function decryptText(enc: string): Promise<string> {
-  try {
-    if (!enc || !enc.includes(':')) return enc;
-    const [ivB64, dataB64] = enc.split(':');
-    const iv = fromBase64(ivB64);
-    const key = await getKey();
-    const buf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, fromBase64(dataB64));
-    return textDecoder.decode(buf);
-  } catch { return enc; }
-}
-
 // Get region endpoint from marketplace
 function getApiEndpoint(marketplaceId: string | null): string {
   const naMarketplaces = ['ATVPDKIKX0DER', 'A2EUQ1WTGCTBG2', 'A1AM78C64UM0Y8'];
@@ -246,9 +212,17 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const encryptionKey = Deno.env.get('ENCRYPTION_KEY');
 
   if (!supabaseUrl || !supabaseServiceKey) {
     return new Response(JSON.stringify({ error: 'Missing Supabase config' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  if (!encryptionKey) {
+    return new Response(JSON.stringify({ error: 'Missing ENCRYPTION_KEY' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
@@ -287,16 +261,25 @@ Deno.serve(async (req) => {
       try {
         console.log(`\n📌 Syncing search terms for profile ${connection.profile_id}`);
 
-        // Decrypt access token
-        const accessToken = await decryptText(connection.access_token_encrypted || '');
-        if (!accessToken) {
-          console.error(`No access token for profile ${connection.profile_id}`);
+        // Get decrypted access token using RPC function (same as refresh-amazon-token)
+        const { data: tokensArray, error: tokenError } = await supabase
+          .rpc('get_tokens_with_key', {
+            p_profile_id: connection.profile_id,
+            p_encryption_key: encryptionKey
+          });
+
+        if (tokenError || !tokensArray?.[0]?.access_token) {
+          console.error(`Failed to get tokens for profile ${connection.profile_id}:`, tokenError);
           errors.push(`No token for ${connection.profile_id}`);
           continue;
         }
 
-        const apiEndpoint = getApiEndpoint(connection.marketplace_id);
-        console.log(`🌍 Using API endpoint: ${apiEndpoint}`);
+        const accessToken = tokensArray[0].access_token;
+        console.log(`✅ Retrieved access token for profile ${connection.profile_id}`);
+
+        // Use stored endpoint from connection, fallback to marketplace detection
+        const apiEndpoint = connection.advertising_api_endpoint || getApiEndpoint(connection.marketplace_id);
+        console.log(`🌍 Using API endpoint: ${apiEndpoint} (marketplace: ${connection.marketplace_id})`);
 
         // Create and poll search term report
         const reportId = await createSearchTermReport(accessToken, connection.profile_id, dateRange, apiEndpoint);
