@@ -230,51 +230,51 @@ const PublicLanding = () => {
             </p>
           </div>
           
-          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6 lg:gap-8">
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6 lg:gap-8 items-start">
             {/* Automation Card */}
-            <div className="flex flex-col space-y-4">
-              <div className="flex-shrink-0">
+            <div className="flex flex-col h-full">
+              <div className="min-h-[120px] md:min-h-[140px] mb-4">
                 <p className="text-xs font-medium text-primary mb-2 uppercase tracking-wide">Automation</p>
                 <h3 className="text-lg lg:text-xl font-display font-semibold mb-2">
                   Intelligent bid optimization that never sleeps
                 </h3>
-                <p className="text-sm text-muted-foreground mb-3">
+                <p className="text-sm text-muted-foreground">
                   Your bids adjust automatically based on performance data. No more manual tweaking at midnight.
                 </p>
               </div>
-              <div className="flex-1 min-h-0">
+              <div className="flex-1">
                 <AutomationPreview />
               </div>
             </div>
             
             {/* Keywords Card */}
-            <div className="flex flex-col space-y-4">
-              <div className="flex-shrink-0">
+            <div className="flex flex-col h-full">
+              <div className="min-h-[120px] md:min-h-[140px] mb-4">
                 <p className="text-xs font-medium text-primary mb-2 uppercase tracking-wide">Keywords</p>
                 <h3 className="text-lg lg:text-xl font-display font-semibold mb-2">
                   Smart keyword management
                 </h3>
-                <p className="text-sm text-muted-foreground mb-3">
+                <p className="text-sm text-muted-foreground">
                   Identify winners and eliminate losers before they drain your budget.
                 </p>
               </div>
-              <div className="flex-1 min-h-0">
+              <div className="flex-1">
                 <KeywordsPreview />
               </div>
             </div>
             
             {/* Analytics Card */}
-            <div className="flex flex-col space-y-4 sm:col-span-2 md:col-span-1">
-              <div className="flex-shrink-0">
+            <div className="flex flex-col h-full sm:col-span-2 md:col-span-1">
+              <div className="min-h-[120px] md:min-h-[140px] mb-4">
                 <p className="text-xs font-medium text-primary mb-2 uppercase tracking-wide">Analytics</p>
                 <h3 className="text-lg lg:text-xl font-display font-semibold mb-2">
                   Clear performance insights
                 </h3>
-                <p className="text-sm text-muted-foreground mb-3">
+                <p className="text-sm text-muted-foreground">
                   See exactly where your money goes and what it brings back.
                 </p>
               </div>
-              <div className="flex-1 min-h-0">
+              <div className="flex-1">
                 <AnalyticsPreview />
               </div>
             </div>
@@ -298,10 +298,10 @@ const PublicLanding = () => {
             </p>
           </div>
           
-          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6 lg:gap-8">
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6 lg:gap-8 items-start">
             {/* Savings */}
-            <div className="flex flex-col space-y-4">
-              <div className="flex-shrink-0">
+            <div className="flex flex-col h-full">
+              <div className="min-h-[100px] md:min-h-[120px] mb-4">
                 <p className="text-xs font-medium text-success mb-2 uppercase tracking-wide">Savings</p>
                 <h3 className="text-lg lg:text-xl font-display font-semibold mb-2">
                   Cut ad spend without cutting sales
@@ -310,14 +310,14 @@ const PublicLanding = () => {
                   Reduce wasted clicks and improve your cost per acquisition immediately.
                 </p>
               </div>
-              <div className="flex-1 min-h-0">
+              <div className="flex-1">
                 <SavingsPreview />
               </div>
             </div>
             
             {/* Returns */}
-            <div className="flex flex-col space-y-4">
-              <div className="flex-shrink-0">
+            <div className="flex flex-col h-full">
+              <div className="min-h-[100px] md:min-h-[120px] mb-4">
                 <p className="text-xs font-medium text-success mb-2 uppercase tracking-wide">Returns</p>
                 <h3 className="text-lg lg:text-xl font-display font-semibold mb-2">
                   Better ROI from day one
@@ -326,14 +326,14 @@ const PublicLanding = () => {
                   Every dollar works harder when optimization runs continuously.
                 </p>
               </div>
-              <div className="flex-1 min-h-0">
+              <div className="flex-1">
                 <AnalyticsPreview />
               </div>
             </div>
             
             {/* Time */}
-            <div className="flex flex-col space-y-4 sm:col-span-2 md:col-span-1">
-              <div className="flex-shrink-0">
+            <div className="flex flex-col h-full sm:col-span-2 md:col-span-1">
+              <div className="min-h-[100px] md:min-h-[120px] mb-4">
                 <p className="text-xs font-medium text-success mb-2 uppercase tracking-wide">Time</p>
                 <h3 className="text-lg lg:text-xl font-display font-semibold mb-2">
                   Get your hours back
@@ -342,7 +342,7 @@ const PublicLanding = () => {
                   Stop managing campaigns manually and start managing your business.
                 </p>
               </div>
-              <div className="flex-1 min-h-0">
+              <div className="flex-1">
                 <OptimizePreview />
               </div>
             </div>
