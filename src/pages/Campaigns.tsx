@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
   TableBody,
@@ -14,9 +15,22 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useSearchStudio, BulkKeywordPromotion } from "@/hooks/useSearchStudio";
 import { 
   Search, 
   Play, 
@@ -27,7 +41,11 @@ import {
   Sparkles,
   Briefcase,
   Layers,
-  Tags
+  Tags,
+  Sprout,
+  Check,
+  X,
+  Loader2
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
@@ -40,6 +58,7 @@ import { DataAvailabilityIndicator } from "@/components/DataAvailabilityIndicato
 import { CampaignLevelSelector, CampaignLevel } from "@/components/campaigns/CampaignLevelSelector";
 
 type DatePreset = '7D' | '14D' | '30D' | '90D' | 'custom';
+type MatchType = 'exact' | 'phrase';
 
 interface Campaign {
   campaign_id: string;
@@ -94,11 +113,15 @@ interface SearchTerm {
   search_term: string;
   keyword_text: string;
   campaign_name: string;
+  campaign_id: string;
+  ad_group_id: string;
+  profile_id: string;
   impressions: number;
   clicks: number;
   spend: number;
   sales: number;
   acos: number;
+  conversions: number;
 }
 
 interface Portfolio {
@@ -114,6 +137,7 @@ interface Portfolio {
 const Campaigns = () => {
   const { user } = useAuth();
   const { connections } = useAmazonConnections();
+  const { bulkPromoteKeywords, loading: harvestLoading } = useSearchStudio();
   
   // Main data states
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -130,6 +154,11 @@ const Campaigns = () => {
     targets: 0,
     searchTerms: 0,
   });
+  
+  // Harvest selection state
+  const [selectedTerms, setSelectedTerms] = useState<Set<string>>(new Set());
+  const [bulkMatchType, setBulkMatchType] = useState<MatchType>('exact');
+  const [harvestingTermId, setHarvestingTermId] = useState<string | null>(null);
   
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -415,18 +444,24 @@ const Campaigns = () => {
     if (error) throw error;
 
     const searchTermsData: SearchTerm[] = (data || []).map((st: any) => ({
-      id: st.id || `${st.search_term}-${st.campaign_id}`,
+      id: st.id || `${st.search_term}-${st.campaign_id}-${st.ad_group_id}`,
       search_term: st.search_term || 'N/A',
       keyword_text: st.keyword_text || 'N/A',
       campaign_name: st.campaign_name || 'Unknown Campaign',
+      campaign_id: st.campaign_id || '',
+      ad_group_id: st.ad_group_id || '',
+      profile_id: st.profile_id || profileId,
       impressions: st.impressions || 0,
       clicks: st.clicks || 0,
       spend: st.spend || 0,
       sales: st.sales || 0,
       acos: st.acos || (st.spend && st.sales ? (st.spend / st.sales) * 100 : 0),
+      conversions: st.conversions || st.conv_14d || Math.floor((st.sales || 0) / 25),
     }));
 
     setSearchTerms(searchTermsData);
+    // Clear selection when data changes
+    setSelectedTerms(new Set());
   };
 
   // Filter functions
@@ -466,6 +501,88 @@ const Campaigns = () => {
     adGroups: tabCounts.adGroups || adGroups.length,
     targets: tabCounts.targets || keywords.length,
     searchTerms: tabCounts.searchTerms || searchTerms.length,
+  };
+
+  // Check if a search term is a high performer (good for harvesting)
+  const isHighPerformer = (st: SearchTerm): boolean => {
+    return st.conversions >= 1 && st.acos < 40;
+  };
+
+  // Toggle selection for a single term
+  const toggleTermSelection = (termId: string) => {
+    setSelectedTerms(prev => {
+      const next = new Set(prev);
+      if (next.has(termId)) {
+        next.delete(termId);
+      } else {
+        next.add(termId);
+      }
+      return next;
+    });
+  };
+
+  // Toggle select all filtered terms
+  const toggleSelectAll = () => {
+    if (selectedTerms.size === filteredSearchTerms.length) {
+      setSelectedTerms(new Set());
+    } else {
+      setSelectedTerms(new Set(filteredSearchTerms.map(st => st.id)));
+    }
+  };
+
+  // Harvest a single search term
+  const handleHarvestSingle = async (term: SearchTerm, matchType: MatchType) => {
+    if (!term.campaign_id || !term.ad_group_id) {
+      toast.error('Missing campaign or ad group information');
+      return;
+    }
+    
+    setHarvestingTermId(term.id);
+    
+    try {
+      const promotion: BulkKeywordPromotion = {
+        profileId: term.profile_id,
+        campaignId: term.campaign_id,
+        adGroupId: term.ad_group_id,
+        searchTerm: term.search_term,
+        matchType,
+      };
+      
+      await bulkPromoteKeywords([promotion]);
+      toast.success(`"${term.search_term}" queued as ${matchType} keyword`);
+    } catch (err) {
+      // Error already handled by the hook
+    } finally {
+      setHarvestingTermId(null);
+    }
+  };
+
+  // Harvest multiple selected search terms
+  const handleBulkHarvest = async () => {
+    const selectedList = filteredSearchTerms.filter(st => selectedTerms.has(st.id));
+    
+    // Filter out terms without proper IDs
+    const validTerms = selectedList.filter(st => st.campaign_id && st.ad_group_id);
+    
+    if (validTerms.length === 0) {
+      toast.error('Selected terms are missing campaign/ad group data');
+      return;
+    }
+    
+    const promotions: BulkKeywordPromotion[] = validTerms.map(st => ({
+      profileId: st.profile_id,
+      campaignId: st.campaign_id,
+      adGroupId: st.ad_group_id,
+      searchTerm: st.search_term,
+      matchType: bulkMatchType,
+    }));
+    
+    try {
+      await bulkPromoteKeywords(promotions);
+      setSelectedTerms(new Set());
+    } catch (err) {
+      // Error already handled by the hook
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -663,41 +780,161 @@ const Campaigns = () => {
           );
         }
         return (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Search Term</TableHead>
-                <TableHead>Matched Keyword</TableHead>
-                <TableHead>Campaign</TableHead>
-                <TableHead className="text-right">Impressions</TableHead>
-                <TableHead className="text-right">Clicks</TableHead>
-                <TableHead className="text-right">Spend</TableHead>
-                <TableHead className="text-right">ACOS</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredSearchTerms.map((st) => (
-                <TableRow key={st.id}>
-                  <TableCell className="font-medium">{st.search_term}</TableCell>
-                  <TableCell className="text-muted-foreground text-sm">{st.keyword_text}</TableCell>
-                  <TableCell className="text-muted-foreground text-sm">{st.campaign_name}</TableCell>
-                  <TableCell className="text-right">{formatNumber(st.impressions)}</TableCell>
-                  <TableCell className="text-right">{formatNumber(st.clicks)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(st.spend)}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      {st.acos > 30 ? (
-                        <TrendingUp className="h-3 w-3 text-destructive" />
-                      ) : (
-                        <TrendingDown className="h-3 w-3 text-success" />
-                      )}
-                      {st.acos?.toFixed(1) || '0.0'}%
-                    </div>
-                  </TableCell>
+          <div className="space-y-4">
+            {/* Bulk action bar */}
+            {selectedTerms.size > 0 && (
+              <div className="flex items-center justify-between p-3 bg-muted/50 border border-border rounded-lg">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-medium">
+                    {selectedTerms.size} term{selectedTerms.size > 1 ? 's' : ''} selected
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedTerms(new Set())}
+                    className="h-7 px-2"
+                  >
+                    <X className="h-3 w-3 mr-1" />
+                    Clear
+                  </Button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Select value={bulkMatchType} onValueChange={(v) => setBulkMatchType(v as MatchType)}>
+                    <SelectTrigger className="w-28 h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="exact">Exact</SelectItem>
+                      <SelectItem value="phrase">Phrase</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    size="sm"
+                    onClick={handleBulkHarvest}
+                    disabled={harvestLoading}
+                    className="gap-1.5"
+                  >
+                    {harvestLoading ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Sprout className="h-3.5 w-3.5" />
+                    )}
+                    Harvest {selectedTerms.size} Keyword{selectedTerms.size > 1 ? 's' : ''}
+                  </Button>
+                </div>
+              </div>
+            )}
+            
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-10">
+                    <Checkbox
+                      checked={selectedTerms.size === filteredSearchTerms.length && filteredSearchTerms.length > 0}
+                      onCheckedChange={toggleSelectAll}
+                      aria-label="Select all"
+                    />
+                  </TableHead>
+                  <TableHead>Search Term</TableHead>
+                  <TableHead>Matched Keyword</TableHead>
+                  <TableHead>Campaign</TableHead>
+                  <TableHead className="text-right">Clicks</TableHead>
+                  <TableHead className="text-right">Sales</TableHead>
+                  <TableHead className="text-right">ACOS</TableHead>
+                  <TableHead className="text-right w-28">Action</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filteredSearchTerms.map((st) => {
+                  const isSelected = selectedTerms.has(st.id);
+                  const highPerformer = isHighPerformer(st);
+                  const isHarvesting = harvestingTermId === st.id;
+                  
+                  return (
+                    <TableRow 
+                      key={st.id}
+                      className={isSelected ? 'bg-primary/5' : undefined}
+                    >
+                      <TableCell>
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => toggleTermSelection(st.id)}
+                          aria-label={`Select ${st.search_term}`}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{st.search_term}</span>
+                          {highPerformer && (
+                            <Badge variant="outline" className="text-xs border-success/50 text-success bg-success/10">
+                              <Sprout className="h-3 w-3 mr-1" />
+                              Harvest
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">{st.keyword_text}</TableCell>
+                      <TableCell className="text-muted-foreground text-sm max-w-[150px] truncate">{st.campaign_name}</TableCell>
+                      <TableCell className="text-right">{formatNumber(st.clicks)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(st.sales)}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          {st.acos > 30 ? (
+                            <TrendingUp className="h-3 w-3 text-destructive" />
+                          ) : (
+                            <TrendingDown className="h-3 w-3 text-success" />
+                          )}
+                          {st.acos?.toFixed(1) || '0.0'}%
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 px-2 gap-1"
+                              disabled={isHarvesting || !st.campaign_id || !st.ad_group_id}
+                            >
+                              {isHarvesting ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Sprout className="h-3 w-3" />
+                              )}
+                              Harvest
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-40 p-2" align="end">
+                            <div className="space-y-1">
+                              <p className="text-xs text-muted-foreground mb-2">Match type:</p>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="w-full justify-start h-8"
+                                onClick={() => handleHarvestSingle(st, 'exact')}
+                              >
+                                <Check className="h-3 w-3 mr-2" />
+                                Exact
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="w-full justify-start h-8"
+                                onClick={() => handleHarvestSingle(st, 'phrase')}
+                              >
+                                <Check className="h-3 w-3 mr-2" />
+                                Phrase
+                              </Button>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
         );
 
       default:
