@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import DashboardShell from "@/components/DashboardShell";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -94,13 +94,14 @@ const CommandCenter = () => {
   
   // Fetch brand terms
   const { brandTerms, fetchBrandTerms } = useSearchStudio();
-  const memoizedFetchBrandTerms = useCallback(fetchBrandTerms, []);
+  const brandTermsFetchedRef = useRef(false);
   
   useEffect(() => {
-    if (profileId) {
-      memoizedFetchBrandTerms(profileId);
+    if (profileId && !brandTermsFetchedRef.current) {
+      brandTermsFetchedRef.current = true;
+      fetchBrandTerms(profileId);
     }
-  }, [profileId, memoizedFetchBrandTerms]);
+  }, [profileId, fetchBrandTerms]);
   
   const brandOptions: BrandOption[] = useMemo(() => {
     return brandTerms.map(bt => ({ id: bt.id, term: bt.term }));
@@ -166,13 +167,15 @@ const CommandCenter = () => {
   
   // Fetch anomalies
   const { anomalies, loading: anomaliesLoading, fetchAnomalies } = useAnomalies();
+  const dataFetchedRef = useRef(false);
   
   useEffect(() => {
-    if (profileId) {
+    if (profileId && !dataFetchedRef.current) {
+      dataFetchedRef.current = true;
       refetchAlerts();
       fetchAnomalies({ profileId, state: 'new' });
     }
-  }, [profileId, refetchAlerts, fetchAnomalies]);
+  }, [profileId]); // Only depend on profileId, use ref to prevent re-fetching
 
   // Pending actions count
   const pendingActionsCount = feedActions.filter(a => a.status === 'queued').length;
