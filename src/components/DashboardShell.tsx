@@ -1,5 +1,5 @@
 import { PropsWithChildren } from "react";
-import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 
 const DashboardShell = ({ children }: PropsWithChildren) => {
@@ -8,13 +8,6 @@ const DashboardShell = ({ children }: PropsWithChildren) => {
       <div className="min-h-screen flex w-full bg-background">
         <AppSidebar />
         <SidebarInset className="flex flex-col">
-          {/* Minimal Header - just sidebar trigger */}
-          <header className="sticky top-0 z-40 border-b border-border bg-background">
-            <div className="flex h-12 items-center px-4">
-              <SidebarTrigger className="h-8 w-8 shrink-0" />
-            </div>
-          </header>
-
           {/* Main content area */}
           <main className="flex-1 overflow-auto bg-muted/30">
             <div className="relative min-h-full">
