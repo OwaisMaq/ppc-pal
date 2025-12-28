@@ -7,11 +7,11 @@ export default function PublicTerms() {
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <Link to="/" className="flex items-center gap-3">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+          <Link to="/" className="flex items-center gap-2">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-foreground text-background">
               <Bot className="h-5 w-5" />
             </span>
-            <span className="font-semibold text-lg">PPC Pal</span>
+            <span className="font-display font-semibold text-lg">PPC Pal</span>
           </Link>
           <Link to="/">
             <Button variant="ghost" size="sm">
