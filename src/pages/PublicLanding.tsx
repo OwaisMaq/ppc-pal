@@ -214,15 +214,12 @@ const PublicLanding = () => {
       <section id="features" className="py-20 lg:py-28 relative overflow-hidden">
         {/* Section background with subtle pattern */}
         <div className="absolute inset-0 bg-muted/40" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,hsl(var(--primary)/0.03),transparent_50%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,hsl(var(--primary)/0.08),transparent)]" />
         
         <div className="container mx-auto px-4 relative">
-          {/* Section header with badge */}
-          <div className="text-center mb-12 lg:mb-16">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-4 animate-fade-in">
-              <span>🛠️</span>
-              <span className="text-xs font-semibold text-primary uppercase tracking-wider">Capabilities</span>
-            </div>
+          {/* Section header */}
+          <div className="text-center mb-16 lg:mb-20">
+            <p className="text-xs font-semibold text-primary uppercase tracking-[0.2em] mb-4">Capabilities</p>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold mb-4">
               Your unfair advantage
             </h2>
@@ -231,60 +228,66 @@ const PublicLanding = () => {
             </p>
           </div>
           
-          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6 lg:gap-8 items-start">
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-8 lg:gap-12 items-start">
             {/* Automation Card */}
             <div className="group flex flex-col h-full">
-              <div className="min-h-[120px] md:min-h-[140px] mb-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-2xl">🤖</span>
-                  <p className="text-xs font-medium text-primary uppercase tracking-wide">Automation</p>
+              <div className="min-h-[140px] md:min-h-[160px] mb-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <div className="w-3 h-3 rounded-full bg-primary animate-pulse" />
+                  </div>
+                  <p className="text-sm font-semibold text-foreground">Automation</p>
                 </div>
-                <h3 className="text-lg lg:text-xl font-display font-semibold mb-2">
+                <h3 className="text-xl lg:text-2xl font-display font-semibold mb-3 leading-tight">
                   Works while you sleep
                 </h3>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground leading-relaxed">
                   3am bid adjustments? Done. Weekend optimization? Handled. Your campaigns never take a day off.
                 </p>
               </div>
-              <div className="flex-1 transform group-hover:scale-[1.02] transition-transform duration-300">
+              <div className="flex-1 rounded-xl overflow-hidden border border-border/50 shadow-sm group-hover:shadow-md group-hover:border-border transition-all duration-300">
                 <AutomationPreview />
               </div>
             </div>
             
             {/* Keywords Card */}
             <div className="group flex flex-col h-full">
-              <div className="min-h-[120px] md:min-h-[140px] mb-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-2xl">🎯</span>
-                  <p className="text-xs font-medium text-primary uppercase tracking-wide">Keywords</p>
+              <div className="min-h-[140px] md:min-h-[160px] mb-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center">
+                    <div className="w-3 h-3 rounded-sm bg-destructive" />
+                  </div>
+                  <p className="text-sm font-semibold text-foreground">Keywords</p>
                 </div>
-                <h3 className="text-lg lg:text-xl font-display font-semibold mb-2">
+                <h3 className="text-xl lg:text-2xl font-display font-semibold mb-3 leading-tight">
                   Kill the money-wasters
                 </h3>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground leading-relaxed">
                   Spot bleeding keywords before they drain your budget. Average seller saves $847/month on wasted clicks.
                 </p>
               </div>
-              <div className="flex-1 transform group-hover:scale-[1.02] transition-transform duration-300">
+              <div className="flex-1 rounded-xl overflow-hidden border border-border/50 shadow-sm group-hover:shadow-md group-hover:border-border transition-all duration-300">
                 <KeywordsPreview />
               </div>
             </div>
             
             {/* Analytics Card */}
             <div className="group flex flex-col h-full sm:col-span-2 md:col-span-1">
-              <div className="min-h-[120px] md:min-h-[140px] mb-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-2xl">📊</span>
-                  <p className="text-xs font-medium text-primary uppercase tracking-wide">Analytics</p>
+              <div className="min-h-[140px] md:min-h-[160px] mb-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
+                    <div className="w-4 h-2 rounded-sm bg-blue-500" />
+                  </div>
+                  <p className="text-sm font-semibold text-foreground">Analytics</p>
                 </div>
-                <h3 className="text-lg lg:text-xl font-display font-semibold mb-2">
-                  Numbers that actually make sense
+                <h3 className="text-xl lg:text-2xl font-display font-semibold mb-3 leading-tight">
+                  Numbers that make sense
                 </h3>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground leading-relaxed">
                   No PhD required. See exactly what's working, what's not, and what to do about it.
                 </p>
               </div>
-              <div className="flex-1 transform group-hover:scale-[1.02] transition-transform duration-300">
+              <div className="flex-1 rounded-xl overflow-hidden border border-border/50 shadow-sm group-hover:shadow-md group-hover:border-border transition-all duration-300">
                 <AnalyticsPreview />
               </div>
             </div>
@@ -295,12 +298,9 @@ const PublicLanding = () => {
       {/* Results Section */}
       <section className="py-20 lg:py-28 relative border-t border-border">
         <div className="container mx-auto px-4">
-          {/* Section header with badge */}
-          <div className="text-center mb-12 lg:mb-16">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-100 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 mb-4 animate-fade-in">
-              <span>💰</span>
-              <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 uppercase tracking-wider">Results</span>
-            </div>
+          {/* Section header */}
+          <div className="text-center mb-16 lg:mb-20">
+            <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-[0.2em] mb-4">Results</p>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold mb-4">
               The "is this real?" results
             </h2>
@@ -309,60 +309,69 @@ const PublicLanding = () => {
             </p>
           </div>
           
-          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6 lg:gap-8 items-start">
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-8 lg:gap-12 items-start">
             {/* Savings */}
             <div className="group flex flex-col h-full">
-              <div className="min-h-[100px] md:min-h-[120px] mb-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-2xl">💸</span>
-                  <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">Savings</p>
+              <div className="min-h-[140px] md:min-h-[160px] mb-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="relative w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-t from-emerald-500/20 to-transparent" />
+                    <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400">%</span>
+                  </div>
+                  <p className="text-sm font-semibold text-foreground">Savings</p>
                 </div>
-                <h3 className="text-lg lg:text-xl font-display font-semibold mb-2">
+                <h3 className="text-xl lg:text-2xl font-display font-semibold mb-3 leading-tight">
                   23% less spend, same sales
                 </h3>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground leading-relaxed">
                   That's the average. Some hit 40%. Imagine what you'd do with that extra margin.
                 </p>
               </div>
-              <div className="flex-1 transform group-hover:scale-[1.02] transition-transform duration-300">
+              <div className="flex-1 rounded-xl overflow-hidden border border-border/50 shadow-sm group-hover:shadow-md group-hover:border-border transition-all duration-300">
                 <SavingsPreview />
               </div>
             </div>
             
             {/* Returns */}
             <div className="group flex flex-col h-full">
-              <div className="min-h-[100px] md:min-h-[120px] mb-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-2xl">📈</span>
-                  <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">Returns</p>
+              <div className="min-h-[140px] md:min-h-[160px] mb-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="relative w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                    <svg className="w-5 h-5 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M2 12h4l3-9 6 18 3-9h4" />
+                    </svg>
+                  </div>
+                  <p className="text-sm font-semibold text-foreground">Returns</p>
                 </div>
-                <h3 className="text-lg lg:text-xl font-display font-semibold mb-2">
+                <h3 className="text-xl lg:text-2xl font-display font-semibold mb-3 leading-tight">
                   ROAS that makes accountants smile
                 </h3>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground leading-relaxed">
                   Average improvement: 2.1x → 3.4x. Your finance team will send thank you cards.
                 </p>
               </div>
-              <div className="flex-1 transform group-hover:scale-[1.02] transition-transform duration-300">
+              <div className="flex-1 rounded-xl overflow-hidden border border-border/50 shadow-sm group-hover:shadow-md group-hover:border-border transition-all duration-300">
                 <AnalyticsPreview />
               </div>
             </div>
             
             {/* Time */}
             <div className="group flex flex-col h-full sm:col-span-2 md:col-span-1">
-              <div className="min-h-[100px] md:min-h-[120px] mb-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-2xl">⏰</span>
-                  <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">Time</p>
+              <div className="min-h-[140px] md:min-h-[160px] mb-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="relative w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                    <div className="w-4 h-4 rounded-full border-2 border-emerald-600 dark:border-emerald-400 border-t-transparent animate-spin" style={{ animationDuration: '2s' }} />
+                  </div>
+                  <p className="text-sm font-semibold text-foreground">Time</p>
                 </div>
-                <h3 className="text-lg lg:text-xl font-display font-semibold mb-2">
+                <h3 className="text-xl lg:text-2xl font-display font-semibold mb-3 leading-tight">
                   10+ hours back every week
                 </h3>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground leading-relaxed">
                   That's 520 hours a year. Launch a new product. Take a vacation. Remember what weekends feel like.
                 </p>
               </div>
-              <div className="flex-1 transform group-hover:scale-[1.02] transition-transform duration-300">
+              <div className="flex-1 rounded-xl overflow-hidden border border-border/50 shadow-sm group-hover:shadow-md group-hover:border-border transition-all duration-300">
                 <OptimizePreview />
               </div>
             </div>
@@ -377,12 +386,9 @@ const PublicLanding = () => {
         <div className="absolute inset-0 bg-[linear-gradient(to_right,hsl(var(--border)/0.3)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border)/0.3)_1px,transparent_1px)] bg-[size:4rem_4rem]" />
         
         <div className="container mx-auto px-4 relative">
-          {/* Section header with badge */}
-          <div className="text-center mb-12 lg:mb-16">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-100 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 mb-4 animate-fade-in">
-              <span>⚡</span>
-              <span className="text-xs font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-wider">Process</span>
-            </div>
+          {/* Section header */}
+          <div className="text-center mb-16 lg:mb-20">
+            <p className="text-xs font-semibold text-primary uppercase tracking-[0.2em] mb-4">Process</p>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold mb-4">
               Stupid simple setup
             </h2>
@@ -391,59 +397,62 @@ const PublicLanding = () => {
             </p>
           </div>
           
-          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6 lg:gap-8">
+          {/* Steps connector line - desktop only */}
+          <div className="hidden md:block absolute top-[340px] left-1/2 -translate-x-1/2 w-[60%] h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+          
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-8 lg:gap-12">
             {/* Connect */}
-            <div className="group flex flex-col space-y-4">
-              <div className="flex-1 min-h-0 transform group-hover:scale-[1.02] transition-transform duration-300">
+            <div className="group flex flex-col space-y-6">
+              <div className="flex-1 min-h-0 rounded-xl overflow-hidden border border-border/50 shadow-sm group-hover:shadow-md group-hover:border-border transition-all duration-300">
                 <ConnectPreview />
               </div>
               <div className="flex-shrink-0">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold">1</span>
-                  <p className="text-xs font-medium text-primary uppercase tracking-wide">Connect</p>
+                <div className="flex items-center gap-4 mb-3">
+                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-foreground text-background text-sm font-bold">1</span>
+                  <div className="h-px flex-1 bg-border" />
                 </div>
-                <h3 className="text-lg lg:text-xl font-display font-semibold mb-2">
-                  Click, authorize, done 🔗
+                <h3 className="text-xl lg:text-2xl font-display font-semibold mb-2">
+                  Connect
                 </h3>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground leading-relaxed">
                   One OAuth flow. No spreadsheet uploads. No API keys to hunt down.
                 </p>
               </div>
             </div>
             
             {/* Analyze */}
-            <div className="group flex flex-col space-y-4">
-              <div className="flex-1 min-h-0 transform group-hover:scale-[1.02] transition-transform duration-300">
+            <div className="group flex flex-col space-y-6">
+              <div className="flex-1 min-h-0 rounded-xl overflow-hidden border border-border/50 shadow-sm group-hover:shadow-md group-hover:border-border transition-all duration-300">
                 <AnalyzePreview />
               </div>
               <div className="flex-shrink-0">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold">2</span>
-                  <p className="text-xs font-medium text-primary uppercase tracking-wide">Analyze</p>
+                <div className="flex items-center gap-4 mb-3">
+                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-foreground text-background text-sm font-bold">2</span>
+                  <div className="h-px flex-1 bg-border" />
                 </div>
-                <h3 className="text-lg lg:text-xl font-display font-semibold mb-2">
-                  Watch the magic happen 🔍
+                <h3 className="text-xl lg:text-2xl font-display font-semibold mb-2">
+                  Analyze
                 </h3>
-                <p className="text-sm text-muted-foreground">
-                  Our AI scans every campaign, keyword, and bid. You'll see opportunities within minutes.
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Our AI scans every campaign, keyword, and bid. Opportunities surface within minutes.
                 </p>
               </div>
             </div>
             
             {/* Optimize */}
-            <div className="group flex flex-col space-y-4 sm:col-span-2 md:col-span-1">
-              <div className="flex-1 min-h-0 transform group-hover:scale-[1.02] transition-transform duration-300">
+            <div className="group flex flex-col space-y-6 sm:col-span-2 md:col-span-1">
+              <div className="flex-1 min-h-0 rounded-xl overflow-hidden border border-border/50 shadow-sm group-hover:shadow-md group-hover:border-border transition-all duration-300">
                 <OptimizePreview />
               </div>
               <div className="flex-shrink-0">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold">3</span>
-                  <p className="text-xs font-medium text-primary uppercase tracking-wide">Optimize</p>
+                <div className="flex items-center gap-4 mb-3">
+                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-foreground text-background text-sm font-bold">3</span>
+                  <div className="h-px flex-1 bg-border" />
                 </div>
-                <h3 className="text-lg lg:text-xl font-display font-semibold mb-2">
-                  Sit back and profit 🚀
+                <h3 className="text-xl lg:text-2xl font-display font-semibold mb-2">
+                  Optimize
                 </h3>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground leading-relaxed">
                   Automation kicks in. Bids adjust. Waste disappears. You take the credit.
                 </p>
               </div>
@@ -455,12 +464,9 @@ const PublicLanding = () => {
       {/* Testimonials Section */}
       <section className="py-20 lg:py-28 relative border-t border-border">
         <div className="container mx-auto px-4">
-          {/* Section header with badge */}
-          <div className="text-center mb-12 lg:mb-16">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-100 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 mb-4 animate-fade-in">
-              <span>⭐</span>
-              <span className="text-xs font-semibold text-amber-700 dark:text-amber-300 uppercase tracking-wider">Testimonials</span>
-            </div>
+          {/* Section header */}
+          <div className="text-center mb-16 lg:mb-20">
+            <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-[0.2em] mb-4">Testimonials</p>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold mb-4">
               Don't take our word for it
             </h2>
@@ -469,61 +475,62 @@ const PublicLanding = () => {
             </p>
           </div>
           
-          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6">
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6 lg:gap-8">
             {[
               {
                 stars: 5,
                 quote: "I used to spend Sunday nights tweaking bids. Now I spend them with my kids. Same revenue, 10x better life.",
                 name: "Marcus Chen",
                 role: "6-figure electronics seller",
-                emoji: "🎮",
-                highlight: "10x better life"
+                metric: "10x",
+                metricLabel: "better life"
               },
               {
                 stars: 5,
                 quote: "Cut my ACoS from 42% to 18% in three weeks. My CFO asked what changed. I just smiled.",
                 name: "Sarah Williams",
                 role: "Home goods brand owner",
-                emoji: "🏠",
-                highlight: "42% → 18% ACoS"
+                metric: "42%→18%",
+                metricLabel: "ACoS"
               },
               {
                 stars: 5,
                 quote: "Finally, a PPC tool that doesn't require a PhD to use. Connected in 3 minutes, saw savings in 3 days.",
                 name: "James Rodriguez",
                 role: "Supplements entrepreneur",
-                emoji: "💊",
-                highlight: "3 min setup"
+                metric: "3 min",
+                metricLabel: "setup"
               }
             ].map((testimonial, i) => (
-              <Card key={i} className="group p-6 hover:shadow-lg transition-shadow duration-300 relative overflow-hidden">
-                {/* Highlight badge */}
-                <div className="absolute -right-8 top-4 rotate-45 bg-primary/10 px-10 py-1">
-                  <span className="text-[10px] font-bold text-primary">{testimonial.highlight}</span>
+              <Card key={i} className="group relative p-6 lg:p-8 hover:shadow-lg transition-all duration-300 overflow-hidden">
+                {/* Metric highlight */}
+                <div className="absolute top-4 right-4">
+                  <div className="text-right">
+                    <p className="text-2xl font-display font-bold text-primary">{testimonial.metric}</p>
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{testimonial.metricLabel}</p>
+                  </div>
                 </div>
                 
-                <div className="flex gap-1 mb-4">
+                <div className="flex gap-0.5 mb-6">
                   {[...Array(5)].map((_, j) => (
                     <Star 
                       key={j} 
                       className={cn(
-                        "h-4 w-4 transition-transform duration-200",
-                        j < testimonial.stars ? "fill-amber-400 text-amber-400" : "text-muted-foreground",
-                        "group-hover:scale-110"
+                        "h-4 w-4",
+                        j < testimonial.stars ? "fill-amber-400 text-amber-400" : "text-muted-foreground"
                       )} 
-                      style={{ transitionDelay: `${j * 50}ms` }}
                     />
                   ))}
                 </div>
-                <p className="text-sm mb-6 leading-relaxed italic">
+                <blockquote className="text-sm lg:text-base mb-8 leading-relaxed text-foreground/90">
                   "{testimonial.quote}"
-                </p>
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center text-xl">
-                    {testimonial.emoji}
+                </blockquote>
+                <div className="flex items-center gap-4">
+                  <div className="h-12 w-12 rounded-full bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center">
+                    <span className="text-lg font-semibold text-muted-foreground">{testimonial.name.charAt(0)}</span>
                   </div>
                   <div>
-                    <p className="font-medium text-sm">{testimonial.name}</p>
+                    <p className="font-semibold text-sm">{testimonial.name}</p>
                     <p className="text-xs text-muted-foreground">{testimonial.role}</p>
                   </div>
                 </div>
@@ -532,16 +539,25 @@ const PublicLanding = () => {
           </div>
           
           {/* Trust indicator */}
-          <div className="mt-12 text-center">
-            <div className="inline-flex items-center gap-3 px-6 py-3 rounded-full bg-muted/50 border border-border">
-              <div className="flex -space-x-2">
-                {['😊', '🤩', '😎', '🥳'].map((emoji, i) => (
-                  <span key={i} className="text-lg bg-background rounded-full p-1 border-2 border-background">{emoji}</span>
+          <div className="mt-16 text-center">
+            <div className="inline-flex items-center gap-4 px-6 py-4 rounded-2xl bg-muted/50 border border-border">
+              <div className="flex -space-x-3">
+                {['M', 'S', 'J', 'A'].map((initial, i) => (
+                  <div 
+                    key={i} 
+                    className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 border-2 border-background flex items-center justify-center text-sm font-medium text-primary"
+                  >
+                    {initial}
+                  </div>
                 ))}
+                <div className="w-10 h-10 rounded-full bg-muted border-2 border-background flex items-center justify-center text-xs font-medium text-muted-foreground">
+                  +2k
+                </div>
               </div>
-              <p className="text-sm text-muted-foreground">
-                Join <span className="font-semibold text-foreground">2,000+</span> happy sellers
-              </p>
+              <div className="text-left">
+                <p className="text-sm font-medium text-foreground">2,000+ sellers</p>
+                <p className="text-xs text-muted-foreground">trust PPC Pal with their budgets</p>
+              </div>
             </div>
           </div>
         </div>
