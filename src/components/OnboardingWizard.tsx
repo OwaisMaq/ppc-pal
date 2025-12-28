@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Bot, CheckCircle, Target, TrendingUp, Sparkles, Database, Loader2 } from "lucide-react";
 import AmazonOAuthSetup from "./AmazonOAuthSetup";
+import GoalSelector, { OptimizationGoal } from "./onboarding/GoalSelector";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
@@ -15,10 +16,11 @@ interface OnboardingWizardProps {
 
 export const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
   const [currentStep, setCurrentStep] = useState(1);
+  const [selectedGoal, setSelectedGoal] = useState<OptimizationGoal | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
   const { connections } = useAmazonConnections();
-  const totalSteps = 4;
+  const totalSteps = 5;
   
   // Import progress state
   const [importStatus, setImportStatus] = useState({
@@ -71,21 +73,24 @@ export const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
           .upsert({ 
             id: user.id, 
             onboarding_completed: true,
+            optimization_goal: selectedGoal,
             updated_at: new Date().toISOString()
           });
       }
       
       toast({
         title: "Welcome to PPC Pal!",
-        description: "You're all set up and ready to optimize your campaigns.",
+        description: selectedGoal 
+          ? `We've configured your account for "${selectedGoal.replace('_', ' ')}" optimization.`
+          : "You're all set up and ready to optimize your campaigns.",
       });
       
       onComplete();
-      navigate('/dashboard');
+      navigate('/overview');
     } catch (error) {
       console.error('Error completing onboarding:', error);
       onComplete();
-      navigate('/dashboard');
+      navigate('/overview');
     }
   };
 
@@ -100,7 +105,7 @@ export const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
               </div>
               <CardTitle className="text-2xl">Welcome to PPC Pal!</CardTitle>
               <CardDescription className="text-base">
-                Your AI-powered Amazon PPC optimization platform
+                Your intelligent Amazon PPC optimization platform
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -117,7 +122,7 @@ export const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
                 <div className="flex items-start gap-3">
                   <Sparkles className="h-5 w-5 text-brand mt-0.5" />
                   <div>
-                    <h4 className="font-medium">AI-Powered Insights</h4>
+                    <h4 className="font-medium">Data-Driven Insights</h4>
                     <p className="text-sm text-muted-foreground">
                       Get intelligent recommendations to reduce waste and increase sales
                     </p>
@@ -126,9 +131,9 @@ export const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
                 <div className="flex items-start gap-3">
                   <TrendingUp className="h-5 w-5 text-brand mt-0.5" />
                   <div>
-                    <h4 className="font-medium">Automated Optimization</h4>
+                    <h4 className="font-medium">Rule-Based Automation</h4>
                     <p className="text-sm text-muted-foreground">
-                      Let AI handle bid adjustments, negatives, and budget pacing
+                      Automated bid adjustments, negatives, and budget pacing based on proven logic
                     </p>
                   </div>
                 </div>
@@ -162,6 +167,16 @@ export const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
 
       case 3:
         return (
+          <GoalSelector
+            selectedGoal={selectedGoal}
+            onGoalSelect={setSelectedGoal}
+            onContinue={() => setCurrentStep(4)}
+            showContinue={true}
+          />
+        );
+
+      case 4:
+        return (
           <Card className="border-none shadow-none">
             <CardHeader className="text-center">
               <CardTitle className="text-2xl">Key Features Overview</CardTitle>
@@ -185,7 +200,7 @@ export const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
                   <div>
                     <h4 className="font-medium">Search Terms & Keywords</h4>
                     <p className="text-sm text-muted-foreground">
-                      AI identifies waste and opportunities at the keyword level
+                      Identify waste and opportunities at the keyword level
                     </p>
                   </div>
                 </div>
@@ -212,7 +227,7 @@ export const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
           </Card>
         );
 
-      case 4:
+      case 5:
         return (
           <Card className="border-none shadow-none">
             <CardHeader className="text-center">
@@ -270,7 +285,7 @@ export const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-brand">•</span>
-                    <span>AI will analyze your campaigns and generate insights</span>
+                    <span>Our rules engine will analyze your campaigns and identify opportunities</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-brand">•</span>
@@ -304,7 +319,7 @@ export const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
         {renderStep()}
 
         <div className="flex justify-between gap-4">
-          {currentStep > 1 && currentStep < 4 && (
+          {currentStep > 1 && currentStep < 5 && (
             <Button
               variant="outline"
               onClick={() => setCurrentStep(currentStep - 1)}
@@ -322,16 +337,16 @@ export const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
             </Button>
           )}
 
-          {currentStep === 3 && (
+          {currentStep === 4 && (
             <Button
               className="ml-auto"
-              onClick={() => setCurrentStep(4)}
+              onClick={() => setCurrentStep(5)}
             >
               Continue
             </Button>
           )}
 
-          {currentStep === 4 && (
+          {currentStep === 5 && (
             <Button
               className="ml-auto"
               onClick={handleComplete}
@@ -340,7 +355,7 @@ export const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
             </Button>
           )}
 
-          {currentStep < 4 && (
+          {currentStep < 5 && currentStep !== 3 && (
             <Button
               variant="ghost"
               onClick={handleComplete}

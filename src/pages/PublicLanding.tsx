@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserCount, formatUserCount } from "@/hooks/useUserCount";
+import { useOptimizationsToday } from "@/hooks/useOptimizationsToday";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { 
@@ -31,13 +32,14 @@ import {
   AnalyzePreview,
   OptimizePreview
 } from "@/components/landing";
-import TrustBadges, { AmazonPartnerBadge, LiveStatsBadge, ManagedSpendBadge } from "@/components/landing/TrustBadges";
+import TrustBadges, { AmazonPartnerBadge, LiveStatsBadge } from "@/components/landing/TrustBadges";
 import LiveAutomationFeed from "@/components/landing/LiveAutomationFeed";
 import ROICalculator from "@/components/landing/ROICalculator";
 
 const PublicLanding = () => {
   const { user } = useAuth();
   const { data: userCount } = useUserCount();
+  const { count: optimizationsToday, loading: optimizationsLoading } = useOptimizationsToday();
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
   const displayCount = formatUserCount(userCount || 0);
 
@@ -252,7 +254,7 @@ const PublicLanding = () => {
             
             {/* Right: Live Stats */}
             <div className="flex items-center gap-4">
-              <LiveStatsBadge actionsToday={1247} />
+              <LiveStatsBadge actionsToday={optimizationsToday} loading={optimizationsLoading} />
             </div>
           </div>
         </div>
