@@ -169,7 +169,7 @@ export function useDataAvailability(profileId: string | undefined) {
       }
 
       toast.success(`Historical import started`, {
-        description: `${totalReports} report requests queued covering the last year. Data will appear within a few minutes.`,
+        description: `${totalReports} report requests queued covering the last 90 days. Data will appear within a few minutes.`,
       });
     } catch (error) {
       console.error('Error importing full history:', error);
