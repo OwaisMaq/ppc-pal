@@ -228,9 +228,12 @@ const Automate: React.FC = () => {
           </CardContent>
         </Card>
 
+        {/* Bid Optimizer Status */}
+        <BidOptimizerStatusCard profileId={selectedProfile} />
+
         {selectedProfile ? (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-5">
+            <TabsList className="grid w-full grid-cols-6">
               <TabsTrigger value="rules" className="gap-2">
                 <Zap className="h-4 w-4" />
                 Rules ({rules.length})
@@ -254,7 +257,11 @@ const Automate: React.FC = () => {
               </TabsTrigger>
               <TabsTrigger value="trust" className="gap-2">
                 <Shield className="h-4 w-4" />
-                Trust Report
+                Trust
+              </TabsTrigger>
+              <TabsTrigger value="experiments" className="gap-2">
+                <FlaskConical className="h-4 w-4" />
+                Experiments
               </TabsTrigger>
             </TabsList>
 
@@ -333,10 +340,17 @@ const Automate: React.FC = () => {
               <div>
                 <h2 className="text-xl font-semibold mb-2">Automation Trust Report</h2>
                 <p className="text-muted-foreground text-sm">
-                  See how automation is performing and track outcome attribution
+                  See how automation is performing and track model accuracy
                 </p>
               </div>
               
+              {/* Model Accuracy & Portfolio Health */}
+              <div className="grid gap-6 lg:grid-cols-2">
+                <ModelAccuracyCard profileId={selectedProfile} />
+                <PortfolioHealthPanel profileId={selectedProfile} />
+              </div>
+              
+              {/* Trust Report & Outcomes */}
               <div className="grid gap-6 lg:grid-cols-2">
                 <TrustReportCard
                   stats={outcomeStats}
@@ -349,6 +363,10 @@ const Automate: React.FC = () => {
                   loading={outcomesLoading}
                 />
               </div>
+            </TabsContent>
+
+            <TabsContent value="experiments" className="space-y-6">
+              <ExperimentsTab profileId={selectedProfile} />
             </TabsContent>
           </Tabs>
         ) : (
