@@ -434,7 +434,7 @@ serve(async (req) => {
       const highAcosCampaigns = campaignsArray.filter(c => c.acos > 50 && c.spend > 20 && c.orders > 0);
       if (highAcosCampaigns.length > 0) {
         const potentialSavings = highAcosCampaigns.reduce((sum, c) => {
-          const targetAcos = 30;
+          const targetAcos = 20;
           const excessSpend = c.spend - (c.sales * (targetAcos / 100));
           return sum + Math.max(0, excessSpend);
         }, 0);

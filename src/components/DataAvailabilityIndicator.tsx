@@ -1,7 +1,6 @@
 import { format } from 'date-fns';
-import { AlertCircle, Database, Loader2, Download, History } from 'lucide-react';
+import { Database, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 
@@ -20,8 +19,6 @@ interface DataAvailabilityIndicatorProps {
     total: number;
     isImporting: boolean;
   };
-  onImportFullHistory?: () => void;
-  isImportingFullHistory?: boolean;
 }
 
 export function DataAvailabilityIndicator({
@@ -29,11 +26,7 @@ export function DataAvailabilityIndicator({
   maxDate,
   hasData,
   loading,
-  selectedFrom,
-  selectedTo,
   importProgress,
-  onImportFullHistory,
-  isImportingFullHistory,
 }: DataAvailabilityIndicatorProps) {
   if (loading) {
     return (
@@ -44,7 +37,6 @@ export function DataAvailabilityIndicator({
     );
   }
 
-  const isBeforeAvailable = selectedFrom && minDate && selectedFrom < new Date(minDate);
   const progressPercent = importProgress?.total 
     ? Math.round(((importProgress.completed + importProgress.failed) / importProgress.total) * 100) 
     : 0;
@@ -68,35 +60,11 @@ export function DataAvailabilityIndicator({
 
   return (
     <div className="flex flex-col gap-3 p-4 rounded-lg border bg-card">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Database className="h-4 w-4" />
-          <span>
-            Data available: <span className="font-medium text-foreground">{format(new Date(minDate!), 'MMM d, yyyy')}</span> – <span className="font-medium text-foreground">{format(new Date(maxDate!), 'MMM d, yyyy')}</span>
-          </span>
-        </div>
-        
-        {onImportFullHistory && !importProgress?.isImporting && (
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={onImportFullHistory}
-            disabled={isImportingFullHistory}
-            className="gap-2"
-          >
-            {isImportingFullHistory ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Starting import...
-              </>
-            ) : (
-              <>
-                <History className="h-4 w-4" />
-                Re-import Last 90 Days
-              </>
-            )}
-          </Button>
-        )}
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Database className="h-4 w-4" />
+        <span>
+          Data available: <span className="font-medium text-foreground">{format(new Date(minDate!), 'MMM d, yyyy')}</span> – <span className="font-medium text-foreground">{format(new Date(maxDate!), 'MMM d, yyyy')}</span>
+        </span>
       </div>
 
       {importProgress?.isImporting && (
@@ -115,15 +83,6 @@ export function DataAvailabilityIndicator({
             )}
           </div>
         </div>
-      )}
-
-      {isBeforeAvailable && !importProgress?.isImporting && (
-        <Alert variant="default" className="bg-amber-50 border-amber-200">
-          <AlertCircle className="h-4 w-4 text-amber-600" />
-          <AlertDescription className="text-amber-800">
-            Selected date range includes dates before available data. Amazon retains approximately 60-90 days of historical data.
-          </AlertDescription>
-        </Alert>
       )}
     </div>
   );

@@ -196,11 +196,7 @@ const Dashboard = () => {
             maxDate={maxDate}
             hasData={hasData}
             loading={availabilityLoading}
-            selectedFrom={dateRange?.from}
-            selectedTo={dateRange?.to}
             importProgress={importProgress}
-            onImportFullHistory={importFullHistory}
-            isImportingFullHistory={isImportingFullHistory}
           />
         </div>
 

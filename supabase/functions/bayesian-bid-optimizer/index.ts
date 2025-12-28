@@ -44,7 +44,7 @@ interface OptimizerConfig {
 const DEFAULT_CONFIG: OptimizerConfig = {
   min_observations: 7,
   min_impressions: 100,
-  target_acos: 0.30,
+  target_acos: 0.20,
   max_bid_change_percent: 0.25,
   min_bid_micros: 100000,     // $0.10
   max_bid_micros: 10000000,   // $10.00
