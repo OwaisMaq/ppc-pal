@@ -17,13 +17,15 @@ import {
   Zap,
   Clock,
   History,
-  ListChecks
+  ListChecks,
+  FlaskConical
 } from "lucide-react";
 import { AutomationRulesList } from "@/components/AutomationRulesList";
 import { AlertsPanel } from "@/components/AlertsPanel";
 import PendingApprovals from "@/components/PendingApprovals";
 import ActionsFeed from "@/components/ActionsFeed";
 import { TrustReportCard, OutcomeAttributionPanel } from "@/components/overview";
+import { BidOptimizerStatusCard, ModelAccuracyCard, PortfolioHealthPanel, ExperimentsTab } from "@/components/automation";
 import { useAutomationRules, useAlerts } from "@/hooks/useAutomation";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { useSubscription } from "@/hooks/useSubscription";
