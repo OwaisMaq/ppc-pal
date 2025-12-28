@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import DashboardShell from "@/components/DashboardShell";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,16 +14,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useEffect } from "react";
 import { 
   Search, 
   Play, 
@@ -31,12 +24,14 @@ import {
   TrendingUp,
   TrendingDown,
   Target,
-  Sparkles
+  Sparkles,
+  Briefcase,
+  Layers,
+  Tags
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { subDays } from "date-fns";
 import { DateRange } from "react-day-picker";
@@ -65,32 +60,77 @@ interface Campaign {
   conversions: number;
 }
 
-interface CampaignDetails {
-  campaign: Campaign;
-  keywords: any[];
-  adGroups: any[];
+interface AdGroup {
+  id: string;
+  name: string;
+  campaign_name: string;
+  status: string;
+  default_bid: number;
+  impressions: number;
+  clicks: number;
+  spend: number;
+  sales: number;
+  acos: number;
+  roas: number;
+}
+
+interface Keyword {
+  id: string;
+  keyword_text: string;
+  match_type: string;
+  adgroup_name: string;
+  campaign_name: string;
+  status: string;
+  bid: number;
+  impressions: number;
+  clicks: number;
+  spend: number;
+  sales: number;
+  acos: number;
+}
+
+interface SearchTerm {
+  id: string;
+  search_term: string;
+  keyword_text: string;
+  campaign_name: string;
+  impressions: number;
+  clicks: number;
+  spend: number;
+  sales: number;
+  acos: number;
+}
+
+interface Portfolio {
+  id: string;
+  name: string;
+  budget: number;
+  campaigns_count: number;
+  spend: number;
+  sales: number;
+  acos: number;
 }
 
 const Campaigns = () => {
   const { user } = useAuth();
   const { connections } = useAmazonConnections();
+  
+  // Main data states
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [adGroups, setAdGroups] = useState<AdGroup[]>([]);
+  const [keywords, setKeywords] = useState<Keyword[]>([]);
+  const [searchTerms, setSearchTerms] = useState<SearchTerm[]>([]);
+  const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
+  
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [autoMode, setAutoMode] = useState(false);
   const [viewLevel, setViewLevel] = useState<CampaignLevel>('campaigns');
-  const [selectedCampaign, setSelectedCampaign] = useState<CampaignDetails | null>(null);
-  const [detailsLoading, setDetailsLoading] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState<DatePreset>('30D');
   const [dateRange, setDateRange] = useState<DateRange>({
     from: subDays(new Date(), 30),
     to: new Date(),
   });
-
-  // Debug component mount
-  useEffect(() => {
-    console.log('🔍 [CAMPAIGNS PAGE] Component mounted at:', new Date().toISOString());
-  }, []);
 
   const hasConnections = connections.length > 0;
   const primaryConnection = connections[0];
@@ -127,263 +167,261 @@ const Campaigns = () => {
     }
   };
 
+  // Fetch data based on current view level
   useEffect(() => {
-    const fetchCampaigns = async () => {
-      console.log('🔍 [CAMPAIGNS PAGE] Initialization:', {
-        user: user?.email,
-        hasUser: !!user,
-        connections: connections.length,
-        primaryConnection: primaryConnection?.profile_id,
-        window_location: window.location.href,
-        dateRange: { from: dateRange?.from, to: dateRange?.to }
-      });
-
-      // Check auth session
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      console.log('🔍 [CAMPAIGNS PAGE] Auth session:', {
-        session: !!session,
-        user: session?.user?.email,
-        sessionError,
-        access_token: session?.access_token ? 'present' : 'missing'
-      });
-
+    const fetchData = async () => {
       if (!user || !primaryConnection) {
-        console.warn('⚠️ [CAMPAIGNS PAGE] Missing user or connection, aborting');
         setLoading(false);
         return;
       }
 
       if (!dateRange?.from || !dateRange?.to) {
-        console.warn('⚠️ [CAMPAIGNS PAGE] Missing date range, aborting');
         setLoading(false);
         return;
       }
 
+      setLoading(true);
+      
       try {
-        setLoading(true);
-        // Fetch campaigns from campaign daily view using selected date range
-        const fromDate = dateRange.from.toISOString().split('T')[0];
-        const toDate = dateRange.to.toISOString().split('T')[0];
-        
-        console.log('🔍 [CAMPAIGNS PAGE] Fetching campaigns:', {
-          profile_id: primaryConnection.profile_id,
-          date_from: fromDate,
-          date_to: toDate,
-          dayCount
-        });
+        const profileId = primaryConnection.profile_id;
 
-        const { data, error } = await supabase
-          .from('v_campaign_daily')
-          .select('*')
-          .eq('profile_id', primaryConnection.profile_id)
-          .gte('date', fromDate)
-          .lte('date', toDate);
-
-        console.log('🔍 [CAMPAIGNS PAGE] Campaigns query result:', {
-          data: data?.length || 0,
-          error
-        });
-
-        if (error) throw error;
-
-        // Aggregate metrics by campaign
-        const campaignMap = new Map<string, Campaign>();
-        
-        data?.forEach((row: any) => {
-          const campaignId = row.campaign_id;
-          
-          if (!campaignMap.has(campaignId)) {
-            campaignMap.set(campaignId, {
-              campaign_id: campaignId,
-              campaign_name: row.campaign_name || 'Unknown',
-              campaign_type: row.campaign_type || 'N/A',
-              targeting_type: row.targeting_type || 'N/A',
-              status: row.status || 'unknown',
-              budget: row.budget || 0,
-              budget_type: row.budget_type || 'daily',
-              daily_spend: 0,
-              impressions: 0,
-              clicks: 0,
-              sales: 0,
-              acos: 0,
-              roas: 0,
-              ctr: 0,
-              cpc: 0,
-              conversions: 0,
-            });
-          }
-          
-          const campaign = campaignMap.get(campaignId)!;
-          campaign.daily_spend += row.spend || 0;
-          campaign.impressions += row.impressions || 0;
-          campaign.clicks += row.clicks || 0;
-          campaign.sales += row.sales || 0;
-        });
-
-        // Calculate averages and ratios using dynamic day count
-        const campaignsArray = Array.from(campaignMap.values()).map(campaign => {
-          const totalSpend = campaign.daily_spend;
-          const avgSpend = totalSpend / dayCount;
-          const impressions = campaign.impressions;
-          const clicks = campaign.clicks;
-          
-          return {
-            ...campaign,
-            daily_spend: avgSpend,
-            acos: campaign.sales > 0 ? (totalSpend / campaign.sales) * 100 : 0,
-            roas: totalSpend > 0 ? campaign.sales / totalSpend : 0,
-            ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
-            cpc: clicks > 0 ? avgSpend / clicks : 0,
-            conversions: Math.floor(campaign.sales / 25), // Estimate conversions
-          };
-        });
-
-        setCampaigns(campaignsArray);
+        switch (viewLevel) {
+          case 'campaigns':
+            await fetchCampaigns(profileId);
+            break;
+          case 'ad-groups':
+            await fetchAdGroups(profileId);
+            break;
+          case 'targets':
+            await fetchKeywords(profileId);
+            break;
+          case 'search-terms':
+            await fetchSearchTerms(profileId);
+            break;
+          case 'portfolios':
+            // Portfolios not yet available - show placeholder
+            setPortfolios([]);
+            break;
+        }
       } catch (error) {
-        console.error('Error fetching campaigns:', error);
-        toast.error('Failed to load campaigns');
+        console.error('Error fetching data:', error);
+        toast.error('Failed to load data');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchCampaigns();
-  }, [user, primaryConnection, dateRange, dayCount]);
+    fetchData();
+  }, [user, primaryConnection, dateRange, viewLevel, dayCount]);
 
-  const filteredCampaigns = campaigns.filter((campaign) =>
-    campaign.campaign_name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const fetchCampaigns = async (profileId: string) => {
+    const fromDate = dateRange!.from!.toISOString().split('T')[0];
+    const toDate = dateRange!.to!.toISOString().split('T')[0];
 
-  const handleCampaignClick = async (campaign: Campaign) => {
-    console.log('🔍 [DEBUG] Campaign clicked:', {
-      campaign_id: campaign.campaign_id,
-      campaign_name: campaign.campaign_name
+    const { data, error } = await supabase
+      .from('v_campaign_daily')
+      .select('*')
+      .eq('profile_id', profileId)
+      .gte('date', fromDate)
+      .lte('date', toDate);
+
+    if (error) throw error;
+
+    // Aggregate metrics by campaign
+    const campaignMap = new Map<string, Campaign>();
+    
+    data?.forEach((row: any) => {
+      const campaignId = row.campaign_id;
+      
+      if (!campaignMap.has(campaignId)) {
+        campaignMap.set(campaignId, {
+          campaign_id: campaignId,
+          campaign_name: row.campaign_name || 'Unknown',
+          campaign_type: row.campaign_type || 'N/A',
+          targeting_type: row.targeting_type || 'N/A',
+          status: row.status || 'unknown',
+          budget: row.budget || 0,
+          budget_type: row.budget_type || 'daily',
+          daily_spend: 0,
+          impressions: 0,
+          clicks: 0,
+          sales: 0,
+          acos: 0,
+          roas: 0,
+          ctr: 0,
+          cpc: 0,
+          conversions: 0,
+        });
+      }
+      
+      const campaign = campaignMap.get(campaignId)!;
+      campaign.daily_spend += row.spend || 0;
+      campaign.impressions += row.impressions || 0;
+      campaign.clicks += row.clicks || 0;
+      campaign.sales += row.sales || 0;
     });
 
-    setDetailsLoading(true);
-    setSelectedCampaign({ campaign, keywords: [], adGroups: [] });
-    
-    try {
-      // Check authentication state
-      const { data: { session } } = await supabase.auth.getSession();
-      console.log('🔍 [DEBUG] Current session:', {
-        user: session?.user?.email,
-        authenticated: !!session
-      });
-
-      // First, get the campaign UUID from amazon_campaign_id
-      const { data: campaignData, error: campaignError } = await supabase
-        .from('campaigns')
-        .select('id, profile_id')
-        .eq('amazon_campaign_id', campaign.campaign_id)
-        .single();
-
-      console.log('🔍 [DEBUG] Campaign UUID lookup:', {
-        campaignData,
-        campaignError,
-        amazon_campaign_id: campaign.campaign_id
-      });
-
-      if (campaignError || !campaignData) {
-        console.error('❌ [DEBUG] Campaign not found in campaigns table');
-        toast.error('Campaign not found');
-        return;
-      }
-
-      // Fetch ad groups using the campaign UUID
-      const { data: adGroups, error: adGroupsError } = await supabase
-        .from('ad_groups')
-        .select(`
-          id,
-          name,
-          status,
-          default_bid,
-          impressions,
-          clicks,
-          spend,
-          sales,
-          orders,
-          acos,
-          roas,
-          profile_id
-        `)
-        .eq('campaign_id', campaignData.id);
-
-      console.log('🔍 [DEBUG] Ad groups query result:', {
-        adGroups,
-        adGroupsError,
-        count: adGroups?.length || 0,
-        campaign_id: campaignData.id
-      });
-
-      if (adGroupsError) {
-        console.error('❌ [DEBUG] Ad groups error:', adGroupsError);
-        throw adGroupsError;
-      }
-
-      // Fetch keywords for all ad groups in this campaign
-      const adGroupIds = (adGroups || []).map(ag => ag.id);
-      console.log('🔍 [DEBUG] Ad group IDs for keywords query:', adGroupIds);
+    // Calculate averages and ratios
+    const campaignsArray = Array.from(campaignMap.values()).map(campaign => {
+      const totalSpend = campaign.daily_spend;
+      const avgSpend = totalSpend / dayCount;
       
-      let keywords: any[] = [];
-      
-      if (adGroupIds.length > 0) {
-        const { data: keywordData, error: keywordsError } = await supabase
-          .from('keywords')
-          .select(`
-            id,
-            keyword_text,
-            match_type,
-            bid,
-            status,
-            impressions,
-            clicks,
-            spend,
-            sales,
-            orders,
-            acos,
-            roas,
-            adgroup_id,
-            profile_id
-          `)
-          .in('adgroup_id', adGroupIds);
+      return {
+        ...campaign,
+        daily_spend: avgSpend,
+        acos: campaign.sales > 0 ? (totalSpend / campaign.sales) * 100 : 0,
+        roas: totalSpend > 0 ? campaign.sales / totalSpend : 0,
+        ctr: campaign.impressions > 0 ? (campaign.clicks / campaign.impressions) * 100 : 0,
+        cpc: campaign.clicks > 0 ? avgSpend / campaign.clicks : 0,
+        conversions: Math.floor(campaign.sales / 25),
+      };
+    });
 
-        console.log('🔍 [DEBUG] Keywords query result:', {
-          keywordData,
-          keywordsError,
-          count: keywordData?.length || 0,
-          adGroupIds
-        });
+    setCampaigns(campaignsArray);
+  };
 
-        if (keywordsError) {
-          console.error('❌ [DEBUG] Keywords error:', keywordsError);
-          throw keywordsError;
-        }
-        keywords = keywordData || [];
-      } else {
-        console.warn('⚠️ [DEBUG] No ad group IDs found, skipping keywords query');
-      }
+  const fetchAdGroups = async (profileId: string) => {
+    const { data, error } = await supabase
+      .from('ad_groups')
+      .select(`
+        id,
+        name,
+        status,
+        default_bid,
+        impressions,
+        clicks,
+        spend,
+        sales,
+        acos,
+        roas,
+        campaign_id,
+        campaigns!inner(name)
+      `)
+      .eq('profile_id', profileId);
 
-      console.log('✅ [DEBUG] Final results:', {
-        keywords_count: keywords.length,
-        adGroups_count: adGroups?.length || 0
-      });
+    if (error) throw error;
 
-      setSelectedCampaign({
-        campaign,
-        keywords,
-        adGroups: adGroups || [],
-      });
-    } catch (error) {
-      console.error('❌ [DEBUG] Error fetching campaign details:', error);
-      toast.error('Failed to load campaign details');
-    } finally {
-      setDetailsLoading(false);
-    }
+    const adGroupsData: AdGroup[] = (data || []).map((ag: any) => ({
+      id: ag.id,
+      name: ag.name,
+      campaign_name: ag.campaigns?.name || 'Unknown Campaign',
+      status: ag.status || 'unknown',
+      default_bid: ag.default_bid || 0,
+      impressions: ag.impressions || 0,
+      clicks: ag.clicks || 0,
+      spend: ag.spend || 0,
+      sales: ag.sales || 0,
+      acos: ag.acos || 0,
+      roas: ag.roas || 0,
+    }));
+
+    setAdGroups(adGroupsData);
+  };
+
+  const fetchKeywords = async (profileId: string) => {
+    const { data, error } = await supabase
+      .from('keywords')
+      .select(`
+        id,
+        keyword_text,
+        match_type,
+        status,
+        bid,
+        impressions,
+        clicks,
+        spend,
+        sales,
+        acos,
+        adgroup_id,
+        ad_groups!inner(name, campaign_id, campaigns!inner(name))
+      `)
+      .eq('profile_id', profileId);
+
+    if (error) throw error;
+
+    const keywordsData: Keyword[] = (data || []).map((kw: any) => ({
+      id: kw.id,
+      keyword_text: kw.keyword_text || 'N/A',
+      match_type: kw.match_type || 'N/A',
+      adgroup_name: kw.ad_groups?.name || 'Unknown Ad Group',
+      campaign_name: kw.ad_groups?.campaigns?.name || 'Unknown Campaign',
+      status: kw.status || 'unknown',
+      bid: kw.bid || 0,
+      impressions: kw.impressions || 0,
+      clicks: kw.clicks || 0,
+      spend: kw.spend || 0,
+      sales: kw.sales || 0,
+      acos: kw.acos || 0,
+    }));
+
+    setKeywords(keywordsData);
+  };
+
+  const fetchSearchTerms = async (profileId: string) => {
+    const { data, error } = await supabase
+      .from('v_studio_search_terms')
+      .select('*')
+      .eq('profile_id', profileId)
+      .limit(500);
+
+    if (error) throw error;
+
+    const searchTermsData: SearchTerm[] = (data || []).map((st: any) => ({
+      id: st.id || `${st.search_term}-${st.campaign_id}`,
+      search_term: st.search_term || 'N/A',
+      keyword_text: st.keyword_text || 'N/A',
+      campaign_name: st.campaign_name || 'Unknown Campaign',
+      impressions: st.impressions || 0,
+      clicks: st.clicks || 0,
+      spend: st.spend || 0,
+      sales: st.sales || 0,
+      acos: st.acos || (st.spend && st.sales ? (st.spend / st.sales) * 100 : 0),
+    }));
+
+    setSearchTerms(searchTermsData);
+  };
+
+  // Filter functions
+  const filteredCampaigns = useMemo(() => 
+    campaigns.filter(c => c.campaign_name.toLowerCase().includes(searchQuery.toLowerCase())),
+    [campaigns, searchQuery]
+  );
+
+  const filteredAdGroups = useMemo(() =>
+    adGroups.filter(ag => 
+      ag.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      ag.campaign_name.toLowerCase().includes(searchQuery.toLowerCase())
+    ),
+    [adGroups, searchQuery]
+  );
+
+  const filteredKeywords = useMemo(() =>
+    keywords.filter(kw => 
+      kw.keyword_text.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      kw.campaign_name.toLowerCase().includes(searchQuery.toLowerCase())
+    ),
+    [keywords, searchQuery]
+  );
+
+  const filteredSearchTerms = useMemo(() =>
+    searchTerms.filter(st => 
+      st.search_term.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      st.campaign_name.toLowerCase().includes(searchQuery.toLowerCase())
+    ),
+    [searchTerms, searchQuery]
+  );
+
+  // Counts for tabs
+  const counts = {
+    portfolios: portfolios.length,
+    campaigns: campaigns.length,
+    adGroups: adGroups.length,
+    targets: keywords.length,
+    searchTerms: searchTerms.length,
   };
 
   const getStatusBadge = (status: string) => {
-    const statusLower = status.toLowerCase();
+    const statusLower = status?.toLowerCase() || '';
     if (statusLower === 'enabled') {
       return <Badge variant="default" className="gap-1"><Play className="h-3 w-3" />Active</Badge>;
     } else if (statusLower === 'paused') {
@@ -403,6 +441,220 @@ const Campaigns = () => {
 
   const formatNumber = (value: number) => {
     return new Intl.NumberFormat('en-US').format(Math.round(value));
+  };
+
+  const renderEmptyState = (message: string, icon: React.ReactNode) => (
+    <div className="text-center py-12">
+      {icon}
+      <p className="text-muted-foreground mt-4">{message}</p>
+    </div>
+  );
+
+  const renderTable = () => {
+    if (loading) {
+      return (
+        <div className="space-y-3">
+          {[...Array(5)].map((_, i) => (
+            <Skeleton key={i} className="h-16 w-full" />
+          ))}
+        </div>
+      );
+    }
+
+    switch (viewLevel) {
+      case 'portfolios':
+        return renderEmptyState(
+          'Portfolios feature coming soon',
+          <Briefcase className="h-12 w-12 mx-auto text-muted-foreground" />
+        );
+
+      case 'campaigns':
+        if (filteredCampaigns.length === 0) {
+          return renderEmptyState(
+            searchQuery ? 'No campaigns match your search' : 'No campaigns found',
+            <Layers className="h-12 w-12 mx-auto text-muted-foreground" />
+          );
+        }
+        return (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Campaign Name</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Impressions</TableHead>
+                <TableHead className="text-right">Clicks</TableHead>
+                <TableHead className="text-right">Spend</TableHead>
+                <TableHead className="text-right">Sales</TableHead>
+                <TableHead className="text-right">ACOS</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredCampaigns.map((campaign) => (
+                <TableRow key={campaign.campaign_id}>
+                  <TableCell className="font-medium">{campaign.campaign_name}</TableCell>
+                  <TableCell>{getStatusBadge(campaign.status)}</TableCell>
+                  <TableCell className="text-right">{formatNumber(campaign.impressions)}</TableCell>
+                  <TableCell className="text-right">{formatNumber(campaign.clicks)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(campaign.daily_spend * dayCount)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(campaign.sales)}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      {campaign.acos > 30 ? (
+                        <TrendingUp className="h-3 w-3 text-destructive" />
+                      ) : (
+                        <TrendingDown className="h-3 w-3 text-success" />
+                      )}
+                      {campaign.acos.toFixed(1)}%
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        );
+
+      case 'ad-groups':
+        if (filteredAdGroups.length === 0) {
+          return renderEmptyState(
+            searchQuery ? 'No ad groups match your search' : 'No ad groups found',
+            <Target className="h-12 w-12 mx-auto text-muted-foreground" />
+          );
+        }
+        return (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Ad Group Name</TableHead>
+                <TableHead>Campaign</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Impressions</TableHead>
+                <TableHead className="text-right">Clicks</TableHead>
+                <TableHead className="text-right">Spend</TableHead>
+                <TableHead className="text-right">ACOS</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredAdGroups.map((ag) => (
+                <TableRow key={ag.id}>
+                  <TableCell className="font-medium">{ag.name}</TableCell>
+                  <TableCell className="text-muted-foreground text-sm">{ag.campaign_name}</TableCell>
+                  <TableCell>{getStatusBadge(ag.status)}</TableCell>
+                  <TableCell className="text-right">{formatNumber(ag.impressions)}</TableCell>
+                  <TableCell className="text-right">{formatNumber(ag.clicks)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(ag.spend)}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      {ag.acos > 30 ? (
+                        <TrendingUp className="h-3 w-3 text-destructive" />
+                      ) : (
+                        <TrendingDown className="h-3 w-3 text-success" />
+                      )}
+                      {ag.acos?.toFixed(1) || '0.0'}%
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        );
+
+      case 'targets':
+        if (filteredKeywords.length === 0) {
+          return renderEmptyState(
+            searchQuery ? 'No keywords match your search' : 'No keywords found',
+            <Tags className="h-12 w-12 mx-auto text-muted-foreground" />
+          );
+        }
+        return (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Keyword</TableHead>
+                <TableHead>Match Type</TableHead>
+                <TableHead>Ad Group</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Bid</TableHead>
+                <TableHead className="text-right">Clicks</TableHead>
+                <TableHead className="text-right">Spend</TableHead>
+                <TableHead className="text-right">ACOS</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredKeywords.map((kw) => (
+                <TableRow key={kw.id}>
+                  <TableCell className="font-medium">{kw.keyword_text}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="text-xs">{kw.match_type}</Badge>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-sm">{kw.adgroup_name}</TableCell>
+                  <TableCell>{getStatusBadge(kw.status)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(kw.bid)}</TableCell>
+                  <TableCell className="text-right">{formatNumber(kw.clicks)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(kw.spend)}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      {kw.acos > 30 ? (
+                        <TrendingUp className="h-3 w-3 text-destructive" />
+                      ) : (
+                        <TrendingDown className="h-3 w-3 text-success" />
+                      )}
+                      {kw.acos?.toFixed(1) || '0.0'}%
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        );
+
+      case 'search-terms':
+        if (filteredSearchTerms.length === 0) {
+          return renderEmptyState(
+            searchQuery ? 'No search terms match your search' : 'No search terms found',
+            <Search className="h-12 w-12 mx-auto text-muted-foreground" />
+          );
+        }
+        return (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Search Term</TableHead>
+                <TableHead>Matched Keyword</TableHead>
+                <TableHead>Campaign</TableHead>
+                <TableHead className="text-right">Impressions</TableHead>
+                <TableHead className="text-right">Clicks</TableHead>
+                <TableHead className="text-right">Spend</TableHead>
+                <TableHead className="text-right">ACOS</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredSearchTerms.map((st) => (
+                <TableRow key={st.id}>
+                  <TableCell className="font-medium">{st.search_term}</TableCell>
+                  <TableCell className="text-muted-foreground text-sm">{st.keyword_text}</TableCell>
+                  <TableCell className="text-muted-foreground text-sm">{st.campaign_name}</TableCell>
+                  <TableCell className="text-right">{formatNumber(st.impressions)}</TableCell>
+                  <TableCell className="text-right">{formatNumber(st.clicks)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(st.spend)}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      {st.acos > 30 ? (
+                        <TrendingUp className="h-3 w-3 text-destructive" />
+                      ) : (
+                        <TrendingDown className="h-3 w-3 text-success" />
+                      )}
+                      {st.acos?.toFixed(1) || '0.0'}%
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        );
+
+      default:
+        return null;
+    }
   };
 
   return (
@@ -473,9 +725,7 @@ const Campaigns = () => {
                 <CampaignLevelSelector
                   value={viewLevel}
                   onChange={setViewLevel}
-                  counts={{
-                    campaigns: campaigns.length,
-                  }}
+                  counts={counts}
                 />
                 
                 <div className="flex items-center gap-2">
@@ -513,191 +763,10 @@ const Campaigns = () => {
             </div>
             
             <CardContent>
-              {loading ? (
-                <div className="space-y-3">
-                  {[...Array(5)].map((_, i) => (
-                    <Skeleton key={i} className="h-16 w-full" />
-                  ))}
-                </div>
-              ) : filteredCampaigns.length === 0 ? (
-                <div className="text-center py-12">
-                  <Target className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">
-                    {searchQuery ? 'No campaigns match your search' : 'No campaigns found'}
-                  </p>
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Spend ({dayCount}d)</TableHead>
-                      <TableHead className="text-right">ACOS</TableHead>
-                      <TableHead className="w-12"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredCampaigns.map((campaign) => (
-                      <TableRow 
-                        key={campaign.campaign_id}
-                        className="cursor-pointer"
-                        onClick={() => handleCampaignClick(campaign)}
-                      >
-                        <TableCell className="font-medium">
-                          {campaign.campaign_name}
-                        </TableCell>
-                        <TableCell>
-                          {getStatusBadge(campaign.status)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatCurrency(campaign.daily_spend * dayCount)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            {campaign.acos > 30 ? (
-                              <TrendingUp className="h-3 w-3 text-destructive" />
-                            ) : (
-                              <TrendingDown className="h-3 w-3 text-success" />
-                            )}
-                            {campaign.acos.toFixed(1)}%
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Button 
-                            variant="ghost" 
-                            size="icon"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toast.info('AI suggestions coming soon!');
-                            }}
-                          >
-                            <Sparkles className="h-4 w-4 text-brand-accent" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
+              {renderTable()}
             </CardContent>
           </Card>
         )}
-
-        {/* Campaign Details Dialog */}
-        <Dialog open={!!selectedCampaign} onOpenChange={() => setSelectedCampaign(null)}>
-          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>{selectedCampaign?.campaign.campaign_name}</DialogTitle>
-            </DialogHeader>
-            
-            {detailsLoading ? (
-              <div className="space-y-3">
-                <Skeleton className="h-20 w-full" />
-                <Skeleton className="h-20 w-full" />
-                <Skeleton className="h-40 w-full" />
-              </div>
-            ) : selectedCampaign && (
-              <div className="space-y-6">
-                {/* Key Metrics */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <Card>
-                    <CardContent className="pt-6">
-                      <div className="text-sm text-muted-foreground">CTR</div>
-                      <div className="text-2xl font-bold">
-                        {selectedCampaign.campaign.ctr.toFixed(2)}%
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="pt-6">
-                      <div className="text-sm text-muted-foreground">CPC</div>
-                      <div className="text-2xl font-bold">
-                        {formatCurrency(selectedCampaign.campaign.cpc)}
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="pt-6">
-                      <div className="text-sm text-muted-foreground">Conversions</div>
-                      <div className="text-2xl font-bold">
-                        {selectedCampaign.campaign.conversions}
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="pt-6">
-                      <div className="text-sm text-muted-foreground">ROAS</div>
-                      <div className="text-2xl font-bold">
-                        {selectedCampaign.campaign.roas.toFixed(2)}x
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Tabs for Keywords and Ad Groups */}
-                <Tabs defaultValue="keywords" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="keywords">Keywords ({selectedCampaign.keywords.length})</TabsTrigger>
-                    <TabsTrigger value="adgroups">Ad Groups ({selectedCampaign.adGroups.length})</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="keywords" className="mt-4">
-                    {selectedCampaign.keywords.length === 0 ? (
-                      <p className="text-center text-muted-foreground py-8">No keywords found</p>
-                    ) : (
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Keyword</TableHead>
-                            <TableHead className="text-right">Clicks</TableHead>
-                            <TableHead className="text-right">Spend</TableHead>
-                            <TableHead className="text-right">Sales</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {selectedCampaign.keywords.map((kw: any, idx: number) => (
-                            <TableRow key={idx}>
-                              <TableCell>{kw.keyword_text || 'N/A'}</TableCell>
-                              <TableCell className="text-right">{kw.clicks || 0}</TableCell>
-                              <TableCell className="text-right">{formatCurrency(kw.spend || 0)}</TableCell>
-                              <TableCell className="text-right">{formatCurrency(kw.sales || 0)}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    )}
-                  </TabsContent>
-                  <TabsContent value="adgroups" className="mt-4">
-                    {selectedCampaign.adGroups.length === 0 ? (
-                      <p className="text-center text-muted-foreground py-8">No ad groups found</p>
-                    ) : (
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Ad Group</TableHead>
-                            <TableHead className="text-right">Impressions</TableHead>
-                            <TableHead className="text-right">Clicks</TableHead>
-                            <TableHead className="text-right">Spend</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {selectedCampaign.adGroups.map((ag: any, idx: number) => (
-                            <TableRow key={idx}>
-                              <TableCell>{ag.adgroup_name || 'N/A'}</TableCell>
-                              <TableCell className="text-right">{formatNumber(ag.impressions || 0)}</TableCell>
-                              <TableCell className="text-right">{formatNumber(ag.clicks || 0)}</TableCell>
-                              <TableCell className="text-right">{formatCurrency(ag.spend || 0)}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    )}
-                  </TabsContent>
-                </Tabs>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
       </div>
     </DashboardShell>
   );
