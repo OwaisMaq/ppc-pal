@@ -67,7 +67,7 @@ export const AccountHealthCard = ({
   spend,
   sales,
   currentAcos,
-  targetAcos = 30,
+  targetAcos = 20,
   automationStatus,
   automationReason,
   loading

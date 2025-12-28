@@ -22,7 +22,7 @@ const TEMPLATES: PlaybookTemplate[] = [
     defaultParams: {
       minConversions: 2,
       minSales: 50,
-      maxACOS: 30,
+      maxACOS: 20,
       lookbackDays: 14,
       exactBidMultiplier: 1.2,
       negativeMatchType: 'negative_exact'
@@ -34,7 +34,7 @@ const TEMPLATES: PlaybookTemplate[] = [
     name: 'Bid Down High ACOS',
     description: 'Lower bids on targets above ACOS goal',
     defaultParams: {
-      acosThreshold: 30,
+      acosThreshold: 25,
       bidReductionPercent: 20,
       minBidMicros: 100000, // $0.10
       lookbackDays: 7
