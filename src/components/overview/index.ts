@@ -15,3 +15,7 @@ export { OnboardingGuidanceCard, getDefaultSetupItems } from './OnboardingGuidan
 
 export { OverviewFilters, getMarketplaceName } from './OverviewFilters';
 export type { DatePreset, MarketplaceOption, BrandOption } from './OverviewFilters';
+
+export { TrustReportCard } from './TrustReportCard';
+export { OutcomeAttributionPanel } from './OutcomeAttributionPanel';
+export { QuickWinsCard } from './QuickWinsCard';
