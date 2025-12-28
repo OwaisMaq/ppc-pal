@@ -79,17 +79,17 @@ const PublicLanding = () => {
         </div>
       </header>
 
-      {/* Hero Section */}
-      <section className="min-h-[calc(100dvh-4rem)] md:min-h-0 md:py-20 lg:py-28 py-8 overflow-hidden flex items-center snap-start">
+      {/* Hero Section - includes trusted brands on mobile */}
+      <section className="min-h-[calc(100dvh-4rem)] md:min-h-0 md:py-20 lg:py-28 py-6 overflow-hidden flex items-center snap-start">
         <div className="container mx-auto px-4">
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-            <div className="space-y-8">
+          <div className="grid lg:grid-cols-2 gap-6 lg:gap-16 items-center">
+            <div className="space-y-4 md:space-y-8">
               {/* Playful Badge */}
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-100 dark:bg-amber-900/30 rounded-full text-sm font-medium text-amber-800 dark:text-amber-200 animate-fade-in">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-amber-100 dark:bg-amber-900/30 rounded-full text-xs md:text-sm font-medium text-amber-800 dark:text-amber-200 animate-fade-in">
                 <span>👋</span> Bye-bye, messy spreadsheets
               </div>
               
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-display font-bold tracking-tight leading-[1.1]">
+              <h1 className="text-3xl sm:text-5xl lg:text-6xl font-display font-bold tracking-tight leading-[1.1]">
                 Amazon Ads,{" "}
                 <span className="relative inline-block">
                   Simplified.
@@ -99,17 +99,17 @@ const PublicLanding = () => {
                 </span>
               </h1>
               
-              <p className="text-lg text-muted-foreground max-w-lg leading-relaxed">
+              <p className="text-base md:text-lg text-muted-foreground max-w-lg leading-relaxed">
                 We optimize your bids 24/7 so you can focus on growing your brand (or sleeping).
               </p>
               
-              <div className="flex flex-wrap items-center gap-4">
+              <div className="flex flex-wrap items-center gap-3 md:gap-4">
                 <Link to="/auth">
-                  <Button size="lg" className="gap-2 rounded-full px-8 shadow-lg hover:shadow-xl transition-shadow">
+                  <Button size="lg" className="gap-2 rounded-full px-6 md:px-8 shadow-lg hover:shadow-xl transition-shadow text-sm md:text-base">
                     Start Free Trial <ArrowRight className="h-4 w-4" />
                   </Button>
                 </Link>
-                <a href="#features" className="group">
+                <a href="#features" className="group hidden sm:block">
                   <Button variant="outline" size="lg" className="gap-2 rounded-full px-6">
                     <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors">
                       <svg className="w-3 h-3 text-primary" fill="currentColor" viewBox="0 0 24 24">
@@ -122,33 +122,33 @@ const PublicLanding = () => {
               </div>
               
               {/* Social Proof */}
-              <div className="flex items-center gap-4 pt-4">
+              <div className="flex items-center gap-3 md:gap-4 pt-2 md:pt-4">
                 <div className="flex -space-x-2">
                   {[
                     "bg-blue-500", "bg-emerald-500", "bg-purple-500", "bg-amber-500"
                   ].map((color, i) => (
                     <div 
                       key={i}
-                      className={`w-10 h-10 rounded-full ${color} border-2 border-background flex items-center justify-center text-white text-xs font-medium`}
+                      className={`w-8 h-8 md:w-10 md:h-10 rounded-full ${color} border-2 border-background flex items-center justify-center text-white text-xs font-medium`}
                       style={{ animationDelay: `${i * 100}ms` }}
                     >
                       {['M', 'S', 'J', 'A'][i]}
                     </div>
                   ))}
-                  <div className="w-10 h-10 rounded-full bg-muted border-2 border-background flex items-center justify-center text-xs font-medium text-muted-foreground">
+                  <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-muted border-2 border-background flex items-center justify-center text-xs font-medium text-muted-foreground">
                     +{displayCount.replace('+', '')}
                   </div>
                 </div>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-xs md:text-sm text-muted-foreground">
                   Trusted by <span className="font-semibold text-foreground">{displayCount}</span> sellers
                 </p>
               </div>
             </div>
             
             {/* Hero Image - Dashboard Preview with Floating Cards */}
-            <div className="relative scale-75 md:scale-100 origin-top">
+            <div className="relative scale-[0.55] md:scale-100 origin-top -mt-16 md:mt-0 -mb-24 md:mb-0">
               {/* Floating Metric Card - Top Right */}
-              <div className="absolute -top-4 -right-4 lg:right-0 z-10 animate-fade-in" style={{ animationDelay: '0.3s' }}>
+              <div className="absolute -top-4 -right-4 lg:right-0 z-10 animate-fade-in hidden md:block" style={{ animationDelay: '0.3s' }}>
                 <div className="bg-background rounded-xl shadow-xl border border-border p-4 flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center">
                     <TrendingUp className="h-5 w-5 text-white" />
@@ -166,7 +166,7 @@ const PublicLanding = () => {
               </div>
               
               {/* Floating Status Card - Bottom Left */}
-              <div className="absolute -bottom-4 -left-4 lg:left-8 z-10 animate-fade-in" style={{ animationDelay: '0.5s' }}>
+              <div className="absolute -bottom-4 -left-4 lg:left-8 z-10 animate-fade-in hidden md:block" style={{ animationDelay: '0.5s' }}>
                 <div className="bg-background rounded-xl shadow-xl border border-border p-4 flex items-center gap-3">
                   <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
                     <Sparkles className="h-4 w-4 text-primary" />
@@ -185,11 +185,30 @@ const PublicLanding = () => {
               </div>
             </div>
           </div>
+          
+          {/* Trusted By - Integrated in hero on mobile */}
+          <div className="mt-4 md:mt-0 pt-4 md:pt-0 border-t border-border md:border-0 md:hidden">
+            <p className="text-center text-[10px] font-medium text-muted-foreground tracking-widest uppercase mb-3">
+              Powering Top Brands Globally
+            </p>
+            <div className="flex items-center justify-center gap-8">
+              <img 
+                src={infiniteWorldLogo} 
+                alt="Infinite World" 
+                className="h-8 w-auto object-contain opacity-70"
+              />
+              <img 
+                src={wishAndWillowLogo} 
+                alt="Wish & Willow" 
+                className="h-8 w-auto object-contain opacity-70"
+              />
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* Trusted By Section */}
-      <section className="min-h-[100dvh] md:min-h-0 md:py-12 py-8 border-y border-border bg-muted/20 flex items-center snap-start">
+      {/* Trusted By Section - Desktop only */}
+      <section className="hidden md:flex md:py-12 border-y border-border bg-muted/20 items-center">
         <div className="container mx-auto px-4">
           <p className="text-center text-xs font-medium text-muted-foreground tracking-widest uppercase mb-8">
             Powering Top Brands Globally
@@ -214,27 +233,48 @@ const PublicLanding = () => {
       </section>
 
       {/* Capabilities Section */}
-      <section id="features" className="min-h-[100dvh] md:min-h-0 md:py-20 lg:py-28 py-12 relative overflow-hidden flex items-center snap-start">
+      <section id="features" className="min-h-[calc(100dvh-4rem)] md:min-h-0 md:py-20 lg:py-28 py-8 relative overflow-hidden flex items-center snap-start">
         {/* Section background with subtle pattern */}
         <div className="absolute inset-0 bg-muted/40" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,hsl(var(--primary)/0.08),transparent)]" />
         
         <div className="container mx-auto px-4 relative">
           {/* Section header */}
-          <div className="text-center mb-16 lg:mb-20">
-            <p className="text-xs font-semibold text-primary uppercase tracking-[0.2em] mb-4">Capabilities</p>
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold mb-4">
+          <div className="text-center mb-6 md:mb-16 lg:mb-20">
+            <p className="text-xs font-semibold text-primary uppercase tracking-[0.2em] mb-2 md:mb-4">Capabilities</p>
+            <h2 className="text-2xl sm:text-4xl lg:text-5xl font-display font-bold mb-2 md:mb-4">
               Your unfair advantage
             </h2>
-            <p className="text-muted-foreground text-base sm:text-lg max-w-2xl mx-auto">
+            <p className="text-muted-foreground text-sm sm:text-lg max-w-2xl mx-auto">
               While competitors guess, you'll <span className="text-foreground font-medium">know</span>.
             </p>
           </div>
           
-          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-8 lg:gap-12 items-start">
+          {/* Mobile: Horizontal scroll cards */}
+          <div className="md:hidden flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory -mx-4 px-4 scrollbar-hide">
+            {[
+              { icon: <div className="w-3 h-3 rounded-full bg-primary animate-pulse" />, iconBg: "bg-primary/10", label: "Automation", title: "Works while you sleep", desc: "3am bid adjustments? Done. Weekend optimization? Handled." },
+              { icon: <div className="w-3 h-3 rounded-sm bg-destructive" />, iconBg: "bg-destructive/10", label: "Keywords", title: "Kill the money-wasters", desc: "Spot bleeding keywords before they drain your budget." },
+              { icon: <div className="w-4 h-2 rounded-sm bg-blue-500" />, iconBg: "bg-blue-500/10", label: "Analytics", title: "Numbers that make sense", desc: "No PhD required. See exactly what's working." }
+            ].map((item, i) => (
+              <div key={i} className="flex-shrink-0 w-[280px] snap-center bg-background rounded-xl border border-border p-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", item.iconBg)}>
+                    {item.icon}
+                  </div>
+                  <p className="text-xs font-semibold text-foreground">{item.label}</p>
+                </div>
+                <h3 className="text-lg font-display font-semibold mb-2 leading-tight">{item.title}</h3>
+                <p className="text-xs text-muted-foreground leading-relaxed">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+          
+          {/* Desktop: Grid layout */}
+          <div className="hidden md:grid md:grid-cols-3 gap-8 lg:gap-12 items-start">
             {/* Automation Card */}
             <div className="group flex flex-col h-full">
-              <div className="min-h-[140px] md:min-h-[160px] mb-6">
+              <div className="min-h-[160px] mb-6">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                     <div className="w-3 h-3 rounded-full bg-primary animate-pulse" />
@@ -255,7 +295,7 @@ const PublicLanding = () => {
             
             {/* Keywords Card */}
             <div className="group flex flex-col h-full">
-              <div className="min-h-[140px] md:min-h-[160px] mb-6">
+              <div className="min-h-[160px] mb-6">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center">
                     <div className="w-3 h-3 rounded-sm bg-destructive" />
@@ -275,8 +315,8 @@ const PublicLanding = () => {
             </div>
             
             {/* Analytics Card */}
-            <div className="group flex flex-col h-full sm:col-span-2 md:col-span-1">
-              <div className="min-h-[140px] md:min-h-[160px] mb-6">
+            <div className="group flex flex-col h-full">
+              <div className="min-h-[160px] mb-6">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
                     <div className="w-4 h-2 rounded-sm bg-blue-500" />
@@ -299,23 +339,47 @@ const PublicLanding = () => {
       </section>
 
       {/* Results Section */}
-      <section className="min-h-[100dvh] md:min-h-0 md:py-20 lg:py-28 py-12 relative border-t border-border flex items-center snap-start">
+      <section className="min-h-[calc(100dvh-4rem)] md:min-h-0 md:py-20 lg:py-28 py-8 relative border-t border-border flex items-center snap-start">
         <div className="container mx-auto px-4">
           {/* Section header */}
-          <div className="text-center mb-16 lg:mb-20">
-            <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-[0.2em] mb-4">Results</p>
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold mb-4">
+          <div className="text-center mb-6 md:mb-16 lg:mb-20">
+            <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-[0.2em] mb-2 md:mb-4">Results</p>
+            <h2 className="text-2xl sm:text-4xl lg:text-5xl font-display font-bold mb-2 md:mb-4">
               The "is this real?" results
             </h2>
-            <p className="text-muted-foreground text-base sm:text-lg max-w-2xl mx-auto">
-              Spoiler: Yes. Our average seller sees ROI improvements within <span className="text-foreground font-medium">72 hours</span>.
+            <p className="text-muted-foreground text-sm sm:text-lg max-w-2xl mx-auto">
+              Spoiler: Yes. ROI improvements within <span className="text-foreground font-medium">72 hours</span>.
             </p>
           </div>
           
-          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-8 lg:gap-12 items-start">
+          {/* Mobile: Horizontal scroll cards */}
+          <div className="md:hidden flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory -mx-4 px-4 scrollbar-hide">
+            {[
+              { icon: <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400">%</span>, label: "Savings", title: "23% less spend", desc: "Same sales, bigger margin.", metric: "23%" },
+              { icon: <svg className="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M2 12h4l3-9 6 18 3-9h4" /></svg>, label: "Returns", title: "ROAS boost", desc: "Average: 2.1x → 3.4x", metric: "3.4x" },
+              { icon: <div className="w-4 h-4 rounded-full border-2 border-emerald-600 border-t-transparent animate-spin" style={{ animationDuration: '2s' }} />, label: "Time", title: "10+ hours back", desc: "Every week, automatically.", metric: "10h" }
+            ].map((item, i) => (
+              <div key={i} className="flex-shrink-0 w-[280px] snap-center bg-background rounded-xl border border-border p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                      {item.icon}
+                    </div>
+                    <p className="text-xs font-semibold text-foreground">{item.label}</p>
+                  </div>
+                  <span className="text-xl font-display font-bold text-emerald-600">{item.metric}</span>
+                </div>
+                <h3 className="text-lg font-display font-semibold mb-2 leading-tight">{item.title}</h3>
+                <p className="text-xs text-muted-foreground leading-relaxed">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+          
+          {/* Desktop: Grid layout */}
+          <div className="hidden md:grid md:grid-cols-3 gap-8 lg:gap-12 items-start">
             {/* Savings */}
             <div className="group flex flex-col h-full">
-              <div className="min-h-[140px] md:min-h-[160px] mb-6">
+              <div className="min-h-[160px] mb-6">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="relative w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-t from-emerald-500/20 to-transparent" />
@@ -337,7 +401,7 @@ const PublicLanding = () => {
             
             {/* Returns */}
             <div className="group flex flex-col h-full">
-              <div className="min-h-[140px] md:min-h-[160px] mb-6">
+              <div className="min-h-[160px] mb-6">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="relative w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
                     <svg className="w-5 h-5 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -359,8 +423,8 @@ const PublicLanding = () => {
             </div>
             
             {/* Time */}
-            <div className="group flex flex-col h-full sm:col-span-2 md:col-span-1">
-              <div className="min-h-[140px] md:min-h-[160px] mb-6">
+            <div className="group flex flex-col h-full">
+              <div className="min-h-[160px] mb-6">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="relative w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
                     <div className="w-4 h-4 rounded-full border-2 border-emerald-600 dark:border-emerald-400 border-t-transparent animate-spin" style={{ animationDuration: '2s' }} />
@@ -383,27 +447,46 @@ const PublicLanding = () => {
       </section>
 
       {/* How It Works Section */}
-      <section className="min-h-[100dvh] md:min-h-0 md:py-20 lg:py-28 py-12 relative overflow-hidden flex items-center snap-start">
+      <section className="min-h-[calc(100dvh-4rem)] md:min-h-0 md:py-20 lg:py-28 py-8 relative overflow-hidden flex items-center snap-start">
         {/* Section background */}
         <div className="absolute inset-0 bg-muted/40" />
         <div className="absolute inset-0 bg-[linear-gradient(to_right,hsl(var(--border)/0.3)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border)/0.3)_1px,transparent_1px)] bg-[size:4rem_4rem]" />
         
         <div className="container mx-auto px-4 relative">
           {/* Section header */}
-          <div className="text-center mb-16 lg:mb-20">
-            <p className="text-xs font-semibold text-primary uppercase tracking-[0.2em] mb-4">Process</p>
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold mb-4">
+          <div className="text-center mb-6 md:mb-16 lg:mb-20">
+            <p className="text-xs font-semibold text-primary uppercase tracking-[0.2em] mb-2 md:mb-4">Process</p>
+            <h2 className="text-2xl sm:text-4xl lg:text-5xl font-display font-bold mb-2 md:mb-4">
               Stupid simple setup
             </h2>
-            <p className="text-muted-foreground text-base sm:text-lg max-w-2xl mx-auto">
-              Coffee's still hot by the time you're done. <span className="text-foreground font-medium">Under 5 minutes</span>, we promise.
+            <p className="text-muted-foreground text-sm sm:text-lg max-w-2xl mx-auto">
+              <span className="text-foreground font-medium">Under 5 minutes</span>, we promise.
             </p>
+          </div>
+          
+          {/* Mobile: Horizontal steps */}
+          <div className="md:hidden flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory -mx-4 px-4 scrollbar-hide">
+            {[
+              { step: 1, title: "Connect", desc: "One OAuth flow. No API keys." },
+              { step: 2, title: "Analyze", desc: "AI scans every campaign." },
+              { step: 3, title: "Optimize", desc: "Bids adjust automatically." }
+            ].map((item, i) => (
+              <div key={i} className="flex-shrink-0 w-[280px] snap-center bg-background rounded-xl border border-border p-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-foreground text-background text-sm font-bold">{item.step}</span>
+                  <div className="h-px flex-1 bg-border" />
+                </div>
+                <h3 className="text-lg font-display font-semibold mb-2">{item.title}</h3>
+                <p className="text-xs text-muted-foreground leading-relaxed">{item.desc}</p>
+              </div>
+            ))}
           </div>
           
           {/* Steps connector line - desktop only */}
           <div className="hidden md:block absolute top-[340px] left-1/2 -translate-x-1/2 w-[60%] h-px bg-gradient-to-r from-transparent via-border to-transparent" />
           
-          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-8 lg:gap-12">
+          {/* Desktop: Grid layout */}
+          <div className="hidden md:grid md:grid-cols-3 gap-8 lg:gap-12">
             {/* Connect */}
             <div className="group flex flex-col space-y-6">
               <div className="flex-1 min-h-0 rounded-xl overflow-hidden border border-border/50 shadow-sm group-hover:shadow-md group-hover:border-border transition-all duration-300">
@@ -443,7 +526,7 @@ const PublicLanding = () => {
             </div>
             
             {/* Optimize */}
-            <div className="group flex flex-col space-y-6 sm:col-span-2 md:col-span-1">
+            <div className="group flex flex-col space-y-6">
               <div className="flex-1 min-h-0 rounded-xl overflow-hidden border border-border/50 shadow-sm group-hover:shadow-md group-hover:border-border transition-all duration-300">
                 <OptimizePreview />
               </div>
@@ -465,20 +548,51 @@ const PublicLanding = () => {
       </section>
 
       {/* Testimonials Section */}
-      <section className="min-h-[100dvh] md:min-h-0 md:py-20 lg:py-28 py-12 relative border-t border-border flex items-center snap-start">
+      <section className="min-h-[calc(100dvh-4rem)] md:min-h-0 md:py-20 lg:py-28 py-8 relative border-t border-border flex items-center snap-start">
         <div className="container mx-auto px-4">
           {/* Section header */}
-          <div className="text-center mb-16 lg:mb-20">
-            <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-[0.2em] mb-4">Testimonials</p>
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold mb-4">
+          <div className="text-center mb-6 md:mb-16 lg:mb-20">
+            <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-[0.2em] mb-2 md:mb-4">Testimonials</p>
+            <h2 className="text-2xl sm:text-4xl lg:text-5xl font-display font-bold mb-2 md:mb-4">
               Don't take our word for it
             </h2>
-            <p className="text-muted-foreground text-base sm:text-lg max-w-2xl mx-auto">
-              Real sellers. Real results. Real quotes we didn't make up.
+            <p className="text-muted-foreground text-sm sm:text-lg max-w-2xl mx-auto">
+              Real sellers. Real results.
             </p>
           </div>
           
-          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6 lg:gap-8">
+          {/* Mobile: Horizontal scroll testimonials */}
+          <div className="md:hidden flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory -mx-4 px-4 scrollbar-hide">
+            {[
+              { name: "Marcus Chen", role: "Electronics seller", quote: "Same revenue, 10x better life.", metric: "10x" },
+              { name: "Sarah Williams", role: "Home goods brand", quote: "ACoS from 42% to 18% in 3 weeks.", metric: "42%→18%" },
+              { name: "James Rodriguez", role: "Supplements", quote: "Connected in 3 min, savings in 3 days.", metric: "3 min" }
+            ].map((t, i) => (
+              <div key={i} className="flex-shrink-0 w-[280px] snap-center bg-background rounded-xl border border-border p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex gap-0.5">
+                    {[...Array(5)].map((_, j) => (
+                      <Star key={j} className="h-3 w-3 fill-amber-400 text-amber-400" />
+                    ))}
+                  </div>
+                  <span className="text-lg font-display font-bold text-primary">{t.metric}</span>
+                </div>
+                <blockquote className="text-sm mb-4 leading-relaxed text-foreground/90">"{t.quote}"</blockquote>
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+                    <span className="text-sm font-semibold text-muted-foreground">{t.name.charAt(0)}</span>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-xs">{t.name}</p>
+                    <p className="text-[10px] text-muted-foreground">{t.role}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          {/* Desktop: Grid layout */}
+          <div className="hidden md:grid md:grid-cols-3 gap-6 lg:gap-8">
             {[
               {
                 stars: 5,
@@ -541,8 +655,8 @@ const PublicLanding = () => {
             ))}
           </div>
           
-          {/* Trust indicator */}
-          <div className="mt-16 text-center">
+          {/* Trust indicator - desktop only */}
+          <div className="hidden md:block mt-16 text-center">
             <div className="inline-flex items-center gap-4 px-6 py-4 rounded-2xl bg-muted/50 border border-border">
               <div className="flex -space-x-3">
                 {['M', 'S', 'J', 'A'].map((initial, i) => (
