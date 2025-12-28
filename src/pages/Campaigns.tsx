@@ -122,6 +122,15 @@ const Campaigns = () => {
   const [searchTerms, setSearchTerms] = useState<SearchTerm[]>([]);
   const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
   
+  // Separate counts state for tab badges
+  const [tabCounts, setTabCounts] = useState({
+    portfolios: 0,
+    campaigns: 0,
+    adGroups: 0,
+    targets: 0,
+    searchTerms: 0,
+  });
+  
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [autoMode, setAutoMode] = useState(false);
@@ -166,6 +175,35 @@ const Campaigns = () => {
       setSelectedPreset('custom');
     }
   };
+
+  // Fetch counts for all tabs on mount and when profile changes
+  useEffect(() => {
+    const fetchCounts = async () => {
+      if (!primaryConnection) return;
+      
+      const profileId = primaryConnection.profile_id;
+      
+      try {
+        const [campaignsRes, adGroupsRes, keywordsRes] = await Promise.all([
+          supabase.from('campaigns').select('id', { count: 'exact', head: true }).eq('profile_id', profileId),
+          supabase.from('ad_groups').select('id', { count: 'exact', head: true }).eq('profile_id', profileId),
+          supabase.from('keywords').select('id', { count: 'exact', head: true }).eq('profile_id', profileId),
+        ]);
+        
+        setTabCounts({
+          portfolios: 0, // Not implemented yet
+          campaigns: campaignsRes.count || 0,
+          adGroups: adGroupsRes.count || 0,
+          targets: keywordsRes.count || 0,
+          searchTerms: 0, // Will be set when fetched
+        });
+      } catch (error) {
+        console.error('Error fetching counts:', error);
+      }
+    };
+    
+    fetchCounts();
+  }, [primaryConnection]);
 
   // Fetch data based on current view level
   useEffect(() => {
@@ -295,11 +333,16 @@ const Campaigns = () => {
         acos,
         roas,
         campaign_id,
-        campaigns!inner(name)
+        campaigns(name)
       `)
       .eq('profile_id', profileId);
 
-    if (error) throw error;
+    if (error) {
+      console.error('fetchAdGroups error:', error);
+      throw error;
+    }
+
+    console.log('fetchAdGroups data:', data?.length, 'for profile:', profileId);
 
     const adGroupsData: AdGroup[] = (data || []).map((ag: any) => ({
       id: ag.id,
@@ -333,11 +376,16 @@ const Campaigns = () => {
         sales,
         acos,
         adgroup_id,
-        ad_groups!inner(name, campaign_id, campaigns!inner(name))
+        ad_groups(name, campaign_id, campaigns(name))
       `)
       .eq('profile_id', profileId);
 
-    if (error) throw error;
+    if (error) {
+      console.error('fetchKeywords error:', error);
+      throw error;
+    }
+
+    console.log('fetchKeywords data:', data?.length, 'for profile:', profileId);
 
     const keywordsData: Keyword[] = (data || []).map((kw: any) => ({
       id: kw.id,
@@ -411,13 +459,13 @@ const Campaigns = () => {
     [searchTerms, searchQuery]
   );
 
-  // Counts for tabs
+  // Counts for tabs - use pre-fetched counts, but update with actual data when available
   const counts = {
-    portfolios: portfolios.length,
-    campaigns: campaigns.length,
-    adGroups: adGroups.length,
-    targets: keywords.length,
-    searchTerms: searchTerms.length,
+    portfolios: tabCounts.portfolios,
+    campaigns: tabCounts.campaigns || campaigns.length,
+    adGroups: tabCounts.adGroups || adGroups.length,
+    targets: tabCounts.targets || keywords.length,
+    searchTerms: tabCounts.searchTerms || searchTerms.length,
   };
 
   const getStatusBadge = (status: string) => {
