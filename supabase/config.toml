@@ -115,9 +115,6 @@ verify_jwt = false
 [functions.refresh-amazon-token]
 verify_jwt = false
 
-[functions.refresh-all-tokens]
-verify_jwt = false
-
 [functions.historical-import]
 verify_jwt = true
 
@@ -145,3 +142,17 @@ verify_jwt = false
 [functions.historical-audit]
 verify_jwt = true
 
+[functions.bayesian-bid-optimizer]
+verify_jwt = false
+
+[functions.bid-response-modeler]
+verify_jwt = false
+
+[functions.portfolio-optimizer]
+verify_jwt = false
+
+[functions.incrementality-analyzer]
+verify_jwt = true
+
+[functions.bid-observation-collector]
+verify_jwt = false

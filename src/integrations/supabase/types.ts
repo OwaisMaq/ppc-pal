@@ -1366,6 +1366,252 @@ export type Database = {
         }
         Relationships: []
       }
+      bid_observations: {
+        Row: {
+          attribution_window: string | null
+          bid_at_time_micros: number | null
+          clicks: number
+          conversions: number
+          created_at: string
+          date: string
+          entity_id: string
+          entity_type: string
+          id: string
+          impressions: number
+          profile_id: string
+          reward: number | null
+          reward_type: string | null
+          sales_micros: number
+          spend_micros: number
+        }
+        Insert: {
+          attribution_window?: string | null
+          bid_at_time_micros?: number | null
+          clicks?: number
+          conversions?: number
+          created_at?: string
+          date: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          impressions?: number
+          profile_id: string
+          reward?: number | null
+          reward_type?: string | null
+          sales_micros?: number
+          spend_micros?: number
+        }
+        Update: {
+          attribution_window?: string | null
+          bid_at_time_micros?: number | null
+          clicks?: number
+          conversions?: number
+          created_at?: string
+          date?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          impressions?: number
+          profile_id?: string
+          reward?: number | null
+          reward_type?: string | null
+          sales_micros?: number
+          spend_micros?: number
+        }
+        Relationships: []
+      }
+      bid_optimizer_runs: {
+        Row: {
+          actions_queued: number | null
+          bids_changed: number | null
+          bids_sampled: number | null
+          config: Json | null
+          entities_eligible: number | null
+          entities_evaluated: number | null
+          error: string | null
+          finished_at: string | null
+          id: string
+          profile_id: string
+          started_at: string
+          status: string
+          summary: Json | null
+        }
+        Insert: {
+          actions_queued?: number | null
+          bids_changed?: number | null
+          bids_sampled?: number | null
+          config?: Json | null
+          entities_eligible?: number | null
+          entities_evaluated?: number | null
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          profile_id: string
+          started_at?: string
+          status?: string
+          summary?: Json | null
+        }
+        Update: {
+          actions_queued?: number | null
+          bids_changed?: number | null
+          bids_sampled?: number | null
+          config?: Json | null
+          entities_eligible?: number | null
+          entities_evaluated?: number | null
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          profile_id?: string
+          started_at?: string
+          status?: string
+          summary?: Json | null
+        }
+        Relationships: []
+      }
+      bid_response_models: {
+        Row: {
+          created_at: string
+          entity_id: string
+          entity_type: string
+          id: string
+          knee_bid_micros: number | null
+          last_fitted_at: string | null
+          model_type: string
+          optimal_bid_micros: number | null
+          params: Json
+          profile_id: string
+          r_squared: number | null
+          rmse: number | null
+          samples_used: number | null
+          saturation_bid_micros: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          knee_bid_micros?: number | null
+          last_fitted_at?: string | null
+          model_type: string
+          optimal_bid_micros?: number | null
+          params?: Json
+          profile_id: string
+          r_squared?: number | null
+          rmse?: number | null
+          samples_used?: number | null
+          saturation_bid_micros?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          knee_bid_micros?: number | null
+          last_fitted_at?: string | null
+          model_type?: string
+          optimal_bid_micros?: number | null
+          params?: Json
+          profile_id?: string
+          r_squared?: number | null
+          rmse?: number | null
+          samples_used?: number | null
+          saturation_bid_micros?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      bid_states: {
+        Row: {
+          ad_group_id: string | null
+          alpha: number
+          beta: number
+          campaign_id: string | null
+          confidence_level: string | null
+          confidence_lower: number | null
+          confidence_upper: number | null
+          created_at: string
+          credible_interval_width: number | null
+          current_bid_micros: number | null
+          entity_id: string
+          entity_type: string
+          id: string
+          last_applied_bid_micros: number | null
+          last_observation_at: string | null
+          last_optimized_at: string | null
+          last_sampled_bid_micros: number | null
+          observations_count: number
+          prior_alpha: number
+          prior_beta: number
+          profile_id: string
+          total_clicks: number
+          total_conversions: number
+          total_impressions: number
+          total_sales_micros: number
+          total_spend_micros: number
+          updated_at: string
+        }
+        Insert: {
+          ad_group_id?: string | null
+          alpha?: number
+          beta?: number
+          campaign_id?: string | null
+          confidence_level?: string | null
+          confidence_lower?: number | null
+          confidence_upper?: number | null
+          created_at?: string
+          credible_interval_width?: number | null
+          current_bid_micros?: number | null
+          entity_id: string
+          entity_type: string
+          id?: string
+          last_applied_bid_micros?: number | null
+          last_observation_at?: string | null
+          last_optimized_at?: string | null
+          last_sampled_bid_micros?: number | null
+          observations_count?: number
+          prior_alpha?: number
+          prior_beta?: number
+          profile_id: string
+          total_clicks?: number
+          total_conversions?: number
+          total_impressions?: number
+          total_sales_micros?: number
+          total_spend_micros?: number
+          updated_at?: string
+        }
+        Update: {
+          ad_group_id?: string | null
+          alpha?: number
+          beta?: number
+          campaign_id?: string | null
+          confidence_level?: string | null
+          confidence_lower?: number | null
+          confidence_upper?: number | null
+          created_at?: string
+          credible_interval_width?: number | null
+          current_bid_micros?: number | null
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          last_applied_bid_micros?: number | null
+          last_observation_at?: string | null
+          last_optimized_at?: string | null
+          last_sampled_bid_micros?: number | null
+          observations_count?: number
+          prior_alpha?: number
+          prior_beta?: number
+          profile_id?: string
+          total_clicks?: number
+          total_conversions?: number
+          total_impressions?: number
+          total_sales_micros?: number
+          total_spend_micros?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       billing_subscriptions: {
         Row: {
           cancel_at_period_end: boolean | null
@@ -2802,6 +3048,90 @@ export type Database = {
         }
         Relationships: []
       }
+      incrementality_experiments: {
+        Row: {
+          baseline_metrics: Json | null
+          confidence_interval: Json | null
+          control_group: Json | null
+          cooldown_end_date: string | null
+          created_at: string
+          entity_id: string
+          entity_type: string
+          experiment_cost_micros: number | null
+          experiment_type: string
+          id: string
+          incremental_lift: number | null
+          incremental_lift_percent: number | null
+          incremental_sales_micros: number | null
+          is_significant: boolean | null
+          name: string
+          profile_id: string
+          statistical_significance: number | null
+          status: string
+          treatment_end_date: string | null
+          treatment_group: Json | null
+          treatment_metrics: Json | null
+          treatment_start_date: string | null
+          updated_at: string
+          user_id: string
+          warmup_start_date: string | null
+        }
+        Insert: {
+          baseline_metrics?: Json | null
+          confidence_interval?: Json | null
+          control_group?: Json | null
+          cooldown_end_date?: string | null
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          experiment_cost_micros?: number | null
+          experiment_type: string
+          id?: string
+          incremental_lift?: number | null
+          incremental_lift_percent?: number | null
+          incremental_sales_micros?: number | null
+          is_significant?: boolean | null
+          name: string
+          profile_id: string
+          statistical_significance?: number | null
+          status?: string
+          treatment_end_date?: string | null
+          treatment_group?: Json | null
+          treatment_metrics?: Json | null
+          treatment_start_date?: string | null
+          updated_at?: string
+          user_id: string
+          warmup_start_date?: string | null
+        }
+        Update: {
+          baseline_metrics?: Json | null
+          confidence_interval?: Json | null
+          control_group?: Json | null
+          cooldown_end_date?: string | null
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          experiment_cost_micros?: number | null
+          experiment_type?: string
+          id?: string
+          incremental_lift?: number | null
+          incremental_lift_percent?: number | null
+          incremental_sales_micros?: number | null
+          is_significant?: boolean | null
+          name?: string
+          profile_id?: string
+          statistical_significance?: number | null
+          status?: string
+          treatment_end_date?: string | null
+          treatment_group?: Json | null
+          treatment_metrics?: Json | null
+          treatment_start_date?: string | null
+          updated_at?: string
+          user_id?: string
+          warmup_start_date?: string | null
+        }
+        Relationships: []
+      }
       keyword_performance_history: {
         Row: {
           acos: number | null
@@ -3465,6 +3795,111 @@ export type Database = {
         }
         Relationships: []
       }
+      portfolio_marginal_curves: {
+        Row: {
+          campaign_id: string
+          created_at: string
+          current_acos: number | null
+          current_roas: number | null
+          current_sales_micros: number | null
+          current_spend_micros: number | null
+          data_points: number | null
+          diminishing_returns_threshold_micros: number | null
+          id: string
+          last_calculated_at: string | null
+          marginal_curve: Json | null
+          marginal_roas_at_current: number | null
+          optimal_spend_micros: number | null
+          profile_id: string
+          r_squared: number | null
+          updated_at: string
+        }
+        Insert: {
+          campaign_id: string
+          created_at?: string
+          current_acos?: number | null
+          current_roas?: number | null
+          current_sales_micros?: number | null
+          current_spend_micros?: number | null
+          data_points?: number | null
+          diminishing_returns_threshold_micros?: number | null
+          id?: string
+          last_calculated_at?: string | null
+          marginal_curve?: Json | null
+          marginal_roas_at_current?: number | null
+          optimal_spend_micros?: number | null
+          profile_id: string
+          r_squared?: number | null
+          updated_at?: string
+        }
+        Update: {
+          campaign_id?: string
+          created_at?: string
+          current_acos?: number | null
+          current_roas?: number | null
+          current_sales_micros?: number | null
+          current_spend_micros?: number | null
+          data_points?: number | null
+          diminishing_returns_threshold_micros?: number | null
+          id?: string
+          last_calculated_at?: string | null
+          marginal_curve?: Json | null
+          marginal_roas_at_current?: number | null
+          optimal_spend_micros?: number | null
+          profile_id?: string
+          r_squared?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      portfolio_optimization_runs: {
+        Row: {
+          actions_queued: number | null
+          campaigns_included: number | null
+          error: string | null
+          finished_at: string | null
+          id: string
+          optimization_goal: string | null
+          profile_id: string
+          projected_incremental_sales_micros: number | null
+          projected_roas_improvement: number | null
+          reallocation_summary: Json | null
+          started_at: string
+          status: string
+          total_budget_micros: number | null
+        }
+        Insert: {
+          actions_queued?: number | null
+          campaigns_included?: number | null
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          optimization_goal?: string | null
+          profile_id: string
+          projected_incremental_sales_micros?: number | null
+          projected_roas_improvement?: number | null
+          reallocation_summary?: Json | null
+          started_at?: string
+          status?: string
+          total_budget_micros?: number | null
+        }
+        Update: {
+          actions_queued?: number | null
+          campaigns_included?: number | null
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          optimization_goal?: string | null
+          profile_id?: string
+          projected_incremental_sales_micros?: number | null
+          projected_roas_improvement?: number | null
+          reallocation_summary?: Json | null
+          started_at?: string
+          status?: string
+          total_budget_micros?: number | null
+        }
+        Relationships: []
+      }
       profile_currency: {
         Row: {
           currency: string
@@ -3882,6 +4317,44 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      synthetic_control_weights: {
+        Row: {
+          control_entity_id: string
+          control_entity_type: string
+          created_at: string
+          experiment_id: string
+          id: string
+          pre_treatment_rmse: number | null
+          weight: number
+        }
+        Insert: {
+          control_entity_id: string
+          control_entity_type: string
+          created_at?: string
+          experiment_id: string
+          id?: string
+          pre_treatment_rmse?: number | null
+          weight: number
+        }
+        Update: {
+          control_entity_id?: string
+          control_entity_type?: string
+          created_at?: string
+          experiment_id?: string
+          id?: string
+          pre_treatment_rmse?: number | null
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "synthetic_control_weights_experiment_id_fkey"
+            columns: ["experiment_id"]
+            isOneToOne: false
+            referencedRelation: "incrementality_experiments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       targets: {
         Row: {
