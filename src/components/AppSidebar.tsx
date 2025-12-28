@@ -47,7 +47,7 @@ export function AppSidebar() {
   const isCollapsed = state === "collapsed";
 
   const menuItems = [
-    { title: "Overview", url: "/overview", icon: LayoutDashboard },
+    { title: "Command Center", url: "/command-center", icon: LayoutDashboard },
     { title: "Campaigns", url: "/campaigns", icon: Target },
     { title: "Automate", url: "/automate", icon: Zap },
     { title: "Reports", url: "/reports", icon: BarChart3 },

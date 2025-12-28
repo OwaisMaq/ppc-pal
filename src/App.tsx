@@ -13,10 +13,9 @@ import { useLoginSync } from "@/hooks/useLoginSync";
 
 // Lazy load pages for better performance
 const Auth = lazy(() => import("@/pages/Auth"));
-const Overview = lazy(() => import("@/pages/Overview"));
+const CommandCenter = lazy(() => import("@/pages/CommandCenter"));
 const Feedback = lazy(() => import("@/pages/Feedback"));
 const Campaigns = lazy(() => import("@/pages/Campaigns"));
-// AIInsights and SearchTerms now embedded in their parent pages
 
 const Privacy = lazy(() => import("@/pages/Privacy"));
 const Automate = lazy(() => import("@/pages/Automate"));
@@ -86,10 +85,10 @@ const App = () => {
                         </ProtectedRoute>
                       } />
                       
-                      {/* New routes - Overview */}
-                      <Route path="/overview" element={
+                      {/* Command Center - Main dashboard */}
+                      <Route path="/command-center" element={
                         <ProtectedRoute>
-                          <Overview />
+                          <CommandCenter />
                         </ProtectedRoute>
                       } />
                       
@@ -150,7 +149,8 @@ const App = () => {
                       } />
                       
                       {/* Redirects from old routes */}
-                      <Route path="/dashboard" element={<Navigate to="/overview" replace />} />
+                      <Route path="/dashboard" element={<Navigate to="/command-center" replace />} />
+                      <Route path="/overview" element={<Navigate to="/command-center" replace />} />
                       <Route path="/search-terms" element={<Navigate to="/campaigns/search-terms" replace />} />
                       <Route path="/ai-insights" element={<Navigate to="/reports/ai-insights" replace />} />
                       <Route path="/account-audit" element={<Navigate to="/reports" replace />} />
