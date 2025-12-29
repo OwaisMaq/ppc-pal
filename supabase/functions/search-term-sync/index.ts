@@ -283,7 +283,7 @@ Deno.serve(async (req) => {
 
         // Create and poll search term report
         const reportId = await createSearchTermReport(accessToken, connection.profile_id, dateRange, apiEndpoint);
-        const reportStatus = await pollReportStatus(accessToken, connection.profile_id, reportId, 60000, apiEndpoint);
+        const reportStatus = await pollReportStatus(accessToken, connection.profile_id, reportId, 300000, apiEndpoint);
 
         if (!reportStatus.url) {
           console.error(`No download URL for report ${reportId}`);
