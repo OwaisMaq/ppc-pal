@@ -329,37 +329,62 @@ class EntitySyncer {
   }
 
   async* listPortfoliosPaged(config: SyncConfig, args: FetchPageArgs) {
-    let cursor = args.pageCursor ?? 0;
-    let hasMore = true;
+    let nextToken: string | null = null;
+    const url = `${config.baseUrl}/portfolios/list`;
     
-    while (hasMore) {
-      const url = new URL(`${config.baseUrl}/v2/portfolios`);
-      url.searchParams.set('startIndex', cursor.toString());
-      url.searchParams.set('count', '100');
-
-      const response = await this.httpClient.makeRequest(url.toString(), {
-        headers: this.getApiHeaders(config)
+    console.log(`📁 Fetching portfolios from ${url}`);
+    
+    do {
+      const body: any = {
+        includeExtendedDataFields: true,
+        stateFilter: { include: ['ENABLED', 'PAUSED'] },
+        maxResults: 100
+      };
+      
+      if (nextToken) {
+        body.nextToken = nextToken;
+      }
+      
+      const headers = {
+        ...this.getApiHeaders(config),
+        'Content-Type': 'application/vnd.spPortfolio.v3+json',
+        'Accept': 'application/vnd.spPortfolio.v3+json'
+      };
+      
+      console.log(`📄 Fetching portfolios page, nextToken: ${nextToken ? 'yes' : 'no'}`);
+      
+      const response = await this.httpClient.makeRequest(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body)
       });
       
       const data = await response.json();
-      yield data;
       
-      if (data.length < 100) {
-        hasMore = false;
+      if (data.portfolios && data.portfolios.length > 0) {
+        console.log(`✅ Found ${data.portfolios.length} portfolios`);
+        yield data.portfolios;
       } else {
-        cursor = (cursor as number) + data.length;
+        console.log(`⚠️ No portfolios in response:`, JSON.stringify(data).substring(0, 200));
       }
-    }
+      
+      nextToken = data.nextToken || null;
+    } while (nextToken);
+    
+    console.log(`✅ Portfolio sync complete`);
   }
 
   async upsertPortfolios(profileId: string, portfolios: any[]): Promise<number> {
     if (portfolios.length === 0) return 0;
 
+    console.log(`📝 Upserting ${portfolios.length} portfolios`);
+
     const upsertData = portfolios.map(portfolio => ({
       profile_id: profileId,
       portfolio_id: portfolio.portfolioId.toString(),
       name: portfolio.name,
-      state: portfolio.state || 'enabled',
+      // v3 API returns uppercase state (ENABLED, PAUSED), normalize to lowercase
+      state: (portfolio.state || 'enabled').toLowerCase(),
       budget_amount_micros: portfolio.budget?.amount ? Math.round(portfolio.budget.amount * 1000000) : null,
       budget_currency: portfolio.budget?.currencyCode || null,
       budget_policy: portfolio.budget?.policy || null,
@@ -380,6 +405,7 @@ class EntitySyncer {
       throw new Error(`Failed to upsert portfolios: ${error.message}`);
     }
 
+    console.log(`✅ Upserted ${portfolios.length} portfolios successfully`);
     return portfolios.length;
   }
   async upsertCampaigns(profileId: string, campaigns: any[]): Promise<number> {
