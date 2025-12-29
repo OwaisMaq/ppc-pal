@@ -45,6 +45,8 @@ const Reports = () => {
     getTotalSavings,
     getTotalInsightsCount,
     getCriticalIssuesCount,
+    getAverageScore,
+    getScoreTrend,
   } = useHistoricalAudit(profileId);
 
   useEffect(() => {
@@ -279,6 +281,8 @@ const Reports = () => {
                   totalInsights={getTotalInsightsCount()}
                   criticalIssues={getCriticalIssuesCount()}
                   monthsAnalyzed={audits.length}
+                  averageScore={getAverageScore()}
+                  scoreTrend={getScoreTrend()}
                 />
 
                 <div className="flex items-center justify-between">
