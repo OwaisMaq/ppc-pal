@@ -2235,6 +2235,101 @@ export type Database = {
         }
         Relationships: []
       }
+      daypart_execution_history: {
+        Row: {
+          action: string
+          campaign_id: string
+          created_at: string
+          error: string | null
+          executed_at: string
+          id: string
+          multiplier_applied: number | null
+          new_state: string | null
+          previous_state: string | null
+          profile_id: string
+          schedule_id: string
+          success: boolean
+        }
+        Insert: {
+          action: string
+          campaign_id: string
+          created_at?: string
+          error?: string | null
+          executed_at?: string
+          id?: string
+          multiplier_applied?: number | null
+          new_state?: string | null
+          previous_state?: string | null
+          profile_id: string
+          schedule_id: string
+          success?: boolean
+        }
+        Update: {
+          action?: string
+          campaign_id?: string
+          created_at?: string
+          error?: string | null
+          executed_at?: string
+          id?: string
+          multiplier_applied?: number | null
+          new_state?: string | null
+          previous_state?: string | null
+          profile_id?: string
+          schedule_id?: string
+          success?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daypart_execution_history_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "daypart_schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      daypart_schedules: {
+        Row: {
+          campaign_id: string
+          created_at: string
+          enabled: boolean
+          id: string
+          last_applied_at: string | null
+          last_applied_state: string | null
+          pause_multiplier: number
+          profile_id: string
+          schedule: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          campaign_id: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          last_applied_at?: string | null
+          last_applied_state?: string | null
+          pause_multiplier?: number
+          profile_id: string
+          schedule?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          campaign_id?: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          last_applied_at?: string | null
+          last_applied_state?: string | null
+          pause_multiplier?: number
+          profile_id?: string
+          schedule?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       dim_ad_group: {
         Row: {
           ad_group_id: string
