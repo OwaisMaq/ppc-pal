@@ -125,7 +125,7 @@ async function createSearchTermReport(
   return result.reportId;
 }
 
-// Main handler - Step 1: Create reports and track them in DB
+// Main handler - Step 1: Create reports and track them in pending_amazon_reports
 Deno.serve(async (req) => {
   const requestId = crypto.randomUUID();
 
@@ -212,24 +212,28 @@ Deno.serve(async (req) => {
         // Create search term report (returns immediately after creation)
         const reportId = await createSearchTermReport(accessToken, connection.profile_id, startDate, endDate, apiEndpoint);
 
-        // Save report to amazon_report_requests table for the poller to pick up
+        // Save report to pending_amazon_reports table for the unified poller to pick up
         const { error: insertError } = await supabase
-          .from('amazon_report_requests')
+          .from('pending_amazon_reports')
           .upsert({
             report_id: reportId,
             report_type: 'spSearchTerm',
             connection_id: connection.id,
-            start_date: startDate.toISOString().split('T')[0],
-            end_date: endDate.toISOString().split('T')[0],
-            status: 'IN_PROGRESS',
+            status: 'pending',
+            poll_count: 0,
             configuration: {
+              entityType: 'searchTerms',
               adProduct: 'SPONSORED_PRODUCTS',
               reportTypeId: 'spSearchTerm',
               api_endpoint: apiEndpoint,
-              profile_id: connection.profile_id
+              profile_id: connection.profile_id,
+              dateRange: {
+                startDate: startDate.toISOString().split('T')[0],
+                endDate: endDate.toISOString().split('T')[0]
+              },
+              timeUnit: 'DAILY'
             },
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            created_at: new Date().toISOString()
           }, {
             onConflict: 'report_id'
           });
@@ -238,7 +242,7 @@ Deno.serve(async (req) => {
           console.error(`Failed to track report ${reportId}:`, insertError);
           errors.push(`Failed to track report for ${connection.profile_id}`);
         } else {
-          console.log(`✅ Report ${reportId} saved to tracking table`);
+          console.log(`✅ Report ${reportId} saved to pending_amazon_reports table`);
           reportsCreated++;
         }
 
@@ -250,14 +254,14 @@ Deno.serve(async (req) => {
     }
 
     console.log(`\n✅ Search term sync Step 1 complete - ${reportsCreated} reports created`);
-    console.log(`📋 Reports will be processed by the poller function`);
+    console.log(`📋 Reports will be processed by ams-report-poller`);
 
     return new Response(JSON.stringify({
       success: true,
       request_id: requestId,
       reports_created: reportsCreated,
       connections_processed: connections.length,
-      message: 'Reports created. The poller will process them when ready.',
+      message: 'Reports created. The ams-report-poller will process them when ready.',
       errors: errors.length > 0 ? errors : undefined
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
