@@ -1,10 +1,12 @@
 import { useState } from "react";
 import DashboardShell from "@/components/DashboardShell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { RankTrackerTable, RankTrendChart, AddKeywordDialog } from "@/components/rank-tracker";
+import { RankTrackerTable, RankTrendChart } from "@/components/rank-tracker";
 import { useRankTracker, useRankHistory, TrackedKeyword } from "@/hooks/useRankTracker";
-import { TrendingUp, Target, Award, AlertTriangle } from "lucide-react";
+import { TrendingUp, Target, Award, AlertTriangle, Clock } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function RankTracker() {
   const { 
@@ -32,14 +34,29 @@ export default function RankTracker() {
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Keyword Rank Tracker</h1>
+          <div className="space-y-1">
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-semibold tracking-tight">Keyword Rank Tracker</h1>
+              <Badge variant="secondary" className="gap-1">
+                <Clock className="h-3 w-3" />
+                Coming Soon
+              </Badge>
+            </div>
             <p className="text-muted-foreground">
               Monitor your sponsored and organic keyword positions over time
             </p>
           </div>
-          <AddKeywordDialog onAdd={addKeyword} isAdding={isAdding} />
         </div>
+
+        {/* Coming Soon Banner */}
+        <Alert>
+          <TrendingUp className="h-4 w-4" />
+          <AlertTitle>Feature in Development</AlertTitle>
+          <AlertDescription>
+            We're integrating with rank tracking APIs to provide accurate sponsored and organic position data. 
+            This feature will be available soon.
+          </AlertDescription>
+        </Alert>
 
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-4">

@@ -50,7 +50,7 @@ export function AppSidebar() {
   const menuItems = [
     { title: "Command Center", url: "/command-center", icon: LayoutDashboard },
     { title: "Campaigns", url: "/campaigns", icon: Target },
-    { title: "Rank Tracker", url: "/rank-tracker", icon: TrendingUp },
+    { title: "Rank Tracker", url: "/rank-tracker", icon: TrendingUp, comingSoon: true },
     { title: "Automate", url: "/automate", icon: Zap },
     { title: "Reports", url: "/reports", icon: BarChart3 },
     { title: "Settings", url: "/settings", icon: Settings },
@@ -87,6 +87,11 @@ export function AppSidebar() {
                     >
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
+                      {item.comingSoon && !isCollapsed && (
+                        <span className="ml-auto text-[10px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                          Soon
+                        </span>
+                      )}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
