@@ -23,6 +23,8 @@ export default function AccountAudit() {
     getTotalSavings,
     getTotalInsightsCount,
     getCriticalIssuesCount,
+    getAverageScore,
+    getScoreTrend,
   } = useHistoricalAudit(profileId);
 
   useEffect(() => {
@@ -125,6 +127,8 @@ export default function AccountAudit() {
           totalInsights={getTotalInsightsCount()}
           criticalIssues={getCriticalIssuesCount()}
           monthsAnalyzed={audits.length}
+          averageScore={getAverageScore()}
+          scoreTrend={getScoreTrend()}
         />
 
         <div className="flex items-center justify-between">
