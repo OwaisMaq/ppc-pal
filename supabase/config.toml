@@ -133,6 +133,9 @@ verify_jwt = true
 [functions.search-term-sync]
 verify_jwt = false
 
+[functions.search-term-report-poller]
+verify_jwt = false
+
 [functions.revert-action]
 verify_jwt = true
 
