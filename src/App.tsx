@@ -16,6 +16,7 @@ const Auth = lazy(() => import("@/pages/Auth"));
 const CommandCenter = lazy(() => import("@/pages/CommandCenter"));
 const Feedback = lazy(() => import("@/pages/Feedback"));
 const Campaigns = lazy(() => import("@/pages/Campaigns"));
+const CampaignBuilder = lazy(() => import("@/pages/CampaignBuilder"));
 
 const Privacy = lazy(() => import("@/pages/Privacy"));
 const Automate = lazy(() => import("@/pages/Automate"));
@@ -96,6 +97,11 @@ const App = () => {
                       <Route path="/campaigns" element={
                         <ProtectedRoute>
                           <Campaigns />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="/campaigns/new" element={
+                        <ProtectedRoute>
+                          <CampaignBuilder />
                         </ProtectedRoute>
                       } />
                       <Route path="/campaigns/search-terms" element={<Navigate to="/campaigns" replace />} />

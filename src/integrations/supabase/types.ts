@@ -1871,6 +1871,69 @@ export type Database = {
           },
         ]
       }
+      campaign_templates: {
+        Row: {
+          asin: string
+          campaigns_created: Json | null
+          created_at: string
+          daily_budget: number
+          default_bid: number
+          description: string | null
+          error_message: string | null
+          id: string
+          name: string
+          product_name: string | null
+          product_price: number | null
+          profile_id: string
+          rules_created: Json | null
+          status: string
+          structure: Json
+          template_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          asin: string
+          campaigns_created?: Json | null
+          created_at?: string
+          daily_budget?: number
+          default_bid?: number
+          description?: string | null
+          error_message?: string | null
+          id?: string
+          name: string
+          product_name?: string | null
+          product_price?: number | null
+          profile_id: string
+          rules_created?: Json | null
+          status?: string
+          structure?: Json
+          template_type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          asin?: string
+          campaigns_created?: Json | null
+          created_at?: string
+          daily_budget?: number
+          default_bid?: number
+          description?: string | null
+          error_message?: string | null
+          id?: string
+          name?: string
+          product_name?: string | null
+          product_price?: number | null
+          profile_id?: string
+          rules_created?: Json | null
+          status?: string
+          structure?: Json
+          template_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       campaigns: {
         Row: {
           acos: number | null
