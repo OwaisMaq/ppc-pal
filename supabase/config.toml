@@ -160,3 +160,6 @@ verify_jwt = false
 
 [functions.daypart-executor]
 verify_jwt = false
+
+[functions.create-campaign-set]
+verify_jwt = true

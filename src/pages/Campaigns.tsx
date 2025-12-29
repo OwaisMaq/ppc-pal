@@ -45,7 +45,8 @@ import {
   Sprout,
   Check,
   X,
-  Loader2
+  Loader2,
+  Wand2
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
