@@ -50,13 +50,10 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3)
 async function createSearchTermReport(
   accessToken: string,
   profileId: string,
-  dateRange: number,
+  startDate: Date,
+  endDate: Date,
   apiEndpoint: string
 ): Promise<string> {
-  const endDate = new Date();
-  const startDate = new Date();
-  startDate.setDate(endDate.getDate() - dateRange);
-
   const clientId = Deno.env.get('AMAZON_CLIENT_ID');
   if (!clientId) throw new Error('AMAZON_CLIENT_ID is required');
 
@@ -76,7 +73,7 @@ async function createSearchTermReport(
     'purchases1d'
   ];
 
-  console.log(`📊 Creating search term report for last ${dateRange} days`);
+  console.log(`📊 Creating search term report for ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
 
   const response = await fetchWithRetry(
     `${apiEndpoint}/reporting/reports`,
@@ -128,81 +125,7 @@ async function createSearchTermReport(
   return result.reportId;
 }
 
-// Poll report status
-async function pollReportStatus(
-  accessToken: string,
-  profileId: string,
-  reportId: string,
-  maxWaitTime: number,
-  apiEndpoint: string
-): Promise<{ status: string; url?: string }> {
-  const startTime = Date.now();
-  const clientId = Deno.env.get('AMAZON_CLIENT_ID')!;
-
-  while (Date.now() - startTime < maxWaitTime) {
-    const response = await fetchWithRetry(
-      `${apiEndpoint}/reporting/reports/${reportId}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Amazon-Advertising-API-ClientId': clientId.trim(),
-          'Amazon-Advertising-API-Scope': profileId,
-          'Content-Type': 'application/vnd.amazon.reporting.v3+json'
-        }
-      }
-    );
-
-    if (!response.ok) throw new Error(`Status check failed: ${response.status}`);
-    const result = await response.json();
-    console.log(`📊 Report status: ${result.status}`);
-
-    if (result.status === 'COMPLETED' || result.status === 'SUCCESS') {
-      return result;
-    }
-    if (result.status === 'FAILED') {
-      throw new Error(`Report failed: ${result.statusDetails}`);
-    }
-    await new Promise(r => setTimeout(r, 5000));
-  }
-
-  throw new Error('Report polling timeout');
-}
-
-// Download and parse gzipped report
-async function downloadReport(downloadUrl: string): Promise<any[]> {
-  console.log('📥 Downloading search term report...');
-  const response = await fetchWithRetry(downloadUrl, {});
-  if (!response.ok) throw new Error(`Download failed: ${response.status}`);
-
-  const gzippedData = await response.arrayBuffer();
-  const decompressedData = new Response(
-    new ReadableStream({
-      start(controller) {
-        const stream = new DecompressionStream('gzip');
-        const writer = stream.writable.getWriter();
-        const reader = stream.readable.getReader();
-        
-        writer.write(new Uint8Array(gzippedData));
-        writer.close();
-        
-        (async () => {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) { controller.close(); break; }
-            controller.enqueue(value);
-          }
-        })();
-      }
-    })
-  );
-
-  const jsonText = await decompressedData.text();
-  const results = jsonText.trim().split('\n').filter(l => l).map(line => JSON.parse(line));
-  console.log(`✅ Downloaded ${results.length} search term records`);
-  return results;
-}
-
-// Main handler
+// Main handler - Step 1: Create reports and track them in DB
 Deno.serve(async (req) => {
   const requestId = crypto.randomUUID();
 
@@ -229,11 +152,16 @@ Deno.serve(async (req) => {
   }
 
   try {
-    console.log(`🔍 Search term sync started - ${requestId}`);
+    console.log(`🔍 Search term sync started (Step 1: Create Reports) - ${requestId}`);
     const body = await req.json().catch(() => ({}));
     const { profileId, dateRange = 14 } = body;
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Calculate date range
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(endDate.getDate() - dateRange);
 
     // Get all active connections (or specific profile if provided)
     let query = supabase
@@ -249,19 +177,19 @@ Deno.serve(async (req) => {
 
     if (connError || !connections?.length) {
       console.log('No active connections found');
-      return new Response(JSON.stringify({ success: true, message: 'No connections to sync', synced: 0 }), {
+      return new Response(JSON.stringify({ success: true, message: 'No connections to sync', reports_created: 0 }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    let totalSynced = 0;
+    let reportsCreated = 0;
     const errors: string[] = [];
 
     for (const connection of connections) {
       try {
-        console.log(`\n📌 Syncing search terms for profile ${connection.profile_id}`);
+        console.log(`\n📌 Creating search term report for profile ${connection.profile_id}`);
 
-        // Get decrypted access token using RPC function (same as refresh-amazon-token)
+        // Get decrypted access token using RPC function
         const { data: tokensArray, error: tokenError } = await supabase
           .rpc('get_tokens_with_key', {
             p_profile_id: connection.profile_id,
@@ -279,80 +207,57 @@ Deno.serve(async (req) => {
 
         // Use stored endpoint from connection, fallback to marketplace detection
         const apiEndpoint = connection.advertising_api_endpoint || getApiEndpoint(connection.marketplace_id);
-        console.log(`🌍 Using API endpoint: ${apiEndpoint} (marketplace: ${connection.marketplace_id})`);
+        console.log(`🌍 Using API endpoint: ${apiEndpoint}`);
 
-        // Create and poll search term report
-        const reportId = await createSearchTermReport(accessToken, connection.profile_id, dateRange, apiEndpoint);
-        const reportStatus = await pollReportStatus(accessToken, connection.profile_id, reportId, 300000, apiEndpoint);
+        // Create search term report (returns immediately after creation)
+        const reportId = await createSearchTermReport(accessToken, connection.profile_id, startDate, endDate, apiEndpoint);
 
-        if (!reportStatus.url) {
-          console.error(`No download URL for report ${reportId}`);
-          errors.push(`No URL for ${connection.profile_id}`);
-          continue;
+        // Save report to amazon_report_requests table for the poller to pick up
+        const { error: insertError } = await supabase
+          .from('amazon_report_requests')
+          .upsert({
+            report_id: reportId,
+            report_type: 'spSearchTerm',
+            connection_id: connection.id,
+            start_date: startDate.toISOString().split('T')[0],
+            end_date: endDate.toISOString().split('T')[0],
+            status: 'IN_PROGRESS',
+            configuration: {
+              adProduct: 'SPONSORED_PRODUCTS',
+              reportTypeId: 'spSearchTerm',
+              api_endpoint: apiEndpoint,
+              profile_id: connection.profile_id
+            },
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'report_id'
+          });
+
+        if (insertError) {
+          console.error(`Failed to track report ${reportId}:`, insertError);
+          errors.push(`Failed to track report for ${connection.profile_id}`);
+        } else {
+          console.log(`✅ Report ${reportId} saved to tracking table`);
+          reportsCreated++;
         }
-
-        // Download and parse report
-        const searchTerms = await downloadReport(reportStatus.url);
-
-        if (searchTerms.length === 0) {
-          console.log(`No search terms found for profile ${connection.profile_id}`);
-          continue;
-        }
-
-        // Transform and batch upsert into fact_search_term_daily
-        const batchSize = 500;
-        let inserted = 0;
-
-        for (let i = 0; i < searchTerms.length; i += batchSize) {
-          const batch = searchTerms.slice(i, i + batchSize).map(term => ({
-            date: term.date || new Date().toISOString().split('T')[0],
-            profile_id: connection.profile_id,
-            campaign_id: term.campaignId || '',
-            ad_group_id: term.adGroupId || '',
-            keyword_id: term.keywordId || null,
-            keyword_text: term.keyword || term.keywordText || null,
-            search_term: term.searchTerm || '',
-            match_type: term.matchType || 'BROAD',
-            targeting: term.targeting || null,
-            impressions: parseInt(term.impressions) || 0,
-            clicks: parseInt(term.clicks) || 0,
-            cost_micros: Math.round(parseFloat(term.cost || 0) * 1000000),
-            attributed_conversions_1d: parseInt(term.purchases1d) || 0,
-            attributed_conversions_7d: parseInt(term.purchases7d) || 0,
-            attributed_sales_7d_micros: Math.round(parseFloat(term.sales7d || 0) * 1000000)
-          }));
-
-          const { error: upsertError } = await supabase
-            .from('fact_search_term_daily')
-            .upsert(batch, {
-              onConflict: 'date,profile_id,campaign_id,ad_group_id,search_term,match_type'
-            });
-
-          if (upsertError) {
-            console.error(`Batch upsert error:`, upsertError);
-            errors.push(`Upsert error for ${connection.profile_id}: ${upsertError.message}`);
-          } else {
-            inserted += batch.length;
-          }
-        }
-
-        console.log(`✅ Inserted ${inserted} search term records for ${connection.profile_id}`);
-        totalSynced += inserted;
 
       } catch (connError) {
         const errMsg = connError instanceof Error ? connError.message : 'Unknown error';
-        console.error(`Error syncing ${connection.profile_id}:`, errMsg);
+        console.error(`Error creating report for ${connection.profile_id}:`, errMsg);
         errors.push(`${connection.profile_id}: ${errMsg}`);
       }
     }
 
-    console.log(`\n✅ Search term sync complete - ${totalSynced} records synced`);
+    console.log(`\n✅ Search term sync Step 1 complete - ${reportsCreated} reports created`);
+    console.log(`📋 Reports will be processed by the poller function`);
 
     return new Response(JSON.stringify({
       success: true,
       request_id: requestId,
-      synced: totalSynced,
+      reports_created: reportsCreated,
       connections_processed: connections.length,
+      message: 'Reports created. The poller will process them when ready.',
       errors: errors.length > 0 ? errors : undefined
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
