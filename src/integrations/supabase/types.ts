@@ -3170,11 +3170,15 @@ export type Database = {
           created_at: string
           error: string | null
           estimated_savings: number | null
+          grade: string | null
           id: string
           insights: Json
           profile_id: string
+          score: number | null
+          score_breakdown: Json | null
           status: string
           summary: Json
+          trend_vs_prior_month: string | null
           updated_at: string
           user_id: string
         }
@@ -3183,11 +3187,15 @@ export type Database = {
           created_at?: string
           error?: string | null
           estimated_savings?: number | null
+          grade?: string | null
           id?: string
           insights?: Json
           profile_id: string
+          score?: number | null
+          score_breakdown?: Json | null
           status?: string
           summary?: Json
+          trend_vs_prior_month?: string | null
           updated_at?: string
           user_id: string
         }
@@ -3196,11 +3204,15 @@ export type Database = {
           created_at?: string
           error?: string | null
           estimated_savings?: number | null
+          grade?: string | null
           id?: string
           insights?: Json
           profile_id?: string
+          score?: number | null
+          score_breakdown?: Json | null
           status?: string
           summary?: Json
+          trend_vs_prior_month?: string | null
           updated_at?: string
           user_id?: string
         }

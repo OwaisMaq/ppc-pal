@@ -56,6 +56,14 @@ export interface AuditBreakdown {
   };
 }
 
+export interface ScoreBreakdown {
+  acosEfficiency: { score: number; value: number; weight: number };
+  conversionRate: { score: number; value: number; weight: number };
+  ctr: { score: number; value: number; weight: number };
+  budgetUtilization: { score: number; value: number; weight: number };
+  wasteRatio: { score: number; value: number; weight: number };
+}
+
 export interface AuditSummary {
   monthLabel: string;
   totalSpend: number;
@@ -78,6 +86,10 @@ export interface HistoricalAudit {
   summary: AuditSummary;
   breakdown?: AuditBreakdown;
   estimated_savings: number;
+  score?: number;
+  grade?: string;
+  score_breakdown?: ScoreBreakdown;
+  trend_vs_prior_month?: "up" | "down" | "stable" | "new";
   status: string;
   created_at: string;
   updated_at: string;
@@ -125,7 +137,7 @@ export function useHistoricalAudit(profileId: string | null) {
 
       const data = await response.json();
       
-      // Parse the insights, summary, and breakdown from JSONB
+      // Parse the insights, summary, breakdown, and score_breakdown from JSONB
       const parsedAudits: HistoricalAudit[] = (data.audits || []).map((audit: any) => ({
         ...audit,
         insights: typeof audit.insights === 'string' 
@@ -137,6 +149,9 @@ export function useHistoricalAudit(profileId: string | null) {
         breakdown: typeof audit.breakdown === 'string'
           ? JSON.parse(audit.breakdown)
           : audit.breakdown || null,
+        score_breakdown: typeof audit.score_breakdown === 'string'
+          ? JSON.parse(audit.score_breakdown)
+          : audit.score_breakdown || null,
       }));
 
       setAudits(parsedAudits);
@@ -180,6 +195,30 @@ export function useHistoricalAudit(profileId: string | null) {
     );
   }, [audits]);
 
+  const getAverageScore = useCallback(() => {
+    const auditsWithScores = audits.filter(a => a.score !== undefined && a.score !== null);
+    if (auditsWithScores.length === 0) return null;
+    const total = auditsWithScores.reduce((sum, a) => sum + (a.score || 0), 0);
+    return Math.round(total / auditsWithScores.length);
+  }, [audits]);
+
+  const getScoreTrend = useCallback(() => {
+    if (audits.length < 2) return "stable";
+    const sortedAudits = [...audits].sort((a, b) => 
+      new Date(a.audit_month).getTime() - new Date(b.audit_month).getTime()
+    );
+    const recentAudits = sortedAudits.slice(-3);
+    if (recentAudits.length < 2) return "stable";
+    
+    const firstScore = recentAudits[0]?.score || 0;
+    const lastScore = recentAudits[recentAudits.length - 1]?.score || 0;
+    const diff = lastScore - firstScore;
+    
+    if (diff >= 10) return "improving";
+    if (diff <= -10) return "declining";
+    return "stable";
+  }, [audits]);
+
   return {
     audits,
     loading,
@@ -190,5 +229,7 @@ export function useHistoricalAudit(profileId: string | null) {
     getTotalInsightsCount,
     getCriticalIssuesCount,
     getInsightsByLevel,
+    getAverageScore,
+    getScoreTrend,
   };
 }

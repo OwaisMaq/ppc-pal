@@ -11,6 +11,7 @@ import {
   PoundSterling, Search, Target, LayoutGrid 
 } from "lucide-react";
 import { HistoricalAudit, AuditInsight, SearchTermBreakdown, TargetBreakdown } from "@/hooks/useHistoricalAudit";
+import { HealthScoreCircle, ScoreBreakdownBars, TrendIndicator } from "@/components/health";
 
 interface AuditMonthCardProps {
   audit: HistoricalAudit;
@@ -163,14 +164,12 @@ function TargetTable({ targets, title }: { targets: TargetBreakdown[]; title: st
 
 export function AuditMonthCard({ audit }: AuditMonthCardProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const { summary, insights, estimated_savings, breakdown } = audit;
+  const { summary, insights, estimated_savings, breakdown, score, grade, score_breakdown, trend_vs_prior_month } = audit;
 
   const criticalCount = insights?.filter(i => i.severity === "critical").length || 0;
   const warningCount = insights?.filter(i => i.severity === "warning").length || 0;
 
   const campaignInsights = insights?.filter(i => i.level === "campaign") || [];
-  const searchTermInsights = insights?.filter(i => i.level === "search_term") || [];
-  const targetInsights = insights?.filter(i => i.level === "target") || [];
 
   return (
     <Card className="mb-4">
@@ -179,14 +178,29 @@ export function AuditMonthCard({ audit }: AuditMonthCardProps) {
           <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <CardTitle className="text-lg">{summary?.monthLabel || "Unknown Month"}</CardTitle>
-                <div className="flex gap-2">
-                  {criticalCount > 0 && (
-                    <Badge variant="destructive">{criticalCount} Critical</Badge>
-                  )}
-                  {warningCount > 0 && (
-                    <Badge variant="secondary">{warningCount} Warning</Badge>
-                  )}
+                {score !== undefined && grade && (
+                  <HealthScoreCircle score={score} grade={grade} size="sm" showGrade={false} />
+                )}
+                <div>
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-lg">{summary?.monthLabel || "Unknown Month"}</CardTitle>
+                    {grade && (
+                      <Badge variant="outline" className="font-semibold">
+                        Grade {grade}
+                      </Badge>
+                    )}
+                    {trend_vs_prior_month && (
+                      <TrendIndicator trend={trend_vs_prior_month} compact />
+                    )}
+                  </div>
+                  <div className="flex gap-2 mt-1">
+                    {criticalCount > 0 && (
+                      <Badge variant="destructive" className="text-xs">{criticalCount} Critical</Badge>
+                    )}
+                    {warningCount > 0 && (
+                      <Badge variant="secondary" className="text-xs">{warningCount} Warning</Badge>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-4">
@@ -233,6 +247,14 @@ export function AuditMonthCard({ audit }: AuditMonthCardProps) {
                 <div className="text-lg font-semibold">{summary?.targetCount || 0}</div>
               </div>
             </div>
+
+            {/* Score Breakdown */}
+            {score_breakdown && (
+              <div className="mb-6 p-4 bg-muted/30 rounded-lg">
+                <div className="text-sm font-medium mb-3">Health Score Breakdown</div>
+                <ScoreBreakdownBars breakdown={score_breakdown} />
+              </div>
+            )}
 
             {/* AI Summary */}
             {summary?.aiSummary && (
