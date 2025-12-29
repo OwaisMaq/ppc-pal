@@ -21,7 +21,7 @@ const RankTracker = lazy(() => import("@/pages/RankTracker"));
 
 const Privacy = lazy(() => import("@/pages/Privacy"));
 const Automate = lazy(() => import("@/pages/Automate"));
-const Reports = lazy(() => import("@/pages/Reports"));
+const Analytics = lazy(() => import("@/pages/Analytics"));
 const MultiAccount = lazy(() => import("@/pages/MultiAccount"));
 const PublicLanding = lazy(() => import("@/pages/PublicLanding"));
 const PublicPrivacy = lazy(() => import("@/pages/PublicPrivacy"));
@@ -131,13 +131,13 @@ const App = () => {
                         </ProtectedRoute>
                       } />
                       
-                      {/* Reports routes */}
-                      <Route path="/reports" element={
+                      {/* Analytics routes */}
+                      <Route path="/analytics" element={
                         <ProtectedRoute>
-                          <Reports />
+                          <Analytics />
                         </ProtectedRoute>
                       } />
-                      <Route path="/reports/ai-insights" element={<Navigate to="/reports" replace />} />
+                      <Route path="/analytics/ai-insights" element={<Navigate to="/analytics" replace />} />
 
                       
                       {/* Settings routes */}
@@ -165,11 +165,13 @@ const App = () => {
                       <Route path="/dashboard" element={<Navigate to="/command-center" replace />} />
                       <Route path="/overview" element={<Navigate to="/command-center" replace />} />
                       <Route path="/search-terms" element={<Navigate to="/campaigns/search-terms" replace />} />
-                      <Route path="/ai-insights" element={<Navigate to="/reports/ai-insights" replace />} />
-                      <Route path="/account-audit" element={<Navigate to="/reports" replace />} />
-                      <Route path="/attribution" element={<Navigate to="/reports" replace />} />
-                      <Route path="/anomalies" element={<Navigate to="/reports" replace />} />
-                      <Route path="/budget-copilot" element={<Navigate to="/reports" replace />} />
+                      <Route path="/reports" element={<Navigate to="/analytics" replace />} />
+                      <Route path="/reports/ai-insights" element={<Navigate to="/analytics" replace />} />
+                      <Route path="/ai-insights" element={<Navigate to="/analytics" replace />} />
+                      <Route path="/account-audit" element={<Navigate to="/analytics" replace />} />
+                      <Route path="/attribution" element={<Navigate to="/analytics" replace />} />
+                      <Route path="/anomalies" element={<Navigate to="/analytics" replace />} />
+                      <Route path="/budget-copilot" element={<Navigate to="/analytics" replace />} />
                       <Route path="/multi-account" element={<Navigate to="/settings/accounts" replace />} />
                       
                       {/* 404 */}

@@ -25,7 +25,7 @@ import {
 import { useEffect } from "react";
 
 
-const Reports = () => {
+const Analytics = () => {
   const [activeTab, setActiveTab] = useState("performance");
   const { connections, loading: connectionsLoading } = useAmazonConnections();
   const activeConnection = connections?.[0];
@@ -59,7 +59,7 @@ const Reports = () => {
     <DashboardShell>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Reports</h1>
+          <h1 className="text-3xl font-bold text-foreground">Analytics</h1>
           <p className="text-muted-foreground mt-2">
             Performance insights, attribution, anomalies, and budget analysis
           </p>
@@ -312,4 +312,4 @@ const Reports = () => {
   );
 };
 
-export default Reports;
+export default Analytics;
