@@ -157,3 +157,6 @@ verify_jwt = true
 
 [functions.bid-observation-collector]
 verify_jwt = false
+
+[functions.daypart-executor]
+verify_jwt = false

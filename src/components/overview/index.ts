@@ -19,3 +19,4 @@ export type { DatePreset, MarketplaceOption, BrandOption } from './OverviewFilte
 export { TrustReportCard } from './TrustReportCard';
 export { OutcomeAttributionPanel } from './OutcomeAttributionPanel';
 export { QuickWinsCard } from './QuickWinsCard';
+export { ComparisonKPIs } from './ComparisonKPIs';

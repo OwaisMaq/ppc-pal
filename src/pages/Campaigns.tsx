@@ -55,7 +55,7 @@ import { subDays } from "date-fns";
 import { DateRange } from "react-day-picker";
 import { useDataAvailability } from "@/hooks/useDataAvailability";
 import { DataAvailabilityIndicator } from "@/components/DataAvailabilityIndicator";
-import { CampaignLevelSelector, CampaignLevel } from "@/components/campaigns/CampaignLevelSelector";
+import { CampaignLevelSelector, CampaignLevel, BulkActionsBar } from "@/components/campaigns";
 
 type DatePreset = '7D' | '14D' | '30D' | '90D' | 'custom';
 type MatchType = 'exact' | 'phrase';
@@ -159,6 +159,11 @@ const Campaigns = () => {
   const [selectedTerms, setSelectedTerms] = useState<Set<string>>(new Set());
   const [bulkMatchType, setBulkMatchType] = useState<MatchType>('exact');
   const [harvestingTermId, setHarvestingTermId] = useState<string | null>(null);
+  
+  // Bulk selection state for campaigns/ad groups/keywords
+  const [selectedCampaigns, setSelectedCampaigns] = useState<Set<string>>(new Set());
+  const [selectedAdGroups, setSelectedAdGroups] = useState<Set<string>>(new Set());
+  const [selectedKeywords, setSelectedKeywords] = useState<Set<string>>(new Set());
   
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -640,42 +645,89 @@ const Campaigns = () => {
             <Layers className="h-12 w-12 mx-auto text-muted-foreground" />
           );
         }
+        const allCampaignsSelected = filteredCampaigns.length > 0 && 
+          filteredCampaigns.every(c => selectedCampaigns.has(c.campaign_id));
         return (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Campaign Name</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Impressions</TableHead>
-                <TableHead className="text-right">Clicks</TableHead>
-                <TableHead className="text-right">Spend</TableHead>
-                <TableHead className="text-right">Sales</TableHead>
-                <TableHead className="text-right">ACOS</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredCampaigns.map((campaign) => (
-                <TableRow key={campaign.campaign_id}>
-                  <TableCell className="font-medium">{campaign.campaign_name}</TableCell>
-                  <TableCell>{getStatusBadge(campaign.status)}</TableCell>
-                  <TableCell className="text-right">{formatNumber(campaign.impressions)}</TableCell>
-                  <TableCell className="text-right">{formatNumber(campaign.clicks)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(campaign.daily_spend * dayCount)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(campaign.sales)}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      {campaign.acos > 30 ? (
-                        <TrendingUp className="h-3 w-3 text-destructive" />
-                      ) : (
-                        <TrendingDown className="h-3 w-3 text-success" />
-                      )}
-                      {campaign.acos.toFixed(1)}%
-                    </div>
-                  </TableCell>
+          <div className="space-y-4">
+            {selectedCampaigns.size > 0 && primaryConnection && (
+              <BulkActionsBar
+                profileId={primaryConnection.profile_id}
+                selectedIds={Array.from(selectedCampaigns)}
+                entityType="campaign"
+                onClear={() => setSelectedCampaigns(new Set())}
+                onComplete={() => {
+                  setSelectedCampaigns(new Set());
+                  // Refetch data
+                }}
+              />
+            )}
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-10">
+                    <Checkbox
+                      checked={allCampaignsSelected}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedCampaigns(new Set(filteredCampaigns.map(c => c.campaign_id)));
+                        } else {
+                          setSelectedCampaigns(new Set());
+                        }
+                      }}
+                    />
+                  </TableHead>
+                  <TableHead>Campaign Name</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Impressions</TableHead>
+                  <TableHead className="text-right">Clicks</TableHead>
+                  <TableHead className="text-right">Spend</TableHead>
+                  <TableHead className="text-right">Sales</TableHead>
+                  <TableHead className="text-right">ACOS</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filteredCampaigns.map((campaign) => (
+                  <TableRow 
+                    key={campaign.campaign_id}
+                    className={selectedCampaigns.has(campaign.campaign_id) ? 'bg-muted/30' : ''}
+                  >
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedCampaigns.has(campaign.campaign_id)}
+                        onCheckedChange={(checked) => {
+                          setSelectedCampaigns(prev => {
+                            const next = new Set(prev);
+                            if (checked) {
+                              next.add(campaign.campaign_id);
+                            } else {
+                              next.delete(campaign.campaign_id);
+                            }
+                            return next;
+                          });
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell className="font-medium">{campaign.campaign_name}</TableCell>
+                    <TableCell>{getStatusBadge(campaign.status)}</TableCell>
+                    <TableCell className="text-right">{formatNumber(campaign.impressions)}</TableCell>
+                    <TableCell className="text-right">{formatNumber(campaign.clicks)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(campaign.daily_spend * dayCount)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(campaign.sales)}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        {campaign.acos > 30 ? (
+                          <TrendingUp className="h-3 w-3 text-destructive" />
+                        ) : (
+                          <TrendingDown className="h-3 w-3 text-success" />
+                        )}
+                        {campaign.acos.toFixed(1)}%
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         );
 
       case 'ad-groups':
@@ -685,42 +737,85 @@ const Campaigns = () => {
             <Target className="h-12 w-12 mx-auto text-muted-foreground" />
           );
         }
+        const allAdGroupsSelected = filteredAdGroups.length > 0 && 
+          filteredAdGroups.every(ag => selectedAdGroups.has(ag.id));
         return (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Ad Group Name</TableHead>
-                <TableHead>Campaign</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Impressions</TableHead>
-                <TableHead className="text-right">Clicks</TableHead>
-                <TableHead className="text-right">Spend</TableHead>
-                <TableHead className="text-right">ACOS</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredAdGroups.map((ag) => (
-                <TableRow key={ag.id}>
-                  <TableCell className="font-medium">{ag.name}</TableCell>
-                  <TableCell className="text-muted-foreground text-sm">{ag.campaign_name}</TableCell>
-                  <TableCell>{getStatusBadge(ag.status)}</TableCell>
-                  <TableCell className="text-right">{formatNumber(ag.impressions)}</TableCell>
-                  <TableCell className="text-right">{formatNumber(ag.clicks)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(ag.spend)}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      {ag.acos > 30 ? (
-                        <TrendingUp className="h-3 w-3 text-destructive" />
-                      ) : (
-                        <TrendingDown className="h-3 w-3 text-success" />
-                      )}
-                      {ag.acos?.toFixed(1) || '0.0'}%
-                    </div>
-                  </TableCell>
+          <div className="space-y-4">
+            {selectedAdGroups.size > 0 && primaryConnection && (
+              <BulkActionsBar
+                profileId={primaryConnection.profile_id}
+                selectedIds={Array.from(selectedAdGroups)}
+                entityType="ad_group"
+                onClear={() => setSelectedAdGroups(new Set())}
+              />
+            )}
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-10">
+                    <Checkbox
+                      checked={allAdGroupsSelected}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedAdGroups(new Set(filteredAdGroups.map(ag => ag.id)));
+                        } else {
+                          setSelectedAdGroups(new Set());
+                        }
+                      }}
+                    />
+                  </TableHead>
+                  <TableHead>Ad Group Name</TableHead>
+                  <TableHead>Campaign</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Impressions</TableHead>
+                  <TableHead className="text-right">Clicks</TableHead>
+                  <TableHead className="text-right">Spend</TableHead>
+                  <TableHead className="text-right">ACOS</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filteredAdGroups.map((ag) => (
+                  <TableRow 
+                    key={ag.id}
+                    className={selectedAdGroups.has(ag.id) ? 'bg-muted/30' : ''}
+                  >
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedAdGroups.has(ag.id)}
+                        onCheckedChange={(checked) => {
+                          setSelectedAdGroups(prev => {
+                            const next = new Set(prev);
+                            if (checked) {
+                              next.add(ag.id);
+                            } else {
+                              next.delete(ag.id);
+                            }
+                            return next;
+                          });
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell className="font-medium">{ag.name}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{ag.campaign_name}</TableCell>
+                    <TableCell>{getStatusBadge(ag.status)}</TableCell>
+                    <TableCell className="text-right">{formatNumber(ag.impressions)}</TableCell>
+                    <TableCell className="text-right">{formatNumber(ag.clicks)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(ag.spend)}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        {ag.acos > 30 ? (
+                          <TrendingUp className="h-3 w-3 text-destructive" />
+                        ) : (
+                          <TrendingDown className="h-3 w-3 text-success" />
+                        )}
+                        {ag.acos?.toFixed(1) || '0.0'}%
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         );
 
       case 'targets':

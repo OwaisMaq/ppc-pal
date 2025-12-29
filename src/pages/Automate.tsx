@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import DashboardShell from "@/components/DashboardShell";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -18,7 +18,8 @@ import {
   Clock,
   History,
   ListChecks,
-  FlaskConical
+  FlaskConical,
+  Calendar
 } from "lucide-react";
 import { AutomationRulesList } from "@/components/AutomationRulesList";
 import { AlertsPanel } from "@/components/AlertsPanel";
@@ -26,11 +27,14 @@ import PendingApprovals from "@/components/PendingApprovals";
 import ActionsFeed from "@/components/ActionsFeed";
 import { TrustReportCard, OutcomeAttributionPanel } from "@/components/overview";
 import { BidOptimizerStatusCard, ModelAccuracyCard, PortfolioHealthPanel, ExperimentsTab } from "@/components/automation";
+import { DaypartScheduler } from "@/components/dayparting";
 import { useAutomationRules, useAlerts } from "@/hooks/useAutomation";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useActionOutcomes } from "@/hooks/useActionOutcomes";
 import { useSavingsMetric } from "@/hooks/useSavingsMetric";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 const Automate: React.FC = () => {
@@ -61,6 +65,25 @@ const Automate: React.FC = () => {
   // Fetch action outcomes and savings for trust report
   const { outcomes, stats: outcomeStats, loading: outcomesLoading } = useActionOutcomes();
   const { savings, loading: savingsLoading } = useSavingsMetric(selectedProfile);
+
+  // Fetch campaigns for dayparting
+  const { data: campaigns = [] } = useQuery({
+    queryKey: ['campaigns-for-dayparting', selectedProfile],
+    queryFn: async () => {
+      if (!selectedProfile) return [];
+      const { data, error } = await supabase
+        .from('campaigns')
+        .select('amazon_campaign_id, name, status')
+        .eq('profile_id', selectedProfile);
+      if (error) throw error;
+      return (data || []).map(c => ({
+        campaign_id: c.amazon_campaign_id,
+        campaign_name: c.name,
+        status: c.status,
+      }));
+    },
+    enabled: !!selectedProfile,
+  });
 
   const plan = subscription?.plan_type || 'free';
 
@@ -233,10 +256,14 @@ const Automate: React.FC = () => {
 
         {selectedProfile ? (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-6">
+            <TabsList className="grid w-full grid-cols-7">
               <TabsTrigger value="rules" className="gap-2">
                 <Zap className="h-4 w-4" />
                 Rules ({rules.length})
+              </TabsTrigger>
+              <TabsTrigger value="dayparting" className="gap-2">
+                <Calendar className="h-4 w-4" />
+                Dayparting
               </TabsTrigger>
               <TabsTrigger value="queue" className="gap-2">
                 <ListChecks className="h-4 w-4" />
@@ -296,6 +323,13 @@ const Automate: React.FC = () => {
                 onToggleRule={toggleRule}
                 onChangeMode={changeMode}
                 onRunRule={handleRunRule}
+              />
+            </TabsContent>
+
+            <TabsContent value="dayparting" className="space-y-6">
+              <DaypartScheduler 
+                profileId={selectedProfile} 
+                campaigns={campaigns}
               />
             </TabsContent>
 
