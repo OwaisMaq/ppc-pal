@@ -1983,6 +1983,7 @@ export type Database = {
           last_updated: string | null
           name: string
           placement_bidding: Json | null
+          portfolio_id: string | null
           product_type: string | null
           profile_id: string
           roas: number | null
@@ -2041,6 +2042,7 @@ export type Database = {
           last_updated?: string | null
           name: string
           placement_bidding?: Json | null
+          portfolio_id?: string | null
           product_type?: string | null
           profile_id: string
           roas?: number | null
@@ -2099,6 +2101,7 @@ export type Database = {
           last_updated?: string | null
           name?: string
           placement_bidding?: Json | null
+          portfolio_id?: string | null
           product_type?: string | null
           profile_id?: string
           roas?: number | null
@@ -4156,6 +4159,57 @@ export type Database = {
         }
         Relationships: []
       }
+      portfolios: {
+        Row: {
+          budget_amount_micros: number | null
+          budget_currency: string | null
+          budget_end_date: string | null
+          budget_policy: string | null
+          budget_start_date: string | null
+          created_at: string | null
+          id: string
+          in_budget: boolean | null
+          name: string
+          portfolio_id: string
+          profile_id: string
+          state: string
+          synced_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          budget_amount_micros?: number | null
+          budget_currency?: string | null
+          budget_end_date?: string | null
+          budget_policy?: string | null
+          budget_start_date?: string | null
+          created_at?: string | null
+          id?: string
+          in_budget?: boolean | null
+          name: string
+          portfolio_id: string
+          profile_id: string
+          state?: string
+          synced_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          budget_amount_micros?: number | null
+          budget_currency?: string | null
+          budget_end_date?: string | null
+          budget_policy?: string | null
+          budget_start_date?: string | null
+          created_at?: string | null
+          id?: string
+          in_budget?: boolean | null
+          name?: string
+          portfolio_id?: string
+          profile_id?: string
+          state?: string
+          synced_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       profile_currency: {
         Row: {
           currency: string
@@ -5256,6 +5310,30 @@ export type Database = {
           sales_30d_micros: number | null
           vcr_30d: number | null
           video_completes_30d: number | null
+        }
+        Relationships: []
+      }
+      v_portfolio_metrics: {
+        Row: {
+          acos: number | null
+          budget_amount_micros: number | null
+          budget_currency: string | null
+          budget_policy: string | null
+          campaign_count: number | null
+          cpc: number | null
+          ctr: number | null
+          in_budget: boolean | null
+          portfolio_id: string | null
+          portfolio_name: string | null
+          portfolio_uuid: string | null
+          profile_id: string | null
+          roas: number | null
+          state: string | null
+          total_clicks: number | null
+          total_conversions: number | null
+          total_impressions: number | null
+          total_sales: number | null
+          total_spend: number | null
         }
         Relationships: []
       }
