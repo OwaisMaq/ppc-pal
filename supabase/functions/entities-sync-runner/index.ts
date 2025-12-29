@@ -328,6 +328,60 @@ class EntitySyncer {
     }
   }
 
+  async* listPortfoliosPaged(config: SyncConfig, args: FetchPageArgs) {
+    let cursor = args.pageCursor ?? 0;
+    let hasMore = true;
+    
+    while (hasMore) {
+      const url = new URL(`${config.baseUrl}/v2/portfolios`);
+      url.searchParams.set('startIndex', cursor.toString());
+      url.searchParams.set('count', '100');
+
+      const response = await this.httpClient.makeRequest(url.toString(), {
+        headers: this.getApiHeaders(config)
+      });
+      
+      const data = await response.json();
+      yield data;
+      
+      if (data.length < 100) {
+        hasMore = false;
+      } else {
+        cursor = (cursor as number) + data.length;
+      }
+    }
+  }
+
+  async upsertPortfolios(profileId: string, portfolios: any[]): Promise<number> {
+    if (portfolios.length === 0) return 0;
+
+    const upsertData = portfolios.map(portfolio => ({
+      profile_id: profileId,
+      portfolio_id: portfolio.portfolioId.toString(),
+      name: portfolio.name,
+      state: portfolio.state || 'enabled',
+      budget_amount_micros: portfolio.budget?.amount ? Math.round(portfolio.budget.amount * 1000000) : null,
+      budget_currency: portfolio.budget?.currencyCode || null,
+      budget_policy: portfolio.budget?.policy || null,
+      budget_start_date: portfolio.budget?.startDate || null,
+      budget_end_date: portfolio.budget?.endDate || null,
+      in_budget: portfolio.inBudget !== false,
+      synced_at: new Date().toISOString()
+    }));
+
+    const { error } = await this.supabase
+      .from('portfolios')
+      .upsert(upsertData, {
+        onConflict: 'profile_id,portfolio_id',
+        ignoreDuplicates: false
+      });
+
+    if (error) {
+      throw new Error(`Failed to upsert portfolios: ${error.message}`);
+    }
+
+    return portfolios.length;
+  }
   async upsertCampaigns(profileId: string, campaigns: any[]): Promise<number> {
     if (campaigns.length === 0) return 0;
 
@@ -648,6 +702,10 @@ async function syncEntity(
     let upsertMethod: (profileId: string, items: any[]) => Promise<number>;
 
     switch (entityType) {
+      case 'portfolios':
+        paginator = syncer.listPortfoliosPaged(config, { profileId: config.profileId, since });
+        upsertMethod = syncer.upsertPortfolios.bind(syncer);
+        break;
       case 'campaigns':
         paginator = syncer.listCampaignsPaged(config, { profileId: config.profileId, since });
         upsertMethod = syncer.upsertCampaigns.bind(syncer);
@@ -782,7 +840,7 @@ Deno.serve(async (req) => {
 
     const results: Record<string, any> = {};
     const entityTypes = entity === 'all' 
-      ? ['campaigns', 'ad_groups', 'ads', 'targets']
+      ? ['portfolios', 'campaigns', 'ad_groups', 'ads', 'targets']
       : [entity];
 
     // Sync entities in order (campaigns first, then ad groups, etc.)

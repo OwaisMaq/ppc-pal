@@ -127,12 +127,20 @@ interface SearchTerm {
 
 interface Portfolio {
   id: string;
+  portfolio_id: string;
   name: string;
-  budget: number;
-  campaigns_count: number;
-  spend: number;
-  sales: number;
+  state: string;
+  budget_amount_micros: number | null;
+  budget_currency: string | null;
+  budget_policy: string | null;
+  in_budget: boolean;
+  campaign_count: number;
+  total_spend: number;
+  total_sales: number;
+  total_clicks: number;
+  total_impressions: number;
   acos: number;
+  roas: number;
 }
 
 const Campaigns = () => {
@@ -219,14 +227,15 @@ const Campaigns = () => {
       const profileId = primaryConnection.profile_id;
       
       try {
-        const [campaignsRes, adGroupsRes, keywordsRes] = await Promise.all([
+        const [campaignsRes, adGroupsRes, keywordsRes, portfoliosRes] = await Promise.all([
           supabase.from('campaigns').select('id', { count: 'exact', head: true }).eq('profile_id', profileId),
           supabase.from('ad_groups').select('id', { count: 'exact', head: true }).eq('profile_id', profileId),
           supabase.from('keywords').select('id', { count: 'exact', head: true }).eq('profile_id', profileId),
+          supabase.from('portfolios').select('id', { count: 'exact', head: true }).eq('profile_id', profileId),
         ]);
         
         setTabCounts({
-          portfolios: 0, // Not implemented yet
+          portfolios: portfoliosRes.count || 0,
           campaigns: campaignsRes.count || 0,
           adGroups: adGroupsRes.count || 0,
           targets: keywordsRes.count || 0,
@@ -272,8 +281,7 @@ const Campaigns = () => {
             await fetchSearchTerms(profileId);
             break;
           case 'portfolios':
-            // Portfolios not yet available - show placeholder
-            setPortfolios([]);
+            await fetchPortfolios(profileId);
             break;
         }
       } catch (error) {
@@ -470,6 +478,40 @@ const Campaigns = () => {
     setSelectedTerms(new Set());
   };
 
+  const fetchPortfolios = async (profileId: string) => {
+    const { data, error } = await supabase
+      .from('v_portfolio_metrics')
+      .select('*')
+      .eq('profile_id', profileId);
+
+    if (error) {
+      console.error('fetchPortfolios error:', error);
+      throw error;
+    }
+
+    console.log('fetchPortfolios data:', data?.length, 'for profile:', profileId);
+
+    const portfoliosData: Portfolio[] = (data || []).map((p: any) => ({
+      id: p.portfolio_uuid,
+      portfolio_id: p.portfolio_id,
+      name: p.portfolio_name || 'Unnamed Portfolio',
+      state: p.state || 'enabled',
+      budget_amount_micros: p.budget_amount_micros,
+      budget_currency: p.budget_currency,
+      budget_policy: p.budget_policy,
+      in_budget: p.in_budget !== false,
+      campaign_count: p.campaign_count || 0,
+      total_spend: p.total_spend || 0,
+      total_sales: p.total_sales || 0,
+      total_clicks: p.total_clicks || 0,
+      total_impressions: p.total_impressions || 0,
+      acos: p.acos || 0,
+      roas: p.roas || 0,
+    }));
+
+    setPortfolios(portfoliosData);
+  };
+
   // Filter functions
   const filteredCampaigns = useMemo(() => 
     campaigns.filter(c => c.campaign_name.toLowerCase().includes(searchQuery.toLowerCase())),
@@ -498,6 +540,13 @@ const Campaigns = () => {
       st.campaign_name.toLowerCase().includes(searchQuery.toLowerCase())
     ),
     [searchTerms, searchQuery]
+  );
+
+  const filteredPortfolios = useMemo(() =>
+    portfolios.filter(p => 
+      p.name.toLowerCase().includes(searchQuery.toLowerCase())
+    ),
+    [portfolios, searchQuery]
   );
 
   // Counts for tabs - use pre-fetched counts, but update with actual data when available
@@ -634,9 +683,89 @@ const Campaigns = () => {
 
     switch (viewLevel) {
       case 'portfolios':
-        return renderEmptyState(
-          'Portfolios feature coming soon',
-          <Briefcase className="h-12 w-12 mx-auto text-muted-foreground" />
+        if (filteredPortfolios.length === 0) {
+          return renderEmptyState(
+            searchQuery ? 'No portfolios match your search' : 'No portfolios found. Sync your Amazon account to load portfolios.',
+            <Briefcase className="h-12 w-12 mx-auto text-muted-foreground" />
+          );
+        }
+        return (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Portfolio Name</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Budget</TableHead>
+                <TableHead className="text-right">Campaigns</TableHead>
+                <TableHead className="text-right">Spend</TableHead>
+                <TableHead className="text-right">Sales</TableHead>
+                <TableHead className="text-right">ACOS</TableHead>
+                <TableHead className="text-right">ROAS</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredPortfolios.map((portfolio) => {
+                const budgetAmount = portfolio.budget_amount_micros 
+                  ? portfolio.budget_amount_micros / 1000000 
+                  : null;
+                const budgetUtilization = budgetAmount && portfolio.total_spend > 0
+                  ? Math.min((portfolio.total_spend / budgetAmount) * 100, 100)
+                  : 0;
+                
+                return (
+                  <TableRow key={portfolio.id}>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        <Briefcase className="h-4 w-4 text-muted-foreground" />
+                        {portfolio.name}
+                      </div>
+                    </TableCell>
+                    <TableCell>{getStatusBadge(portfolio.state)}</TableCell>
+                    <TableCell className="text-right">
+                      {budgetAmount ? (
+                        <div className="space-y-1">
+                          <span className="text-sm">{formatCurrency(budgetAmount)}</span>
+                          {portfolio.budget_policy && (
+                            <div className="flex items-center gap-1 justify-end">
+                              <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                                <div 
+                                  className={`h-full rounded-full transition-all ${
+                                    portfolio.in_budget ? 'bg-success' : 'bg-destructive'
+                                  }`}
+                                  style={{ width: `${budgetUtilization}%` }}
+                                />
+                              </div>
+                              <span className="text-xs text-muted-foreground">{budgetUtilization.toFixed(0)}%</span>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Badge variant="secondary" className="font-mono">
+                        {portfolio.campaign_count}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">{formatCurrency(portfolio.total_spend)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(portfolio.total_sales)}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        {portfolio.acos > 30 ? (
+                          <TrendingUp className="h-3 w-3 text-destructive" />
+                        ) : (
+                          <TrendingDown className="h-3 w-3 text-success" />
+                        )}
+                        {portfolio.acos.toFixed(1)}%
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">{portfolio.roas.toFixed(2)}x</TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
         );
 
       case 'campaigns':
