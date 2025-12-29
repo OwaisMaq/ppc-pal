@@ -90,6 +90,102 @@ interface Insight {
   entities?: string[];
 }
 
+interface ScoreBreakdown {
+  acosEfficiency: { score: number; value: number; weight: number };
+  conversionRate: { score: number; value: number; weight: number };
+  ctr: { score: number; value: number; weight: number };
+  budgetUtilization: { score: number; value: number; weight: number };
+  wasteRatio: { score: number; value: number; weight: number };
+}
+
+// Calculate monthly health score (0-100) and letter grade
+function calculateMonthlyScore(metrics: MonthlyMetrics, wastedSpend: number): { score: number; grade: string; breakdown: ScoreBreakdown } {
+  // Weights for each component
+  const weights = {
+    acosEfficiency: 0.30,
+    conversionRate: 0.25,
+    ctr: 0.20,
+    budgetUtilization: 0.15,
+    wasteRatio: 0.10,
+  };
+
+  // 1. ACOS Efficiency Score (lower is better)
+  // A: ≤20%, B: ≤30%, C: ≤50%, D: ≤75%, F: >75%
+  const acos = metrics.avgAcos;
+  let acosScore: number;
+  if (acos <= 20) acosScore = 100;
+  else if (acos <= 30) acosScore = 85;
+  else if (acos <= 50) acosScore = 70;
+  else if (acos <= 75) acosScore = 50;
+  else acosScore = Math.max(0, 40 - (acos - 75) * 0.5);
+
+  // 2. Conversion Rate Score (higher is better)
+  // A: ≥15%, B: ≥10%, C: ≥5%, D: ≥2%, F: <2%
+  const cvr = metrics.totalClicks > 0 ? (metrics.totalOrders / metrics.totalClicks) * 100 : 0;
+  let cvrScore: number;
+  if (cvr >= 15) cvrScore = 100;
+  else if (cvr >= 10) cvrScore = 85;
+  else if (cvr >= 5) cvrScore = 70;
+  else if (cvr >= 2) cvrScore = 50;
+  else cvrScore = Math.max(0, cvr * 25);
+
+  // 3. CTR Score (higher is better)
+  // A: ≥0.5%, B: ≥0.35%, C: ≥0.2%, D: ≥0.1%, F: <0.1%
+  const ctr = metrics.totalImpressions > 0 ? (metrics.totalClicks / metrics.totalImpressions) * 100 : 0;
+  let ctrScore: number;
+  if (ctr >= 0.5) ctrScore = 100;
+  else if (ctr >= 0.35) ctrScore = 85;
+  else if (ctr >= 0.2) ctrScore = 70;
+  else if (ctr >= 0.1) ctrScore = 50;
+  else ctrScore = Math.max(0, ctr * 500);
+
+  // 4. Budget Utilization Score (optimal is 80-95%)
+  // Use ROAS as proxy - good ROAS means budget is being used efficiently
+  const roas = metrics.avgRoas;
+  let budgetScore: number;
+  if (roas >= 3) budgetScore = 100;
+  else if (roas >= 2) budgetScore = 85;
+  else if (roas >= 1) budgetScore = 70;
+  else if (roas >= 0.5) budgetScore = 50;
+  else budgetScore = Math.max(0, roas * 100);
+
+  // 5. Waste Ratio Score (lower is better)
+  // A: <5%, B: <10%, C: <20%, D: <35%, F: ≥35%
+  const wasteRatio = metrics.totalSpend > 0 ? (wastedSpend / metrics.totalSpend) * 100 : 0;
+  let wasteScore: number;
+  if (wasteRatio < 5) wasteScore = 100;
+  else if (wasteRatio < 10) wasteScore = 85;
+  else if (wasteRatio < 20) wasteScore = 70;
+  else if (wasteRatio < 35) wasteScore = 50;
+  else wasteScore = Math.max(0, 40 - (wasteRatio - 35) * 0.8);
+
+  // Calculate weighted total score
+  const totalScore = 
+    acosScore * weights.acosEfficiency +
+    cvrScore * weights.conversionRate +
+    ctrScore * weights.ctr +
+    budgetScore * weights.budgetUtilization +
+    wasteScore * weights.wasteRatio;
+
+  // Determine letter grade
+  let grade: string;
+  if (totalScore >= 90) grade = "A";
+  else if (totalScore >= 75) grade = "B";
+  else if (totalScore >= 60) grade = "C";
+  else if (totalScore >= 40) grade = "D";
+  else grade = "F";
+
+  const breakdown: ScoreBreakdown = {
+    acosEfficiency: { score: Math.round(acosScore), value: acos, weight: weights.acosEfficiency * 100 },
+    conversionRate: { score: Math.round(cvrScore), value: cvr, weight: weights.conversionRate * 100 },
+    ctr: { score: Math.round(ctrScore), value: ctr, weight: weights.ctr * 100 },
+    budgetUtilization: { score: Math.round(budgetScore), value: roas, weight: weights.budgetUtilization * 100 },
+    wasteRatio: { score: Math.round(wasteScore), value: wasteRatio, weight: weights.wasteRatio * 100 },
+  };
+
+  return { score: Math.round(totalScore), grade, breakdown };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -402,12 +498,20 @@ serve(async (req) => {
       }
     }
 
+    // Store scores for trend calculation
+    const monthScores = new Map<string, number>();
+
     // Generate insights for each month
     const audits: any[] = [];
 
-    for (const [monthKey, metrics] of monthlyData) {
+    // Sort months chronologically for trend calculation
+    const sortedMonths = Array.from(monthlyData.keys()).sort();
+
+    for (const monthKey of sortedMonths) {
+      const metrics = monthlyData.get(monthKey)!;
       const insights: Insight[] = [];
       let totalEstimatedSavings = 0;
+      let totalWastedSpend = 0;
 
       const campaignsArray = Array.from(metrics.campaigns.values());
 
@@ -417,6 +521,7 @@ serve(async (req) => {
       const wastedCampaigns = campaignsArray.filter(c => c.spend > 10 && c.orders === 0);
       if (wastedCampaigns.length > 0) {
         const wastedSpend = wastedCampaigns.reduce((sum, c) => sum + c.spend, 0);
+        totalWastedSpend += wastedSpend;
         insights.push({
           type: "waste_detection",
           severity: "critical",
@@ -472,6 +577,7 @@ serve(async (req) => {
       const wastedSearchTerms = metrics.searchTerms.filter(t => t.spend > 5 && t.orders === 0);
       if (wastedSearchTerms.length > 0) {
         const wastedSpend = wastedSearchTerms.reduce((sum, t) => sum + t.spend, 0);
+        totalWastedSpend += wastedSpend;
         const topWasters = wastedSearchTerms.slice(0, 10);
         insights.push({
           type: "wasted_search_terms",
@@ -534,6 +640,7 @@ serve(async (req) => {
       const wastedTargets = metrics.targets.filter(t => t.spend > 10 && t.orders === 0);
       if (wastedTargets.length > 0) {
         const wastedSpend = wastedTargets.reduce((sum, t) => sum + t.spend, 0);
+        totalWastedSpend += wastedSpend;
         const topWasters = wastedTargets.slice(0, 10);
         insights.push({
           type: "wasted_targets",
@@ -588,6 +695,24 @@ serve(async (req) => {
         });
       }
 
+      // Calculate monthly health score
+      const { score, grade, breakdown } = calculateMonthlyScore(metrics, totalWastedSpend);
+      monthScores.set(monthKey, score);
+
+      // Determine trend vs prior month
+      const monthIndex = sortedMonths.indexOf(monthKey);
+      let trendVsPriorMonth: string = "new";
+      if (monthIndex > 0) {
+        const priorMonthKey = sortedMonths[monthIndex - 1];
+        const priorScore = monthScores.get(priorMonthKey);
+        if (priorScore !== undefined) {
+          const scoreDiff = score - priorScore;
+          if (scoreDiff >= 5) trendVsPriorMonth = "up";
+          else if (scoreDiff <= -5) trendVsPriorMonth = "down";
+          else trendVsPriorMonth = "stable";
+        }
+      }
+
       // Generate AI summary if API key available
       let aiSummary = "";
       if (lovableApiKey && insights.length > 0) {
@@ -609,6 +734,7 @@ serve(async (req) => {
                 {
                   role: "user",
                   content: `Month: ${metrics.monthLabel}
+Health Score: ${score}/100 (Grade: ${grade})
 Total Spend: £${metrics.totalSpend.toFixed(2)}
 Total Sales: £${metrics.totalSales.toFixed(2)}
 ACOS: ${metrics.avgAcos.toFixed(1)}%
@@ -677,6 +803,10 @@ ${insights.map(i => `- [${i.level}] ${i.title}`).join("\n")}`
           targets: targetBreakdown,
         },
         estimated_savings: totalEstimatedSavings,
+        score,
+        grade,
+        score_breakdown: breakdown,
+        trend_vs_prior_month: trendVsPriorMonth,
         status: "completed",
       };
 
