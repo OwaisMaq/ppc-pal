@@ -14,11 +14,13 @@ interface PendingReport {
   report_type: string
   status: string
   configuration: {
-    dateRange: { startDate: string; endDate: string }
-    timeUnit: string
-    columns: string[]
-    entityIds: string[]
+    dateRange?: { startDate: string; endDate: string }
+    timeUnit?: string
+    columns?: string[]
+    entityIds?: string[]
     entityType: string
+    api_endpoint?: string
+    profile_id?: string
   }
   poll_count: number
   created_at: string
@@ -85,24 +87,54 @@ async function downloadAndParseReport(url: string): Promise<any[]> {
 }
 
 /**
- * Get decrypted access token for a connection
+ * Process search term report data - upsert into fact_search_term_daily
  */
-async function getAccessToken(supabase: any, connectionId: string): Promise<string> {
-  const encryptionKey = Deno.env.get('ENCRYPTION_KEY')
-  if (!encryptionKey) {
-    throw new Error('ENCRYPTION_KEY not configured')
+async function processSearchTermReport(
+  supabase: any,
+  reportData: any[],
+  profileId: string
+): Promise<number> {
+  console.log(`📊 Processing ${reportData.length} search term records`)
+  
+  const BATCH_SIZE = 500
+  let totalUpserted = 0
+
+  for (let i = 0; i < reportData.length; i += BATCH_SIZE) {
+    const batch = reportData.slice(i, i + BATCH_SIZE)
+    
+    const records = batch.map((record: any) => ({
+      date: record.date,
+      profile_id: profileId,
+      campaign_id: record.campaignId || '',
+      ad_group_id: record.adGroupId || '',
+      keyword_id: record.keywordId || null,
+      keyword_text: record.keyword || null,
+      search_term: record.searchTerm || '',
+      match_type: record.matchType || 'UNKNOWN',
+      targeting: record.targeting || null,
+      impressions: record.impressions || 0,
+      clicks: record.clicks || 0,
+      cost_micros: Math.round((record.cost || 0) * 1000000),
+      attributed_conversions_1d: record.purchases1d || 0,
+      attributed_conversions_7d: record.purchases7d || 0,
+      attributed_sales_7d_micros: Math.round((record.sales7d || 0) * 1000000)
+    }))
+
+    const { error } = await supabase
+      .from('fact_search_term_daily')
+      .upsert(records, {
+        onConflict: 'date,profile_id,campaign_id,ad_group_id,search_term,match_type'
+      })
+
+    if (error) {
+      console.error(`❌ Batch upsert error:`, error)
+    } else {
+      totalUpserted += records.length
+    }
   }
 
-  const { data, error } = await supabase.rpc('get_tokens_with_key', {
-    p_profile_id: connectionId,
-    p_encryption_key: encryptionKey
-  })
-
-  if (error || !data || data.length === 0) {
-    throw new Error('Failed to retrieve access token')
-  }
-
-  return data[0].access_token
+  console.log(`✅ Upserted ${totalUpserted} search term records`)
+  return totalUpserted
 }
 
 /**
@@ -115,10 +147,16 @@ async function processCompletedReport(
   connectionId: string,
   profileId: string
 ) {
-  console.log(`📊 Processing ${reportData.length} records for ${report.report_type}, entityType: ${report.configuration.entityType}`)
+  const entityType = report.configuration.entityType
+  console.log(`📊 Processing ${reportData.length} records for ${report.report_type}, entityType: ${entityType}`)
   console.log(`🔍 DEBUG: First 3 records sample:`, reportData.slice(0, 3))
   
-  const { timeUnit, entityType } = report.configuration
+  // Handle search terms separately
+  if (entityType === 'searchTerms') {
+    return await processSearchTermReport(supabase, reportData, profileId)
+  }
+
+  const timeUnit = report.configuration.timeUnit
   let updated = 0
   let notFound = 0
   let errors = 0
@@ -397,15 +435,24 @@ Deno.serve(async (req) => {
           })
           .eq('id', report.id)
 
-        // Fetch connection details
-        const { data: connection, error: connError } = await supabase
-          .from('amazon_connections')
-          .select('profile_id, advertising_api_endpoint')
-          .eq('id', report.connection_id)
-          .single()
+        // Get profile_id from configuration (for search terms) or from connection
+        let profileId = report.configuration?.profile_id
+        let apiEndpoint = report.configuration?.api_endpoint
 
-        if (connError || !connection) {
-          throw new Error('Failed to get connection details')
+        // Fetch connection details if not in configuration
+        if (!profileId || !apiEndpoint) {
+          const { data: connection, error: connError } = await supabase
+            .from('amazon_connections')
+            .select('profile_id, advertising_api_endpoint')
+            .eq('id', report.connection_id)
+            .single()
+
+          if (connError || !connection) {
+            throw new Error('Failed to get connection details')
+          }
+
+          profileId = profileId || connection.profile_id
+          apiEndpoint = apiEndpoint || connection.advertising_api_endpoint || 'https://advertising-api.amazon.com'
         }
 
         // Get access token - try to refresh if needed
@@ -416,7 +463,7 @@ Deno.serve(async (req) => {
 
         let accessToken: string
         let tokenData = await supabase.rpc('get_tokens_with_key', {
-          p_profile_id: connection.profile_id,
+          p_profile_id: profileId,
           p_encryption_key: encryptionKey
         })
 
@@ -425,14 +472,13 @@ Deno.serve(async (req) => {
         }
 
         accessToken = tokenData.data[0].access_token
-        const apiEndpoint = connection.advertising_api_endpoint || 'https://advertising-api.amazon.com'
 
         // Check report status - will retry with token refresh if 401
         let reportStatus: ReportStatus
         try {
           reportStatus = await pollReportStatus(
             accessToken,
-            connection.profile_id,
+            profileId,
             report.report_id,
             apiEndpoint
           )
@@ -450,7 +496,7 @@ Deno.serve(async (req) => {
                 'Authorization': `Bearer ${serviceRoleKey}`,
                 'Content-Type': 'application/json'
               },
-              body: JSON.stringify({ profileId: connection.profile_id })
+              body: JSON.stringify({ profileId: profileId })
             })
             
             if (!refreshResponse.ok) {
@@ -460,7 +506,7 @@ Deno.serve(async (req) => {
 
             // Get new token
             tokenData = await supabase.rpc('get_tokens_with_key', {
-              p_profile_id: connection.profile_id,
+              p_profile_id: profileId,
               p_encryption_key: encryptionKey
             })
 
@@ -473,7 +519,7 @@ Deno.serve(async (req) => {
             // Retry with new token
             reportStatus = await pollReportStatus(
               accessToken,
-              connection.profile_id,
+              profileId,
               report.report_id,
               apiEndpoint
             )
@@ -496,7 +542,7 @@ Deno.serve(async (req) => {
             report,
             reportData,
             report.connection_id,
-            connection.profile_id
+            profileId
           )
           console.log(`✅ Updated ${recordsUpdated} records in database`)
 
