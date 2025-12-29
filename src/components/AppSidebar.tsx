@@ -52,7 +52,7 @@ export function AppSidebar() {
     { title: "Campaigns", url: "/campaigns", icon: Target },
     { title: "Rank Tracker", url: "/rank-tracker", icon: TrendingUp, comingSoon: true },
     { title: "Automate", url: "/automate", icon: Zap },
-    { title: "Reports", url: "/reports", icon: BarChart3 },
+    { title: "Analytics", url: "/analytics", icon: BarChart3 },
     { title: "Settings", url: "/settings", icon: Settings },
   ];
 
