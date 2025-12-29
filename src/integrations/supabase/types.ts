@@ -3352,6 +3352,92 @@ export type Database = {
           },
         ]
       }
+      keyword_rank_history: {
+        Row: {
+          checked_at: string
+          created_at: string
+          id: string
+          organic_rank: number | null
+          profile_id: string
+          sponsored_rank: number | null
+          tracking_id: string
+        }
+        Insert: {
+          checked_at?: string
+          created_at?: string
+          id?: string
+          organic_rank?: number | null
+          profile_id: string
+          sponsored_rank?: number | null
+          tracking_id: string
+        }
+        Update: {
+          checked_at?: string
+          created_at?: string
+          id?: string
+          organic_rank?: number | null
+          profile_id?: string
+          sponsored_rank?: number | null
+          tracking_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "keyword_rank_history_tracking_id_fkey"
+            columns: ["tracking_id"]
+            isOneToOne: false
+            referencedRelation: "keyword_rank_tracking"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      keyword_rank_tracking: {
+        Row: {
+          asin: string
+          best_organic_rank: number | null
+          best_sponsored_rank: number | null
+          created_at: string
+          current_organic_rank: number | null
+          current_sponsored_rank: number | null
+          id: string
+          is_active: boolean
+          keyword: string
+          last_checked_at: string | null
+          profile_id: string
+          rank_trend: number | null
+          updated_at: string
+        }
+        Insert: {
+          asin: string
+          best_organic_rank?: number | null
+          best_sponsored_rank?: number | null
+          created_at?: string
+          current_organic_rank?: number | null
+          current_sponsored_rank?: number | null
+          id?: string
+          is_active?: boolean
+          keyword: string
+          last_checked_at?: string | null
+          profile_id: string
+          rank_trend?: number | null
+          updated_at?: string
+        }
+        Update: {
+          asin?: string
+          best_organic_rank?: number | null
+          best_sponsored_rank?: number | null
+          created_at?: string
+          current_organic_rank?: number | null
+          current_sponsored_rank?: number | null
+          id?: string
+          is_active?: boolean
+          keyword?: string
+          last_checked_at?: string | null
+          profile_id?: string
+          rank_trend?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       keywords: {
         Row: {
           acos: number | null

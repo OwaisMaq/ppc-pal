@@ -17,6 +17,7 @@ const CommandCenter = lazy(() => import("@/pages/CommandCenter"));
 const Feedback = lazy(() => import("@/pages/Feedback"));
 const Campaigns = lazy(() => import("@/pages/Campaigns"));
 const CampaignBuilder = lazy(() => import("@/pages/CampaignBuilder"));
+const RankTracker = lazy(() => import("@/pages/RankTracker"));
 
 const Privacy = lazy(() => import("@/pages/Privacy"));
 const Automate = lazy(() => import("@/pages/Automate"));
@@ -106,7 +107,13 @@ const App = () => {
                       } />
                       <Route path="/campaigns/search-terms" element={<Navigate to="/campaigns" replace />} />
 
-                      
+                      {/* Rank Tracker */}
+                      <Route path="/rank-tracker" element={
+                        <ProtectedRoute>
+                          <RankTracker />
+                        </ProtectedRoute>
+                      } />
+
                       {/* Automate routes */}
                       <Route path="/automate" element={
                         <ProtectedRoute>

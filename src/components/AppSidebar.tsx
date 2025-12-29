@@ -25,7 +25,8 @@ import {
   HelpCircle,
   ChevronUp,
   RefreshCw,
-  Check
+  Check,
+  TrendingUp
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useSyncStatus } from "@/hooks/useSyncStatus";
@@ -49,6 +50,7 @@ export function AppSidebar() {
   const menuItems = [
     { title: "Command Center", url: "/command-center", icon: LayoutDashboard },
     { title: "Campaigns", url: "/campaigns", icon: Target },
+    { title: "Rank Tracker", url: "/rank-tracker", icon: TrendingUp },
     { title: "Automate", url: "/automate", icon: Zap },
     { title: "Reports", url: "/reports", icon: BarChart3 },
     { title: "Settings", url: "/settings", icon: Settings },
