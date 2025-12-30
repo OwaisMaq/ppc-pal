@@ -18,6 +18,7 @@ import { useAnomalies } from "@/hooks/useAnomalies";
 import { useActionQueue } from "@/hooks/useActionQueue";
 import { useSearchStudio } from "@/hooks/useSearchStudio";
 import { useActionsFeed } from "@/hooks/useActionsFeed";
+import { useAccountHealth } from "@/hooks/useAccountHealth";
 
 // Components
 import { DashboardKPIs } from "@/components/DashboardKPIs";
@@ -213,40 +214,30 @@ const CommandCenter = () => {
     };
   }, [comparisonMetrics]);
 
-  // Derive health status
-  const healthStatus: HealthStatus = useMemo(() => {
-    if (!metrics) return 'healthy';
-    const acosHigh = metrics.acos > 40;
-    const spendSpike = comparisonMetrics && metrics.totalSpend > comparisonMetrics.totalSpend * 1.5;
-    const hasErrors = alerts?.filter(a => a.level === 'critical').length > 0;
-    
-    if (acosHigh || hasErrors) return 'at_risk';
-    if (spendSpike || alerts?.filter(a => a.level === 'warn').length > 2) return 'watch';
-    return 'healthy';
-  }, [metrics, comparisonMetrics, alerts]);
-  
-  const healthReasons = useMemo(() => {
-    const reasons: string[] = [];
-    if (!metrics) return reasons;
-    
-    if (metrics.acos > 40) reasons.push('ACoS is above 40%');
-    if (comparisonMetrics && metrics.totalSpend > comparisonMetrics.totalSpend * 1.5) {
-      reasons.push('Spend increased >50% vs previous period');
-    }
-    if (alerts?.filter(a => a.level === 'critical').length > 0) {
-      reasons.push('Critical alerts detected');
-    }
-    return reasons;
-  }, [metrics, comparisonMetrics, alerts]);
+  // Calculate account health using the new comprehensive hook
+  const { 
+    status: healthStatus, 
+    score: healthScore,
+    reasons: healthReasons,
+    signals: healthSignals 
+  } = useAccountHealth(profileId, {
+    alerts: alerts?.map(a => ({ level: a.level, state: a.state })),
+    rules: rules?.map(r => ({ enabled: r.enabled })),
+    anomalies: anomalies?.map(a => ({ severity: a.severity, state: a.state })),
+    lastSyncAt: primaryConnection?.last_sync_at,
+    currentAcos: metrics?.acos,
+    targetAcos: 25, // Default target, could be fetched from settings
+    recentActionFailures: actions?.filter(a => a.status === 'failed').length,
+  });
 
-  // Automation status
+  // Automation status (derived from health signals for consistency)
   const automationStatus: AutomationStatus = useMemo(() => {
-    if (!rules || rules.length === 0) return 'paused';
-    const enabledRules = rules.filter(r => r.enabled);
-    if (enabledRules.length === 0) return 'paused';
-    if (enabledRules.length < rules.length) return 'limited';
+    if (healthSignals.automationPaused) return 'paused';
+    if (healthSignals.totalRulesCount === 0) return 'paused';
+    if (healthSignals.enabledRulesCount === 0) return 'paused';
+    if (healthSignals.enabledRulesCount < healthSignals.totalRulesCount) return 'limited';
     return 'on';
-  }, [rules]);
+  }, [healthSignals]);
 
   // What Matters Now items
   const whatMattersNowItems: MatterItem[] = useMemo(() => {
@@ -259,7 +250,7 @@ const CommandCenter = () => {
         title: 'Savings Generated',
         description: `$${savings.totalSavings.toFixed(2)} saved through optimizations`,
         details: `From ${savings.actionCount} AI actions in this period`,
-        link: { label: 'View details', to: '/reports' }
+        link: { label: 'View details', to: '/analytics' }
       });
     }
     
@@ -271,7 +262,7 @@ const CommandCenter = () => {
           type: 'positive',
           title: 'ACoS Improved',
           description: `Decreased ${improvement}% from ${comparisonMetrics.acos.toFixed(1)}% to ${metrics.acos.toFixed(1)}%`,
-          link: { label: 'View trends', to: '/reports' }
+          link: { label: 'View trends', to: '/analytics' }
         });
       } else if (metrics.acos > comparisonMetrics.acos * 1.1) {
         items.push({
@@ -291,7 +282,7 @@ const CommandCenter = () => {
           type: 'positive',
           title: 'Sales Growing',
           description: `Up ${growth}% vs previous period`,
-          link: { label: 'View report', to: '/reports' }
+          link: { label: 'View report', to: '/analytics' }
         });
       }
     }
@@ -304,7 +295,7 @@ const CommandCenter = () => {
         title: `${anomaly.metric} ${anomaly.direction === 'spike' ? 'Spike' : 'Dip'}`,
         description: `${anomaly.severity === 'critical' ? 'Critical' : 'Warning'}: ${anomaly.metric} ${anomaly.direction}`,
         details: `Current: ${anomaly.value.toFixed(2)}, Baseline: ${anomaly.baseline.toFixed(2)}`,
-        link: { label: 'View anomalies', to: '/reports' }
+        link: { label: 'View anomalies', to: '/analytics' }
       });
     });
     
