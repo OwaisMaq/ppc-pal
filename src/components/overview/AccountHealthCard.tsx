@@ -140,7 +140,7 @@ export const AccountHealthCard = ({
             {/* Savings - PRIMARY OUTCOME METRIC */}
             <Tooltip>
               <TooltipTrigger asChild>
-                <Link to="/reports" className="block group col-span-2 lg:col-span-1">
+                <Link to="/analytics" className="block group col-span-2 lg:col-span-1">
                   <div className="p-4 rounded-lg border-2 border-success/30 bg-success/5 hover:bg-success/10 transition-colors">
                     <div className="flex items-center justify-between mb-2">
                       <div className="p-1.5 rounded-md bg-success/20">
@@ -161,7 +161,7 @@ export const AccountHealthCard = ({
             {/* Spend vs Sales */}
             <Tooltip>
               <TooltipTrigger asChild>
-                <Link to="/reports" className="block group">
+                <Link to="/analytics" className="block group">
                   <div className="p-4 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors">
                     <div className="flex items-center justify-between mb-2">
                       <div className="p-1.5 rounded-md bg-muted">
