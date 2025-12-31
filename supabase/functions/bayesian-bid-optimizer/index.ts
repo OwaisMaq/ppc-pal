@@ -373,6 +373,50 @@ serve(async (req) => {
       avgOrderValue = totalSales / totalConversions;
     }
 
+    // Collect entity IDs for name lookups
+    const keywordIds = new Set<string>();
+    const targetIds = new Set<string>();
+    const adGroupIds = new Set<string>();
+    
+    for (const state of states) {
+      if (state.entity_type === 'keyword') keywordIds.add(state.entity_id);
+      else if (state.entity_type === 'target') targetIds.add(state.entity_id);
+      if (state.ad_group_id) adGroupIds.add(state.ad_group_id);
+    }
+
+    // Fetch entity names for enrichment
+    const entityNames = new Map<string, string>();
+    const adGroupNames = new Map<string, string>();
+
+    if (keywordIds.size > 0) {
+      const { data: keywords } = await supabase
+        .from('keywords')
+        .select('amazon_keyword_id, keyword_text, match_type')
+        .in('amazon_keyword_id', Array.from(keywordIds));
+      keywords?.forEach(k => {
+        entityNames.set(k.amazon_keyword_id, `"${k.keyword_text}" (${k.match_type})`);
+      });
+    }
+
+    if (targetIds.size > 0) {
+      const { data: targets } = await supabase
+        .from('targets')
+        .select('amazon_target_id, expression_type, expression')
+        .in('amazon_target_id', Array.from(targetIds));
+      targets?.forEach(t => {
+        const expr = t.expression || t.expression_type || 'Target';
+        entityNames.set(t.amazon_target_id, expr.length > 50 ? expr.substring(0, 47) + '...' : expr);
+      });
+    }
+
+    if (adGroupIds.size > 0) {
+      const { data: adGroups } = await supabase
+        .from('ad_groups')
+        .select('amazon_adgroup_id, name')
+        .in('amazon_adgroup_id', Array.from(adGroupIds));
+      adGroups?.forEach(ag => adGroupNames.set(ag.amazon_adgroup_id, ag.name));
+    }
+
     // Process each entity
     const bidUpdates: any[] = [];
     const actions: any[] = [];
@@ -413,6 +457,26 @@ serve(async (req) => {
       if (bidChangePercent > 0.02) {
         results.bids_changed++;
 
+        // Get entity name for enriched display
+        const entityName = entityNames.get(state.entity_id) || 
+          (state.ad_group_id ? adGroupNames.get(state.ad_group_id) : null) ||
+          `${state.entity_type} ...${state.entity_id.slice(-6)}`;
+
+        // Format bid change for display
+        const currentBidDollars = (currentBid / 1000000).toFixed(2);
+        const newBidDollars = (newBidMicros / 1000000).toFixed(2);
+        const changeDirection = newBidMicros > currentBid ? '+' : '';
+        const changePercentFormatted = `${changeDirection}${(bidChangePercent * 100).toFixed(0)}%`;
+
+        // Build reason based on CVR improvement/decline
+        const baseCvr = state.total_conversions / Math.max(1, state.total_clicks);
+        let reason = '';
+        if (newBidMicros > currentBid) {
+          reason = `CVR improved to ${(sampledCvr * 100).toFixed(1)}%`;
+        } else {
+          reason = `Optimizing for ${(config.target_acos * 100).toFixed(0)}% target ACOS`;
+        }
+
         const recommendation = {
           entity_type: state.entity_type,
           entity_id: state.entity_id,
@@ -432,7 +496,7 @@ serve(async (req) => {
         results.recommendations.push(recommendation);
 
         if (!dry_run) {
-          // Queue action for bid change
+          // Queue action for bid change with enriched payload
           const idempotencyKey = `bid_opt_${profile_id}_${state.entity_type}_${state.entity_id}_${new Date().toISOString().split('T')[0]}`;
           
           actions.push({
@@ -449,7 +513,19 @@ serve(async (req) => {
               new_bid_micros: newBidMicros,
               optimization_source: 'bayesian_thompson_sampling',
               confidence,
-              confidence_level: confidenceLevel
+              confidence_level: confidenceLevel,
+              // Enriched fields for display
+              entity_name: entityName,
+              reason: reason,
+              bid_display: `$${currentBidDollars} → $${newBidDollars} (${changePercentFormatted})`,
+              trigger_metrics: {
+                sampled_cvr: sampledCvr * 100,
+                confidence: confidence * 100,
+                current_bid: parseFloat(currentBidDollars),
+                new_bid: parseFloat(newBidDollars),
+                change_percent: bidChangePercent * 100
+              },
+              estimated_impact: `${confidenceLevel} confidence bid optimization`
             },
             rule_id: null
           });

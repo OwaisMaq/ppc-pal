@@ -89,9 +89,11 @@ export const useBulkOperations = (profileId?: string) => {
 
         case 'bid_increase':
         case 'bid_decrease': {
+          const adjustPercent = value || 10;
           const multiplier = type === 'bid_increase' 
-            ? 1 + (value || 10) / 100 
-            : 1 - (value || 10) / 100;
+            ? 1 + adjustPercent / 100 
+            : 1 - adjustPercent / 100;
+          const changeSign = type === 'bid_increase' ? '+' : '-';
 
           for (const entityId of entityIds) {
             const idempotencyKey = `bulk_${type}_${entityId}_${Date.now()}`;
@@ -108,6 +110,13 @@ export const useBulkOperations = (profileId?: string) => {
                   adjustmentType: 'percentage',
                   multiplier,
                   originalValue: value,
+                  // Enriched fields for display
+                  reason: `Manual ${changeSign}${adjustPercent}% bid adjustment`,
+                  bid_display: `Bid ${changeSign}${adjustPercent}%`,
+                  trigger_metrics: {
+                    adjustment_percent: type === 'bid_increase' ? adjustPercent : -adjustPercent,
+                  },
+                  estimated_impact: 'Manual bid adjustment'
                 },
                 idempotency_key: idempotencyKey,
                 status: 'queued',
@@ -141,6 +150,14 @@ export const useBulkOperations = (profileId?: string) => {
                   entityType,
                   entityId,
                   newBid: value,
+                  new_bid_micros: value * 1000000,
+                  // Enriched fields for display
+                  reason: 'Manual bid adjustment',
+                  bid_display: `Set to $${value.toFixed(2)}`,
+                  trigger_metrics: {
+                    new_bid: value,
+                  },
+                  estimated_impact: 'Manual bid change'
                 },
                 idempotency_key: idempotencyKey,
                 status: 'queued',

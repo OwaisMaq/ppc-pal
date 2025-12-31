@@ -68,36 +68,75 @@ export const useActionsFeed = (limit: number = 20, statusFilter?: string) => {
     }
   }, [user]);
 
-  // Enrich actions with entity names from campaigns/targets tables
+  // Enrich actions with entity names from campaigns/keywords/targets tables
   const enrichActions = useCallback(async (rawActions: ActionItem[]): Promise<ActionItem[]> => {
     if (!rawActions.length) return rawActions;
 
-    // Extract campaign IDs that need lookup
+    // Extract IDs that need lookup
     const campaignIdsToLookup = new Set<string>();
+    const keywordIdsToLookup = new Set<string>();
+    const targetIdsToLookup = new Set<string>();
     
     rawActions.forEach(action => {
       const payload = action.payload as Record<string, any>;
       // Only lookup if entity_name is missing
       if (!payload.entity_name) {
         if (payload.campaign_id) campaignIdsToLookup.add(payload.campaign_id);
-        if (payload.entityId && payload.entityType === 'campaign') {
-          campaignIdsToLookup.add(payload.entityId);
+        if (payload.entityId) {
+          if (payload.entityType === 'campaign') campaignIdsToLookup.add(payload.entityId);
+          else if (payload.entityType === 'keyword') keywordIdsToLookup.add(payload.entityId);
+          else if (payload.entityType === 'target') targetIdsToLookup.add(payload.entityId);
+        }
+        if (payload.entity_id) {
+          if (payload.entity_type === 'campaign') campaignIdsToLookup.add(payload.entity_id);
+          else if (payload.entity_type === 'keyword') keywordIdsToLookup.add(payload.entity_id);
+          else if (payload.entity_type === 'target') targetIdsToLookup.add(payload.entity_id);
         }
       }
     });
 
-    // Fetch campaign names if needed
-    let campaignMap = new Map<string, string>();
-    if (campaignIdsToLookup.size > 0) {
-      const { data: campaigns } = await supabase
-        .from('campaigns')
-        .select('amazon_campaign_id, name')
-        .in('amazon_campaign_id', Array.from(campaignIdsToLookup));
-      
-      if (campaigns) {
-        campaigns.forEach(c => campaignMap.set(c.amazon_campaign_id, c.name));
-      }
-    }
+    // Fetch entity names in parallel
+    const [campaignMap, keywordMap, targetMap] = await Promise.all([
+      // Campaigns
+      (async () => {
+        const map = new Map<string, string>();
+        if (campaignIdsToLookup.size > 0) {
+          const { data: campaigns } = await supabase
+            .from('campaigns')
+            .select('amazon_campaign_id, name')
+            .in('amazon_campaign_id', Array.from(campaignIdsToLookup));
+          campaigns?.forEach(c => map.set(c.amazon_campaign_id, c.name));
+        }
+        return map;
+      })(),
+      // Keywords
+      (async () => {
+        const map = new Map<string, string>();
+        if (keywordIdsToLookup.size > 0) {
+          const { data: keywords } = await supabase
+            .from('keywords')
+            .select('amazon_keyword_id, keyword_text, match_type')
+            .in('amazon_keyword_id', Array.from(keywordIdsToLookup));
+          keywords?.forEach(k => map.set(k.amazon_keyword_id, `"${k.keyword_text}" (${k.match_type})`));
+        }
+        return map;
+      })(),
+      // Targets
+      (async () => {
+        const map = new Map<string, string>();
+        if (targetIdsToLookup.size > 0) {
+          const { data: targets } = await supabase
+            .from('targets')
+            .select('amazon_target_id, expression_type, expression')
+            .in('amazon_target_id', Array.from(targetIdsToLookup));
+          targets?.forEach(t => {
+            const expr = String(t.expression || t.expression_type || 'Target');
+            map.set(t.amazon_target_id, expr.length > 40 ? expr.substring(0, 37) + '...' : expr);
+          });
+        }
+        return map;
+      })()
+    ]);
 
     // Enrich each action
     return rawActions.map(action => {
@@ -108,37 +147,53 @@ export const useActionsFeed = (limit: number = 20, statusFilter?: string) => {
         return {
           ...action,
           entity_name: payload.entity_name,
-          trigger_reason: payload.reason,
+          trigger_reason: payload.bid_display || payload.reason,
           estimated_impact: payload.estimated_impact,
           trigger_metrics: payload.trigger_metrics
         };
       }
 
       // Fallback: look up entity name
-      let entityName = payload.entity_name;
-      if (!entityName) {
-        if (payload.keyword_text) {
-          entityName = `"${payload.keyword_text}"`;
+      let entityName: string | undefined;
+      const entityId = payload.entityId || payload.entity_id;
+      const entityType = payload.entityType || payload.entity_type;
+      
+      if (payload.keyword_text) {
+        entityName = `"${payload.keyword_text}"`;
+      } else if (entityId) {
+        if (entityType === 'campaign' && campaignMap.has(entityId)) {
+          entityName = campaignMap.get(entityId);
+        } else if (entityType === 'keyword' && keywordMap.has(entityId)) {
+          entityName = keywordMap.get(entityId);
+        } else if (entityType === 'target' && targetMap.has(entityId)) {
+          entityName = targetMap.get(entityId);
         } else if (payload.campaign_id && campaignMap.has(payload.campaign_id)) {
           entityName = campaignMap.get(payload.campaign_id);
-        } else if (payload.entityId) {
-          if (payload.entityType === 'campaign' && campaignMap.has(payload.entityId)) {
-            entityName = campaignMap.get(payload.entityId);
-          } else {
-            // Last resort: show truncated ID
-            entityName = `${payload.entityType || 'Target'} ...${payload.entityId.slice(-6)}`;
-          }
-        } else if (payload.target_id) {
-          entityName = `Target ...${payload.target_id.slice(-6)}`;
+        } else {
+          // Last resort: show truncated ID with type
+          entityName = `${entityType || 'Entity'} ...${entityId.slice(-6)}`;
         }
+      } else if (payload.campaign_id && campaignMap.has(payload.campaign_id)) {
+        entityName = campaignMap.get(payload.campaign_id);
+      } else if (payload.target_id) {
+        entityName = targetMap.get(payload.target_id) || `Target ...${payload.target_id.slice(-6)}`;
       }
 
       // Build trigger reason from available data
-      let triggerReason = payload.reason;
+      let triggerReason = payload.bid_display || payload.reason;
       if (!triggerReason) {
         const metrics = payload.trigger_metrics;
         if (metrics) {
-          if (metrics.acos !== undefined) {
+          if (metrics.sampled_cvr !== undefined && metrics.current_bid !== undefined && metrics.new_bid !== undefined) {
+            // Bid optimizer action
+            const changePercent = ((metrics.new_bid - metrics.current_bid) / metrics.current_bid * 100).toFixed(0);
+            const sign = metrics.new_bid > metrics.current_bid ? '+' : '';
+            triggerReason = `$${metrics.current_bid.toFixed(2)} → $${metrics.new_bid.toFixed(2)} (${sign}${changePercent}%)`;
+          } else if (metrics.adjustment_percent !== undefined) {
+            // Bulk bid adjustment
+            const sign = metrics.adjustment_percent > 0 ? '+' : '';
+            triggerReason = `Bid ${sign}${metrics.adjustment_percent.toFixed(0)}%`;
+          } else if (metrics.acos !== undefined) {
             triggerReason = `ACOS ${metrics.acos.toFixed(0)}%`;
           } else if (metrics.usage_percent !== undefined) {
             triggerReason = `Budget ${metrics.usage_percent.toFixed(0)}% used`;
