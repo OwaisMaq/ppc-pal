@@ -498,30 +498,30 @@ const CommandCenter = () => {
       <div className="container mx-auto py-6 px-4 space-y-6">
         {/* Top Bar: Filters + Data Availability */}
         {hasConnections && (
-          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between pb-4 border-b">
-            <div className="flex flex-wrap items-center gap-3">
-              <DateRangePicker 
-                value={dateRange}
-                onChange={setDateRange}
-              />
-              <ASINFilter 
-                selectedASIN={selectedASIN}
-                onASINChange={setSelectedASIN}
-              />
-              <ComparisonModeSelector 
-                mode={comparisonMode}
-                onModeChange={setComparisonMode}
-                customRange={customComparisonRange}
-                onCustomRangeChange={setCustomComparisonRange}
+          <div className="flex flex-wrap items-center gap-3 pb-4 border-b">
+            <DateRangePicker 
+              value={dateRange}
+              onChange={setDateRange}
+            />
+            <ASINFilter 
+              selectedASIN={selectedASIN}
+              onASINChange={setSelectedASIN}
+            />
+            <ComparisonModeSelector 
+              mode={comparisonMode}
+              onModeChange={setComparisonMode}
+              customRange={customComparisonRange}
+              onCustomRangeChange={setCustomComparisonRange}
+            />
+            <div className="ml-auto">
+              <DataAvailabilityIndicator
+                minDate={minDate}
+                maxDate={maxDate}
+                hasData={hasData}
+                loading={availabilityLoading}
+                importProgress={importProgress}
               />
             </div>
-            <DataAvailabilityIndicator
-              minDate={minDate}
-              maxDate={maxDate}
-              hasData={hasData}
-              loading={availabilityLoading}
-              importProgress={importProgress}
-            />
           </div>
         )}
 
