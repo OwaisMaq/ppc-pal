@@ -33,10 +33,8 @@ import {
   AccountHealthCard,
   WhatMattersNow,
   ActiveAlertsCard,
-  AutomationSummaryCard,
   ConfidenceSignalsCard,
   OnboardingGuidanceCard,
-  OverviewFilters,
   getDefaultSetupItems,
   getMarketplaceName,
   type HealthStatus,
@@ -237,47 +235,13 @@ const CommandCenter = () => {
     return 'on';
   }, [healthSignals]);
 
-  // What Matters Now items - comprehensive overview of important items
+  // What Matters Now items - focused on performance insights only
+  // Alerts and pending actions are shown in dedicated sections
   const whatMattersNowItems: MatterItem[] = useMemo(() => {
     const attentionItems: MatterItem[] = [];
     const positiveItems: MatterItem[] = [];
     
-    // 1. CRITICAL ALERTS (highest priority attention items)
-    const criticalAlerts = alerts?.filter(a => a.state === 'new' && a.level === 'critical');
-    if (criticalAlerts && criticalAlerts.length > 0) {
-      attentionItems.push({
-        id: 'critical-alerts',
-        type: 'attention',
-        title: `${criticalAlerts.length} Critical Alert${criticalAlerts.length > 1 ? 's' : ''}`,
-        description: criticalAlerts[0].title,
-        details: criticalAlerts.length > 1 ? `Plus ${criticalAlerts.length - 1} more critical alerts requiring attention` : criticalAlerts[0].message,
-        link: { label: 'View alerts', to: '/automate' }
-      });
-    }
-    
-    // 2. PENDING ACTIONS AWAITING APPROVAL
-    const pendingActions = actions?.filter(a => a.status === 'queued');
-    if (pendingActions && pendingActions.length > 0) {
-      const actionTypes = pendingActions.reduce((acc, a) => {
-        const type = a.action_type.replace('_', ' ');
-        acc[type] = (acc[type] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
-      const breakdown = Object.entries(actionTypes)
-        .map(([type, count]) => `${count} ${type}`)
-        .join(', ');
-      
-      attentionItems.push({
-        id: 'pending-actions',
-        type: 'attention',
-        title: 'Actions Awaiting Approval',
-        description: `${pendingActions.length} optimization${pendingActions.length > 1 ? 's' : ''} ready for review`,
-        details: breakdown,
-        link: { label: 'Review now', to: '/command-center?tab=suggestions' }
-      });
-    }
-    
-    // 3. DATA FRESHNESS WARNINGS
+    // 1. DATA FRESHNESS WARNINGS
     if (maxDate) {
       const daysSinceLastSync = differenceInDays(new Date(), new Date(maxDate));
       if (daysSinceLastSync >= 2) {
@@ -292,23 +256,10 @@ const CommandCenter = () => {
       }
     }
     
-    // 4. WARNING ALERTS (lower priority than critical)
-    const warningAlerts = alerts?.filter(a => a.state === 'new' && a.level === 'warn');
-    if (warningAlerts && warningAlerts.length > 0 && attentionItems.length < 3) {
-      attentionItems.push({
-        id: 'warning-alerts',
-        type: 'attention',
-        title: `${warningAlerts.length} Warning${warningAlerts.length > 1 ? 's' : ''}`,
-        description: warningAlerts[0].title,
-        details: warningAlerts.length > 1 ? `Plus ${warningAlerts.length - 1} more warnings` : warningAlerts[0].message,
-        link: { label: 'View alerts', to: '/automate' }
-      });
-    }
-    
-    // 5. ANOMALIES
+    // 2. ANOMALIES (performance-related)
     const newAnomalies = anomalies?.filter(a => a.state === 'new' && a.severity !== 'info').slice(0, 2);
     newAnomalies?.forEach(anomaly => {
-      if (attentionItems.length < 4) {
+      if (attentionItems.length < 3) {
         attentionItems.push({
           id: `anomaly-${anomaly.id}`,
           type: 'attention',
@@ -320,7 +271,7 @@ const CommandCenter = () => {
       }
     });
     
-    // 6. ACoS INCREASED (attention)
+    // 3. ACoS INCREASED (attention)
     if (metrics && comparisonMetrics && metrics.acos > comparisonMetrics.acos * 1.1) {
       attentionItems.push({
         id: 'acos-increased',
@@ -400,7 +351,7 @@ const CommandCenter = () => {
     // Combine and limit: prioritize attention items, then positive
     // Max 3 attention + 3 positive for a balanced view
     return [...attentionItems.slice(0, 3), ...positiveItems.slice(0, 3)];
-  }, [savings, metrics, comparisonMetrics, anomalies, alerts, actions, rules, maxDate]);
+  }, [savings, metrics, comparisonMetrics, anomalies, actions, rules, maxDate]);
 
   // Active alerts
   const activeAlerts: ActiveAlert[] = useMemo(() => {
@@ -420,31 +371,6 @@ const CommandCenter = () => {
       }));
   }, [alerts]);
 
-  // Automation summary
-  const automationSummary = useMemo(() => {
-    if (!actions || actions.length === 0) return null;
-    
-    const appliedActions = actions.filter(a => a.status === 'applied');
-    const preventedActions = actions.filter(a => a.status === 'prevented' || a.status === 'rejected');
-    const skippedActions = actions.filter(a => a.status === 'skipped');
-    const lastRun = actions[0]?.created_at;
-    
-    return {
-      lastRunAt: lastRun,
-      rulesEvaluated: rules?.length || 0,
-      actionsApplied: appliedActions.length,
-      actionsPrevented: preventedActions.length,
-      actionsSkipped: skippedActions.length,
-      recentActions: actions.slice(0, 5).map(a => ({
-        id: a.id,
-        type: a.action_type,
-        target: (a.payload as any)?.targetName || (a.payload as any)?.campaignName || 'Unknown',
-        status: (a.status === 'applied' ? 'applied' : 
-                a.status === 'prevented' || a.status === 'rejected' ? 'prevented' : 'skipped') as 'applied' | 'prevented' | 'skipped',
-        reason: a.error || undefined
-      }))
-    };
-  }, [actions, rules]);
 
   // Confidence signals
   const confidenceSignals = useMemo(() => {
@@ -543,58 +469,6 @@ const CommandCenter = () => {
           )}
         </div>
 
-        {/* Quick Stats Row */}
-        <div className="grid gap-3 grid-cols-3">
-          <Card 
-            className={`cursor-pointer transition-all ${activeTab === 'overview' ? 'border-primary ring-1 ring-primary/20' : 'hover:border-muted-foreground/50'}`}
-            onClick={() => setActiveTab('overview')}
-          >
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium">Overview</CardTitle>
-                <LayoutDashboard className="h-4 w-4 text-muted-foreground" />
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="text-2xl font-bold">
-                {healthStatus === 'healthy' ? '✓' : healthStatus === 'watch' ? '⚠' : '!'}
-              </div>
-              <p className="text-xs text-muted-foreground capitalize">{healthStatus.replace('_', ' ')}</p>
-            </CardContent>
-          </Card>
-
-          <Card 
-            className={`cursor-pointer transition-all ${activeTab === 'suggestions' ? 'border-primary ring-1 ring-primary/20' : 'hover:border-muted-foreground/50'}`}
-            onClick={() => setActiveTab('suggestions')}
-          >
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium">Suggestions</CardTitle>
-                <Lightbulb className="h-4 w-4 text-muted-foreground" />
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="text-2xl font-bold">{pendingActionsCount}</div>
-              <p className="text-xs text-muted-foreground">Pending actions</p>
-            </CardContent>
-          </Card>
-
-          <Card 
-            className={`cursor-pointer transition-all ${activeTab === 'activity' ? 'border-primary ring-1 ring-primary/20' : 'hover:border-muted-foreground/50'}`}
-            onClick={() => setActiveTab('activity')}
-          >
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium">Activity</CardTitle>
-                <Activity className="h-4 w-4 text-muted-foreground" />
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="text-2xl font-bold">{automationSummary?.actionsApplied || 0}</div>
-              <p className="text-xs text-muted-foreground">Actions today</p>
-            </CardContent>
-          </Card>
-        </div>
 
         {/* Tabs Content */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -645,10 +519,6 @@ const CommandCenter = () => {
                     <ActiveAlertsCard
                       alerts={activeAlerts}
                       loading={alertsLoading}
-                    />
-                    <AutomationSummaryCard
-                      summary={automationSummary}
-                      loading={actionsLoading || rulesLoading}
                     />
                     <ConfidenceSignalsCard
                       riskLevel={confidenceSignals.riskLevel}
