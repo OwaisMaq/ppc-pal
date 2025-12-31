@@ -1,6 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import {
   LineChart,
   Line,
@@ -13,7 +15,7 @@ import {
   Legend,
 } from 'recharts';
 import { format, parseISO } from 'date-fns';
-import { useHistoricalPerformance, PerformanceMilestone } from '@/hooks/useHistoricalPerformance';
+import { useHistoricalPerformance } from '@/hooks/useHistoricalPerformance';
 import { TrendingUp } from 'lucide-react';
 
 interface HistoricalPerformanceChartProps {
@@ -21,7 +23,8 @@ interface HistoricalPerformanceChartProps {
 }
 
 export const HistoricalPerformanceChart = ({ profileId }: HistoricalPerformanceChartProps) => {
-  const { data, milestones, loading, error } = useHistoricalPerformance(profileId);
+  const [automatedOnly, setAutomatedOnly] = useState(false);
+  const { data, milestones, loading, error } = useHistoricalPerformance(profileId, automatedOnly);
 
   // Scale spend to match sales range for better visualization
   const chartData = useMemo(() => {
@@ -101,16 +104,28 @@ export const HistoricalPerformanceChart = ({ profileId }: HistoricalPerformanceC
   if (error || data.length === 0) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-muted-foreground" />
-            Tracking
-          </CardTitle>
-          <CardDescription>Historical ACOS, Sales & Spend</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-muted-foreground" />
+              Tracking
+            </CardTitle>
+            <CardDescription>Historical ACOS, Sales & Spend</CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch
+              id="automated-toggle-empty"
+              checked={automatedOnly}
+              onCheckedChange={setAutomatedOnly}
+            />
+            <Label htmlFor="automated-toggle-empty" className="text-sm text-muted-foreground cursor-pointer">
+              Automated only
+            </Label>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-            {error || 'No historical data available yet'}
+            {error || (automatedOnly ? 'No automated campaign data available yet' : 'No historical data available yet')}
           </div>
         </CardContent>
       </Card>
@@ -119,14 +134,26 @@ export const HistoricalPerformanceChart = ({ profileId }: HistoricalPerformanceC
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <TrendingUp className="h-5 w-5 text-primary" />
-          Tracking
-        </CardTitle>
-        <CardDescription>
-          Historical ACOS, Sales & Spend with optimization milestones
-        </CardDescription>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <div>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-primary" />
+            Tracking
+          </CardTitle>
+          <CardDescription>
+            Historical ACOS, Sales & Spend with optimization milestones
+          </CardDescription>
+        </div>
+        <div className="flex items-center gap-2">
+          <Switch
+            id="automated-toggle"
+            checked={automatedOnly}
+            onCheckedChange={setAutomatedOnly}
+          />
+          <Label htmlFor="automated-toggle" className="text-sm text-muted-foreground cursor-pointer">
+            Automated only
+          </Label>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="h-[300px]">
