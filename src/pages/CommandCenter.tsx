@@ -239,12 +239,119 @@ const CommandCenter = () => {
     return 'on';
   }, [healthSignals]);
 
-  // What Matters Now items
+  // What Matters Now items - comprehensive overview of important items
   const whatMattersNowItems: MatterItem[] = useMemo(() => {
-    const items: MatterItem[] = [];
+    const attentionItems: MatterItem[] = [];
+    const positiveItems: MatterItem[] = [];
     
+    // 1. CRITICAL ALERTS (highest priority attention items)
+    const criticalAlerts = alerts?.filter(a => a.state === 'new' && a.level === 'critical');
+    if (criticalAlerts && criticalAlerts.length > 0) {
+      attentionItems.push({
+        id: 'critical-alerts',
+        type: 'attention',
+        title: `${criticalAlerts.length} Critical Alert${criticalAlerts.length > 1 ? 's' : ''}`,
+        description: criticalAlerts[0].title,
+        details: criticalAlerts.length > 1 ? `Plus ${criticalAlerts.length - 1} more critical alerts requiring attention` : criticalAlerts[0].message,
+        link: { label: 'View alerts', to: '/automate' }
+      });
+    }
+    
+    // 2. PENDING ACTIONS AWAITING APPROVAL
+    const pendingActions = actions?.filter(a => a.status === 'queued');
+    if (pendingActions && pendingActions.length > 0) {
+      const actionTypes = pendingActions.reduce((acc, a) => {
+        const type = a.action_type.replace('_', ' ');
+        acc[type] = (acc[type] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      const breakdown = Object.entries(actionTypes)
+        .map(([type, count]) => `${count} ${type}`)
+        .join(', ');
+      
+      attentionItems.push({
+        id: 'pending-actions',
+        type: 'attention',
+        title: 'Actions Awaiting Approval',
+        description: `${pendingActions.length} optimization${pendingActions.length > 1 ? 's' : ''} ready for review`,
+        details: breakdown,
+        link: { label: 'Review now', to: '/command-center?tab=suggestions' }
+      });
+    }
+    
+    // 3. DATA FRESHNESS WARNINGS
+    if (maxDate) {
+      const daysSinceLastSync = differenceInDays(new Date(), new Date(maxDate));
+      if (daysSinceLastSync >= 2) {
+        attentionItems.push({
+          id: 'data-stale',
+          type: 'attention',
+          title: 'Data Sync Delayed',
+          description: `Last data update was ${daysSinceLastSync} days ago`,
+          details: 'Your metrics may not reflect the latest performance',
+          link: { label: 'Check sync status', to: '/settings' }
+        });
+      }
+    }
+    
+    // 4. WARNING ALERTS (lower priority than critical)
+    const warningAlerts = alerts?.filter(a => a.state === 'new' && a.level === 'warn');
+    if (warningAlerts && warningAlerts.length > 0 && attentionItems.length < 3) {
+      attentionItems.push({
+        id: 'warning-alerts',
+        type: 'attention',
+        title: `${warningAlerts.length} Warning${warningAlerts.length > 1 ? 's' : ''}`,
+        description: warningAlerts[0].title,
+        details: warningAlerts.length > 1 ? `Plus ${warningAlerts.length - 1} more warnings` : warningAlerts[0].message,
+        link: { label: 'View alerts', to: '/automate' }
+      });
+    }
+    
+    // 5. ANOMALIES
+    const newAnomalies = anomalies?.filter(a => a.state === 'new' && a.severity !== 'info').slice(0, 2);
+    newAnomalies?.forEach(anomaly => {
+      if (attentionItems.length < 4) {
+        attentionItems.push({
+          id: `anomaly-${anomaly.id}`,
+          type: 'attention',
+          title: `${anomaly.metric} ${anomaly.direction === 'spike' ? 'Spike' : 'Dip'}`,
+          description: `${anomaly.severity === 'critical' ? 'Critical' : 'Warning'}: ${anomaly.metric} ${anomaly.direction}`,
+          details: `Current: ${anomaly.value.toFixed(2)}, Baseline: ${anomaly.baseline.toFixed(2)}`,
+          link: { label: 'View anomalies', to: '/analytics' }
+        });
+      }
+    });
+    
+    // 6. ACoS INCREASED (attention)
+    if (metrics && comparisonMetrics && metrics.acos > comparisonMetrics.acos * 1.1) {
+      attentionItems.push({
+        id: 'acos-increased',
+        type: 'attention',
+        title: 'ACoS Increased',
+        description: `Rose from ${comparisonMetrics.acos.toFixed(1)}% to ${metrics.acos.toFixed(1)}%`,
+        details: 'Consider reviewing your targeting and bids',
+        link: { label: 'Review campaigns', to: '/campaigns' }
+      });
+    }
+    
+    // POSITIVE ITEMS
+    
+    // 1. AUTOMATION ACTIVITY (positive indicator)
+    const enabledRules = rules?.filter(r => r.enabled);
+    const recentAppliedActions = actions?.filter(a => a.status === 'applied');
+    if (enabledRules && enabledRules.length > 0 && recentAppliedActions && recentAppliedActions.length > 0) {
+      positiveItems.push({
+        id: 'automation-active',
+        type: 'positive',
+        title: 'Automation Active',
+        description: `${enabledRules.length} rule${enabledRules.length > 1 ? 's' : ''} running, ${recentAppliedActions.length} action${recentAppliedActions.length > 1 ? 's' : ''} applied`,
+        link: { label: 'View activity', to: '/automate' }
+      });
+    }
+    
+    // 2. SAVINGS GENERATED
     if (savings && savings.totalSavings > 0) {
-      items.push({
+      positiveItems.push({
         id: 'savings',
         type: 'positive',
         title: 'Savings Generated',
@@ -254,53 +361,48 @@ const CommandCenter = () => {
       });
     }
     
-    if (metrics && comparisonMetrics) {
-      if (metrics.acos < comparisonMetrics.acos) {
-        const improvement = ((comparisonMetrics.acos - metrics.acos) / comparisonMetrics.acos * 100).toFixed(0);
-        items.push({
-          id: 'acos-improved',
+    // 3. ACoS IMPROVED
+    if (metrics && comparisonMetrics && metrics.acos < comparisonMetrics.acos) {
+      const improvement = ((comparisonMetrics.acos - metrics.acos) / comparisonMetrics.acos * 100).toFixed(0);
+      positiveItems.push({
+        id: 'acos-improved',
+        type: 'positive',
+        title: 'ACoS Improved',
+        description: `Decreased ${improvement}% from ${comparisonMetrics.acos.toFixed(1)}% to ${metrics.acos.toFixed(1)}%`,
+        link: { label: 'View trends', to: '/analytics' }
+      });
+    }
+    
+    // 4. SALES GROWING
+    if (metrics && comparisonMetrics && metrics.totalSales > comparisonMetrics.totalSales * 1.1) {
+      const growth = ((metrics.totalSales - comparisonMetrics.totalSales) / comparisonMetrics.totalSales * 100).toFixed(0);
+      positiveItems.push({
+        id: 'sales-growing',
+        type: 'positive',
+        title: 'Sales Growing',
+        description: `Up ${growth}% vs previous period`,
+        link: { label: 'View report', to: '/analytics' }
+      });
+    }
+    
+    // 5. DATA FRESH (positive)
+    if (maxDate) {
+      const daysSinceLastSync = differenceInDays(new Date(), new Date(maxDate));
+      if (daysSinceLastSync === 0) {
+        positiveItems.push({
+          id: 'data-fresh',
           type: 'positive',
-          title: 'ACoS Improved',
-          description: `Decreased ${improvement}% from ${comparisonMetrics.acos.toFixed(1)}% to ${metrics.acos.toFixed(1)}%`,
-          link: { label: 'View trends', to: '/analytics' }
-        });
-      } else if (metrics.acos > comparisonMetrics.acos * 1.1) {
-        items.push({
-          id: 'acos-increased',
-          type: 'attention',
-          title: 'ACoS Increased',
-          description: `Rose from ${comparisonMetrics.acos.toFixed(1)}% to ${metrics.acos.toFixed(1)}%`,
-          details: 'Consider reviewing your targeting and bids',
-          link: { label: 'Review campaigns', to: '/campaigns' }
-        });
-      }
-      
-      if (metrics.totalSales > comparisonMetrics.totalSales * 1.1) {
-        const growth = ((metrics.totalSales - comparisonMetrics.totalSales) / comparisonMetrics.totalSales * 100).toFixed(0);
-        items.push({
-          id: 'sales-growing',
-          type: 'positive',
-          title: 'Sales Growing',
-          description: `Up ${growth}% vs previous period`,
-          link: { label: 'View report', to: '/analytics' }
+          title: 'Data Up to Date',
+          description: 'Your metrics are current as of today',
+          link: { label: 'View data', to: '/analytics' }
         });
       }
     }
     
-    const newAnomalies = anomalies?.filter(a => a.state === 'new' && a.severity !== 'info').slice(0, 2);
-    newAnomalies?.forEach(anomaly => {
-      items.push({
-        id: `anomaly-${anomaly.id}`,
-        type: 'attention',
-        title: `${anomaly.metric} ${anomaly.direction === 'spike' ? 'Spike' : 'Dip'}`,
-        description: `${anomaly.severity === 'critical' ? 'Critical' : 'Warning'}: ${anomaly.metric} ${anomaly.direction}`,
-        details: `Current: ${anomaly.value.toFixed(2)}, Baseline: ${anomaly.baseline.toFixed(2)}`,
-        link: { label: 'View anomalies', to: '/analytics' }
-      });
-    });
-    
-    return items;
-  }, [savings, metrics, comparisonMetrics, anomalies]);
+    // Combine and limit: prioritize attention items, then positive
+    // Max 3 attention + 3 positive for a balanced view
+    return [...attentionItems.slice(0, 3), ...positiveItems.slice(0, 3)];
+  }, [savings, metrics, comparisonMetrics, anomalies, alerts, actions, rules, maxDate]);
 
   // Active alerts
   const activeAlerts: ActiveAlert[] = useMemo(() => {
