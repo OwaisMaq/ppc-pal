@@ -87,14 +87,29 @@ class RuleEvaluator {
 
         // Create action if in auto mode
         if (rule.mode === 'auto') {
+          // Look up campaign name for enriched payload
+          const { data: campaignData } = await this.supabase
+            .from('campaigns')
+            .select('name')
+            .eq('amazon_campaign_id', campaignId)
+            .single();
+
           const action = {
             rule_id: rule.id,
             profile_id: rule.profile_id,
             action_type: 'pause_campaign',
             payload: {
               campaign_id: campaignId,
-              reason: 'budget_depletion',
-              usage_percent: usagePercent
+              entity_name: campaignData?.name || `Campaign ${campaignId.slice(-6)}`,
+              entity_type: 'campaign',
+              reason: `Budget ${usagePercent.toFixed(0)}% depleted`,
+              trigger_metrics: {
+                usage_percent: usagePercent,
+                spend: budgetRow.spend_micros / 1e6,
+                budget: budgetRow.budget_micros / 1e6,
+                threshold: percentThreshold
+              },
+              estimated_impact: `Paused to prevent overspend - budget was ${usagePercent.toFixed(0)}% used`
             },
             idempotency_key: this.generateIdempotencyKey(rule.profile_id, 'pause_campaign', campaignId)
           };
@@ -278,6 +293,10 @@ class RuleEvaluator {
 
       // Create action if in auto mode
       if (rule.mode === 'auto') {
+        const cpc = agg.total_cost_micros / Math.max(agg.total_clicks, 1);
+        const salesDollars = agg.total_sales_micros / 1e6;
+        const spendDollars = agg.total_cost_micros / 1e6;
+        
         const action = {
           rule_id: rule.id,
           profile_id: rule.profile_id,
@@ -286,9 +305,19 @@ class RuleEvaluator {
             campaign_id: agg.campaign_id,
             ad_group_id: agg.ad_group_id,
             keyword_text: agg.search_term,
+            entity_name: `"${agg.search_term}"`,
+            entity_type: 'keyword',
             match_type: 'EXACT',
-            bid_micros: Math.round(agg.total_cost_micros / Math.max(agg.total_clicks, 1)), // CPC as initial bid
-            reason: `harvest_${acos.toFixed(0)}pct_acos_${agg.total_conversions}_convs`
+            bid_micros: Math.round(cpc),
+            reason: `${agg.total_conversions} conversions at ${acos.toFixed(0)}% ACOS`,
+            trigger_metrics: {
+              conversions: agg.total_conversions,
+              acos: acos,
+              sales: salesDollars,
+              spend: spendDollars,
+              clicks: agg.total_clicks
+            },
+            estimated_impact: `Harvest winning term - $${salesDollars.toFixed(2)} in sales at ${acos.toFixed(0)}% ACOS`
           },
           idempotency_key: this.generateIdempotencyKey(rule.profile_id, 'create_keyword', `${agg.ad_group_id}:${agg.search_term}`)
         };
@@ -399,8 +428,16 @@ class RuleEvaluator {
             campaign_id: agg.campaign_id,
             ad_group_id: agg.ad_group_id,
             keyword_text: agg.search_term,
+            entity_name: `"${agg.search_term}"`,
+            entity_type: 'negative_keyword',
             match_type: 'NEGATIVE_EXACT',
-            reason: `prune_${agg.total_clicks}_clicks_$${spendDollars.toFixed(0)}_0conv`
+            reason: `${agg.total_clicks} clicks, $${spendDollars.toFixed(2)} spent, ${agg.total_conversions} conversions`,
+            trigger_metrics: {
+              clicks: agg.total_clicks,
+              spend: spendDollars,
+              conversions: agg.total_conversions
+            },
+            estimated_impact: `Stop wasted spend - saved ~$${spendDollars.toFixed(2)} from non-converting traffic`
           },
           idempotency_key: this.generateIdempotencyKey(rule.profile_id, 'add_negative', key)
         };
