@@ -14,6 +14,11 @@ export interface ActionItem {
   profile_id: string;
   amazon_api_response?: Record<string, unknown>;
   user_id?: string;
+  // Enriched fields (joined or from payload)
+  entity_name?: string;
+  trigger_reason?: string;
+  estimated_impact?: string;
+  trigger_metrics?: Record<string, number>;
 }
 
 export interface ActionStats {
@@ -63,6 +68,96 @@ export const useActionsFeed = (limit: number = 20, statusFilter?: string) => {
     }
   }, [user]);
 
+  // Enrich actions with entity names from campaigns/targets tables
+  const enrichActions = useCallback(async (rawActions: ActionItem[]): Promise<ActionItem[]> => {
+    if (!rawActions.length) return rawActions;
+
+    // Extract campaign IDs that need lookup
+    const campaignIdsToLookup = new Set<string>();
+    
+    rawActions.forEach(action => {
+      const payload = action.payload as Record<string, any>;
+      // Only lookup if entity_name is missing
+      if (!payload.entity_name) {
+        if (payload.campaign_id) campaignIdsToLookup.add(payload.campaign_id);
+        if (payload.entityId && payload.entityType === 'campaign') {
+          campaignIdsToLookup.add(payload.entityId);
+        }
+      }
+    });
+
+    // Fetch campaign names if needed
+    let campaignMap = new Map<string, string>();
+    if (campaignIdsToLookup.size > 0) {
+      const { data: campaigns } = await supabase
+        .from('campaigns')
+        .select('amazon_campaign_id, name')
+        .in('amazon_campaign_id', Array.from(campaignIdsToLookup));
+      
+      if (campaigns) {
+        campaigns.forEach(c => campaignMap.set(c.amazon_campaign_id, c.name));
+      }
+    }
+
+    // Enrich each action
+    return rawActions.map(action => {
+      const payload = action.payload as Record<string, any>;
+      
+      // If payload already has rich data, use it
+      if (payload.entity_name) {
+        return {
+          ...action,
+          entity_name: payload.entity_name,
+          trigger_reason: payload.reason,
+          estimated_impact: payload.estimated_impact,
+          trigger_metrics: payload.trigger_metrics
+        };
+      }
+
+      // Fallback: look up entity name
+      let entityName = payload.entity_name;
+      if (!entityName) {
+        if (payload.keyword_text) {
+          entityName = `"${payload.keyword_text}"`;
+        } else if (payload.campaign_id && campaignMap.has(payload.campaign_id)) {
+          entityName = campaignMap.get(payload.campaign_id);
+        } else if (payload.entityId) {
+          if (payload.entityType === 'campaign' && campaignMap.has(payload.entityId)) {
+            entityName = campaignMap.get(payload.entityId);
+          } else {
+            // Last resort: show truncated ID
+            entityName = `${payload.entityType || 'Target'} ...${payload.entityId.slice(-6)}`;
+          }
+        } else if (payload.target_id) {
+          entityName = `Target ...${payload.target_id.slice(-6)}`;
+        }
+      }
+
+      // Build trigger reason from available data
+      let triggerReason = payload.reason;
+      if (!triggerReason) {
+        const metrics = payload.trigger_metrics;
+        if (metrics) {
+          if (metrics.acos !== undefined) {
+            triggerReason = `ACOS ${metrics.acos.toFixed(0)}%`;
+          } else if (metrics.usage_percent !== undefined) {
+            triggerReason = `Budget ${metrics.usage_percent.toFixed(0)}% used`;
+          } else if (metrics.clicks !== undefined && metrics.conversions !== undefined) {
+            triggerReason = `${metrics.clicks} clicks, ${metrics.conversions} conversions`;
+          }
+        }
+      }
+
+      return {
+        ...action,
+        entity_name: entityName,
+        trigger_reason: triggerReason,
+        estimated_impact: payload.estimated_impact,
+        trigger_metrics: payload.trigger_metrics
+      };
+    });
+  }, []);
+
   const fetchActions = useCallback(async () => {
     if (!user) return;
     
@@ -94,13 +189,16 @@ export const useActionsFeed = (limit: number = 20, statusFilter?: string) => {
       const { data, error } = await query;
 
       if (error) throw error;
-      setActions((data || []) as ActionItem[]);
+      
+      // Enrich actions with entity names
+      const enrichedActions = await enrichActions((data || []) as ActionItem[]);
+      setActions(enrichedActions);
     } catch (error) {
       console.error('Error fetching actions:', error);
     } finally {
       setLoading(false);
     }
-  }, [user, limit, statusFilter]);
+  }, [user, limit, statusFilter, enrichActions]);
 
   useEffect(() => {
     fetchActions();
