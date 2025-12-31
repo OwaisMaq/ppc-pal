@@ -170,28 +170,28 @@ export const AccountHealthCard = ({
             
             {/* Compact filters */}
             <div className="flex flex-wrap items-center gap-2">
-              {/* Marketplace filter - only show if multiple marketplaces */}
-              {marketplaceOptions.length > 1 && (
-                <Select
-                  value={selectedMarketplace || "all"}
-                  onValueChange={(value) => onMarketplaceChange?.(value === "all" ? null : value)}
-                >
-                  <SelectTrigger className="h-7 w-[130px] text-xs">
-                    <Globe className="h-3 w-3 mr-1.5 shrink-0" />
-                    <SelectValue placeholder="All Markets" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover">
+              {/* Marketplace filter */}
+              <Select
+                value={selectedMarketplace || "all"}
+                onValueChange={(value) => onMarketplaceChange?.(value === "all" ? null : value)}
+              >
+                <SelectTrigger className="h-7 w-[130px] text-xs">
+                  <Globe className="h-3 w-3 mr-1.5 shrink-0" />
+                  <SelectValue placeholder={marketplaceOptions.length === 1 ? marketplaceOptions[0]?.name : "All Markets"} />
+                </SelectTrigger>
+                <SelectContent className="bg-popover">
+                  {marketplaceOptions.length > 1 && (
                     <SelectItem value="all" className="text-xs">
                       All Markets ({connectionCount})
                     </SelectItem>
-                    {marketplaceOptions.map((mp) => (
-                      <SelectItem key={mp.id} value={mp.id} className="text-xs">
-                        {mp.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+                  )}
+                  {marketplaceOptions.map((mp) => (
+                    <SelectItem key={mp.id} value={mp.id} className="text-xs">
+                      {mp.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               
               {/* Date range toggle */}
               <ToggleGroup
