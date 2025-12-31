@@ -107,10 +107,10 @@ const ActionsFeed = () => {
         };
       case 'skipped':
         return { 
-          icon: Lightbulb, 
-          label: 'Suggested', 
-          color: 'text-info',
-          dotColor: 'bg-info'
+          icon: XCircle, 
+          label: 'Skipped',
+          color: 'text-muted-foreground',
+          dotColor: 'bg-muted-foreground'
         };
       case 'prevented':
       case 'rejected':
