@@ -104,7 +104,7 @@ export const HistoricalPerformanceChart = ({ profileId }: HistoricalPerformanceC
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TrendingUp className="h-5 w-5 text-muted-foreground" />
-            Performance History
+            Tracking
           </CardTitle>
           <CardDescription>Historical ACOS, Sales & Spend</CardDescription>
         </CardHeader>
@@ -122,7 +122,7 @@ export const HistoricalPerformanceChart = ({ profileId }: HistoricalPerformanceC
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <TrendingUp className="h-5 w-5 text-primary" />
-          Performance History
+          Tracking
         </CardTitle>
         <CardDescription>
           Historical ACOS, Sales & Spend with optimization milestones

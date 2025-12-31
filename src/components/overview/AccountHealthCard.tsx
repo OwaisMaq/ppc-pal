@@ -146,7 +146,7 @@ export const AccountHealthCard = ({
             <div className="flex items-center gap-3">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Shield className="h-5 w-5 text-primary" />
-                Account Protection
+                Overview
               </CardTitle>
               <Tooltip>
                 <TooltipTrigger asChild>
