@@ -136,12 +136,32 @@ const ActionsFeed = () => {
     
     // Use enriched entity_name if available
     const entityName = action.entity_name || payload.entity_name;
-    const triggerReason = action.trigger_reason || payload.reason;
+    const triggerReason = action.trigger_reason || payload.bid_display || payload.reason;
+    
+    // For bid actions, show the bid change prominently
+    let bidChange: string | null = null;
+    if (action.action_type === 'set_bid' || action.action_type === 'adjust_bid') {
+      if (payload.bid_display) {
+        bidChange = payload.bid_display;
+      } else if (payload.trigger_metrics?.current_bid !== undefined && payload.trigger_metrics?.new_bid !== undefined) {
+        const currentBid = payload.trigger_metrics.current_bid;
+        const newBid = payload.trigger_metrics.new_bid;
+        const changePercent = ((newBid - currentBid) / currentBid * 100).toFixed(0);
+        const sign = newBid > currentBid ? '+' : '';
+        bidChange = `$${currentBid.toFixed(2)} → $${newBid.toFixed(2)} (${sign}${changePercent}%)`;
+      } else if (payload.trigger_metrics?.adjustment_percent !== undefined) {
+        const sign = payload.trigger_metrics.adjustment_percent > 0 ? '+' : '';
+        bidChange = `Bid ${sign}${payload.trigger_metrics.adjustment_percent.toFixed(0)}%`;
+      }
+    }
     
     return {
       entityName: entityName || 'Unknown entity',
       triggerReason: triggerReason || getDefaultTriggerReason(action.action_type),
-      impact: action.estimated_impact || payload.estimated_impact
+      impact: action.estimated_impact || payload.estimated_impact,
+      bidChange,
+      confidence: payload.confidence_level || (payload.trigger_metrics?.confidence ? 
+        `${payload.trigger_metrics.confidence.toFixed(0)}% confidence` : null)
     };
   };
 
@@ -277,6 +297,12 @@ const ActionsFeed = () => {
                           <span className="text-sm font-medium">
                             {getActionLabel(action.action_type)}
                           </span>
+                          {/* Confidence badge for optimizer actions */}
+                          {display.confidence && (
+                            <Badge variant="secondary" className="text-xs py-0 h-5">
+                              {display.confidence}
+                            </Badge>
+                          )}
                         </div>
                         {/* Entity name - prominently displayed */}
                         <p className="text-sm font-medium text-foreground truncate mt-0.5" title={display.entityName}>
@@ -293,10 +319,22 @@ const ActionsFeed = () => {
                     </Badge>
                   </div>
                   
-                  {/* Trigger reason */}
-                  <p className="text-sm text-muted-foreground mb-1">
-                    {display.triggerReason}
-                  </p>
+                  {/* Bid change display for bid actions */}
+                  {display.bidChange && (
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <DollarSign className="h-3.5 w-3.5 text-primary" />
+                      <span className="text-sm font-medium text-primary">
+                        {display.bidChange}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {/* Trigger reason (skip if same as bid change) */}
+                  {display.triggerReason && display.triggerReason !== display.bidChange && (
+                    <p className="text-sm text-muted-foreground mb-1">
+                      {display.triggerReason}
+                    </p>
+                  )}
 
                   {/* Metrics tooltip */}
                   {metrics && (
