@@ -5,14 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
-import { DateRange } from "react-day-picker";
-import { subDays, differenceInDays, subYears } from "date-fns";
+import { subDays, differenceInDays } from "date-fns";
 
 // Hooks
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { useAmsMetrics } from "@/hooks/useAmsMetrics";
 import { useSavingsMetric } from "@/hooks/useSavingsMetric";
-import { useDataAvailability } from "@/hooks/useDataAvailability";
 import { useAutomationRules, useAlerts } from "@/hooks/useAutomation";
 import { useAnomalies } from "@/hooks/useAnomalies";
 import { useActionQueue } from "@/hooks/useActionQueue";
@@ -22,11 +20,7 @@ import { useAccountHealth } from "@/hooks/useAccountHealth";
 
 // Components
 
-import { DateRangePicker } from "@/components/DateRangePicker";
-import { ComparisonModeSelector, ComparisonMode } from "@/components/ComparisonModeSelector";
-import { DataAvailabilityIndicator } from "@/components/DataAvailabilityIndicator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ASINFilter } from "@/components/ASINFilter";
 import PendingApprovals from "@/components/PendingApprovals";
 import ActionsFeed from "@/components/ActionsFeed";
 import {
@@ -58,13 +52,15 @@ const CommandCenter = () => {
   const [selectedASIN, setSelectedASIN] = useState<string | null>(null);
   const [selectedMarketplace, setSelectedMarketplace] = useState<string | null>(null);
   const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
-  const [datePreset, setDatePreset] = useState<DatePreset>('last_month');
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: subDays(new Date(), 30),
-    to: new Date(),
-  });
-  const [comparisonMode, setComparisonMode] = useState<ComparisonMode>("previous");
-  const [customComparisonRange, setCustomComparisonRange] = useState<DateRange | undefined>();
+  const [dateRangePreset, setDateRangePreset] = useState<'24h' | '7d' | '30d'>('30d');
+  
+  // Derive date range from preset
+  const dateRange = useMemo(() => {
+    const to = new Date();
+    const daysMap = { '24h': 1, '7d': 7, '30d': 30 };
+    const from = subDays(to, daysMap[dateRangePreset]);
+    return { from, to };
+  }, [dateRangePreset]);
   
   const primaryConnection = connections[0];
   const profileId = primaryConnection?.profile_id;
@@ -102,34 +98,6 @@ const CommandCenter = () => {
     dateRange?.to
   );
   
-  // Calculate comparison period
-  const comparisonPeriodRange = useMemo(() => {
-    if (!dateRange?.from || !dateRange?.to) return undefined;
-    const daysDiff = differenceInDays(dateRange.to, dateRange.from);
-    
-    switch (comparisonMode) {
-      case "previous":
-        return {
-          from: subDays(dateRange.from, daysDiff + 1),
-          to: subDays(dateRange.from, 1),
-        };
-      case "last-year":
-        return {
-          from: subYears(dateRange.from, 1),
-          to: subYears(dateRange.to, 1),
-        };
-      case "custom":
-        return customComparisonRange;
-      default:
-        return undefined;
-    }
-  }, [dateRange, comparisonMode, customComparisonRange]);
-  
-  const { metrics: comparisonMetrics } = useAmsMetrics(
-    primaryConnection?.id,
-    comparisonPeriodRange?.from,
-    comparisonPeriodRange?.to
-  );
   
   // Fetch savings
   const { savings, loading: savingsLoading } = useSavingsMetric(
@@ -139,13 +107,9 @@ const CommandCenter = () => {
   );
 
   // Fetch data availability
-  const { 
-    minDate, 
-    maxDate, 
-    hasData, 
-    loading: availabilityLoading, 
-    importProgress
-  } = useDataAvailability(profileId);
+  // We still need hasData and minDate for confidence signals calculation
+  const hasData = true; // Simplified since we're not showing the data availability indicator
+  const minDate: string | null = primaryConnection?.created_at || null;
   
   // Fetch automation data
   const { rules, loading: rulesLoading } = useAutomationRules(profileId);
@@ -185,21 +149,6 @@ const CommandCenter = () => {
     };
   }, [metrics]);
   
-  const comparisonKpiData: KPIData | null = useMemo(() => {
-    if (!comparisonMetrics) return null;
-    return {
-      spend: comparisonMetrics.totalSpend || 0,
-      sales: comparisonMetrics.totalSales || 0,
-      acos: comparisonMetrics.acos || 0,
-      roas: comparisonMetrics.roas || 0,
-      clicks: comparisonMetrics.totalClicks || 0,
-      impressions: comparisonMetrics.totalImpressions || 0,
-      cpc: comparisonMetrics.cpc || 0,
-      ctr: comparisonMetrics.ctr || 0,
-      cvr: comparisonMetrics.conversionRate || 0,
-      conversions: comparisonMetrics.totalOrders || 0
-    };
-  }, [comparisonMetrics]);
 
   // Calculate account health using the new comprehensive hook
   const { 
@@ -296,35 +245,6 @@ const CommandCenter = () => {
   return (
     <DashboardShell>
       <div className="container mx-auto py-6 px-4 space-y-6">
-        {/* Top Bar: Filters + Data Availability */}
-        {hasConnections && (
-          <div className="flex items-center gap-3 pb-4 border-b overflow-x-auto">
-            <DateRangePicker 
-              value={dateRange}
-              onChange={setDateRange}
-            />
-            <ASINFilter 
-              selectedASIN={selectedASIN}
-              onASINChange={setSelectedASIN}
-            />
-            <ComparisonModeSelector 
-              mode={comparisonMode}
-              onModeChange={setComparisonMode}
-              customRange={customComparisonRange}
-              onCustomRangeChange={setCustomComparisonRange}
-            />
-            <div className="ml-auto shrink-0">
-              <DataAvailabilityIndicator
-                minDate={minDate}
-                maxDate={maxDate}
-                hasData={hasData}
-                loading={availabilityLoading}
-                importProgress={importProgress}
-              />
-            </div>
-          </div>
-        )}
-
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
@@ -375,6 +295,10 @@ const CommandCenter = () => {
                 targetAcos={20}
                 automationStatus={automationStatus}
                 loading={isLoading}
+                dateRangePreset={dateRangePreset}
+                onDateRangePresetChange={setDateRangePreset}
+                selectedASIN={selectedASIN}
+                onASINChange={setSelectedASIN}
               />
               
               <div className="grid gap-6 md:grid-cols-2">

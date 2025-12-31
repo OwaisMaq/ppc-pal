@@ -1,12 +1,22 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Shield, DollarSign, TrendingUp, Target, Bot, ChevronRight, AlertTriangle, CheckCircle } from "lucide-react";
+import { Shield, DollarSign, TrendingUp, Target, Bot, ChevronRight, AlertTriangle, CheckCircle, Package } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useASINs } from "@/hooks/useASINs";
 
 export type HealthStatus = 'healthy' | 'watch' | 'at_risk';
 export type AutomationStatus = 'on' | 'limited' | 'paused';
+export type DateRangePreset = '24h' | '7d' | '30d';
 
 interface AccountHealthCardProps {
   healthStatus: HealthStatus;
@@ -19,6 +29,10 @@ interface AccountHealthCardProps {
   automationStatus: AutomationStatus;
   automationReason?: string;
   loading?: boolean;
+  dateRangePreset?: DateRangePreset;
+  onDateRangePresetChange?: (preset: DateRangePreset) => void;
+  selectedASIN?: string | null;
+  onASINChange?: (asin: string | null) => void;
 }
 
 const healthConfig = {
@@ -70,11 +84,17 @@ export const AccountHealthCard = ({
   targetAcos = 20,
   automationStatus,
   automationReason,
-  loading
+  loading,
+  dateRangePreset = '30d',
+  onDateRangePresetChange,
+  selectedASIN,
+  onASINChange
 }: AccountHealthCardProps) => {
   const healthInfo = healthConfig[healthStatus];
   const HealthIcon = healthInfo.icon;
   const automationInfo = automationConfig[automationStatus];
+  
+  const { asins } = useASINs();
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -109,29 +129,71 @@ export const AccountHealthCard = ({
     <TooltipProvider>
       <Card>
         <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Shield className="h-5 w-5 text-primary" />
-              Account Protection
-            </CardTitle>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Badge variant="outline" className={cn("gap-1.5", healthInfo.color)}>
-                  <HealthIcon className="h-3.5 w-3.5" />
-                  {healthInfo.label}
-                </Badge>
-              </TooltipTrigger>
-              <TooltipContent side="left" className="max-w-xs">
-                <p className="font-medium mb-1">{healthInfo.description}</p>
-                {healthReasons.length > 0 && (
-                  <ul className="text-sm list-disc list-inside space-y-0.5">
-                    {healthReasons.map((reason, i) => (
-                      <li key={i}>{reason}</li>
-                    ))}
-                  </ul>
-                )}
-              </TooltipContent>
-            </Tooltip>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Shield className="h-5 w-5 text-primary" />
+                Account Protection
+              </CardTitle>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge variant="outline" className={cn("gap-1.5", healthInfo.color)}>
+                    <HealthIcon className="h-3.5 w-3.5" />
+                    {healthInfo.label}
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-xs">
+                  <p className="font-medium mb-1">{healthInfo.description}</p>
+                  {healthReasons.length > 0 && (
+                    <ul className="text-sm list-disc list-inside space-y-0.5">
+                      {healthReasons.map((reason, i) => (
+                        <li key={i}>{reason}</li>
+                      ))}
+                    </ul>
+                  )}
+                </TooltipContent>
+              </Tooltip>
+            </div>
+            
+            {/* Compact filters */}
+            <div className="flex items-center gap-2">
+              {/* Date range toggle */}
+              <ToggleGroup
+                type="single"
+                value={dateRangePreset}
+                onValueChange={(value) => value && onDateRangePresetChange?.(value as DateRangePreset)}
+                className="h-7"
+              >
+                <ToggleGroupItem value="24h" className="text-xs px-2 h-7 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+                  24h
+                </ToggleGroupItem>
+                <ToggleGroupItem value="7d" className="text-xs px-2 h-7 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+                  7d
+                </ToggleGroupItem>
+                <ToggleGroupItem value="30d" className="text-xs px-2 h-7 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+                  30d
+                </ToggleGroupItem>
+              </ToggleGroup>
+              
+              {/* ASIN filter */}
+              <Select
+                value={selectedASIN || "all"}
+                onValueChange={(value) => onASINChange?.(value === "all" ? null : value)}
+              >
+                <SelectTrigger className="h-7 w-[140px] text-xs">
+                  <Package className="h-3 w-3 mr-1.5 shrink-0" />
+                  <SelectValue placeholder="All ASINs" />
+                </SelectTrigger>
+                <SelectContent className="bg-popover">
+                  <SelectItem value="all" className="text-xs">All ASINs</SelectItem>
+                  {asins.map((asinInfo) => (
+                    <SelectItem key={asinInfo.asin} value={asinInfo.asin} className="text-xs font-mono">
+                      {asinInfo.label || asinInfo.asin}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
