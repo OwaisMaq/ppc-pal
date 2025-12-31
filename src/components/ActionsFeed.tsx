@@ -51,8 +51,15 @@ const ActionsFeed = () => {
         return 'Placement Adjust';
       case 'create_keyword':
         return 'New Keyword';
+      case 'enable_entity':
+        return 'Enable Target';
+      case 'disable_entity':
+        return 'Disable Target';
       default:
-        return actionType;
+        // Convert snake_case to Title Case for unknown types
+        return actionType.split('_').map(word => 
+          word.charAt(0).toUpperCase() + word.slice(1)
+        ).join(' ');
     }
   };
 
@@ -133,10 +140,22 @@ const ActionsFeed = () => {
           action: 'Paused',
           details: `Paused target to protect your budget from continued poor performance.`
         };
+      case 'enable_entity':
+        return {
+          trigger: payload.reason || 'Ready to re-enable',
+          action: 'Enable target',
+          details: `Re-enabled a previously paused target that is now performing within acceptable thresholds.`
+        };
+      case 'disable_entity':
+        return {
+          trigger: payload.reason || 'Performance issue',
+          action: 'Disable target',
+          details: `Disabled a target to protect your budget from poor performance.`
+        };
       default:
         return {
           trigger: 'Rule triggered',
-          action: action_type,
+          action: getActionLabel(action_type),
           details: undefined
         };
     }
@@ -156,8 +175,16 @@ const ActionsFeed = () => {
         return `${payload.entity_name || payload.target_id} paused`;
       case 'set_placement_adjust':
         return `${payload.placement} → ${payload.adjustment}%`;
+      case 'enable_entity':
+        return `Target ${payload.entityId?.slice(-6) || 'ID'} enabled`;
+      case 'disable_entity':
+        return `Target ${payload.entityId?.slice(-6) || 'ID'} disabled`;
       default:
-        return JSON.stringify(payload).substring(0, 50);
+        // Try to extract meaningful info from payload
+        if (payload.entity_name) return payload.entity_name;
+        if (payload.keyword_text) return payload.keyword_text;
+        if (payload.entityId) return `Target ...${payload.entityId.slice(-6)}`;
+        return 'Action completed';
     }
   };
 
