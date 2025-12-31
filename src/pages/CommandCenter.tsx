@@ -31,7 +31,6 @@ import PendingApprovals from "@/components/PendingApprovals";
 import ActionsFeed from "@/components/ActionsFeed";
 import {
   AccountHealthCard,
-  WhatMattersNow,
   ActiveAlertsCard,
   ConfidenceSignalsCard,
   OnboardingGuidanceCard,
@@ -39,7 +38,6 @@ import {
   getMarketplaceName,
   type HealthStatus,
   type AutomationStatus,
-  type MatterItem,
   type ActiveAlert,
   type DatePreset,
   type MarketplaceOption,
@@ -229,123 +227,6 @@ const CommandCenter = () => {
     return 'on';
   }, [healthSignals]);
 
-  // What Matters Now items - focused on performance insights only
-  // Alerts and pending actions are shown in dedicated sections
-  const whatMattersNowItems: MatterItem[] = useMemo(() => {
-    const attentionItems: MatterItem[] = [];
-    const positiveItems: MatterItem[] = [];
-    
-    // 1. DATA FRESHNESS WARNINGS
-    if (maxDate) {
-      const daysSinceLastSync = differenceInDays(new Date(), new Date(maxDate));
-      if (daysSinceLastSync >= 2) {
-        attentionItems.push({
-          id: 'data-stale',
-          type: 'attention',
-          title: 'Data Sync Delayed',
-          description: `Last data update was ${daysSinceLastSync} days ago`,
-          details: 'Your metrics may not reflect the latest performance',
-          link: { label: 'Check sync status', to: '/settings' }
-        });
-      }
-    }
-    
-    // 2. ANOMALIES (performance-related)
-    const newAnomalies = anomalies?.filter(a => a.state === 'new' && a.severity !== 'info').slice(0, 2);
-    newAnomalies?.forEach(anomaly => {
-      if (attentionItems.length < 3) {
-        attentionItems.push({
-          id: `anomaly-${anomaly.id}`,
-          type: 'attention',
-          title: `${anomaly.metric} ${anomaly.direction === 'spike' ? 'Spike' : 'Dip'}`,
-          description: `${anomaly.severity === 'critical' ? 'Critical' : 'Warning'}: ${anomaly.metric} ${anomaly.direction}`,
-          details: `Current: ${anomaly.value.toFixed(2)}, Baseline: ${anomaly.baseline.toFixed(2)}`,
-          link: { label: 'View anomalies', to: '/analytics' }
-        });
-      }
-    });
-    
-    // 3. ACoS INCREASED (attention)
-    if (metrics && comparisonMetrics && metrics.acos > comparisonMetrics.acos * 1.1) {
-      attentionItems.push({
-        id: 'acos-increased',
-        type: 'attention',
-        title: 'ACoS Increased',
-        description: `Rose from ${comparisonMetrics.acos.toFixed(1)}% to ${metrics.acos.toFixed(1)}%`,
-        details: 'Consider reviewing your targeting and bids',
-        link: { label: 'Review campaigns', to: '/campaigns' }
-      });
-    }
-    
-    // POSITIVE ITEMS
-    
-    // 1. AUTOMATION ACTIVITY (positive indicator)
-    const enabledRules = rules?.filter(r => r.enabled);
-    const recentAppliedActions = actions?.filter(a => a.status === 'applied');
-    if (enabledRules && enabledRules.length > 0 && recentAppliedActions && recentAppliedActions.length > 0) {
-      positiveItems.push({
-        id: 'automation-active',
-        type: 'positive',
-        title: 'Automation Active',
-        description: `${enabledRules.length} rule${enabledRules.length > 1 ? 's' : ''} running, ${recentAppliedActions.length} action${recentAppliedActions.length > 1 ? 's' : ''} applied`,
-        link: { label: 'View activity', to: '/automate' }
-      });
-    }
-    
-    // 2. SAVINGS GENERATED
-    if (savings && savings.totalSavings > 0) {
-      positiveItems.push({
-        id: 'savings',
-        type: 'positive',
-        title: 'Savings Generated',
-        description: `$${savings.totalSavings.toFixed(2)} saved through optimizations`,
-        details: `From ${savings.actionCount} AI actions in this period`,
-        link: { label: 'View details', to: '/analytics' }
-      });
-    }
-    
-    // 3. ACoS IMPROVED
-    if (metrics && comparisonMetrics && metrics.acos < comparisonMetrics.acos) {
-      const improvement = ((comparisonMetrics.acos - metrics.acos) / comparisonMetrics.acos * 100).toFixed(0);
-      positiveItems.push({
-        id: 'acos-improved',
-        type: 'positive',
-        title: 'ACoS Improved',
-        description: `Decreased ${improvement}% from ${comparisonMetrics.acos.toFixed(1)}% to ${metrics.acos.toFixed(1)}%`,
-        link: { label: 'View trends', to: '/analytics' }
-      });
-    }
-    
-    // 4. SALES GROWING
-    if (metrics && comparisonMetrics && metrics.totalSales > comparisonMetrics.totalSales * 1.1) {
-      const growth = ((metrics.totalSales - comparisonMetrics.totalSales) / comparisonMetrics.totalSales * 100).toFixed(0);
-      positiveItems.push({
-        id: 'sales-growing',
-        type: 'positive',
-        title: 'Sales Growing',
-        description: `Up ${growth}% vs previous period`,
-        link: { label: 'View report', to: '/analytics' }
-      });
-    }
-    
-    // 5. DATA FRESH (positive)
-    if (maxDate) {
-      const daysSinceLastSync = differenceInDays(new Date(), new Date(maxDate));
-      if (daysSinceLastSync === 0) {
-        positiveItems.push({
-          id: 'data-fresh',
-          type: 'positive',
-          title: 'Data Up to Date',
-          description: 'Your metrics are current as of today',
-          link: { label: 'View data', to: '/analytics' }
-        });
-      }
-    }
-    
-    // Combine and limit: prioritize attention items, then positive
-    // Max 3 attention + 3 positive for a balanced view
-    return [...attentionItems.slice(0, 3), ...positiveItems.slice(0, 3)];
-  }, [savings, metrics, comparisonMetrics, anomalies, actions, rules, maxDate]);
 
   // Active alerts
   const activeAlerts: ActiveAlert[] = useMemo(() => {
@@ -473,10 +354,6 @@ const CommandCenter = () => {
                   currentAcos={metrics?.acos || 0}
                   targetAcos={20}
                   automationStatus={automationStatus}
-                  loading={isLoading}
-                />
-                <WhatMattersNow 
-                  items={whatMattersNowItems}
                   loading={isLoading}
                 />
               </div>
