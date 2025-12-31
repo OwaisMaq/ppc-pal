@@ -496,6 +496,35 @@ const CommandCenter = () => {
   return (
     <DashboardShell>
       <div className="container mx-auto py-6 px-4 space-y-6">
+        {/* Top Bar: Filters + Data Availability */}
+        {hasConnections && (
+          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between pb-4 border-b">
+            <div className="flex flex-wrap items-center gap-3">
+              <DateRangePicker 
+                value={dateRange}
+                onChange={setDateRange}
+              />
+              <ASINFilter 
+                selectedASIN={selectedASIN}
+                onASINChange={setSelectedASIN}
+              />
+              <ComparisonModeSelector 
+                mode={comparisonMode}
+                onModeChange={setComparisonMode}
+                customRange={customComparisonRange}
+                onCustomRangeChange={setCustomComparisonRange}
+              />
+            </div>
+            <DataAvailabilityIndicator
+              minDate={minDate}
+              maxDate={maxDate}
+              hasData={hasData}
+              loading={availabilityLoading}
+              importProgress={importProgress}
+            />
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
@@ -566,41 +595,6 @@ const CommandCenter = () => {
             </CardContent>
           </Card>
         </div>
-
-        {/* Filters */}
-        {hasConnections && (
-          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
-            <div className="flex items-center gap-3">
-              <DateRangePicker 
-                value={dateRange}
-                onChange={setDateRange}
-              />
-            </div>
-            <div className="flex items-center gap-3">
-              <ASINFilter 
-                selectedASIN={selectedASIN}
-                onASINChange={setSelectedASIN}
-              />
-            </div>
-            <ComparisonModeSelector 
-              mode={comparisonMode}
-              onModeChange={setComparisonMode}
-              customRange={customComparisonRange}
-              onCustomRangeChange={setCustomComparisonRange}
-            />
-          </div>
-        )}
-
-        {/* Data Availability */}
-        {hasConnections && (
-          <DataAvailabilityIndicator
-            minDate={minDate}
-            maxDate={maxDate}
-            hasData={hasData}
-            loading={availabilityLoading}
-            importProgress={importProgress}
-          />
-        )}
 
         {/* Tabs Content */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
