@@ -21,12 +21,12 @@ import { useActionsFeed } from "@/hooks/useActionsFeed";
 import { useAccountHealth } from "@/hooks/useAccountHealth";
 
 // Components
-import { DashboardKPIs } from "@/components/DashboardKPIs";
 import { DashboardChart } from "@/components/DashboardChart";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { ComparisonModeSelector, ComparisonMode } from "@/components/ComparisonModeSelector";
-import { SavingsKPI } from "@/components/SavingsKPI";
 import { DataAvailabilityIndicator } from "@/components/DataAvailabilityIndicator";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ASINFilter } from "@/components/ASINFilter";
 import PendingApprovals from "@/components/PendingApprovals";
 import ActionsFeed from "@/components/ActionsFeed";
@@ -52,10 +52,9 @@ import {
 import { DashboardKPIs as KPIData } from "@/hooks/useDashboardData";
 import { 
   LayoutDashboard, 
-  TrendingUp, 
-  Bell,
   Lightbulb,
-  Activity
+  Activity,
+  ChevronDown
 } from "lucide-react";
 
 const CommandCenter = () => {
@@ -517,7 +516,7 @@ const CommandCenter = () => {
         </div>
 
         {/* Quick Stats Row */}
-        <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
+        <div className="grid gap-3 grid-cols-3">
           <Card 
             className={`cursor-pointer transition-all ${activeTab === 'overview' ? 'border-primary ring-1 ring-primary/20' : 'hover:border-muted-foreground/50'}`}
             onClick={() => setActiveTab('overview')}
@@ -533,22 +532,6 @@ const CommandCenter = () => {
                 {healthStatus === 'healthy' ? '✓' : healthStatus === 'watch' ? '⚠' : '!'}
               </div>
               <p className="text-xs text-muted-foreground capitalize">{healthStatus.replace('_', ' ')}</p>
-            </CardContent>
-          </Card>
-
-          <Card 
-            className={`cursor-pointer transition-all ${activeTab === 'metrics' ? 'border-primary ring-1 ring-primary/20' : 'hover:border-muted-foreground/50'}`}
-            onClick={() => setActiveTab('metrics')}
-          >
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium">Metrics</CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="text-2xl font-bold">{metrics?.acos?.toFixed(1) || '0'}%</div>
-              <p className="text-xs text-muted-foreground">Current ACoS</p>
             </CardContent>
           </Card>
 
@@ -622,14 +605,10 @@ const CommandCenter = () => {
 
         {/* Tabs Content */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="overview" className="gap-2">
               <LayoutDashboard className="h-4 w-4" />
               <span className="hidden sm:inline">Overview</span>
-            </TabsTrigger>
-            <TabsTrigger value="metrics" className="gap-2">
-              <TrendingUp className="h-4 w-4" />
-              <span className="hidden sm:inline">Metrics</span>
             </TabsTrigger>
             <TabsTrigger value="suggestions" className="gap-2 relative">
               <Lightbulb className="h-4 w-4" />
@@ -649,49 +628,123 @@ const CommandCenter = () => {
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
             {hasConnections ? (
-              <div className="grid gap-6 lg:grid-cols-3">
-                <div className="lg:col-span-2 space-y-6">
-                  <AccountHealthCard
-                    healthStatus={healthStatus}
-                    healthReasons={healthReasons}
-                    savings={savings?.totalSavings || 0}
-                    spend={metrics?.totalSpend || 0}
-                    sales={metrics?.totalSales || 0}
-                    currentAcos={metrics?.acos || 0}
-                    targetAcos={20}
-                    automationStatus={automationStatus}
-                    loading={isLoading}
-                  />
-                  <WhatMattersNow 
-                    items={whatMattersNowItems}
-                    loading={isLoading}
-                  />
-                </div>
-                <div className="space-y-6">
-                  <ActiveAlertsCard
-                    alerts={activeAlerts}
-                    loading={alertsLoading}
-                  />
-                  <AutomationSummaryCard
-                    summary={automationSummary}
-                    loading={actionsLoading || rulesLoading}
-                  />
-                  <ConfidenceSignalsCard
-                    riskLevel={confidenceSignals.riskLevel}
-                    riskScore={confidenceSignals.riskScore}
-                    confidenceScore={confidenceSignals.confidenceScore}
-                    daysSinceManualIntervention={confidenceSignals.daysSinceManualIntervention}
-                    loading={isLoading}
-                  />
-                  {showOnboarding && (
-                    <OnboardingGuidanceCard
-                      items={setupItems}
-                      automationExplainer={automationExplainer}
-                      loading={rulesLoading}
+              <>
+                <div className="grid gap-6 lg:grid-cols-3">
+                  <div className="lg:col-span-2 space-y-6">
+                    <AccountHealthCard
+                      healthStatus={healthStatus}
+                      healthReasons={healthReasons}
+                      savings={savings?.totalSavings || 0}
+                      spend={metrics?.totalSpend || 0}
+                      sales={metrics?.totalSales || 0}
+                      currentAcos={metrics?.acos || 0}
+                      targetAcos={20}
+                      automationStatus={automationStatus}
+                      loading={isLoading}
                     />
-                  )}
+                    <WhatMattersNow 
+                      items={whatMattersNowItems}
+                      loading={isLoading}
+                    />
+                    
+                    {/* Detailed Metrics Collapsible */}
+                    <Collapsible>
+                      <Card>
+                        <CollapsibleTrigger className="w-full">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                              <CardTitle className="text-sm font-medium">Detailed Metrics</CardTitle>
+                              <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" />
+                            </div>
+                            <CardDescription className="text-xs">Clicks, impressions, CPC, CTR, and conversion rate</CardDescription>
+                          </CardHeader>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <CardContent className="pt-0">
+                            {metricsLoading ? (
+                              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                                {[...Array(5)].map((_, i) => (
+                                  <Skeleton key={i} className="h-16" />
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                                <div className="space-y-1">
+                                  <p className="text-xs text-muted-foreground">Clicks</p>
+                                  <p className="text-lg font-semibold">{kpiData?.clicks?.toLocaleString() || 0}</p>
+                                </div>
+                                <div className="space-y-1">
+                                  <p className="text-xs text-muted-foreground">Impressions</p>
+                                  <p className="text-lg font-semibold">{kpiData?.impressions?.toLocaleString() || 0}</p>
+                                </div>
+                                <div className="space-y-1">
+                                  <p className="text-xs text-muted-foreground">CPC</p>
+                                  <p className="text-lg font-semibold">${kpiData?.cpc?.toFixed(2) || '0.00'}</p>
+                                </div>
+                                <div className="space-y-1">
+                                  <p className="text-xs text-muted-foreground">CTR</p>
+                                  <p className="text-lg font-semibold">{kpiData?.ctr?.toFixed(2) || 0}%</p>
+                                </div>
+                                <div className="space-y-1">
+                                  <p className="text-xs text-muted-foreground">CVR</p>
+                                  <p className="text-lg font-semibold">{kpiData?.cvr?.toFixed(2) || 0}%</p>
+                                </div>
+                              </div>
+                            )}
+                          </CardContent>
+                        </CollapsibleContent>
+                      </Card>
+                    </Collapsible>
+                  </div>
+                  <div className="space-y-6">
+                    <ActiveAlertsCard
+                      alerts={activeAlerts}
+                      loading={alertsLoading}
+                    />
+                    <AutomationSummaryCard
+                      summary={automationSummary}
+                      loading={actionsLoading || rulesLoading}
+                    />
+                    <ConfidenceSignalsCard
+                      riskLevel={confidenceSignals.riskLevel}
+                      riskScore={confidenceSignals.riskScore}
+                      confidenceScore={confidenceSignals.confidenceScore}
+                      daysSinceManualIntervention={confidenceSignals.daysSinceManualIntervention}
+                      loading={isLoading}
+                    />
+                    {showOnboarding && (
+                      <OnboardingGuidanceCard
+                        items={setupItems}
+                        automationExplainer={automationExplainer}
+                        loading={rulesLoading}
+                      />
+                    )}
+                  </div>
                 </div>
-              </div>
+                
+                {/* Performance Chart - Full Width */}
+                <DashboardChart
+                  data={{ points: metrics?.timeseries || [] }}
+                  loading={metricsLoading}
+                  error={metricsError}
+                  granularity="day"
+                />
+                
+                {hasExpiredTokens && (
+                  <Card className="border-warning/20 bg-warning/5">
+                    <CardContent className="pt-6">
+                      <p className="text-sm text-warning-foreground">
+                        Your Amazon connection has expired. You can still view historical data, but you'll need to refresh your connection to sync new data.
+                      </p>
+                      <div className="mt-3">
+                        <Button asChild variant="outline">
+                          <Link to="/settings">Refresh Connection</Link>
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
             ) : (
               <Card className="border-warning/20 bg-warning/5">
                 <CardContent className="pt-6">
@@ -701,52 +754,6 @@ const CommandCenter = () => {
                   <Button asChild>
                     <Link to="/settings">Connect Amazon Account</Link>
                   </Button>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-
-          {/* Metrics Tab */}
-          <TabsContent value="metrics" className="space-y-6">
-            {hasConnections && savings && (
-              <SavingsKPI
-                totalSavings={savings.totalSavings}
-                negativeKeywordsSavings={savings.negativeKeywordsSavings}
-                pausedTargetsSavings={savings.pausedTargetsSavings}
-                bidOptimizationSavings={savings.bidOptimizationSavings}
-                acosImprovementSavings={savings.acosImprovementSavings}
-                actionCount={savings.actionCount}
-                loading={savingsLoading}
-              />
-            )}
-            {hasConnections && (
-              <DashboardKPIs 
-                data={kpiData}
-                loading={metricsLoading}
-                error={metricsError}
-                previousData={comparisonKpiData}
-                timeseries={metrics?.timeseries}
-              />
-            )}
-            {hasConnections && (
-              <DashboardChart
-                data={{ points: metrics?.timeseries || [] }}
-                loading={metricsLoading}
-                error={metricsError}
-                granularity="day"
-              />
-            )}
-            {hasExpiredTokens && (
-              <Card className="border-warning/20 bg-warning/5">
-                <CardContent className="pt-6">
-                  <p className="text-sm text-warning-foreground">
-                    Your Amazon connection has expired. You can still view historical data, but you'll need to refresh your connection to sync new data.
-                  </p>
-                  <div className="mt-3">
-                    <Button asChild variant="outline">
-                      <Link to="/settings">Refresh Connection</Link>
-                    </Button>
-                  </div>
                 </CardContent>
               </Card>
             )}
