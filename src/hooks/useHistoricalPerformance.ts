@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface DailyPerformance {
@@ -21,7 +21,10 @@ export interface HistoricalPerformanceResult {
   error: string | null;
 }
 
-export const useHistoricalPerformance = (profileId: string | undefined): HistoricalPerformanceResult => {
+export const useHistoricalPerformance = (
+  profileId: string | undefined,
+  automatedOnly: boolean = false
+): HistoricalPerformanceResult => {
   const [data, setData] = useState<DailyPerformance[]>([]);
   const [milestones, setMilestones] = useState<PerformanceMilestone[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,6 +41,31 @@ export const useHistoricalPerformance = (profileId: string | undefined): Histori
       setError(null);
 
       try {
+        // If automatedOnly, first get campaign IDs that have been optimized (have bid_states)
+        let automatedCampaignIds: string[] | null = null;
+        
+        if (automatedOnly) {
+          const { data: bidStatesData } = await supabase
+            .from('bid_states')
+            .select('campaign_id')
+            .eq('profile_id', profileId)
+            .not('campaign_id', 'is', null);
+          
+          automatedCampaignIds = [...new Set(
+            (bidStatesData || [])
+              .map((bs: any) => bs.campaign_id)
+              .filter(Boolean)
+          )];
+          
+          // If no automated campaigns, return empty data
+          if (automatedCampaignIds.length === 0) {
+            setData([]);
+            setMilestones([]);
+            setLoading(false);
+            return;
+          }
+        }
+
         // Fetch historical performance data and milestones in parallel
         const [performanceRes, firstOptRes, trustRes] = await Promise.all([
           // Get daily aggregated performance
@@ -49,7 +77,7 @@ export const useHistoricalPerformance = (profileId: string | undefined): Histori
               sales,
               acos,
               campaign_id,
-              campaigns!inner(profile_id)
+              campaigns!inner(profile_id, id)
             `)
             .eq('campaigns.profile_id', profileId)
             .eq('attribution_window', '14d')
@@ -65,7 +93,6 @@ export const useHistoricalPerformance = (profileId: string | undefined): Histori
             .limit(1),
           
           // Get when model first hit 80%+ confidence
-          // We infer this from bid_states confidence_level or observations_count
           supabase
             .from('bid_states')
             .select('created_at, confidence_level, observations_count')
@@ -75,10 +102,18 @@ export const useHistoricalPerformance = (profileId: string | undefined): Histori
 
         if (performanceRes.error) throw performanceRes.error;
 
+        // Filter by automated campaigns if needed
+        let filteredData = performanceRes.data || [];
+        if (automatedOnly && automatedCampaignIds) {
+          filteredData = filteredData.filter((row: any) => 
+            automatedCampaignIds!.includes(row.campaign_id)
+          );
+        }
+
         // Aggregate by date
         const dateMap = new Map<string, { spend: number; sales: number }>();
         
-        (performanceRes.data || []).forEach((row: any) => {
+        filteredData.forEach((row: any) => {
           const date = row.date;
           if (!dateMap.has(date)) {
             dateMap.set(date, { spend: 0, sales: 0 });
@@ -115,8 +150,7 @@ export const useHistoricalPerformance = (profileId: string | undefined): Histori
           }
         }
 
-        // Trust 80% milestone - infer from bid_states
-        // Consider "high" confidence or observations_count >= 30 as proxy for 80%+ trust
+        // Trust 80% milestone
         if (trustRes.data && trustRes.data.length > 0) {
           const highTrustRecord = trustRes.data.find(
             (r: any) => r.confidence_level === 'high' || (r.observations_count && r.observations_count >= 30)
@@ -143,7 +177,7 @@ export const useHistoricalPerformance = (profileId: string | undefined): Histori
     };
 
     fetchData();
-  }, [profileId]);
+  }, [profileId, automatedOnly]);
 
   return { data, milestones, loading, error };
 };
