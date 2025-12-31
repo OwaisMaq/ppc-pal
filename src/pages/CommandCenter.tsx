@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import DashboardShell from "@/components/DashboardShell";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -47,15 +47,9 @@ import {
 } from "@/components/overview";
 
 import { DashboardKPIs as KPIData } from "@/hooks/useDashboardData";
-import { 
-  LayoutDashboard, 
-  Lightbulb,
-  Activity,
-  ChevronDown
-} from "lucide-react";
+import { Lightbulb, Activity } from "lucide-react";
 
 const CommandCenter = () => {
-  const [activeTab, setActiveTab] = useState("overview");
   const { connections } = useAmazonConnections();
   
   const hasConnections = connections.length > 0;
@@ -458,141 +452,111 @@ const CommandCenter = () => {
             <p className="text-muted-foreground">Your Amazon Advertising control hub</p>
           </div>
           {pendingActionsCount > 0 && (
-            <Button 
-              variant="default" 
-              className="gap-2"
-              onClick={() => setActiveTab("suggestions")}
-            >
-              <Lightbulb className="h-4 w-4" />
-              {pendingActionsCount} Suggestions Pending
-            </Button>
+            <Badge variant="destructive" className="text-sm px-3 py-1">
+              {pendingActionsCount} Pending
+            </Badge>
           )}
         </div>
 
-
-        {/* Tabs Content */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="overview" className="gap-2">
-              <LayoutDashboard className="h-4 w-4" />
-              <span className="hidden sm:inline">Overview</span>
-            </TabsTrigger>
-            <TabsTrigger value="suggestions" className="gap-2 relative">
-              <Lightbulb className="h-4 w-4" />
-              <span className="hidden sm:inline">Suggestions</span>
-              {pendingActionsCount > 0 && (
-                <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 w-5 p-0 text-[10px] flex items-center justify-center">
-                  {pendingActionsCount}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="activity" className="gap-2">
-              <Activity className="h-4 w-4" />
-              <span className="hidden sm:inline">Activity</span>
-            </TabsTrigger>
-          </TabsList>
-
-          {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-6">
-            {hasConnections ? (
-              <>
-                <div className="grid gap-6 lg:grid-cols-3">
-                  <div className="lg:col-span-2 space-y-6">
-                    <AccountHealthCard
-                      healthStatus={healthStatus}
-                      healthReasons={healthReasons}
-                      savings={savings?.totalSavings || 0}
-                      spend={metrics?.totalSpend || 0}
-                      sales={metrics?.totalSales || 0}
-                      currentAcos={metrics?.acos || 0}
-                      targetAcos={20}
-                      automationStatus={automationStatus}
-                      loading={isLoading}
-                    />
-                    <WhatMattersNow 
-                      items={whatMattersNowItems}
-                      loading={isLoading}
-                    />
-                    
-                  </div>
-                  <div className="space-y-6">
-                    <ActiveAlertsCard
-                      alerts={activeAlerts}
-                      loading={alertsLoading}
-                    />
-                    <ConfidenceSignalsCard
-                      riskLevel={confidenceSignals.riskLevel}
-                      riskScore={confidenceSignals.riskScore}
-                      confidenceScore={confidenceSignals.confidenceScore}
-                      daysSinceManualIntervention={confidenceSignals.daysSinceManualIntervention}
-                      loading={isLoading}
-                    />
-                    {showOnboarding && (
-                      <OnboardingGuidanceCard
-                        items={setupItems}
-                        automationExplainer={automationExplainer}
-                        loading={rulesLoading}
-                      />
-                    )}
-                  </div>
-                </div>
-                
-                
-                {hasExpiredTokens && (
-                  <Card className="border-warning/20 bg-warning/5">
-                    <CardContent className="pt-6">
-                      <p className="text-sm text-warning-foreground">
-                        Your Amazon connection has expired. You can still view historical data, but you'll need to refresh your connection to sync new data.
-                      </p>
-                      <div className="mt-3">
-                        <Button asChild variant="outline">
-                          <Link to="/settings">Refresh Connection</Link>
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
+        {/* Main Content */}
+        {hasConnections ? (
+          <div className="space-y-8">
+            {/* Overview Section */}
+            <div className="grid gap-6 lg:grid-cols-3">
+              <div className="lg:col-span-2 space-y-6">
+                <AccountHealthCard
+                  healthStatus={healthStatus}
+                  healthReasons={healthReasons}
+                  savings={savings?.totalSavings || 0}
+                  spend={metrics?.totalSpend || 0}
+                  sales={metrics?.totalSales || 0}
+                  currentAcos={metrics?.acos || 0}
+                  targetAcos={20}
+                  automationStatus={automationStatus}
+                  loading={isLoading}
+                />
+                <WhatMattersNow 
+                  items={whatMattersNowItems}
+                  loading={isLoading}
+                />
+              </div>
+              <div className="space-y-6">
+                <ActiveAlertsCard
+                  alerts={activeAlerts}
+                  loading={alertsLoading}
+                />
+                <ConfidenceSignalsCard
+                  riskLevel={confidenceSignals.riskLevel}
+                  riskScore={confidenceSignals.riskScore}
+                  confidenceScore={confidenceSignals.confidenceScore}
+                  daysSinceManualIntervention={confidenceSignals.daysSinceManualIntervention}
+                  loading={isLoading}
+                />
+                {showOnboarding && (
+                  <OnboardingGuidanceCard
+                    items={setupItems}
+                    automationExplainer={automationExplainer}
+                    loading={rulesLoading}
+                  />
                 )}
-              </>
-            ) : (
+              </div>
+            </div>
+
+            {hasExpiredTokens && (
               <Card className="border-warning/20 bg-warning/5">
                 <CardContent className="pt-6">
-                  <p className="text-sm text-warning-foreground mb-4">
-                    No Amazon connections found. Please connect your account to get started.
+                  <p className="text-sm text-warning-foreground">
+                    Your Amazon connection has expired. You can still view historical data, but you'll need to refresh your connection to sync new data.
                   </p>
-                  <Button asChild>
-                    <Link to="/settings">Connect Amazon Account</Link>
-                  </Button>
+                  <div className="mt-3">
+                    <Button asChild variant="outline">
+                      <Link to="/settings">Refresh Connection</Link>
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             )}
-          </TabsContent>
 
-          {/* Suggestions Tab */}
-          <TabsContent value="suggestions" className="space-y-6">
+            {/* Suggestions Section */}
             <div className="space-y-4">
-              <div>
-                <h2 className="text-xl font-semibold mb-1">AI Suggestions</h2>
-                <p className="text-sm text-muted-foreground">
-                  Review and approve optimization recommendations from PPC Pal
-                </p>
+              <div className="flex items-center gap-3">
+                <Lightbulb className="h-5 w-5 text-primary" />
+                <div>
+                  <h2 className="text-xl font-semibold">AI Suggestions</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Review and approve optimization recommendations
+                  </p>
+                </div>
               </div>
               <PendingApprovals />
             </div>
-          </TabsContent>
 
-          {/* Activity Tab */}
-          <TabsContent value="activity" className="space-y-6">
+            {/* Activity Section */}
             <div className="space-y-4">
-              <div>
-                <h2 className="text-xl font-semibold mb-1">Recent Activity</h2>
-                <p className="text-sm text-muted-foreground">
-                  All automation actions and changes
-                </p>
+              <div className="flex items-center gap-3">
+                <Activity className="h-5 w-5 text-muted-foreground" />
+                <div>
+                  <h2 className="text-xl font-semibold">Recent Activity</h2>
+                  <p className="text-sm text-muted-foreground">
+                    All automation actions and changes
+                  </p>
+                </div>
               </div>
               <ActionsFeed />
             </div>
-          </TabsContent>
-        </Tabs>
+          </div>
+        ) : (
+          <Card className="border-warning/20 bg-warning/5">
+            <CardContent className="pt-6">
+              <p className="text-sm text-warning-foreground mb-4">
+                No Amazon connections found. Please connect your account to get started.
+              </p>
+              <Button asChild>
+                <Link to="/settings">Connect Amazon Account</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </DashboardShell>
   );
