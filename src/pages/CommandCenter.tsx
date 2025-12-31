@@ -498,7 +498,7 @@ const CommandCenter = () => {
       <div className="container mx-auto py-6 px-4 space-y-6">
         {/* Top Bar: Filters + Data Availability */}
         {hasConnections && (
-          <div className="flex flex-wrap items-center gap-3 pb-4 border-b">
+          <div className="flex items-center gap-3 pb-4 border-b overflow-x-auto">
             <DateRangePicker 
               value={dateRange}
               onChange={setDateRange}
@@ -513,7 +513,7 @@ const CommandCenter = () => {
               customRange={customComparisonRange}
               onCustomRangeChange={setCustomComparisonRange}
             />
-            <div className="ml-auto">
+            <div className="ml-auto shrink-0">
               <DataAvailabilityIndicator
                 minDate={minDate}
                 maxDate={maxDate}
