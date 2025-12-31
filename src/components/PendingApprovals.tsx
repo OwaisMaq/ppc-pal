@@ -10,14 +10,13 @@ import {
   ClipboardCheck,
   TrendingUp, 
   Ban, 
-  XCircle,
   Activity,
   DollarSign,
   Check,
   X,
   Loader2,
-  RotateCcw,
-  Pause
+  Pause,
+  Play
 } from "lucide-react";
 
 const PendingApprovals = () => {
@@ -38,7 +37,10 @@ const PendingApprovals = () => {
       case 'negative_product':
         return Ban;
       case 'pause_target':
+      case 'disable_entity':
         return Pause;
+      case 'enable_entity':
+        return Play;
       case 'set_placement_adjust':
         return Activity;
       default:
@@ -49,38 +51,50 @@ const PendingApprovals = () => {
   const getActionLabel = (actionType: string) => {
     switch (actionType) {
       case 'set_bid':
-        return 'Bid Adjustment';
+        return 'Adjust Bid';
       case 'negative_keyword':
-        return 'Negative Keyword';
+        return 'Add Negative Keyword';
       case 'negative_product':
-        return 'Negative Product';
+        return 'Add Negative Product';
       case 'pause_target':
         return 'Pause Target';
       case 'set_placement_adjust':
-        return 'Placement Adjustment';
+        return 'Adjust Placement';
       case 'create_keyword':
-        return 'New Keyword';
+        return 'Add Keyword';
+      case 'enable_entity':
+        return 'Re-enable Entity';
+      case 'disable_entity':
+        return 'Disable Entity';
       default:
-        return actionType;
+        // Convert snake_case to Title Case
+        return actionType.split('_').map(word => 
+          word.charAt(0).toUpperCase() + word.slice(1)
+        ).join(' ');
     }
   };
 
   const formatActionDetails = (action: any) => {
     const { action_type, payload } = action;
+    const entityName = payload.entity_name || payload.keyword_text || payload.target_name;
     
     switch (action_type) {
       case 'set_bid':
-        return `${payload.entity_name || payload.target_id} → ${payload.new_bid ? `$${payload.new_bid}` : 'N/A'}`;
+        const bidInfo = payload.new_bid ? `$${payload.new_bid}` : '';
+        return entityName ? `${entityName}${bidInfo ? ` → ${bidInfo}` : ''}` : bidInfo || 'Bid change';
       case 'negative_keyword':
-        return `"${payload.keyword_text}" to ${payload.campaign_name || 'campaign'}`;
+        return payload.keyword_text ? `"${payload.keyword_text}"` : 'Keyword';
       case 'negative_product':
-        return `ASIN ${payload.asin} from ${payload.campaign_name || 'campaign'}`;
+        return payload.asin ? `ASIN: ${payload.asin}` : 'Product';
       case 'pause_target':
-        return `${payload.entity_name || payload.target_id}`;
+      case 'enable_entity':
+      case 'disable_entity':
+        return entityName || 'Target';
       case 'set_placement_adjust':
-        return `${payload.placement} → ${payload.adjustment}%`;
+        return payload.placement ? `${payload.placement} placement` : 'Placement';
       default:
-        return JSON.stringify(payload).substring(0, 50);
+        // Try to show entity name, otherwise just show action type
+        return entityName || 'Action pending';
     }
   };
 
@@ -302,8 +316,6 @@ const PendingApprovals = () => {
                 >
                   {isProcessing ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : isSkipped ? (
-                    <RotateCcw className="h-4 w-4" />
                   ) : (
                     <Check className="h-4 w-4" />
                   )}
