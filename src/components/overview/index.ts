@@ -1,5 +1,5 @@
 export { AccountHealthCard } from './AccountHealthCard';
-export type { HealthStatus, AutomationStatus } from './AccountHealthCard';
+export type { HealthStatus, AutomationStatus, DateRangePreset } from './AccountHealthCard';
 
 export { WhatMattersNow } from './WhatMattersNow';
 export type { MatterItem } from './WhatMattersNow';
