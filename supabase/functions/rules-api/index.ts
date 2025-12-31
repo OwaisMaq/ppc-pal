@@ -100,6 +100,7 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Create service role client for database operations
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
     // Get authorization header
@@ -113,11 +114,16 @@ Deno.serve(async (req) => {
 
     let user = null;
     if (authHeader) {
-      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(
-        authHeader.replace('Bearer ', '')
-      );
+      // Create a client with the user's JWT for auth verification
+      const token = authHeader.replace('Bearer ', '');
+      const supabaseAuth = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY') || '', {
+        global: { headers: { Authorization: `Bearer ${token}` } }
+      });
+      
+      const { data: { user: authUser }, error: authError } = await supabaseAuth.auth.getUser();
       
       if (authError || !authUser) {
+        console.error('Auth error:', authError?.message);
         return new Response(
           JSON.stringify({ error: 'Invalid authorization' }),
           { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
