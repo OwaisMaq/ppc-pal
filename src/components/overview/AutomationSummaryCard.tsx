@@ -88,7 +88,7 @@ export const AutomationSummaryCard = ({ summary, loading }: AutomationSummaryCar
           <div className="p-3 rounded-lg border border-success/30 bg-success/5">
             <div className="flex items-center gap-1.5 mb-1">
               <CheckCircle2 className="h-4 w-4 text-success" />
-              <span className="text-xs font-medium text-muted-foreground">Protected</span>
+              <span className="text-xs font-medium text-muted-foreground">Applied</span>
             </div>
             <p className="text-2xl font-display font-bold text-success">{summary.actionsApplied}</p>
           </div>

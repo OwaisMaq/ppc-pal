@@ -61,7 +61,7 @@ const ActionsFeed = () => {
       case 'applied':
         return { 
           icon: CheckCircle2, 
-          label: 'Protected', 
+          label: 'Applied', 
           color: 'text-success',
           dotColor: 'bg-success'
         };
