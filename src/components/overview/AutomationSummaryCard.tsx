@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Link } from "react-router-dom";
-import { Bot, CheckCircle2, XCircle, SkipForward, ChevronDown, ChevronRight, Clock, ShieldCheck } from "lucide-react";
+import { Bot, CheckCircle2, XCircle, Lightbulb, ChevronDown, ChevronRight, Clock, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
@@ -102,13 +102,13 @@ export const AutomationSummaryCard = ({ summary, loading }: AutomationSummaryCar
             <p className="text-2xl font-display font-bold text-warning">{summary.actionsPrevented}</p>
           </div>
           
-          {/* Skipped */}
-          <div className="p-3 rounded-lg border border-border bg-muted/50">
+          {/* Suggested */}
+          <div className="p-3 rounded-lg border border-info/30 bg-info/5">
             <div className="flex items-center gap-1.5 mb-1">
-              <SkipForward className="h-4 w-4 text-muted-foreground" />
-              <span className="text-xs font-medium text-muted-foreground">Skipped</span>
+              <Lightbulb className="h-4 w-4 text-info" />
+              <span className="text-xs font-medium text-muted-foreground">Suggested</span>
             </div>
-            <p className="text-2xl font-display font-bold text-muted-foreground">{summary.actionsSkipped}</p>
+            <p className="text-2xl font-display font-bold text-info">{summary.actionsSkipped}</p>
           </div>
         </div>
 
@@ -131,7 +131,7 @@ export const AutomationSummaryCard = ({ summary, loading }: AutomationSummaryCar
                   const statusConfig = {
                     applied: { icon: CheckCircle2, color: 'text-success', dotColor: 'bg-success' },
                     prevented: { icon: XCircle, color: 'text-warning', dotColor: 'bg-warning' },
-                    skipped: { icon: SkipForward, color: 'text-muted-foreground', dotColor: 'bg-muted-foreground' }
+                    skipped: { icon: Lightbulb, color: 'text-info', dotColor: 'bg-info' }
                   };
                   const { icon: StatusIcon, color, dotColor } = statusConfig[action.status];
                   
