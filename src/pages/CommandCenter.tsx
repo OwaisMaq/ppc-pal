@@ -9,7 +9,7 @@ import { subDays, differenceInDays } from "date-fns";
 
 // Hooks
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
-import { useAmsMetrics } from "@/hooks/useAmsMetrics";
+import { useAggregatedMetrics } from "@/hooks/useAggregatedMetrics";
 import { useSavingsMetric } from "@/hooks/useSavingsMetric";
 import { useAutomationRules, useAlerts } from "@/hooks/useAutomation";
 import { useAnomalies } from "@/hooks/useAnomalies";
@@ -62,9 +62,6 @@ const CommandCenter = () => {
     return { from, to };
   }, [dateRangePreset]);
   
-  const primaryConnection = connections[0];
-  const profileId = primaryConnection?.profile_id;
-  
   // Derive marketplaces from connections
   const marketplaceOptions: MarketplaceOption[] = useMemo(() => {
     const uniqueMarketplaces = new Map<string, string>();
@@ -75,6 +72,16 @@ const CommandCenter = () => {
     });
     return Array.from(uniqueMarketplaces.entries()).map(([id, name]) => ({ id, name }));
   }, [connections]);
+
+  // Get primary connection for profile-based queries (uses first matching connection)
+  const primaryConnection = useMemo(() => {
+    if (!selectedMarketplace || selectedMarketplace === 'all') {
+      return connections[0];
+    }
+    return connections.find(c => c.marketplace_id === selectedMarketplace) || connections[0];
+  }, [connections, selectedMarketplace]);
+  
+  const profileId = primaryConnection?.profile_id;
   
   // Fetch brand terms
   const { brandTerms, fetchBrandTerms } = useSearchStudio();
@@ -91,9 +98,10 @@ const CommandCenter = () => {
     return brandTerms.map(bt => ({ id: bt.id, term: bt.term }));
   }, [brandTerms]);
   
-  // Fetch metrics
-  const { metrics, loading: metricsLoading, error: metricsError } = useAmsMetrics(
-    primaryConnection?.id,
+  // Fetch aggregated metrics across all (or filtered) connections
+  const { metrics, loading: metricsLoading, error: metricsError, connectionCount } = useAggregatedMetrics(
+    connections,
+    selectedMarketplace,
     dateRange?.from,
     dateRange?.to
   );
@@ -299,6 +307,10 @@ const CommandCenter = () => {
                 onDateRangePresetChange={setDateRangePreset}
                 selectedASIN={selectedASIN}
                 onASINChange={setSelectedASIN}
+                selectedMarketplace={selectedMarketplace}
+                onMarketplaceChange={setSelectedMarketplace}
+                marketplaceOptions={marketplaceOptions}
+                connectionCount={connectionCount}
               />
               
               <div className="grid gap-6 md:grid-cols-2">

@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Shield, DollarSign, TrendingUp, Target, Bot, ChevronRight, AlertTriangle, CheckCircle, Package } from "lucide-react";
+import { Shield, DollarSign, TrendingUp, Target, Bot, ChevronRight, AlertTriangle, CheckCircle, Package, Globe } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -18,6 +18,11 @@ export type HealthStatus = 'healthy' | 'watch' | 'at_risk';
 export type AutomationStatus = 'on' | 'limited' | 'paused';
 export type DateRangePreset = '24h' | '7d' | '30d';
 
+export interface MarketplaceOption {
+  id: string;
+  name: string;
+}
+
 interface AccountHealthCardProps {
   healthStatus: HealthStatus;
   healthReasons?: string[];
@@ -33,6 +38,10 @@ interface AccountHealthCardProps {
   onDateRangePresetChange?: (preset: DateRangePreset) => void;
   selectedASIN?: string | null;
   onASINChange?: (asin: string | null) => void;
+  selectedMarketplace?: string | null;
+  onMarketplaceChange?: (marketplace: string | null) => void;
+  marketplaceOptions?: MarketplaceOption[];
+  connectionCount?: number;
 }
 
 const healthConfig = {
@@ -88,7 +97,11 @@ export const AccountHealthCard = ({
   dateRangePreset = '30d',
   onDateRangePresetChange,
   selectedASIN,
-  onASINChange
+  onASINChange,
+  selectedMarketplace,
+  onMarketplaceChange,
+  marketplaceOptions = [],
+  connectionCount = 1
 }: AccountHealthCardProps) => {
   const healthInfo = healthConfig[healthStatus];
   const HealthIcon = healthInfo.icon;
@@ -156,7 +169,30 @@ export const AccountHealthCard = ({
             </div>
             
             {/* Compact filters */}
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Marketplace filter - only show if multiple marketplaces */}
+              {marketplaceOptions.length > 1 && (
+                <Select
+                  value={selectedMarketplace || "all"}
+                  onValueChange={(value) => onMarketplaceChange?.(value === "all" ? null : value)}
+                >
+                  <SelectTrigger className="h-7 w-[130px] text-xs">
+                    <Globe className="h-3 w-3 mr-1.5 shrink-0" />
+                    <SelectValue placeholder="All Markets" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover">
+                    <SelectItem value="all" className="text-xs">
+                      All Markets ({connectionCount})
+                    </SelectItem>
+                    {marketplaceOptions.map((mp) => (
+                      <SelectItem key={mp.id} value={mp.id} className="text-xs">
+                        {mp.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              
               {/* Date range toggle */}
               <ToggleGroup
                 type="single"
