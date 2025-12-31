@@ -38,7 +38,7 @@ import {
 } from "@/components/overview";
 
 import { DashboardKPIs as KPIData } from "@/hooks/useDashboardData";
-import { Lightbulb, Activity } from "lucide-react";
+import { ClipboardCheck, Activity } from "lucide-react";
 
 const CommandCenter = () => {
   const { connections } = useAmazonConnections();
@@ -343,14 +343,14 @@ const CommandCenter = () => {
               </Card>
             )}
 
-            {/* Suggestions Section */}
+            {/* Pending Approvals Section */}
             <div className="space-y-4">
               <div className="flex items-center gap-3">
-                <Lightbulb className="h-5 w-5 text-primary" />
+                <ClipboardCheck className="h-5 w-5 text-primary" />
                 <div>
-                  <h2 className="text-xl font-semibold">AI Suggestions</h2>
+                  <h2 className="text-xl font-semibold">Pending Approvals</h2>
                   <p className="text-sm text-muted-foreground">
-                    Review and approve optimization recommendations
+                    Review and approve actions before they're applied
                   </p>
                 </div>
               </div>

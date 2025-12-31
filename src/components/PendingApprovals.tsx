@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useActionsFeed } from "@/hooks/useActionsFeed";
@@ -7,7 +7,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { ConfidenceBadge } from "@/components/automation";
 import { 
-  AlertCircle,
+  ClipboardCheck,
   TrendingUp, 
   Ban, 
   XCircle,
@@ -15,29 +15,34 @@ import {
   DollarSign,
   Check,
   X,
-  Brain
+  Loader2,
+  RotateCcw,
+  Pause
 } from "lucide-react";
 
 const PendingApprovals = () => {
   const { actions, loading, refetch } = useActionsFeed(50);
   const [processing, setProcessing] = useState<string[]>([]);
 
-  // Filter for queued actions only
-  const pendingActions = actions.filter(action => action.status === 'queued');
+  // Show both queued (awaiting approval) and skipped (blocked/can retry) actions
+  const pendingActions = actions.filter(action => 
+    action.status === 'queued' || 
+    (action.status === 'skipped' && action.error !== 'User rejected')
+  );
 
   const getActionIcon = (actionType: string) => {
     switch (actionType) {
       case 'set_bid':
-        return <TrendingUp className="h-4 w-4" />;
+        return TrendingUp;
       case 'negative_keyword':
       case 'negative_product':
-        return <Ban className="h-4 w-4" />;
+        return Ban;
       case 'pause_target':
-        return <XCircle className="h-4 w-4" />;
+        return Pause;
       case 'set_placement_adjust':
-        return <Activity className="h-4 w-4" />;
+        return Activity;
       default:
-        return <DollarSign className="h-4 w-4" />;
+        return DollarSign;
     }
   };
 
@@ -85,11 +90,6 @@ const PendingApprovals = () => {
     if (payload?.confidence !== undefined) {
       return {
         confidence: Math.round(payload.confidence * 100),
-        observations: payload.observations,
-        confidenceInterval: payload.confidence_interval ? {
-          lower: payload.confidence_interval.lower,
-          upper: payload.confidence_interval.upper,
-        } : undefined,
       };
     }
     return null;
@@ -104,23 +104,28 @@ const PendingApprovals = () => {
   const handleApprove = async (actionId: string) => {
     setProcessing(prev => [...prev, actionId]);
     try {
-      // Update action status to trigger processing
-      const { error } = await supabase
-        .from('action_queue')
-        .update({ status: 'queued' }) // Keep as queued so worker can pick it up
-        .eq('id', actionId);
-
-      if (error) throw error;
-
-      // Trigger the actions-worker function
-      const { error: workerError } = await supabase.functions.invoke('actions-worker');
+      // First update status to queued if it was skipped
+      const action = pendingActions.find(a => a.id === actionId);
+      if (action?.status === 'skipped') {
+        const { error: updateError } = await supabase
+          .from('action_queue')
+          .update({ status: 'queued', error: null })
+          .eq('id', actionId);
+        
+        if (updateError) throw updateError;
+      }
       
-      if (workerError) throw workerError;
-
-      toast.success('Action approved and processing');
+      // Invoke the actions worker to process this action
+      const { error } = await supabase.functions.invoke('actions-worker', {
+        body: { action_id: actionId }
+      });
+      
+      if (error) throw error;
+      
+      toast.success('Action approved and applied');
       refetch();
-    } catch (error) {
-      console.error('Error approving action:', error);
+    } catch (err) {
+      console.error('Failed to approve action:', err);
       toast.error('Failed to approve action');
     } finally {
       setProcessing(prev => prev.filter(id => id !== actionId));
@@ -132,18 +137,15 @@ const PendingApprovals = () => {
     try {
       const { error } = await supabase
         .from('action_queue')
-        .update({ 
-          status: 'skipped',
-          error: 'Rejected by user'
-        })
+        .update({ status: 'skipped', error: 'User rejected' })
         .eq('id', actionId);
-
+      
       if (error) throw error;
-
+      
       toast.success('Action rejected');
       refetch();
-    } catch (error) {
-      console.error('Error rejecting action:', error);
+    } catch (err) {
+      console.error('Failed to reject action:', err);
       toast.error('Failed to reject action');
     } finally {
       setProcessing(prev => prev.filter(id => id !== actionId));
@@ -154,126 +156,167 @@ const PendingApprovals = () => {
     const actionIds = pendingActions.map(a => a.id);
     setProcessing(actionIds);
     
+    const queuedActions = pendingActions.filter(a => a.status === 'queued');
+    if (queuedActions.length === 0) return;
+    
     try {
-      // Trigger the actions-worker to process all queued actions
-      const { error: workerError } = await supabase.functions.invoke('actions-worker');
+      const { error } = await supabase.functions.invoke('actions-worker', {
+        body: { approve_all: true }
+      });
       
-      if (workerError) throw workerError;
-
-      toast.success(`Approved ${pendingActions.length} actions`);
+      if (error) throw error;
+      
+      toast.success(`${queuedActions.length} actions approved`);
       refetch();
-    } catch (error) {
-      console.error('Error approving all actions:', error);
-      toast.error('Failed to approve actions');
-    } finally {
-      setProcessing([]);
+    } catch (err) {
+      console.error('Failed to approve all actions:', err);
+      toast.error('Failed to approve all actions');
     }
   };
 
-  if (loading) return null;
-  
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <ClipboardCheck className="h-5 w-5 text-primary" />
+            Pending Approvals
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (pendingActions.length === 0) {
     return (
-      <Card className="text-center py-8">
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <ClipboardCheck className="h-5 w-5 text-primary" />
+            Pending Approvals
+          </CardTitle>
+          <CardDescription>Review actions before they're applied</CardDescription>
+        </CardHeader>
         <CardContent>
-          <Check className="h-12 w-12 mx-auto mb-4 text-success/50" />
-          <h3 className="text-lg font-semibold mb-2">No Pending Actions</h3>
-          <p className="text-muted-foreground text-sm">
-            All automation actions have been processed or are awaiting generation.
+          <p className="text-sm text-muted-foreground text-center py-4">
+            No actions pending approval
           </p>
         </CardContent>
       </Card>
     );
   }
 
+  const queuedCount = pendingActions.filter(a => a.status === 'queued').length;
+  const skippedCount = pendingActions.filter(a => a.status === 'skipped').length;
+
   return (
-    <Card className="border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/10">
-      <CardHeader>
+    <Card>
+      <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-amber-600" />
-            <CardTitle className="text-lg text-amber-900 dark:text-amber-100">
-              Actions Pending Approval
+          <div>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <ClipboardCheck className="h-5 w-5 text-primary" />
+              Pending Approvals
+              <Badge variant="secondary" className="ml-2">
+                {pendingActions.length}
+              </Badge>
             </CardTitle>
-            <Badge variant="secondary" className="ml-2">
-              {pendingActions.length}
-            </Badge>
+            <CardDescription>
+              {queuedCount > 0 && `${queuedCount} awaiting approval`}
+              {queuedCount > 0 && skippedCount > 0 && ' · '}
+              {skippedCount > 0 && `${skippedCount} blocked`}
+            </CardDescription>
           </div>
-          {pendingActions.length > 1 && (
-            <Button
-              onClick={handleApproveAll}
-              disabled={processing.length > 0}
-              size="sm"
-              variant="default"
-            >
+          {queuedCount > 1 && (
+            <Button size="sm" onClick={handleApproveAll}>
               Approve All
             </Button>
           )}
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          {pendingActions.map((action) => {
-            const confidenceData = getConfidenceData(action);
-            const isBayesian = isBayesianAction(action);
-            
-            return (
-              <div
-                key={action.id}
-                className="flex items-start gap-3 p-3 rounded-lg border bg-card"
-              >
-                <div className={`mt-1 p-2 rounded-full ${isBayesian ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
-                  {isBayesian ? <Brain className="h-4 w-4" /> : getActionIcon(action.action_type)}
+      <CardContent className="space-y-3">
+        {pendingActions.slice(0, 5).map((action) => {
+          const Icon = getActionIcon(action.action_type);
+          const isProcessing = processing.includes(action.id);
+          const bayesianData = isBayesianAction(action) ? getConfidenceData(action) : null;
+          const isSkipped = action.status === 'skipped';
+          
+          return (
+            <div 
+              key={action.id} 
+              className={`flex items-start justify-between p-3 rounded-lg border ${
+                isSkipped ? 'bg-muted/50 border-muted' : 'bg-background'
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <div className={`p-2 rounded-md ${isSkipped ? 'bg-muted' : 'bg-primary/10'}`}>
+                  <Icon className={`h-4 w-4 ${isSkipped ? 'text-muted-foreground' : 'text-primary'}`} />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-sm font-medium">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-sm">
                       {getActionLabel(action.action_type)}
-                    </span>
-                    {confidenceData && (
-                      <ConfidenceBadge 
-                        confidence={confidenceData.confidence}
-                        observations={confidenceData.observations}
-                        confidenceInterval={confidenceData.confidenceInterval}
-                      />
-                    )}
-                    {isBayesian && !confidenceData && (
-                      <Badge variant="outline" className="text-xs bg-primary/5 text-primary border-primary/20">
-                        <Brain className="h-3 w-3 mr-1" />
-                        AI Optimized
+                    </p>
+                    {isSkipped && (
+                      <Badge variant="outline" className="text-xs">
+                        Blocked
                       </Badge>
                     )}
+                    {bayesianData && (
+                      <ConfidenceBadge 
+                        confidence={bayesianData.confidence} 
+                      />
+                    )}
                   </div>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     {formatActionDetails(action)}
                   </p>
-                </div>
-                <div className="flex gap-2 ml-auto">
-                  <Button
-                    size="sm"
-                    variant="default"
-                    onClick={() => handleApprove(action.id)}
-                    disabled={processing.includes(action.id)}
-                    className="gap-1"
-                  >
-                    <Check className="h-3 w-3" />
-                    Approve
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleReject(action.id)}
-                    disabled={processing.includes(action.id)}
-                    className="gap-1"
-                  >
-                    <X className="h-3 w-3" />
-                    Reject
-                  </Button>
+                  {isSkipped && action.error && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      {action.error}
+                    </p>
+                  )}
                 </div>
               </div>
-            );
-          })}
-        </div>
+              <div className="flex items-center gap-1">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                  onClick={() => handleReject(action.id)}
+                  disabled={isProcessing}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8 text-emerald-600 hover:text-emerald-600 hover:bg-emerald-600/10"
+                  onClick={() => handleApprove(action.id)}
+                  disabled={isProcessing}
+                >
+                  {isProcessing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : isSkipped ? (
+                    <RotateCcw className="h-4 w-4" />
+                  ) : (
+                    <Check className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+          );
+        })}
+        {pendingActions.length > 5 && (
+          <p className="text-xs text-muted-foreground text-center pt-2">
+            +{pendingActions.length - 5} more actions
+          </p>
+        )}
       </CardContent>
     </Card>
   );
