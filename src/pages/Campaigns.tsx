@@ -46,7 +46,9 @@ import {
   Check,
   X,
   Loader2,
-  Wand2
+  Wand2,
+  LayoutGrid,
+  List
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
@@ -56,10 +58,12 @@ import { subDays } from "date-fns";
 import { DateRange } from "react-day-picker";
 import { useDataAvailability } from "@/hooks/useDataAvailability";
 import { DataAvailabilityIndicator } from "@/components/DataAvailabilityIndicator";
-import { CampaignLevelSelector, CampaignLevel, BulkActionsBar } from "@/components/campaigns";
+import { CampaignLevelSelector, CampaignLevel, BulkActionsBar, ProductSection } from "@/components/campaigns";
 import { useAmsMetrics } from "@/hooks/useAmsMetrics";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown } from "lucide-react";
+import { useProductGroupedCampaigns } from "@/hooks/useProductGroupedCampaigns";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type DatePreset = '7D' | '14D' | '30D' | '90D' | 'custom';
 type MatchType = 'exact' | 'phrase';
@@ -181,6 +185,7 @@ const Campaigns = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [autoMode, setAutoMode] = useState(false);
   const [viewLevel, setViewLevel] = useState<CampaignLevel>('campaigns');
+  const [viewMode, setViewMode] = useState<'grouped' | 'flat'>('grouped');
   const [selectedPreset, setSelectedPreset] = useState<DatePreset>('30D');
   const [dateRange, setDateRange] = useState<DateRange>({
     from: subDays(new Date(), 30),
@@ -210,6 +215,16 @@ const Campaigns = () => {
   const dayCount = dateRange?.from && dateRange?.to
     ? Math.ceil((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24)) + 1
     : 30;
+
+  // Product grouped campaigns hook
+  const { 
+    productGroups, 
+    loading: productGroupsLoading 
+  } = useProductGroupedCampaigns(
+    primaryConnection?.profile_id,
+    dateRange,
+    dayCount
+  );
 
   const handlePresetChange = (preset: DatePreset) => {
     setSelectedPreset(preset);
@@ -1293,48 +1308,122 @@ const Campaigns = () => {
               </Card>
             </Collapsible>
 
-            {/* Main Campaign Table */}
-            <Card>
-              <CardHeader>
-                <div className="flex flex-col gap-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle>Campaign Performance</CardTitle>
-                      <CardDescription>
-                        {autoMode && (
-                          <Badge variant="default" className="mt-1">
-                            <Sparkles className="h-3 w-3 mr-1" />
-                            AI Optimization Active
-                          </Badge>
-                        )}
-                      </CardDescription>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          placeholder="Search..."
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          className="pl-9 w-64"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Campaign Level Selector Tabs */}
-                  <CampaignLevelSelector
-                    value={viewLevel}
-                    onChange={setViewLevel}
-                    counts={counts}
-                  />
+            {/* View Mode Toggle and Main Content */}
+            <div className="space-y-4">
+              {/* Header with View Toggle */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold">Campaign Performance</h2>
+                  {autoMode && (
+                    <Badge variant="default" className="mt-1">
+                      <Sparkles className="h-3 w-3 mr-1" />
+                      AI Optimization Active
+                    </Badge>
+                  )}
                 </div>
-              </CardHeader>
-              
-              <CardContent>
-                {renderTable()}
-              </CardContent>
-            </Card>
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9 w-64"
+                    />
+                  </div>
+                  <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'grouped' | 'flat')}>
+                    <TabsList className="h-9">
+                      <TabsTrigger value="grouped" className="gap-1.5 px-3">
+                        <LayoutGrid className="h-4 w-4" />
+                        By Product
+                      </TabsTrigger>
+                      <TabsTrigger value="flat" className="gap-1.5 px-3">
+                        <List className="h-4 w-4" />
+                        All
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </div>
+              </div>
+
+              {/* Product Grouped View */}
+              {viewMode === 'grouped' && (
+                <div className="space-y-4">
+                  {productGroupsLoading ? (
+                    <div className="space-y-4">
+                      {[...Array(3)].map((_, i) => (
+                        <Skeleton key={i} className="h-24 w-full" />
+                      ))}
+                    </div>
+                  ) : productGroups.length === 0 ? (
+                    <Card>
+                      <CardContent className="py-12">
+                        <div className="text-center">
+                          <Layers className="h-12 w-12 mx-auto text-muted-foreground" />
+                          <p className="text-muted-foreground mt-4">No campaigns found</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    productGroups
+                      .filter(p => 
+                        !searchQuery || 
+                        p.asin.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        p.label?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        p.campaigns.some(c => c.campaign_name.toLowerCase().includes(searchQuery.toLowerCase()))
+                      )
+                      .map(product => (
+                        <ProductSection
+                          key={product.asin}
+                          product={product}
+                          dayCount={dayCount}
+                          selectedCampaigns={selectedCampaigns}
+                          onCampaignSelect={(campaignId, selected) => {
+                            setSelectedCampaigns(prev => {
+                              const next = new Set(prev);
+                              if (selected) {
+                                next.add(campaignId);
+                              } else {
+                                next.delete(campaignId);
+                              }
+                              return next;
+                            });
+                          }}
+                          onSelectAllInProduct={(campaignIds, selected) => {
+                            setSelectedCampaigns(prev => {
+                              const next = new Set(prev);
+                              campaignIds.forEach(id => {
+                                if (selected) {
+                                  next.add(id);
+                                } else {
+                                  next.delete(id);
+                                }
+                              });
+                              return next;
+                            });
+                          }}
+                        />
+                      ))
+                  )}
+                </div>
+              )}
+
+              {/* Flat View (Original) */}
+              {viewMode === 'flat' && (
+                <Card>
+                  <CardHeader>
+                    <CampaignLevelSelector
+                      value={viewLevel}
+                      onChange={setViewLevel}
+                      counts={counts}
+                    />
+                  </CardHeader>
+                  <CardContent>
+                    {renderTable()}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           </div>
         )}
       </div>
