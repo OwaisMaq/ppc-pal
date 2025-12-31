@@ -6,7 +6,7 @@ export interface ActionItem {
   id: string;
   action_type: string;
   payload: Record<string, unknown>;
-  status: 'queued' | 'applied' | 'failed' | 'skipped';
+  status: 'queued' | 'applied' | 'failed' | 'skipped' | 'prevented' | 'rejected';
   created_at: string;
   applied_at?: string;
   error?: string;
@@ -22,11 +22,12 @@ export interface ActionStats {
   queued: number;
   failed: number;
   skipped: number;
+  prevented: number;
 }
 
 export const useActionsFeed = (limit: number = 20, statusFilter?: string) => {
   const [actions, setActions] = useState<ActionItem[]>([]);
-  const [stats, setStats] = useState<ActionStats>({ total: 0, applied: 0, queued: 0, failed: 0, skipped: 0 });
+  const [stats, setStats] = useState<ActionStats>({ total: 0, applied: 0, queued: 0, failed: 0, skipped: 0, prevented: 0 });
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
@@ -35,7 +36,7 @@ export const useActionsFeed = (limit: number = 20, statusFilter?: string) => {
 
     try {
       // Fetch counts for each status
-      const statuses = ['applied', 'queued', 'failed', 'skipped'];
+      const statuses = ['applied', 'queued', 'failed', 'skipped', 'prevented'];
       const counts = await Promise.all(
         statuses.map(async (status) => {
           const { count, error } = await supabase
@@ -54,6 +55,7 @@ export const useActionsFeed = (limit: number = 20, statusFilter?: string) => {
         queued: counts.find(c => c.status === 'queued')?.count || 0,
         failed: counts.find(c => c.status === 'failed')?.count || 0,
         skipped: counts.find(c => c.status === 'skipped')?.count || 0,
+        prevented: counts.find(c => c.status === 'prevented')?.count || 0,
       };
       setStats(newStats);
     } catch (error) {

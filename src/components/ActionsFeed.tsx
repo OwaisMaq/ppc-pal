@@ -86,6 +86,14 @@ const ActionsFeed = () => {
           color: 'text-info',
           dotColor: 'bg-info'
         };
+      case 'prevented':
+      case 'rejected':
+        return { 
+          icon: XCircle, 
+          label: 'Not Applied', 
+          color: 'text-warning',
+          dotColor: 'bg-warning'
+        };
       default:
         return { 
           icon: Activity, 
