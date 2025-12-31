@@ -1,5 +1,5 @@
 export { AccountHealthCard } from './AccountHealthCard';
-export type { HealthStatus, AutomationStatus, DateRangePreset } from './AccountHealthCard';
+export type { HealthStatus, AutomationStatus, DateRangePreset, MarketplaceOption } from './AccountHealthCard';
 
 export { WhatMattersNow } from './WhatMattersNow';
 export type { MatterItem } from './WhatMattersNow';
@@ -14,7 +14,7 @@ export { ConfidenceSignalsCard } from './ConfidenceSignalsCard';
 export { OnboardingGuidanceCard, getDefaultSetupItems } from './OnboardingGuidanceCard';
 
 export { OverviewFilters, getMarketplaceName } from './OverviewFilters';
-export type { DatePreset, MarketplaceOption, BrandOption } from './OverviewFilters';
+export type { DatePreset, BrandOption } from './OverviewFilters';
 
 export { TrustReportCard } from './TrustReportCard';
 export { OutcomeAttributionPanel } from './OutcomeAttributionPanel';
