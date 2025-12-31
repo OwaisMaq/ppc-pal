@@ -57,6 +57,9 @@ import { DateRange } from "react-day-picker";
 import { useDataAvailability } from "@/hooks/useDataAvailability";
 import { DataAvailabilityIndicator } from "@/components/DataAvailabilityIndicator";
 import { CampaignLevelSelector, CampaignLevel, BulkActionsBar } from "@/components/campaigns";
+import { useAmsMetrics } from "@/hooks/useAmsMetrics";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown } from "lucide-react";
 
 type DatePreset = '7D' | '14D' | '30D' | '90D' | 'custom';
 type MatchType = 'exact' | 'phrase';
@@ -195,6 +198,13 @@ const Campaigns = () => {
     loading: availabilityLoading,
     importProgress 
   } = useDataAvailability(primaryConnection?.profile_id);
+
+  // Detailed metrics hook
+  const { metrics, loading: metricsLoading } = useAmsMetrics(
+    primaryConnection?.id,
+    dateRange?.from,
+    dateRange?.to
+  );
 
   // Calculate day count for dynamic labels and calculations
   const dayCount = dateRange?.from && dateRange?.to
@@ -1203,64 +1213,27 @@ const Campaigns = () => {
             </CardContent>
           </Card>
         ) : (
-          <Card>
-            <CardHeader>
-              <div className="flex flex-col gap-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Campaign Performance</CardTitle>
-                    <CardDescription>
-                      {autoMode && (
-                        <Badge variant="default" className="mt-1">
-                          <Sparkles className="h-3 w-3 mr-1" />
-                          AI Optimization Active
-                        </Badge>
-                      )}
-                    </CardDescription>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Search..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-9 w-64"
-                      />
-                    </div>
-                  </div>
+          <div className="space-y-4">
+            {/* Filters and Data Availability - Top of Page */}
+            <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1">
+                  {(['7D', '14D', '30D', '90D'] as DatePreset[]).map((preset) => (
+                    <Button
+                      key={preset}
+                      variant={selectedPreset === preset ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => handlePresetChange(preset)}
+                    >
+                      {preset}
+                    </Button>
+                  ))}
                 </div>
-                
-                {/* Campaign Level Selector Tabs */}
-                <CampaignLevelSelector
-                  value={viewLevel}
-                  onChange={setViewLevel}
-                  counts={counts}
+                <DateRangePicker
+                  value={dateRange}
+                  onChange={handleDateRangeChange}
                 />
-                
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1">
-                    {(['7D', '14D', '30D', '90D'] as DatePreset[]).map((preset) => (
-                      <Button
-                        key={preset}
-                        variant={selectedPreset === preset ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => handlePresetChange(preset)}
-                      >
-                        {preset}
-                      </Button>
-                    ))}
-                  </div>
-                  <DateRangePicker
-                    value={dateRange}
-                    onChange={handleDateRangeChange}
-                  />
-                </div>
               </div>
-            </CardHeader>
-            
-            {/* Data Availability Indicator */}
-            <div className="px-6 pb-4">
               <DataAvailabilityIndicator
                 minDate={minDate}
                 maxDate={maxDate}
@@ -1271,11 +1244,98 @@ const Campaigns = () => {
                 importProgress={importProgress}
               />
             </div>
-            
-            <CardContent>
-              {renderTable()}
-            </CardContent>
-          </Card>
+
+            {/* Detailed Metrics Row */}
+            <Collapsible defaultOpen>
+              <Card>
+                <CollapsibleTrigger className="w-full">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-medium">Detailed Metrics</CardTitle>
+                      <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" />
+                    </div>
+                  </CardHeader>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent className="pt-0">
+                    {metricsLoading ? (
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                        {[...Array(5)].map((_, i) => (
+                          <Skeleton key={i} className="h-16" />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                        <div className="space-y-1">
+                          <p className="text-xs text-muted-foreground">Clicks</p>
+                          <p className="text-lg font-semibold">{metrics?.totalClicks?.toLocaleString() || 0}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-xs text-muted-foreground">Impressions</p>
+                          <p className="text-lg font-semibold">{metrics?.totalImpressions?.toLocaleString() || 0}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-xs text-muted-foreground">CPC</p>
+                          <p className="text-lg font-semibold">${metrics?.cpc?.toFixed(2) || '0.00'}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-xs text-muted-foreground">CTR</p>
+                          <p className="text-lg font-semibold">{metrics?.ctr?.toFixed(2) || 0}%</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-xs text-muted-foreground">CVR</p>
+                          <p className="text-lg font-semibold">{metrics?.conversionRate?.toFixed(2) || 0}%</p>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
+
+            {/* Main Campaign Table */}
+            <Card>
+              <CardHeader>
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Campaign Performance</CardTitle>
+                      <CardDescription>
+                        {autoMode && (
+                          <Badge variant="default" className="mt-1">
+                            <Sparkles className="h-3 w-3 mr-1" />
+                            AI Optimization Active
+                          </Badge>
+                        )}
+                      </CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="pl-9 w-64"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Campaign Level Selector Tabs */}
+                  <CampaignLevelSelector
+                    value={viewLevel}
+                    onChange={setViewLevel}
+                    counts={counts}
+                  />
+                </div>
+              </CardHeader>
+              
+              <CardContent>
+                {renderTable()}
+              </CardContent>
+            </Card>
+          </div>
         )}
       </div>
     </DashboardShell>
