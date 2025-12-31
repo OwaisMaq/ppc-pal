@@ -32,7 +32,6 @@ import ActionsFeed from "@/components/ActionsFeed";
 import {
   AccountHealthCard,
   ActiveAlertsCard,
-  ConfidenceSignalsCard,
   OnboardingGuidanceCard,
   getDefaultSetupItems,
   getMarketplaceName,
@@ -332,42 +331,56 @@ const CommandCenter = () => {
             <h1 className="text-3xl font-bold text-foreground">Command Center</h1>
             <p className="text-muted-foreground">Your Amazon Advertising control hub</p>
           </div>
-          {pendingActionsCount > 0 && (
-            <Badge variant="destructive" className="text-sm px-3 py-1">
-              {pendingActionsCount} Pending
-            </Badge>
-          )}
+          <div className="flex items-center gap-3">
+            {/* Confidence signals as subtle inline badges */}
+            <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
+              <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full border ${
+                confidenceSignals.riskLevel === 'low' ? 'border-success/30 text-success' :
+                confidenceSignals.riskLevel === 'medium' ? 'border-warning/30 text-warning' :
+                'border-destructive/30 text-destructive'
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${
+                  confidenceSignals.riskLevel === 'low' ? 'bg-success' :
+                  confidenceSignals.riskLevel === 'medium' ? 'bg-warning' :
+                  'bg-destructive'
+                }`} />
+                {confidenceSignals.riskLevel === 'low' ? 'Low Risk' : 
+                 confidenceSignals.riskLevel === 'medium' ? 'Medium Risk' : 'High Risk'}
+              </span>
+              <span className="text-muted-foreground/60">•</span>
+              <span className="text-muted-foreground">
+                {confidenceSignals.confidenceScore}% confidence
+              </span>
+            </div>
+            {pendingActionsCount > 0 && (
+              <Badge variant="destructive" className="text-sm px-3 py-1">
+                {pendingActionsCount} Pending
+              </Badge>
+            )}
+          </div>
         </div>
 
         {/* Main Content */}
         {hasConnections ? (
           <div className="space-y-8">
             {/* Overview Section */}
-            <div className="grid gap-6 lg:grid-cols-3">
-              <div className="lg:col-span-2 space-y-6">
-                <AccountHealthCard
-                  healthStatus={healthStatus}
-                  healthReasons={healthReasons}
-                  savings={savings?.totalSavings || 0}
-                  spend={metrics?.totalSpend || 0}
-                  sales={metrics?.totalSales || 0}
-                  currentAcos={metrics?.acos || 0}
-                  targetAcos={20}
-                  automationStatus={automationStatus}
-                  loading={isLoading}
-                />
-              </div>
-              <div className="space-y-6">
+            <div className="space-y-6">
+              <AccountHealthCard
+                healthStatus={healthStatus}
+                healthReasons={healthReasons}
+                savings={savings?.totalSavings || 0}
+                spend={metrics?.totalSpend || 0}
+                sales={metrics?.totalSales || 0}
+                currentAcos={metrics?.acos || 0}
+                targetAcos={20}
+                automationStatus={automationStatus}
+                loading={isLoading}
+              />
+              
+              <div className="grid gap-6 md:grid-cols-2">
                 <ActiveAlertsCard
                   alerts={activeAlerts}
                   loading={alertsLoading}
-                />
-                <ConfidenceSignalsCard
-                  riskLevel={confidenceSignals.riskLevel}
-                  riskScore={confidenceSignals.riskScore}
-                  confidenceScore={confidenceSignals.confidenceScore}
-                  daysSinceManualIntervention={confidenceSignals.daysSinceManualIntervention}
-                  loading={isLoading}
                 />
                 {showOnboarding && (
                   <OnboardingGuidanceCard
