@@ -21,7 +21,7 @@ import { useActionsFeed } from "@/hooks/useActionsFeed";
 import { useAccountHealth } from "@/hooks/useAccountHealth";
 
 // Components
-import { DashboardChart } from "@/components/DashboardChart";
+
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { ComparisonModeSelector, ComparisonMode } from "@/components/ComparisonModeSelector";
 import { DataAvailabilityIndicator } from "@/components/DataAvailabilityIndicator";
@@ -537,13 +537,6 @@ const CommandCenter = () => {
                   </div>
                 </div>
                 
-                {/* Performance Chart - Full Width */}
-                <DashboardChart
-                  data={{ points: metrics?.timeseries || [] }}
-                  loading={metricsLoading}
-                  error={metricsError}
-                  granularity="day"
-                />
                 
                 {hasExpiredTokens && (
                   <Card className="border-warning/20 bg-warning/5">
