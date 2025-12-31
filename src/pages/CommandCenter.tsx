@@ -25,7 +25,6 @@ import { DashboardChart } from "@/components/DashboardChart";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { ComparisonModeSelector, ComparisonMode } from "@/components/ComparisonModeSelector";
 import { DataAvailabilityIndicator } from "@/components/DataAvailabilityIndicator";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ASINFilter } from "@/components/ASINFilter";
 import PendingApprovals from "@/components/PendingApprovals";
@@ -647,54 +646,6 @@ const CommandCenter = () => {
                       loading={isLoading}
                     />
                     
-                    {/* Detailed Metrics Collapsible */}
-                    <Collapsible>
-                      <Card>
-                        <CollapsibleTrigger className="w-full">
-                          <CardHeader className="pb-3">
-                            <div className="flex items-center justify-between">
-                              <CardTitle className="text-sm font-medium">Detailed Metrics</CardTitle>
-                              <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" />
-                            </div>
-                            <CardDescription className="text-xs">Clicks, impressions, CPC, CTR, and conversion rate</CardDescription>
-                          </CardHeader>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent>
-                          <CardContent className="pt-0">
-                            {metricsLoading ? (
-                              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                                {[...Array(5)].map((_, i) => (
-                                  <Skeleton key={i} className="h-16" />
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                                <div className="space-y-1">
-                                  <p className="text-xs text-muted-foreground">Clicks</p>
-                                  <p className="text-lg font-semibold">{kpiData?.clicks?.toLocaleString() || 0}</p>
-                                </div>
-                                <div className="space-y-1">
-                                  <p className="text-xs text-muted-foreground">Impressions</p>
-                                  <p className="text-lg font-semibold">{kpiData?.impressions?.toLocaleString() || 0}</p>
-                                </div>
-                                <div className="space-y-1">
-                                  <p className="text-xs text-muted-foreground">CPC</p>
-                                  <p className="text-lg font-semibold">${kpiData?.cpc?.toFixed(2) || '0.00'}</p>
-                                </div>
-                                <div className="space-y-1">
-                                  <p className="text-xs text-muted-foreground">CTR</p>
-                                  <p className="text-lg font-semibold">{kpiData?.ctr?.toFixed(2) || 0}%</p>
-                                </div>
-                                <div className="space-y-1">
-                                  <p className="text-xs text-muted-foreground">CVR</p>
-                                  <p className="text-lg font-semibold">{kpiData?.cvr?.toFixed(2) || 0}%</p>
-                                </div>
-                              </div>
-                            )}
-                          </CardContent>
-                        </CollapsibleContent>
-                      </Card>
-                    </Collapsible>
                   </div>
                   <div className="space-y-6">
                     <ActiveAlertsCard
