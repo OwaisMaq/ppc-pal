@@ -27,6 +27,7 @@ import {
   AccountHealthCard,
   ActiveAlertsCard,
   OnboardingGuidanceCard,
+  HistoricalPerformanceChart,
   getDefaultSetupItems,
   getMarketplaceName,
   type HealthStatus,
@@ -312,6 +313,9 @@ const CommandCenter = () => {
                 marketplaceOptions={marketplaceOptions}
                 connectionCount={connectionCount}
               />
+              
+              {/* Historical Performance Chart - Full Width */}
+              <HistoricalPerformanceChart profileId={profileId} />
               
               <div className="grid gap-6 md:grid-cols-2">
                 <ActiveAlertsCard
