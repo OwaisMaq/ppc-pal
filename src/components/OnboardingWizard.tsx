@@ -68,14 +68,20 @@ export const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        await supabase
+        const { error } = await supabase
           .from('profiles')
           .upsert({ 
             id: user.id, 
             onboarding_completed: true,
-            optimization_goal: selectedGoal,
             updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'id'
           });
+        
+        if (error) {
+          console.error('Error updating profile:', error);
+          throw error;
+        }
       }
       
       toast({
@@ -86,11 +92,14 @@ export const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
       });
       
       onComplete();
-      navigate('/overview');
+      navigate('/command-center');
     } catch (error) {
       console.error('Error completing onboarding:', error);
-      onComplete();
-      navigate('/overview');
+      toast({
+        title: "Error",
+        description: "Failed to complete onboarding. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
