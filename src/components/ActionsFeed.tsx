@@ -13,7 +13,8 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  ShieldCheck
+  ShieldCheck,
+  Lightbulb
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -80,10 +81,10 @@ const ActionsFeed = () => {
         };
       case 'skipped':
         return { 
-          icon: Activity, 
-          label: 'Skipped', 
-          color: 'text-muted-foreground',
-          dotColor: 'bg-muted-foreground'
+          icon: Lightbulb, 
+          label: 'Suggested', 
+          color: 'text-info',
+          dotColor: 'bg-info'
         };
       default:
         return { 

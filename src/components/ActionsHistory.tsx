@@ -10,7 +10,7 @@ import {
   CheckCircle2, 
   Clock, 
   XCircle, 
-  SkipForward,
+  Lightbulb,
   TrendingDown,
   TrendingUp,
   DollarSign,
@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 
-type StatusFilter = 'all' | 'applied' | 'queued' | 'failed' | 'skipped';
+type StatusFilter = 'all' | 'applied' | 'queued' | 'failed' | 'skipped' | 'suggested';
 
 const ActionsHistory = () => {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -148,9 +148,9 @@ const ActionsHistory = () => {
         );
       case 'skipped':
         return (
-          <Badge className="bg-muted text-muted-foreground border-border gap-1">
-            <SkipForward className="h-3 w-3" />
-            Skipped
+          <Badge className="bg-info/20 text-info border-info/30 gap-1">
+            <Lightbulb className="h-3 w-3" />
+            Suggested
           </Badge>
         );
       default:
@@ -260,7 +260,7 @@ const ActionsHistory = () => {
     { value: 'applied', label: 'Applied', count: stats.applied },
     { value: 'queued', label: 'Queued', count: stats.queued },
     { value: 'failed', label: 'Failed', count: stats.failed },
-    { value: 'skipped', label: 'Skipped', count: stats.skipped },
+    { value: 'skipped', label: 'Suggested', count: stats.skipped },
   ];
 
   if (loading) {
@@ -322,13 +322,13 @@ const ActionsHistory = () => {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-border bg-muted/30">
+        <Card className="border-info/30 bg-info/5">
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
-              <SkipForward className="h-5 w-5 text-muted-foreground" />
+              <Lightbulb className="h-5 w-5 text-info" />
               <div>
-                <p className="text-2xl font-bold text-muted-foreground">{stats.skipped}</p>
-                <p className="text-xs text-muted-foreground">Skipped</p>
+                <p className="text-2xl font-bold text-info">{stats.skipped}</p>
+                <p className="text-xs text-muted-foreground">Suggested</p>
               </div>
             </div>
           </CardContent>
