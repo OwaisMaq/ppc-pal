@@ -93,11 +93,11 @@ export const AutomationSummaryCard = ({ summary, loading }: AutomationSummaryCar
             <p className="text-2xl font-display font-bold text-success">{summary.actionsApplied}</p>
           </div>
           
-          {/* Prevented */}
+          {/* Not Applied */}
           <div className="p-3 rounded-lg border border-warning/30 bg-warning/5">
             <div className="flex items-center gap-1.5 mb-1">
               <XCircle className="h-4 w-4 text-warning" />
-              <span className="text-xs font-medium text-muted-foreground">Prevented</span>
+              <span className="text-xs font-medium text-muted-foreground">Not Applied</span>
             </div>
             <p className="text-2xl font-display font-bold text-warning">{summary.actionsPrevented}</p>
           </div>

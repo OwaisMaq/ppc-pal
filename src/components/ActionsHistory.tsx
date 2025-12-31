@@ -153,6 +153,14 @@ const ActionsHistory = () => {
             Suggested
           </Badge>
         );
+      case 'prevented':
+      case 'rejected':
+        return (
+          <Badge className="bg-warning/20 text-warning border-warning/30 gap-1">
+            <XCircle className="h-3 w-3" />
+            Not Applied
+          </Badge>
+        );
       default:
         return <Badge variant="outline">{action.status}</Badge>;
     }
