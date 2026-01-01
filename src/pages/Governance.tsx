@@ -14,7 +14,6 @@ import {
   ChevronDown
 } from "lucide-react";
 import { AutomationRulesList } from "@/components/AutomationRulesList";
-import { BidOptimizerStatusCard } from "@/components/automation";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DaypartScheduler } from "@/components/dayparting";
 import { GuardrailsSettings, ProtectedEntities } from "@/components/governance";
@@ -198,10 +197,6 @@ const Governance: React.FC = () => {
             </div>
           </CardContent>
         </Card>
-
-
-        {/* Bid Optimizer Status */}
-        <BidOptimizerStatusCard profileId={selectedProfile} />
 
         {selectedProfile ? (
           <div className="space-y-8">
