@@ -18,7 +18,6 @@ import {
 import { AutomationRulesList } from "@/components/AutomationRulesList";
 import { AlertsPanel } from "@/components/AlertsPanel";
 import PendingApprovals from "@/components/PendingApprovals";
-import ActionsFeed from "@/components/ActionsFeed";
 import { TrustReportCard, OutcomeAttributionPanel } from "@/components/overview";
 import { BidOptimizerStatusCard, ModelAccuracyCard, PortfolioHealthPanel } from "@/components/automation";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -380,7 +379,7 @@ const Governance: React.FC = () => {
               />
             </section>
 
-            {/* Trust & History Section */}
+            {/* Trust Section */}
             <Collapsible defaultOpen={false}>
               <Card>
                 <CollapsibleTrigger asChild>
@@ -388,8 +387,8 @@ const Governance: React.FC = () => {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Shield className="h-5 w-5 text-muted-foreground" />
-                        <CardTitle className="text-base">Trust & History</CardTitle>
-                        <CardDescription className="ml-2">Model accuracy, outcomes, action history</CardDescription>
+                        <CardTitle className="text-base">Trust & Outcomes</CardTitle>
+                        <CardDescription className="ml-2">Model accuracy, portfolio health, outcomes</CardDescription>
                       </div>
                       <ChevronDown className="h-4 w-4 text-muted-foreground" />
                     </div>
@@ -415,12 +414,6 @@ const Governance: React.FC = () => {
                         outcomes={outcomes}
                         loading={outcomesLoading}
                       />
-                    </div>
-
-                    {/* Action History */}
-                    <div>
-                      <h3 className="text-sm font-semibold mb-3">Action History</h3>
-                      <ActionsFeed />
                     </div>
                   </CardContent>
                 </CollapsibleContent>
