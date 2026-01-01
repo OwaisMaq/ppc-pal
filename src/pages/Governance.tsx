@@ -179,45 +179,31 @@ const Governance: React.FC = () => {
         </Card>
 
         {selectedProfile ? (
-          <div className="space-y-8">
-            {/* Guardrails Section - Collapsible */}
-            <Collapsible defaultOpen={false}>
-              <Card>
-                <CollapsibleTrigger asChild>
-                  <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle className="text-lg flex items-center gap-2">
-                          <Shield className="h-5 w-5" />
-                          Safety Guardrails
-                        </CardTitle>
-                        <CardDescription>
-                          Bid limits, approval thresholds, and protected entities
-                        </CardDescription>
-                      </div>
-                      <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" />
-                    </div>
-                  </CardHeader>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <CardContent className="pt-0 space-y-6">
-                    <GuardrailsSettings
-                      settings={governanceSettings}
-                      saving={governanceSaving}
-                      onUpdate={updateSettings}
-                      onToggleAutomation={toggleAutomation}
-                    />
-                    <Separator />
-                    <ProtectedEntities
-                      entities={protectedEntities}
-                      saving={governanceSaving}
-                      onAdd={addProtectedEntity}
-                      onRemove={removeProtectedEntity}
-                    />
-                  </CardContent>
-                </CollapsibleContent>
-              </Card>
-            </Collapsible>
+          <div className="space-y-6">
+            {/* Safety Guardrails - Compact Card */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Shield className="h-4 w-4" />
+                  Safety Guardrails
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <GuardrailsSettings
+                  settings={governanceSettings}
+                  saving={governanceSaving}
+                  onUpdate={updateSettings}
+                  onToggleAutomation={toggleAutomation}
+                />
+                <Separator />
+                <ProtectedEntities
+                  entities={protectedEntities}
+                  saving={governanceSaving}
+                  onAdd={addProtectedEntity}
+                  onRemove={removeProtectedEntity}
+                />
+              </CardContent>
+            </Card>
 
             {/* Automation Rules Section */}
             <section className="space-y-4">
