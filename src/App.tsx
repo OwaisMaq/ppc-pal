@@ -19,6 +19,7 @@ const Feedback = lazy(() => import("@/pages/Feedback"));
 const Campaigns = lazy(() => import("@/pages/Campaigns"));
 const CampaignBuilder = lazy(() => import("@/pages/CampaignBuilder"));
 const RankTracker = lazy(() => import("@/pages/RankTracker"));
+const Changelog = lazy(() => import("@/pages/Changelog"));
 
 const Privacy = lazy(() => import("@/pages/Privacy"));
 const Governance = lazy(() => import("@/pages/Governance"));
@@ -113,6 +114,13 @@ const App = () => {
                       <Route path="/rank-tracker" element={
                         <ProtectedRoute>
                           <RankTracker />
+                        </ProtectedRoute>
+                      } />
+
+                      {/* Changelog */}
+                      <Route path="/changelog" element={
+                        <ProtectedRoute>
+                          <Changelog />
                         </ProtectedRoute>
                       } />
 

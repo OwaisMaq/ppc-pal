@@ -26,7 +26,8 @@ import {
   ChevronUp,
   RefreshCw,
   Check,
-  TrendingUp
+  TrendingUp,
+  History
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useSyncStatus } from "@/hooks/useSyncStatus";
@@ -52,6 +53,7 @@ export function AppSidebar() {
   const menuItems = [
     { title: "Command Center", url: "/command-center", icon: LayoutDashboard },
     { title: "Campaigns", url: "/campaigns", icon: Target },
+    { title: "Changelog", url: "/changelog", icon: History },
     { title: "Rank Tracker", url: "/rank-tracker", icon: TrendingUp, comingSoon: true },
     { title: "Governance", url: "/governance", icon: Shield },
     { title: "Analytics", url: "/analytics", icon: BarChart3 },
