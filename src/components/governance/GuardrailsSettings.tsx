@@ -1,7 +1,7 @@
 import React from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Slider } from '@/components/ui/slider';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { GovernanceSettings } from '@/hooks/useGovernance';
@@ -78,17 +78,24 @@ export function GuardrailsSettings({
             </TooltipTrigger>
             <TooltipContent>Max bid change per action</TooltipContent>
           </Tooltip>
-          <div className="flex items-center gap-2">
-            <Slider
-              value={[localSettings.max_bid_change_percent || 20]}
-              onValueChange={([value]) => handleChange('max_bid_change_percent', value)}
-              min={5}
-              max={50}
-              step={5}
-              className="flex-1"
-            />
-            <span className="text-xs font-medium w-8 text-right">{localSettings.max_bid_change_percent || 20}%</span>
-          </div>
+          <Select
+            value={String(localSettings.max_bid_change_percent || 20)}
+            onValueChange={(value) => handleChange('max_bid_change_percent', parseInt(value))}
+          >
+            <SelectTrigger className="h-8 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="5">5%</SelectItem>
+              <SelectItem value="10">10%</SelectItem>
+              <SelectItem value="15">15%</SelectItem>
+              <SelectItem value="20">20%</SelectItem>
+              <SelectItem value="25">25%</SelectItem>
+              <SelectItem value="30">30%</SelectItem>
+              <SelectItem value="40">40%</SelectItem>
+              <SelectItem value="50">50%</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Min Bid */}
@@ -141,17 +148,23 @@ export function GuardrailsSettings({
             </TooltipTrigger>
             <TooltipContent>Max actions per day</TooltipContent>
           </Tooltip>
-          <div className="flex items-center gap-2">
-            <Slider
-              value={[localSettings.max_actions_per_day || 100]}
-              onValueChange={([value]) => handleChange('max_actions_per_day', value)}
-              min={10}
-              max={500}
-              step={10}
-              className="flex-1"
-            />
-            <span className="text-xs font-medium w-8 text-right">{localSettings.max_actions_per_day || 100}</span>
-          </div>
+          <Select
+            value={String(localSettings.max_actions_per_day || 100)}
+            onValueChange={(value) => handleChange('max_actions_per_day', parseInt(value))}
+          >
+            <SelectTrigger className="h-8 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="10">10</SelectItem>
+              <SelectItem value="25">25</SelectItem>
+              <SelectItem value="50">50</SelectItem>
+              <SelectItem value="100">100</SelectItem>
+              <SelectItem value="200">200</SelectItem>
+              <SelectItem value="300">300</SelectItem>
+              <SelectItem value="500">500</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Approval Threshold */}
