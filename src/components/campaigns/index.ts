@@ -3,3 +3,4 @@ export { CampaignLevelSelector, type CampaignLevel } from './CampaignLevelSelect
 export { BulkActionsBar } from './BulkActionsBar';
 export { PeriodComparison, useComparisonData } from './PeriodComparison';
 export { ProductSection } from './ProductSection';
+export { PerformanceCharts } from './PerformanceCharts';
