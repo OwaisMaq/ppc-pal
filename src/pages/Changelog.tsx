@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useActionsFeed, ActionItem } from '@/hooks/useActionsFeed';
 import { useRevertAction } from '@/hooks/useRevertAction';
 import { 
@@ -67,6 +68,32 @@ const getStatusDisplay = (status: string) => {
     default:
       return { icon: Clock, color: 'text-muted-foreground', bg: 'bg-muted', label: status };
   }
+};
+
+// Build tooltip content from action data
+const getActionDetails = (action: ActionItem): string[] => {
+  const lines: string[] = [];
+  
+  // Add trigger reason if available
+  if (action.trigger_reason) {
+    lines.push(action.trigger_reason);
+  }
+  
+  // Add trigger metrics if available
+  if (action.trigger_metrics) {
+    const m = action.trigger_metrics;
+    if (m.acos !== undefined) lines.push(`ACOS: ${Number(m.acos).toFixed(1)}%`);
+    if (m.spend !== undefined) lines.push(`Spend: $${Number(m.spend).toFixed(2)}`);
+    if (m.clicks !== undefined) lines.push(`Clicks: ${m.clicks}`);
+    if (m.conversions !== undefined) lines.push(`Conversions: ${m.conversions}`);
+  }
+  
+  // Add error message for failed actions
+  if (action.error) {
+    lines.push(`⚠ ${action.error}`);
+  }
+  
+  return lines;
 };
 
 const Changelog = () => {
@@ -181,11 +208,12 @@ const Changelog = () => {
               const statusDisplay = getStatusDisplay(action.status);
               const StatusIcon = statusDisplay.icon;
               const canRevert = action.status === 'applied';
+              const details = getActionDetails(action);
+              const hasDetails = details.length > 0;
               
-              return (
+              const rowContent = (
                 <div 
-                  key={action.id} 
-                  className="flex items-center gap-4 p-4 border rounded-lg bg-card hover:bg-muted/30 transition-colors"
+                  className="flex items-center gap-4 p-4 border rounded-lg bg-card hover:bg-muted/30 transition-colors cursor-default"
                 >
                   {/* Status Icon */}
                   <div className={`h-8 w-8 rounded-full ${statusDisplay.bg} flex items-center justify-center shrink-0`}>
@@ -215,7 +243,10 @@ const Changelog = () => {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleRevert(action.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRevert(action.id);
+                      }}
                       disabled={reverting || revertingAction === action.id}
                       className="shrink-0"
                     >
@@ -223,6 +254,23 @@ const Changelog = () => {
                     </Button>
                   )}
                 </div>
+              );
+              
+              return hasDetails ? (
+                <TooltipProvider key={action.id} delayDuration={300}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      {rowContent}
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs">
+                      {details.map((line, i) => (
+                        <p key={i} className="text-xs">{line}</p>
+                      ))}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : (
+                <div key={action.id}>{rowContent}</div>
               );
             })
           )}
