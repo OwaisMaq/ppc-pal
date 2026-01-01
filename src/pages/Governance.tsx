@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
 import DashboardShell from "@/components/DashboardShell";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -40,7 +39,6 @@ const Governance: React.FC = () => {
   const selectedProfile = selectedProfileId || '';
   
   const [globalAutomationEnabled, setGlobalAutomationEnabled] = useState(true);
-  const [activeTab, setActiveTab] = useState("rules");
   const { subscription } = useSubscription();
   
   const {
@@ -241,88 +239,64 @@ const Governance: React.FC = () => {
         <BidOptimizerStatusCard profileId={selectedProfile} />
 
         {selectedProfile ? (
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-5">
-              <TabsTrigger value="rules" className="gap-2">
-                <Zap className="h-4 w-4" />
-                Rules ({rules.length})
-              </TabsTrigger>
-              <TabsTrigger value="dayparting" className="gap-2">
-                <Calendar className="h-4 w-4" />
-                Dayparting
-              </TabsTrigger>
-              <TabsTrigger value="queue" className="gap-2">
-                <ListChecks className="h-4 w-4" />
-                Queue
-              </TabsTrigger>
-              <TabsTrigger value="alerts" className="gap-2">
-                <AlertTriangle className="h-4 w-4" />
-                Alerts
-                {newAlerts > 0 && (
-                  <Badge variant="destructive" className="ml-1 text-xs">
-                    {newAlerts}
-                  </Badge>
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="trust" className="gap-2">
-                <Shield className="h-4 w-4" />
-                Trust
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="rules" className="space-y-6">
-              {/* Guardrails Section - Collapsible */}
-              <Collapsible defaultOpen={false}>
-                <Card>
-                  <CollapsibleTrigger asChild>
-                    <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <CardTitle className="text-lg flex items-center gap-2">
-                            <Shield className="h-5 w-5" />
-                            Safety Guardrails
-                          </CardTitle>
-                          <CardDescription>
-                            Bid limits, approval thresholds, and protected entities
-                          </CardDescription>
-                        </div>
-                        <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" />
+          <div className="space-y-8">
+            {/* Guardrails Section - Collapsible */}
+            <Collapsible defaultOpen={false}>
+              <Card>
+                <CollapsibleTrigger asChild>
+                  <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <Shield className="h-5 w-5" />
+                          Safety Guardrails
+                        </CardTitle>
+                        <CardDescription>
+                          Bid limits, approval thresholds, and protected entities
+                        </CardDescription>
                       </div>
-                    </CardHeader>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <CardContent className="pt-0 space-y-6">
-                      <GuardrailsSettings
-                        settings={governanceSettings}
-                        saving={governanceSaving}
-                        onUpdate={updateSettings}
-                        onToggleAutomation={toggleAutomation}
-                      />
-                      <Separator />
-                      <ProtectedEntities
-                        entities={protectedEntities}
-                        saving={governanceSaving}
-                        onAdd={addProtectedEntity}
-                        onRemove={removeProtectedEntity}
-                      />
-                    </CardContent>
-                  </CollapsibleContent>
-                </Card>
-              </Collapsible>
+                      <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" />
+                    </div>
+                  </CardHeader>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent className="pt-0 space-y-6">
+                    <GuardrailsSettings
+                      settings={governanceSettings}
+                      saving={governanceSaving}
+                      onUpdate={updateSettings}
+                      onToggleAutomation={toggleAutomation}
+                    />
+                    <Separator />
+                    <ProtectedEntities
+                      entities={protectedEntities}
+                      saving={governanceSaving}
+                      onAdd={addProtectedEntity}
+                      onRemove={removeProtectedEntity}
+                    />
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
 
-              {/* Automation Rules */}
+            {/* Automation Rules Section */}
+            <section className="space-y-4">
               <div className="flex justify-between items-center">
-                <h2 className="text-xl font-semibold">Automation Rules</h2>
+                <div className="flex items-center gap-2">
+                  <Zap className="h-5 w-5 text-primary" />
+                  <h2 className="text-lg font-semibold">Automation Rules</h2>
+                  <Badge variant="secondary" className="text-xs">{rules.length}</Badge>
+                </div>
                 
                 {rules.length === 0 ? (
-                  <Button onClick={handleInitializeRules}>
+                  <Button size="sm" onClick={handleInitializeRules}>
                     <Plus className="h-4 w-4 mr-2" />
                     Create Default Rules
                   </Button>
                 ) : (
-                  <Button variant="outline">
+                  <Button variant="outline" size="sm">
                     <Plus className="h-4 w-4 mr-2" />
-                    Add Custom Rule
+                    Add Rule
                   </Button>
                 )}
               </div>
@@ -342,26 +316,54 @@ const Governance: React.FC = () => {
                 onChangeMode={changeMode}
                 onRunRule={handleRunRule}
               />
-            </TabsContent>
+            </section>
 
-            <TabsContent value="dayparting" className="space-y-6">
-              <DaypartScheduler 
-                profileId={selectedProfile} 
-                campaigns={campaigns}
-              />
-            </TabsContent>
+            {/* Dayparting Section */}
+            <Collapsible defaultOpen={false}>
+              <Card>
+                <CollapsibleTrigger asChild>
+                  <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors py-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-5 w-5 text-muted-foreground" />
+                        <CardTitle className="text-base">Dayparting</CardTitle>
+                      </div>
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </CardHeader>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent className="pt-0">
+                    <DaypartScheduler 
+                      profileId={selectedProfile} 
+                      campaigns={campaigns}
+                    />
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
 
-            <TabsContent value="queue" className="space-y-6">
-              <div>
-                <h2 className="text-xl font-semibold mb-2">Actions Queue</h2>
-                <p className="text-muted-foreground text-sm">
-                  Review and approve pending automation actions before they're applied
-                </p>
+            {/* Actions Queue Section */}
+            <section className="space-y-4">
+              <div className="flex items-center gap-2">
+                <ListChecks className="h-5 w-5 text-muted-foreground" />
+                <h2 className="text-lg font-semibold">Actions Queue</h2>
               </div>
               <PendingApprovals />
-            </TabsContent>
+            </section>
 
-            <TabsContent value="alerts" className="space-y-6">
+            {/* Alerts Section */}
+            <section className="space-y-4">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-muted-foreground" />
+                <h2 className="text-lg font-semibold">Alerts</h2>
+                {newAlerts > 0 && (
+                  <Badge variant="destructive" className="text-xs">
+                    {newAlerts}
+                  </Badge>
+                )}
+              </div>
+              
               {alertsError && (
                 <Card className="border-destructive">
                   <CardContent className="p-4">
@@ -376,43 +378,55 @@ const Governance: React.FC = () => {
                 onAcknowledgeAlerts={handleAcknowledgeAlerts}
                 onFilterChange={refetchAlerts}
               />
-            </TabsContent>
+            </section>
 
-            <TabsContent value="trust" className="space-y-6">
-              <div>
-                <h2 className="text-xl font-semibold mb-2">Trust & History</h2>
-                <p className="text-muted-foreground text-sm">
-                  See how automation is performing, track model accuracy, and review action history
-                </p>
-              </div>
-              
-              {/* Model Accuracy & Portfolio Health */}
-              <div className="grid gap-6 lg:grid-cols-2">
-                <ModelAccuracyCard profileId={selectedProfile} />
-                <PortfolioHealthPanel profileId={selectedProfile} />
-              </div>
-              
-              {/* Trust Report & Outcomes */}
-              <div className="grid gap-6 lg:grid-cols-2">
-                <TrustReportCard
-                  stats={outcomeStats}
-                  totalSavings={savings?.totalSavings || 0}
-                  actionCount={savings?.actionCount || 0}
-                  loading={outcomesLoading || savingsLoading}
-                />
-                <OutcomeAttributionPanel
-                  outcomes={outcomes}
-                  loading={outcomesLoading}
-                />
-              </div>
+            {/* Trust & History Section */}
+            <Collapsible defaultOpen={false}>
+              <Card>
+                <CollapsibleTrigger asChild>
+                  <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors py-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Shield className="h-5 w-5 text-muted-foreground" />
+                        <CardTitle className="text-base">Trust & History</CardTitle>
+                        <CardDescription className="ml-2">Model accuracy, outcomes, action history</CardDescription>
+                      </div>
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </CardHeader>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent className="pt-0 space-y-6">
+                    {/* Model Accuracy & Portfolio Health */}
+                    <div className="grid gap-4 lg:grid-cols-2">
+                      <ModelAccuracyCard profileId={selectedProfile} />
+                      <PortfolioHealthPanel profileId={selectedProfile} />
+                    </div>
+                    
+                    {/* Trust Report & Outcomes */}
+                    <div className="grid gap-4 lg:grid-cols-2">
+                      <TrustReportCard
+                        stats={outcomeStats}
+                        totalSavings={savings?.totalSavings || 0}
+                        actionCount={savings?.actionCount || 0}
+                        loading={outcomesLoading || savingsLoading}
+                      />
+                      <OutcomeAttributionPanel
+                        outcomes={outcomes}
+                        loading={outcomesLoading}
+                      />
+                    </div>
 
-              {/* Action History */}
-              <div>
-                <h3 className="text-lg font-semibold mb-4">Action History</h3>
-                <ActionsFeed />
-              </div>
-            </TabsContent>
-          </Tabs>
+                    {/* Action History */}
+                    <div>
+                      <h3 className="text-sm font-semibold mb-3">Action History</h3>
+                      <ActionsFeed />
+                    </div>
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
+          </div>
         ) : (
           <Card className="text-center py-12">
             <CardContent>
