@@ -260,27 +260,6 @@ export const AccountHealthCard = ({
               </TooltipContent>
             </Tooltip>
 
-            {/* Spend */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Link to="/analytics" className="block group">
-                  <div className="p-4 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="p-1.5 rounded-md bg-muted">
-                        <DollarSign className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                    <p className="text-2xl font-display font-bold">{formatCurrency(spend)}</p>
-                    <p className="text-xs text-muted-foreground">Ad Spend</p>
-                  </div>
-                </Link>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Total ad spend for the selected period</p>
-              </TooltipContent>
-            </Tooltip>
-
             {/* Sales */}
             <Tooltip>
               <TooltipTrigger asChild>
@@ -300,6 +279,27 @@ export const AccountHealthCard = ({
               <TooltipContent>
                 <p>Attributed sales: {formatCurrency(sales)}</p>
                 <p>ROAS: {spend > 0 ? (sales / spend).toFixed(2) : '0'}x</p>
+              </TooltipContent>
+            </Tooltip>
+
+            {/* Spend */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Link to="/analytics" className="block group">
+                  <div className="p-4 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="p-1.5 rounded-md bg-muted">
+                        <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                    <p className="text-2xl font-display font-bold">{formatCurrency(spend)}</p>
+                    <p className="text-xs text-muted-foreground">Ad Spend</p>
+                  </div>
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Total ad spend for the selected period</p>
               </TooltipContent>
             </Tooltip>
 
