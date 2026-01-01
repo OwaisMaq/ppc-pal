@@ -15,11 +15,8 @@ import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { useHistoricalAudit } from "@/hooks/useHistoricalAudit";
 import { 
   BarChart3, 
-  GitBranch, 
   AlertTriangle, 
-  DollarSign, 
   ClipboardList,
-  Sparkles,
   RefreshCw 
 } from "lucide-react";
 import { useEffect } from "react";
@@ -63,93 +60,6 @@ const Analytics = () => {
           <p className="text-muted-foreground mt-2">
             Performance insights, attribution, anomalies, and budget analysis
           </p>
-        </div>
-
-        {/* Quick Stats */}
-        <div className="grid gap-4 md:grid-cols-6">
-          <Card 
-            className={`cursor-pointer transition-colors ${activeTab === 'performance' ? 'border-primary' : 'hover:border-muted-foreground/50'}`}
-            onClick={() => setActiveTab('performance')}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Performance</CardTitle>
-              <BarChart3 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">Overview</div>
-              <p className="text-xs text-muted-foreground">Spend & sales trends</p>
-            </CardContent>
-          </Card>
-
-          <Card 
-            className={`cursor-pointer transition-colors ${activeTab === 'attribution' ? 'border-primary' : 'hover:border-muted-foreground/50'}`}
-            onClick={() => setActiveTab('attribution')}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Attribution</CardTitle>
-              <GitBranch className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">Paths</div>
-              <p className="text-xs text-muted-foreground">Conversion journeys</p>
-            </CardContent>
-          </Card>
-
-          <Card 
-            className={`cursor-pointer transition-colors ${activeTab === 'anomalies' ? 'border-primary' : 'hover:border-muted-foreground/50'}`}
-            onClick={() => setActiveTab('anomalies')}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Anomalies</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">Active</div>
-              <p className="text-xs text-muted-foreground">Spikes & dips</p>
-            </CardContent>
-          </Card>
-
-          <Card 
-            className={`cursor-pointer transition-colors ${activeTab === 'budget' ? 'border-primary' : 'hover:border-muted-foreground/50'}`}
-            onClick={() => setActiveTab('budget')}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Budget</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">Pacing</div>
-              <p className="text-xs text-muted-foreground">Forecast & optimize</p>
-            </CardContent>
-          </Card>
-
-          <Card 
-            className={`cursor-pointer transition-colors ${activeTab === 'audit' ? 'border-primary' : 'hover:border-muted-foreground/50'}`}
-            onClick={() => setActiveTab('audit')}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Audit</CardTitle>
-              <ClipboardList className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">History</div>
-              <p className="text-xs text-muted-foreground">Account analysis</p>
-            </CardContent>
-          </Card>
-
-          <Card 
-            className={`cursor-pointer transition-colors ${activeTab === 'ai-insights' ? 'border-primary' : 'hover:border-muted-foreground/50'}`}
-            onClick={() => setActiveTab('ai-insights')}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">AI Insights</CardTitle>
-              <Sparkles className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">Smart</div>
-              <p className="text-xs text-muted-foreground">AI recommendations</p>
-            </CardContent>
-          </Card>
         </div>
 
         {/* Tabs Content */}
