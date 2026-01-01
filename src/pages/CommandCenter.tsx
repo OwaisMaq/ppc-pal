@@ -18,7 +18,7 @@ import { useSearchStudio } from "@/hooks/useSearchStudio";
 import { useActionsFeed } from "@/hooks/useActionsFeed";
 import { useAccountHealth } from "@/hooks/useAccountHealth";
 import { useAsinAutomationStats } from "@/hooks/useAsinAutomationStats";
-import { useActionOutcomes } from "@/hooks/useActionOutcomes";
+
 
 // Components
 
@@ -30,7 +30,6 @@ import {
   ActiveAlertsCard,
   OnboardingGuidanceCard,
   HistoricalPerformanceChart,
-  AutomationPerformanceCard,
   getDefaultSetupItems,
   getMarketplaceName,
   type HealthStatus,
@@ -125,8 +124,6 @@ const CommandCenter = () => {
   const { actions, loading: actionsLoading } = useActionQueue(profileId);
   const { actions: feedActions } = useActionsFeed(50);
   
-  // Fetch action outcomes for automation performance
-  const { stats: outcomeStats, loading: outcomesLoading } = useActionOutcomes();
   
   // Fetch anomalies
   const { anomalies, loading: anomaliesLoading, fetchAnomalies } = useAnomalies();
@@ -319,15 +316,7 @@ const CommandCenter = () => {
               {/* Historical Performance Chart - Full Width */}
               <HistoricalPerformanceChart profileId={profileId} />
               
-              {/* Automation Performance */}
-              <AutomationPerformanceCard
-                outcomeStats={outcomeStats}
-                totalSavings={savings?.totalSavings || 0}
-                actionCount={savings?.actionCount || 0}
-                loading={outcomesLoading || savingsLoading}
-              />
-              
-              {/* Smart Bid Optimizer */}
+              {/* Smart Bid Optimizer - Compact inline display */}
               <BidOptimizerStatusCard profileId={profileId} />
               
               <div className="grid gap-6 md:grid-cols-2">
