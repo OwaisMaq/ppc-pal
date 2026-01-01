@@ -135,7 +135,7 @@ export const QuickWinsCard = ({
         </div>
         
         <div className="pt-2">
-          <Link to="/automate">
+          <Link to="/governance">
             <Button className="w-full gap-2" size="sm">
               Fix automatically with rules <ArrowRight className="h-4 w-4" />
             </Button>

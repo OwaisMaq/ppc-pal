@@ -9,17 +9,17 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { 
   Plus, 
-  Bot, 
+  Shield, 
   AlertTriangle, 
   Activity, 
   Power, 
-  Shield,
   Zap,
   Clock,
   History,
   ListChecks,
   FlaskConical,
-  Calendar
+  Calendar,
+  Settings
 } from "lucide-react";
 import { AutomationRulesList } from "@/components/AutomationRulesList";
 import { AlertsPanel } from "@/components/AlertsPanel";
@@ -28,16 +28,18 @@ import ActionsFeed from "@/components/ActionsFeed";
 import { TrustReportCard, OutcomeAttributionPanel } from "@/components/overview";
 import { BidOptimizerStatusCard, ModelAccuracyCard, PortfolioHealthPanel, ExperimentsTab } from "@/components/automation";
 import { DaypartScheduler } from "@/components/dayparting";
+import { GuardrailsSettings, ProtectedEntities } from "@/components/governance";
 import { useAutomationRules, useAlerts } from "@/hooks/useAutomation";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useActionOutcomes } from "@/hooks/useActionOutcomes";
 import { useSavingsMetric } from "@/hooks/useSavingsMetric";
+import { useGovernance } from "@/hooks/useGovernance";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-const Automate: React.FC = () => {
+const Governance: React.FC = () => {
   const [selectedProfile, setSelectedProfile] = useState<string>("");
   const [globalAutomationEnabled, setGlobalAutomationEnabled] = useState(true);
   const [activeTab, setActiveTab] = useState("rules");
@@ -65,6 +67,17 @@ const Automate: React.FC = () => {
   // Fetch action outcomes and savings for trust report
   const { outcomes, stats: outcomeStats, loading: outcomesLoading } = useActionOutcomes();
   const { savings, loading: savingsLoading } = useSavingsMetric(selectedProfile);
+
+  // Governance settings (guardrails, protected entities)
+  const {
+    settings: governanceSettings,
+    protectedEntities,
+    saving: governanceSaving,
+    updateSettings,
+    toggleAutomation,
+    addProtectedEntity,
+    removeProtectedEntity,
+  } = useGovernance(selectedProfile || null);
 
   // Fetch campaigns for dayparting
   const { data: campaigns = [] } = useQuery({
@@ -148,11 +161,11 @@ const Automate: React.FC = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold flex items-center gap-2">
-              <Bot className="h-8 w-8" />
-              Automate
+              <Shield className="h-8 w-8" />
+              Governance
             </h1>
             <p className="text-muted-foreground">
-              Manage automation rules, approvals, and safety controls
+              Manage automation rules, guardrails, and safety controls
             </p>
           </div>
           
@@ -256,7 +269,7 @@ const Automate: React.FC = () => {
 
         {selectedProfile ? (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-7">
+            <TabsList className="grid w-full grid-cols-8">
               <TabsTrigger value="rules" className="gap-2">
                 <Zap className="h-4 w-4" />
                 Rules ({rules.length})
@@ -264,6 +277,10 @@ const Automate: React.FC = () => {
               <TabsTrigger value="dayparting" className="gap-2">
                 <Calendar className="h-4 w-4" />
                 Dayparting
+              </TabsTrigger>
+              <TabsTrigger value="guardrails" className="gap-2">
+                <Settings className="h-4 w-4" />
+                Guardrails
               </TabsTrigger>
               <TabsTrigger value="queue" className="gap-2">
                 <ListChecks className="h-4 w-4" />
@@ -330,6 +347,27 @@ const Automate: React.FC = () => {
               <DaypartScheduler 
                 profileId={selectedProfile} 
                 campaigns={campaigns}
+              />
+            </TabsContent>
+
+            <TabsContent value="guardrails" className="space-y-6">
+              <div>
+                <h2 className="text-xl font-semibold mb-2">Guardrails & Protected Entities</h2>
+                <p className="text-muted-foreground text-sm">
+                  Set bid limits, approval thresholds, and protect entities from automation
+                </p>
+              </div>
+              <GuardrailsSettings
+                settings={governanceSettings}
+                saving={governanceSaving}
+                onUpdate={updateSettings}
+                onToggleAutomation={toggleAutomation}
+              />
+              <ProtectedEntities
+                entities={protectedEntities}
+                saving={governanceSaving}
+                onAdd={addProtectedEntity}
+                onRemove={removeProtectedEntity}
               />
             </TabsContent>
 
@@ -406,10 +444,10 @@ const Automate: React.FC = () => {
         ) : (
           <Card className="text-center py-12">
             <CardContent>
-              <Bot className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
+              <Shield className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
               <h3 className="text-lg font-semibold mb-2">Select a Profile</h3>
               <p className="text-muted-foreground">
-                Choose an Amazon advertising profile to view and manage automation.
+                Choose an Amazon advertising profile to view and manage governance.
               </p>
             </CardContent>
           </Card>
@@ -419,4 +457,4 @@ const Automate: React.FC = () => {
   );
 };
 
-export default Automate;
+export default Governance;

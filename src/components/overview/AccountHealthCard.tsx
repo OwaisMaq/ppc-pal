@@ -320,7 +320,7 @@ export const AccountHealthCard = ({
             {/* Automation Status */}
             <Tooltip>
               <TooltipTrigger asChild>
-                <Link to="/automate" className="block group">
+                <Link to="/governance" className="block group">
                   <div className="p-4 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors">
                     <div className="flex items-center justify-between mb-2">
                       <div className="p-1.5 rounded-md bg-muted">

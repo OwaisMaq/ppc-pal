@@ -55,7 +55,7 @@ export const AutomationSummaryCard = ({ summary, loading }: AutomationSummaryCar
           <div className="flex flex-col items-center justify-center py-6 text-center">
             <ShieldCheck className="h-8 w-8 text-muted-foreground/30 mb-2" />
             <p className="text-sm text-muted-foreground">No protection runs yet</p>
-            <Link to="/automate" className="text-sm text-primary hover:underline mt-1">
+            <Link to="/governance" className="text-sm text-primary hover:underline mt-1">
               Configure protection rules
             </Link>
           </div>
@@ -163,7 +163,7 @@ export const AutomationSummaryCard = ({ summary, loading }: AutomationSummaryCar
         )}
 
         <Link 
-          to="/automate"
+          to="/governance"
           className="flex items-center justify-center gap-1 p-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           View full history

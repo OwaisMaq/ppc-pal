@@ -4,40 +4,20 @@ import AmsSetup from "@/components/AmsSetup";
 import { ASINLabelManager } from "@/components/ASINLabelManager";
 import { NotificationSettings } from "@/components/NotificationSettings";
 import { ConnectionStatusAlert } from "@/components/ConnectionStatusAlert";
-import { GuardrailsSettings, ProtectedEntities } from "@/components/governance";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RefreshCw, Settings as SettingsIcon, Info, Tag, Bell, Shield } from "lucide-react";
+import { RefreshCw, Settings as SettingsIcon, Info, Tag, Bell, Shield, ChevronRight } from "lucide-react";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
-import { useGovernance } from "@/hooks/useGovernance";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { Link } from "react-router-dom";
 
 const Settings = () => {
-  const [selectedProfile, setSelectedProfile] = useState<string>("");
   const { connections, refreshConnections, refreshConnection, initiateConnection, loading } = useAmazonConnections();
-  
-  const {
-    settings: governanceSettings,
-    protectedEntities,
-    saving: governanceSaving,
-    updateSettings,
-    toggleAutomation,
-    addProtectedEntity,
-    removeProtectedEntity,
-  } = useGovernance(selectedProfile || null);
-
-  // Set default profile when connections load
-  useEffect(() => {
-    if (connections.length > 0 && !selectedProfile) {
-      setSelectedProfile(connections[0].profile_id);
-    }
-  }, [connections, selectedProfile]);
 
   useEffect(() => {
     document.title = "Settings - Amazon Connections | PPC Pal";
     const meta = document.querySelector('meta[name="description"]');
-    const desc = "Manage Amazon connections, guardrails, and account preferences.";
+    const desc = "Manage Amazon connections and account preferences.";
     if (meta) meta.setAttribute("content", desc);
     else {
       const m = document.createElement("meta");
@@ -56,7 +36,7 @@ const Settings = () => {
               Settings
             </h1>
             <p className="text-muted-foreground">
-              Manage your Amazon connections, guardrails, and account preferences
+              Manage your Amazon connections and account preferences
             </p>
           </div>
           <Button onClick={refreshConnections} variant="outline" disabled={loading} className="flex items-center gap-2">
@@ -116,54 +96,27 @@ const Settings = () => {
             </div>
           </section>
 
-          {/* Governance Section */}
+          {/* Governance Link Card */}
           <section>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Shield className="h-5 w-5 text-brand-primary" />
-                <h2 className="text-xl font-semibold">Automation Guardrails</h2>
-              </div>
-              {connections.length > 1 && (
-                <Select value={selectedProfile} onValueChange={setSelectedProfile}>
-                  <SelectTrigger className="w-[250px]">
-                    <SelectValue placeholder="Select profile" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {connections.map((connection) => (
-                      <SelectItem key={connection.id} value={connection.profile_id}>
-                        {connection.profile_name || connection.profile_id}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+            <div className="flex items-center gap-2 mb-4">
+              <Shield className="h-5 w-5 text-brand-primary" />
+              <h2 className="text-xl font-semibold">Automation Guardrails</h2>
             </div>
-            
-            {connections.length === 0 ? (
-              <Card>
-                <CardContent className="text-center py-8">
-                  <Shield className="h-12 w-12 mx-auto mb-3 text-muted-foreground/30" />
-                  <p className="text-muted-foreground">
-                    Connect an Amazon Ads account to configure guardrails
-                  </p>
+            <Card className="border-primary/20 hover:bg-muted/50 transition-colors">
+              <Link to="/governance?tab=guardrails" className="block">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">Configure bid limits, protected entities, and safety controls</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Manage guardrails and automation settings in the Governance page
+                      </p>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                  </div>
                 </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-6">
-                <GuardrailsSettings
-                  settings={governanceSettings}
-                  saving={governanceSaving}
-                  onUpdate={updateSettings}
-                  onToggleAutomation={toggleAutomation}
-                />
-                <ProtectedEntities
-                  entities={protectedEntities}
-                  saving={governanceSaving}
-                  onAdd={addProtectedEntity}
-                  onRemove={removeProtectedEntity}
-                />
-              </div>
-            )}
+              </Link>
+            </Card>
           </section>
 
           {/* ASIN Labels Section */}

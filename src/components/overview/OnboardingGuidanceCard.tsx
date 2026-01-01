@@ -158,7 +158,7 @@ export const getDefaultSetupItems = (config: {
     id: 'rules',
     label: 'Enable automation rules',
     completed: config.hasRules,
-    link: '/automate',
+    link: '/governance',
     icon: Bot
   },
   {
