@@ -40,6 +40,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { AccountPicker } from "@/components/sidebar/AccountPicker";
+import { Separator } from "@/components/ui/separator";
 
 export function AppSidebar() {
   const { user, signOut } = useAuth();
@@ -102,6 +104,11 @@ export function AppSidebar() {
       </SidebarContent>
       
       <SidebarFooter className="border-t border-border/50 p-2 space-y-1">
+        {/* Account/Marketplace Picker */}
+        <AccountPicker isCollapsed={isCollapsed} />
+        
+        <Separator className="my-1" />
+        
         {/* Sync Status */}
         <Button
           variant="ghost"

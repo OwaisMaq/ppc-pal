@@ -8,7 +8,7 @@ import { Link } from "react-router-dom";
 import { subDays, differenceInDays } from "date-fns";
 
 // Hooks
-import { useAmazonConnections } from "@/hooks/useAmazonConnections";
+import { useGlobalFilters } from "@/context/GlobalFiltersContext";
 import { useAggregatedMetrics } from "@/hooks/useAggregatedMetrics";
 import { useSavingsMetric } from "@/hooks/useSavingsMetric";
 import { useAutomationRules, useAlerts } from "@/hooks/useAutomation";
@@ -43,7 +43,7 @@ import { DashboardKPIs as KPIData } from "@/hooks/useDashboardData";
 import { ClipboardCheck, Activity } from "lucide-react";
 
 const CommandCenter = () => {
-  const { connections } = useAmazonConnections();
+  const { connections, activeConnection, selectedProfileId } = useGlobalFilters();
   
   const hasConnections = connections.length > 0;
   const hasExpiredTokens = connections.some(c => {
@@ -52,9 +52,12 @@ const CommandCenter = () => {
   });
   
   const [selectedASIN, setSelectedASIN] = useState<string | null>(null);
-  const [selectedMarketplace, setSelectedMarketplace] = useState<string | null>(null);
   const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
   const [dateRangePreset, setDateRangePreset] = useState<'24h' | '7d' | '30d'>('30d');
+  
+  // Use the global profile instead of local marketplace selection
+  const primaryConnection = activeConnection;
+  const profileId = primaryConnection?.profile_id;
   
   // Derive date range from preset
   const dateRange = useMemo(() => {
@@ -74,16 +77,6 @@ const CommandCenter = () => {
     });
     return Array.from(uniqueMarketplaces.entries()).map(([id, name]) => ({ id, name }));
   }, [connections]);
-
-  // Get primary connection for profile-based queries (uses first matching connection)
-  const primaryConnection = useMemo(() => {
-    if (!selectedMarketplace || selectedMarketplace === 'all') {
-      return connections[0];
-    }
-    return connections.find(c => c.marketplace_id === selectedMarketplace) || connections[0];
-  }, [connections, selectedMarketplace]);
-  
-  const profileId = primaryConnection?.profile_id;
   
   // ASIN automation stats
   const { autoOptimizedAsins, totalAsins } = useAsinAutomationStats(profileId);
@@ -105,7 +98,7 @@ const CommandCenter = () => {
   // Fetch aggregated metrics across all (or filtered) connections
   const { metrics, loading: metricsLoading, error: metricsError, connectionCount } = useAggregatedMetrics(
     connections,
-    selectedMarketplace,
+    activeConnection?.marketplace_id || null,
     dateRange?.from,
     dateRange?.to
   );
@@ -311,8 +304,6 @@ const CommandCenter = () => {
                 onDateRangePresetChange={setDateRangePreset}
                 selectedASIN={selectedASIN}
                 onASINChange={setSelectedASIN}
-                selectedMarketplace={selectedMarketplace}
-                onMarketplaceChange={setSelectedMarketplace}
                 marketplaceOptions={marketplaceOptions}
                 connectionCount={connectionCount}
                 autoOptimizedAsins={autoOptimizedAsins}
