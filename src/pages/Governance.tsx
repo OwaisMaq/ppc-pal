@@ -8,22 +8,18 @@ import { Separator } from "@/components/ui/separator";
 import { 
   Plus, 
   Shield, 
-  AlertTriangle, 
   Power, 
   Zap,
-  ListChecks,
   Calendar,
   ChevronDown
 } from "lucide-react";
 import { AutomationRulesList } from "@/components/AutomationRulesList";
-import { AlertsPanel } from "@/components/AlertsPanel";
-import PendingApprovals from "@/components/PendingApprovals";
 import { TrustReportCard, OutcomeAttributionPanel } from "@/components/overview";
 import { BidOptimizerStatusCard, ModelAccuracyCard, PortfolioHealthPanel } from "@/components/automation";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DaypartScheduler } from "@/components/dayparting";
 import { GuardrailsSettings, ProtectedEntities } from "@/components/governance";
-import { useAutomationRules, useAlerts } from "@/hooks/useAutomation";
+import { useAutomationRules } from "@/hooks/useAutomation";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useActionOutcomes } from "@/hooks/useActionOutcomes";
 import { useSavingsMetric } from "@/hooks/useSavingsMetric";
@@ -49,14 +45,6 @@ const Governance: React.FC = () => {
     runRule,
     initializeRules
   } = useAutomationRules(selectedProfile);
-
-  const {
-    alerts,
-    loading: alertsLoading,
-    error: alertsError,
-    acknowledgeAlerts,
-    refetch: refetchAlerts
-  } = useAlerts(selectedProfile);
 
   // Fetch action outcomes and savings for trust report
   const { outcomes, stats: outcomeStats, loading: outcomesLoading } = useActionOutcomes();
@@ -124,15 +112,6 @@ const Governance: React.FC = () => {
     }
   };
 
-  const handleAcknowledgeAlerts = async (alertIds: string[]) => {
-    try {
-      await acknowledgeAlerts(alertIds);
-      toast.success(`${alertIds.length} alerts acknowledged`);
-    } catch (error) {
-      toast.error("Failed to acknowledge alerts");
-    }
-  };
-
   const getPlanFeatures = () => {
     switch (plan) {
       case 'free':
@@ -146,7 +125,6 @@ const Governance: React.FC = () => {
 
   const planInfo = getPlanFeatures();
   const activeRules = rules.filter(r => r.enabled).length;
-  const newAlerts = alerts.filter(a => a.state === 'new').length;
 
   return (
     <DashboardShell>
@@ -205,11 +183,6 @@ const Governance: React.FC = () => {
                 <div className="text-center">
                   <p className="text-2xl font-bold">{activeRules}</p>
                   <p className="text-xs text-muted-foreground">Active Rules</p>
-                </div>
-                <Separator orientation="vertical" className="h-10" />
-                <div className="text-center">
-                  <p className="text-2xl font-bold">{newAlerts}</p>
-                  <p className="text-xs text-muted-foreground">New Alerts</p>
                 </div>
                 <Separator orientation="vertical" className="h-10" />
                 <div className="text-center">
@@ -341,43 +314,6 @@ const Governance: React.FC = () => {
                 </CollapsibleContent>
               </Card>
             </Collapsible>
-
-            {/* Actions Queue Section */}
-            <section className="space-y-4">
-              <div className="flex items-center gap-2">
-                <ListChecks className="h-5 w-5 text-muted-foreground" />
-                <h2 className="text-lg font-semibold">Actions Queue</h2>
-              </div>
-              <PendingApprovals />
-            </section>
-
-            {/* Alerts Section */}
-            <section className="space-y-4">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-muted-foreground" />
-                <h2 className="text-lg font-semibold">Alerts</h2>
-                {newAlerts > 0 && (
-                  <Badge variant="destructive" className="text-xs">
-                    {newAlerts}
-                  </Badge>
-                )}
-              </div>
-              
-              {alertsError && (
-                <Card className="border-destructive">
-                  <CardContent className="p-4">
-                    <p className="text-destructive text-sm">Error: {alertsError}</p>
-                  </CardContent>
-                </Card>
-              )}
-
-              <AlertsPanel
-                alerts={alerts}
-                loading={alertsLoading}
-                onAcknowledgeAlerts={handleAcknowledgeAlerts}
-                onFilterChange={refetchAlerts}
-              />
-            </section>
 
             {/* Trust Section */}
             <Collapsible defaultOpen={false}>
