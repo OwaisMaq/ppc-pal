@@ -18,7 +18,7 @@ import {
   Settings, 
   Target, 
   BarChart3, 
-  Zap,
+  Shield,
   Bell,
   LogOut,
   User,
@@ -51,7 +51,7 @@ export function AppSidebar() {
     { title: "Command Center", url: "/command-center", icon: LayoutDashboard },
     { title: "Campaigns", url: "/campaigns", icon: Target },
     { title: "Rank Tracker", url: "/rank-tracker", icon: TrendingUp, comingSoon: true },
-    { title: "Automate", url: "/automate", icon: Zap },
+    { title: "Governance", url: "/governance", icon: Shield },
     { title: "Analytics", url: "/analytics", icon: BarChart3 },
     { title: "Settings", url: "/settings", icon: Settings },
   ];

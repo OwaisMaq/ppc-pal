@@ -20,7 +20,7 @@ const CampaignBuilder = lazy(() => import("@/pages/CampaignBuilder"));
 const RankTracker = lazy(() => import("@/pages/RankTracker"));
 
 const Privacy = lazy(() => import("@/pages/Privacy"));
-const Automate = lazy(() => import("@/pages/Automate"));
+const Governance = lazy(() => import("@/pages/Governance"));
 const Analytics = lazy(() => import("@/pages/Analytics"));
 const MultiAccount = lazy(() => import("@/pages/MultiAccount"));
 const PublicLanding = lazy(() => import("@/pages/PublicLanding"));
@@ -114,22 +114,26 @@ const App = () => {
                         </ProtectedRoute>
                       } />
 
-                      {/* Automate routes */}
-                      <Route path="/automate" element={
+                      {/* Governance routes */}
+                      <Route path="/governance" element={
                         <ProtectedRoute>
-                          <Automate />
+                          <Governance />
                         </ProtectedRoute>
                       } />
-                      <Route path="/automate/queue" element={
+                      <Route path="/governance/queue" element={
                         <ProtectedRoute>
-                          <Automate />
+                          <Governance />
                         </ProtectedRoute>
                       } />
-                      <Route path="/automate/history" element={
+                      <Route path="/governance/history" element={
                         <ProtectedRoute>
-                          <Automate />
+                          <Governance />
                         </ProtectedRoute>
                       } />
+                      
+                      {/* Redirect from old automate route */}
+                      <Route path="/automate" element={<Navigate to="/governance" replace />} />
+                      <Route path="/automate/*" element={<Navigate to="/governance" replace />} />
                       
                       {/* Analytics routes */}
                       <Route path="/analytics" element={

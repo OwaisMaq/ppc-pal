@@ -111,7 +111,7 @@ export const ActiveAlertsCard = ({ alerts, loading }: ActiveAlertsCardProps) => 
           
           {hasMore && (
             <Link 
-              to="/automate"
+              to="/governance"
               className="flex items-center justify-center gap-1 p-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               View all alerts
