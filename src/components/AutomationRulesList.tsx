@@ -1,13 +1,15 @@
 import React, { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Play, Settings, Clock, AlertTriangle, Activity } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Play, Settings, Clock, AlertTriangle, Activity, ChevronDown, ChevronRight } from "lucide-react";
 import { AutomationRule } from "@/hooks/useAutomation";
 import { useSubscription } from "@/hooks/useSubscription";
 import { formatDistanceToNow } from "date-fns";
+import { cn } from "@/lib/utils";
 
 interface AutomationRulesListProps {
   rules: AutomationRule[];
@@ -17,26 +19,32 @@ interface AutomationRulesListProps {
   onRunRule: (ruleId: string) => Promise<any>;
 }
 
-const RULE_TYPE_LABELS = {
-  budget_depletion: 'Budget Depletion',
+const RULE_TYPE_LABELS: Record<string, string> = {
+  budget_depletion: 'Budget',
   spend_spike: 'Spend Spike',
-  st_harvest: 'Search Term Harvest',
-  st_prune: 'Search Term Prune',
-  placement_opt: 'Placement Optimization',
-  bid_down: 'Bid Decrease',
-  bid_up: 'Bid Increase'
+  st_harvest: 'Harvest',
+  st_prune: 'Prune',
+  placement_opt: 'Placement',
+  bid_down: 'Bid ↓',
+  bid_up: 'Bid ↑'
 };
 
-const SEVERITY_COLORS = {
-  info: 'bg-blue-100 text-blue-800',
-  warn: 'bg-yellow-100 text-yellow-800',
-  critical: 'bg-red-100 text-red-800'
+const SEVERITY_STYLES: Record<string, string> = {
+  info: 'bg-info/10 text-info border-info/20',
+  warn: 'bg-warning/10 text-warning border-warning/20',
+  critical: 'bg-destructive/10 text-destructive border-destructive/20'
 };
 
-const MODE_COLORS = {
-  dry_run: 'bg-gray-100 text-gray-800',
-  suggestion: 'bg-blue-100 text-blue-800',
-  auto: 'bg-green-100 text-green-800'
+const MODE_STYLES: Record<string, string> = {
+  dry_run: 'bg-muted text-muted-foreground',
+  suggestion: 'bg-primary/10 text-primary',
+  auto: 'bg-success/10 text-success'
+};
+
+const MODE_LABELS: Record<string, string> = {
+  dry_run: 'Dry Run',
+  suggestion: 'Suggest',
+  auto: 'Auto'
 };
 
 export const AutomationRulesList: React.FC<AutomationRulesListProps> = ({
@@ -47,6 +55,7 @@ export const AutomationRulesList: React.FC<AutomationRulesListProps> = ({
   onRunRule
 }) => {
   const [runningRules, setRunningRules] = useState<Set<string>>(new Set());
+  const [expandedRule, setExpandedRule] = useState<string | null>(null);
   const { subscription } = useSubscription();
   const plan = subscription?.plan_type || 'free';
 
@@ -57,7 +66,7 @@ export const AutomationRulesList: React.FC<AutomationRulesListProps> = ({
       case 'pro':
         return true;
       default:
-        return ['st_harvest', 'st_prune'].includes(ruleType); // starter plan
+        return ['st_harvest', 'st_prune'].includes(ruleType);
     }
   };
 
@@ -76,160 +85,196 @@ export const AutomationRulesList: React.FC<AutomationRulesListProps> = ({
 
   if (loading) {
     return (
-      <div className="space-y-4">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <Card key={i} className="animate-pulse">
-            <CardHeader>
-              <div className="h-6 bg-muted rounded w-1/3"></div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="h-4 bg-muted rounded w-1/2"></div>
-                <div className="h-4 bg-muted rounded w-3/4"></div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <Card>
+        <CardContent className="p-4">
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="h-12 bg-muted rounded animate-pulse" />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
   if (rules.length === 0) {
     return (
-      <Card className="text-center p-8">
-        <Settings className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-        <h3 className="text-lg font-semibold mb-2">No automation rules configured</h3>
-        <p className="text-muted-foreground mb-4">
-          Create rules to automatically monitor and optimize your campaigns.
+      <Card className="text-center p-6">
+        <Settings className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+        <h3 className="text-base font-semibold mb-1">No automation rules</h3>
+        <p className="text-sm text-muted-foreground">
+          Create rules to monitor and optimize your campaigns.
         </p>
       </Card>
     );
   }
 
   return (
-    <div className="space-y-4">
-      {rules.map((rule) => {
-        const lastRun = rule.automation_rule_runs?.[0];
-        const canUseAuto = canAutoApply(rule.rule_type);
-        
-        return (
-          <Card key={rule.id} className="transition-shadow hover:shadow-md">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <CardTitle className="text-lg">{rule.name}</CardTitle>
-                  <Badge variant="outline" className={SEVERITY_COLORS[rule.severity as keyof typeof SEVERITY_COLORS]}>
-                    {rule.severity}
-                  </Badge>
-                  <Badge variant="outline" className={MODE_COLORS[rule.mode]}>
-                    {rule.mode.replace('_', ' ')}
-                  </Badge>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  <Switch
-                    checked={rule.enabled}
-                    onCheckedChange={(enabled) => onToggleRule(rule.id, enabled)}
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleRunRule(rule.id)}
-                    disabled={runningRules.has(rule.id)}
-                  >
-                    {runningRules.has(rule.id) ? (
-                      <Clock className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Play className="h-4 w-4" />
-                    )}
-                    Run Now
-                  </Button>
-                </div>
-              </div>
+    <TooltipProvider>
+      <Card>
+        <CardContent className="p-0">
+          {/* Header */}
+          <div className="grid grid-cols-12 gap-2 px-4 py-2 border-b bg-muted/30 text-xs font-medium text-muted-foreground">
+            <div className="col-span-1">On</div>
+            <div className="col-span-3">Rule</div>
+            <div className="col-span-2">Type</div>
+            <div className="col-span-2">Mode</div>
+            <div className="col-span-2">Last Run</div>
+            <div className="col-span-2 text-right">Actions</div>
+          </div>
+
+          {/* Rules rows */}
+          <div className="divide-y">
+            {rules.map((rule) => {
+              const lastRun = rule.automation_rule_runs?.[0];
+              const canUseAuto = canAutoApply(rule.rule_type);
+              const isExpanded = expandedRule === rule.id;
               
-              <p className="text-sm text-muted-foreground">
-                {RULE_TYPE_LABELS[rule.rule_type as keyof typeof RULE_TYPE_LABELS] || rule.rule_type}
-              </p>
-            </CardHeader>
-            
-            <CardContent className="space-y-4">
-              <div className="flex items-center gap-4">
-                <div className="flex-1">
-                  <label className="text-sm font-medium">Mode</label>
-                  <Select
-                    value={rule.mode}
-                    onValueChange={(mode) => onChangeMode(rule.id, mode as any)}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="dry_run">
-                        Dry Run (Alerts Only)
-                      </SelectItem>
-                      <SelectItem value="suggestion">
-                        Suggestion (Manual Apply)
-                      </SelectItem>
-                      <SelectItem 
-                        value="auto" 
-                        disabled={!canUseAuto}
-                      >
-                        Auto Apply {!canUseAuto && '(Pro)'}
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* Rule Parameters Preview */}
-              <div className="bg-muted/50 p-3 rounded-lg">
-                <h4 className="text-sm font-medium mb-2">Parameters</h4>
-                <div className="text-xs text-muted-foreground space-y-1">
-                  {Object.entries(rule.params).map(([key, value]) => (
-                    <div key={key} className="flex justify-between">
-                      <span className="capitalize">{key.replace(/([A-Z])/g, ' $1').toLowerCase()}:</span>
-                      <span>{String(value)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Last Run Info */}
-              {lastRun && (
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    <Activity className="h-4 w-4" />
-                    <span>
-                      Last run: {formatDistanceToNow(new Date(lastRun.started_at), { addSuffix: true })}
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center gap-4 text-muted-foreground">
-                    <span>{lastRun.alerts_created} alerts</span>
-                    <span>{lastRun.actions_enqueued} actions</span>
-                    {lastRun.error && (
-                      <div className="flex items-center gap-1 text-destructive">
-                        <AlertTriangle className="h-4 w-4" />
-                        Error
-                      </div>
+              return (
+                <div key={rule.id} className="group">
+                  {/* Compact row */}
+                  <div 
+                    className={cn(
+                      "grid grid-cols-12 gap-2 px-4 py-3 items-center text-sm transition-colors",
+                      "hover:bg-muted/30 cursor-pointer",
+                      isExpanded && "bg-muted/20"
                     )}
-                  </div>
-                </div>
-              )}
+                    onClick={() => setExpandedRule(isExpanded ? null : rule.id)}
+                  >
+                    {/* Toggle */}
+                    <div className="col-span-1" onClick={(e) => e.stopPropagation()}>
+                      <Switch
+                        checked={rule.enabled}
+                        onCheckedChange={(enabled) => onToggleRule(rule.id, enabled)}
+                        className="scale-90"
+                      />
+                    </div>
 
-              {/* Throttle Info */}
-              {rule.throttle && (
-                <div className="text-xs text-muted-foreground border-t pt-3">
-                  <div className="flex justify-between">
-                    <span>Cooldown: {rule.throttle.cooldownHours}h</span>
-                    <span>Max/day: {rule.throttle.maxActionsPerDay}</span>
+                    {/* Name */}
+                    <div className="col-span-3 flex items-center gap-2">
+                      {isExpanded ? (
+                        <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      ) : (
+                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      )}
+                      <span className={cn("font-medium truncate", !rule.enabled && "text-muted-foreground")}>
+                        {rule.name}
+                      </span>
+                    </div>
+
+                    {/* Type & Severity */}
+                    <div className="col-span-2 flex items-center gap-1.5">
+                      <Badge variant="outline" className={cn("text-xs px-1.5 py-0", SEVERITY_STYLES[rule.severity])}>
+                        {RULE_TYPE_LABELS[rule.rule_type] || rule.rule_type}
+                      </Badge>
+                    </div>
+
+                    {/* Mode */}
+                    <div className="col-span-2" onClick={(e) => e.stopPropagation()}>
+                      <Select
+                        value={rule.mode}
+                        onValueChange={(mode) => onChangeMode(rule.id, mode as any)}
+                      >
+                        <SelectTrigger className="h-7 text-xs w-24">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="dry_run" className="text-xs">Dry Run</SelectItem>
+                          <SelectItem value="suggestion" className="text-xs">Suggest</SelectItem>
+                          <SelectItem value="auto" disabled={!canUseAuto} className="text-xs">
+                            Auto {!canUseAuto && '(Pro)'}
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Last Run */}
+                    <div className="col-span-2 text-xs text-muted-foreground">
+                      {lastRun ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="flex items-center gap-1">
+                              {lastRun.error && <AlertTriangle className="h-3 w-3 text-destructive" />}
+                              {formatDistanceToNow(new Date(lastRun.started_at), { addSuffix: true })}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            <p>{lastRun.alerts_created} alerts, {lastRun.actions_enqueued} actions</p>
+                            {lastRun.error && <p className="text-destructive text-xs">Error occurred</p>}
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        <span className="text-muted-foreground/50">Never</span>
+                      )}
+                    </div>
+
+                    {/* Actions */}
+                    <div className="col-span-2 flex justify-end" onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => handleRunRule(rule.id)}
+                        disabled={runningRules.has(rule.id)}
+                      >
+                        {runningRules.has(rule.id) ? (
+                          <Clock className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <>
+                            <Play className="h-3.5 w-3.5 mr-1" />
+                            Run
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
+
+                  {/* Expanded details */}
+                  {isExpanded && (
+                    <div className="px-4 pb-3 pt-1 bg-muted/10 border-t border-dashed">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                        {/* Parameters */}
+                        <div className="col-span-2">
+                          <p className="font-medium text-muted-foreground mb-1">Parameters</p>
+                          <div className="space-y-0.5">
+                            {Object.entries(rule.params).slice(0, 4).map(([key, value]) => (
+                              <div key={key} className="flex justify-between text-foreground">
+                                <span className="text-muted-foreground">{key.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ')}:</span>
+                                <span className="font-mono">{String(value)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Throttle */}
+                        {rule.throttle && (
+                          <div>
+                            <p className="font-medium text-muted-foreground mb-1">Throttle</p>
+                            <div className="space-y-0.5 text-foreground">
+                              <div>Cooldown: {rule.throttle.cooldownHours}h</div>
+                              <div>Max/day: {rule.throttle.maxActionsPerDay}</div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Last run stats */}
+                        {lastRun && (
+                          <div>
+                            <p className="font-medium text-muted-foreground mb-1">Last Run Stats</p>
+                            <div className="space-y-0.5 text-foreground">
+                              <div>{lastRun.alerts_created} alerts / {lastRun.actions_enqueued} actions</div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        );
-      })}
-    </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+    </TooltipProvider>
   );
 };
