@@ -17,6 +17,7 @@ import { useActionQueue } from "@/hooks/useActionQueue";
 import { useSearchStudio } from "@/hooks/useSearchStudio";
 import { useActionsFeed } from "@/hooks/useActionsFeed";
 import { useAccountHealth } from "@/hooks/useAccountHealth";
+import { useAsinAutomationStats } from "@/hooks/useAsinAutomationStats";
 
 // Components
 
@@ -84,6 +85,8 @@ const CommandCenter = () => {
   
   const profileId = primaryConnection?.profile_id;
   
+  // ASIN automation stats
+  const { autoOptimizedAsins, totalAsins } = useAsinAutomationStats(profileId);
   // Fetch brand terms
   const { brandTerms, fetchBrandTerms } = useSearchStudio();
   const brandTermsFetchedRef = useRef(false);
@@ -312,6 +315,8 @@ const CommandCenter = () => {
                 onMarketplaceChange={setSelectedMarketplace}
                 marketplaceOptions={marketplaceOptions}
                 connectionCount={connectionCount}
+                autoOptimizedAsins={autoOptimizedAsins}
+                totalAsins={totalAsins}
               />
               
               {/* Historical Performance Chart - Full Width */}

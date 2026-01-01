@@ -42,6 +42,8 @@ interface AccountHealthCardProps {
   onMarketplaceChange?: (marketplace: string | null) => void;
   marketplaceOptions?: MarketplaceOption[];
   connectionCount?: number;
+  autoOptimizedAsins?: number;
+  totalAsins?: number;
 }
 
 const healthConfig = {
@@ -101,7 +103,9 @@ export const AccountHealthCard = ({
   selectedMarketplace,
   onMarketplaceChange,
   marketplaceOptions = [],
-  connectionCount = 1
+  connectionCount = 1,
+  autoOptimizedAsins,
+  totalAsins
 }: AccountHealthCardProps) => {
   const healthInfo = healthConfig[healthStatus];
   const HealthIcon = healthInfo.icon;
@@ -327,7 +331,12 @@ export const AccountHealthCard = ({
                     <Badge variant="outline" className={cn("text-sm", automationInfo.color)}>
                       {automationInfo.label}
                     </Badge>
-                    <p className="text-xs text-muted-foreground mt-1">Protection Status</p>
+                    <p className="text-xs text-muted-foreground mt-1">Automation Status</p>
+                    {totalAsins !== undefined && totalAsins > 0 && (
+                      <p className="text-xs text-muted-foreground mt-0.5 font-mono">
+                        {autoOptimizedAsins ?? 0}/{totalAsins} ASINs
+                      </p>
+                    )}
                   </div>
                 </Link>
               </TooltipTrigger>
