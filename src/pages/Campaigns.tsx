@@ -64,10 +64,11 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { ChevronDown } from "lucide-react";
 import { useProductGroupedCampaigns } from "@/hooks/useProductGroupedCampaigns";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useEntityOptimization } from "@/hooks/useEntityOptimization";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-type DatePreset = '7D' | '14D' | '30D' | '90D' | 'custom';
+type DatePreset = '24h' | '7d' | '30d' | 'custom';
 type MatchType = 'exact' | 'phrase';
 
 interface Campaign {
@@ -188,7 +189,7 @@ const Campaigns = () => {
   const [autoMode, setAutoMode] = useState(false);
   const [viewLevel, setViewLevel] = useState<CampaignLevel>('campaigns');
   const [viewMode, setViewMode] = useState<'grouped' | 'flat'>('grouped');
-  const [selectedPreset, setSelectedPreset] = useState<DatePreset>('30D');
+  const [selectedPreset, setSelectedPreset] = useState<DatePreset>('30d');
   const [dateRange, setDateRange] = useState<DateRange>({
     from: subDays(new Date(), 30),
     to: new Date(),
@@ -236,9 +237,10 @@ const Campaigns = () => {
   } = useEntityOptimization(primaryConnection?.profile_id);
 
   const handlePresetChange = (preset: DatePreset) => {
+    if (!preset) return;
     setSelectedPreset(preset);
     if (preset !== 'custom') {
-      const days = preset === '7D' ? 7 : preset === '14D' ? 14 : preset === '30D' ? 30 : 90;
+      const days = preset === '24h' ? 1 : preset === '7d' ? 7 : 30;
       setDateRange({
         from: subDays(new Date(), days),
         to: new Date(),
@@ -1312,19 +1314,23 @@ const Campaigns = () => {
           <div className="space-y-4">
             {/* Filters and Data Availability - Top of Page */}
             <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-              <div className="flex items-center gap-2 flex-wrap">
-                <div className="flex items-center gap-1">
-                  {(['7D', '14D', '30D', '90D'] as DatePreset[]).map((preset) => (
-                    <Button
-                      key={preset}
-                      variant={selectedPreset === preset ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => handlePresetChange(preset)}
-                    >
-                      {preset}
-                    </Button>
-                  ))}
-                </div>
+              <div className="flex items-center gap-3 flex-wrap">
+                <ToggleGroup
+                  type="single"
+                  value={selectedPreset}
+                  onValueChange={(value) => value && handlePresetChange(value as DatePreset)}
+                  className="h-8"
+                >
+                  <ToggleGroupItem value="24h" className="text-xs px-3 h-8 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+                    24h
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="7d" className="text-xs px-3 h-8 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+                    7d
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="30d" className="text-xs px-3 h-8 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+                    30d
+                  </ToggleGroupItem>
+                </ToggleGroup>
                 <DateRangePicker
                   value={dateRange}
                   onChange={handleDateRangeChange}
