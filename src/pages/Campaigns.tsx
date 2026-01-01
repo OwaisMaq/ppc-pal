@@ -64,6 +64,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { ChevronDown } from "lucide-react";
 import { useProductGroupedCampaigns } from "@/hooks/useProductGroupedCampaigns";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useEntityOptimization } from "@/hooks/useEntityOptimization";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 type DatePreset = '7D' | '14D' | '30D' | '90D' | 'custom';
 type MatchType = 'exact' | 'phrase';
@@ -225,6 +227,13 @@ const Campaigns = () => {
     dateRange,
     dayCount
   );
+
+  // Entity optimization hook for auto-opt toggles
+  const { 
+    optimizationMap, 
+    toggleOptimization, 
+    loading: optLoading 
+  } = useEntityOptimization(primaryConnection?.profile_id);
 
   const handlePresetChange = (preset: DatePreset) => {
     setSelectedPreset(preset);
@@ -833,6 +842,21 @@ const Campaigns = () => {
                   </TableHead>
                   <TableHead>Campaign Name</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="text-center w-20">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex items-center justify-center gap-1">
+                            <Sparkles className="h-3.5 w-3.5" />
+                            Auto-Opt
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Enable Bayesian auto-optimization</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </TableHead>
                   <TableHead className="text-right">Impressions</TableHead>
                   <TableHead className="text-right">Clicks</TableHead>
                   <TableHead className="text-right">Spend</TableHead>
@@ -864,6 +888,15 @@ const Campaigns = () => {
                     </TableCell>
                     <TableCell className="font-medium">{campaign.campaign_name}</TableCell>
                     <TableCell>{getStatusBadge(campaign.status)}</TableCell>
+                    <TableCell className="text-center">
+                      <Switch
+                        checked={optimizationMap.get(campaign.campaign_id) ?? true}
+                        onCheckedChange={(checked) => 
+                          toggleOptimization(campaign.campaign_id, 'campaign', checked)
+                        }
+                        disabled={optLoading}
+                      />
+                    </TableCell>
                     <TableCell className="text-right">{formatNumber(campaign.impressions)}</TableCell>
                     <TableCell className="text-right">{formatNumber(campaign.clicks)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(campaign.daily_spend * dayCount)}</TableCell>
@@ -922,6 +955,21 @@ const Campaigns = () => {
                   <TableHead>Ad Group Name</TableHead>
                   <TableHead>Campaign</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="text-center w-20">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex items-center justify-center gap-1">
+                            <Sparkles className="h-3.5 w-3.5" />
+                            Auto-Opt
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Enable Bayesian auto-optimization</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </TableHead>
                   <TableHead className="text-right">Impressions</TableHead>
                   <TableHead className="text-right">Clicks</TableHead>
                   <TableHead className="text-right">Spend</TableHead>
@@ -953,6 +1001,15 @@ const Campaigns = () => {
                     <TableCell className="font-medium">{ag.name}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">{ag.campaign_name}</TableCell>
                     <TableCell>{getStatusBadge(ag.status)}</TableCell>
+                    <TableCell className="text-center">
+                      <Switch
+                        checked={optimizationMap.get(ag.id) ?? true}
+                        onCheckedChange={(checked) => 
+                          toggleOptimization(ag.id, 'adgroup', checked)
+                        }
+                        disabled={optLoading}
+                      />
+                    </TableCell>
                     <TableCell className="text-right">{formatNumber(ag.impressions)}</TableCell>
                     <TableCell className="text-right">{formatNumber(ag.clicks)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(ag.spend)}</TableCell>
@@ -988,6 +1045,21 @@ const Campaigns = () => {
                 <TableHead>Match Type</TableHead>
                 <TableHead>Ad Group</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="text-center w-20">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center justify-center gap-1">
+                          <Sparkles className="h-3.5 w-3.5" />
+                          Auto-Opt
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Enable Bayesian auto-optimization</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </TableHead>
                 <TableHead className="text-right">Bid</TableHead>
                 <TableHead className="text-right">Clicks</TableHead>
                 <TableHead className="text-right">Spend</TableHead>
@@ -1003,6 +1075,15 @@ const Campaigns = () => {
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm">{kw.adgroup_name}</TableCell>
                   <TableCell>{getStatusBadge(kw.status)}</TableCell>
+                  <TableCell className="text-center">
+                    <Switch
+                      checked={optimizationMap.get(kw.id) ?? true}
+                      onCheckedChange={(checked) => 
+                        toggleOptimization(kw.id, 'keyword', checked)
+                      }
+                      disabled={optLoading}
+                    />
+                  </TableCell>
                   <TableCell className="text-right">{formatCurrency(kw.bid)}</TableCell>
                   <TableCell className="text-right">{formatNumber(kw.clicks)}</TableCell>
                   <TableCell className="text-right">{formatCurrency(kw.spend)}</TableCell>
