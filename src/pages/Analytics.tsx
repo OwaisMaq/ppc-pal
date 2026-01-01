@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import DashboardShell from "@/components/DashboardShell";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -11,15 +11,19 @@ import { BudgetForecastPanel } from "@/components/BudgetForecastPanel";
 import { AuditSummary } from "@/components/AuditSummary";
 import { AuditMonthCard } from "@/components/AuditMonthCard";
 import { AIInsightsPanel } from "@/components/AIInsightsPanel";
+import { DashboardKPIs } from "@/components/DashboardKPIs";
+import { DashboardChart } from "@/components/DashboardChart";
+import { PerformanceFilters, TimePeriod, ACOSTrendChart, CampaignTypeMixChart } from "@/components/analytics";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { useHistoricalAudit } from "@/hooks/useHistoricalAudit";
+import { useAmsMetrics } from "@/hooks/useAmsMetrics";
 import { 
-  BarChart3, 
   AlertTriangle, 
   ClipboardList,
   RefreshCw 
 } from "lucide-react";
 import { useEffect } from "react";
+import { subDays, subHours, format } from "date-fns";
 
 
 const Analytics = () => {
@@ -27,6 +31,92 @@ const Analytics = () => {
   const { connections, loading: connectionsLoading } = useAmazonConnections();
   const activeConnection = connections?.[0];
   const profileId = activeConnection?.profile_id || null;
+
+  // Performance tab state
+  const [period, setPeriod] = useState<TimePeriod>('7d');
+  const [selectedASIN, setSelectedASIN] = useState<string | null>(null);
+
+  // Calculate date range based on period
+  const { from, to } = useMemo(() => {
+    const now = new Date();
+    let fromDate: Date;
+    
+    switch (period) {
+      case '24h':
+        fromDate = subHours(now, 24);
+        break;
+      case '7d':
+        fromDate = subDays(now, 7);
+        break;
+      case '30d':
+        fromDate = subDays(now, 30);
+        break;
+      default:
+        fromDate = subDays(now, 7);
+    }
+    
+    return {
+      from: format(fromDate, 'yyyy-MM-dd'),
+      to: format(now, 'yyyy-MM-dd'),
+    };
+  }, [period]);
+
+  // Fetch AMS metrics for performance tab
+  const { 
+    metrics: amsMetrics, 
+    entityData: campaignData,
+    loading: amsLoading, 
+    error: amsError 
+  } = useAmsMetrics(activeConnection?.id, new Date(from), new Date(to));
+
+  // Derive chart granularity from period
+  const granularity = period === '30d' ? 'week' : 'day';
+
+  // Transform AMS metrics to DashboardKPIs format
+  const kpiData = useMemo(() => {
+    if (!amsMetrics) return null;
+    return {
+      spend: amsMetrics.totalSpend,
+      sales: amsMetrics.totalSales,
+      acos: amsMetrics.acos,
+      roas: amsMetrics.roas,
+      clicks: amsMetrics.totalClicks,
+      impressions: amsMetrics.totalImpressions,
+      cpc: amsMetrics.cpc,
+      ctr: amsMetrics.ctr,
+      cvr: amsMetrics.conversionRate,
+      conversions: amsMetrics.totalOrders,
+    };
+  }, [amsMetrics]);
+
+  // Transform timeseries for chart
+  const chartData = useMemo(() => {
+    if (!amsMetrics?.timeseries) return { points: [] };
+    return {
+      points: amsMetrics.timeseries.map(point => ({
+        date: point.date,
+        spend: point.spend,
+        sales: point.sales,
+        clicks: point.clicks,
+        impressions: point.impressions,
+      })),
+    };
+  }, [amsMetrics?.timeseries]);
+
+  // Calculate campaign type mix from entity data
+  const campaignTypeMix = useMemo(() => {
+    if (!campaignData || campaignData.length === 0) return null;
+    
+    const typeMap: Record<string, number> = {};
+    campaignData.forEach(entity => {
+      if (entity.entityType === 'campaign') {
+        const campaignType = entity.campaign_type || 'sponsoredProducts';
+        typeMap[campaignType] = (typeMap[campaignType] || 0) + (entity.spend || 0);
+      }
+    });
+    
+    return Object.entries(typeMap).map(([type, spend]) => ({ type, spend }));
+  }, [campaignData]);
 
   // For attribution
   const [dateFrom] = useState(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
@@ -73,24 +163,50 @@ const Analytics = () => {
             <TabsTrigger value="ai-insights">AI Insights</TabsTrigger>
           </TabsList>
 
+          <TabsContent value="performance" className="space-y-6">
+            {/* Filters */}
+            <PerformanceFilters
+              period={period}
+              onPeriodChange={setPeriod}
+              selectedASIN={selectedASIN}
+              onASINChange={setSelectedASIN}
+            />
 
+            {/* KPI Cards */}
+            <DashboardKPIs
+              data={kpiData}
+              loading={amsLoading}
+              error={amsError}
+              previousData={null}
+              timeseries={amsMetrics?.timeseries}
+            />
 
-          <TabsContent value="performance">
+            {/* Main Trend Chart */}
             <Card>
-              <CardHeader>
-                <CardTitle>Performance Summary</CardTitle>
-                <CardDescription>
-                  Daily, weekly, and monthly performance trends across your campaigns
-                </CardDescription>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-medium">Spend vs Sales</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-12 text-muted-foreground">
-                  <BarChart3 className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-                  <p>Performance dashboard coming soon</p>
-                  <p className="text-sm">View detailed campaign and marketplace rollups</p>
-                </div>
+                <DashboardChart 
+                  data={chartData} 
+                  loading={amsLoading} 
+                  error={amsError}
+                  granularity={granularity}
+                />
               </CardContent>
             </Card>
+
+            {/* Secondary Charts Row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <ACOSTrendChart 
+                data={amsMetrics?.timeseries || null} 
+                loading={amsLoading} 
+              />
+              <CampaignTypeMixChart 
+                data={campaignTypeMix} 
+                loading={amsLoading} 
+              />
+            </div>
           </TabsContent>
 
           <TabsContent value="attribution">
