@@ -40,6 +40,7 @@ import {
   type MarketplaceOption,
   type BrandOption
 } from "@/components/overview";
+import { BidOptimizerStatusCard } from "@/components/automation";
 
 import { DashboardKPIs as KPIData } from "@/hooks/useDashboardData";
 import { ClipboardCheck, Activity } from "lucide-react";
@@ -325,6 +326,9 @@ const CommandCenter = () => {
                 actionCount={savings?.actionCount || 0}
                 loading={outcomesLoading || savingsLoading}
               />
+              
+              {/* Smart Bid Optimizer */}
+              <BidOptimizerStatusCard profileId={profileId} />
               
               <div className="grid gap-6 md:grid-cols-2">
                 <ActiveAlertsCard

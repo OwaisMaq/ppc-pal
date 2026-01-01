@@ -61,11 +61,11 @@ export function BidOptimizerStatusCard({ profileId }: BidOptimizerStatusCardProp
               <Brain className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <CardTitle className="text-lg">Bayesian Bid Optimizer</CardTitle>
+              <CardTitle className="text-lg">Smart Bid Optimizer</CardTitle>
               <CardDescription>
                 {isLearning 
                   ? 'Learning phase - collecting data to optimize bids'
-                  : 'Actively optimizing bids using Thompson Sampling'}
+                  : 'Intelligently adjusting bids based on performance data'}
               </CardDescription>
             </div>
           </div>
