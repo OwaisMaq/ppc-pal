@@ -36,27 +36,29 @@ const Analytics = () => {
   const [period, setPeriod] = useState<TimePeriod>('7d');
   const [selectedASIN, setSelectedASIN] = useState<string | null>(null);
 
-  // Calculate date range based on period
-  const { from, to } = useMemo(() => {
+  // Calculate date range based on period - memoize Date objects to prevent re-renders
+  const { fromDate, toDate, from, to } = useMemo(() => {
     const now = new Date();
-    let fromDate: Date;
+    let startDate: Date;
     
     switch (period) {
       case '24h':
-        fromDate = subHours(now, 24);
+        startDate = subHours(now, 24);
         break;
       case '7d':
-        fromDate = subDays(now, 7);
+        startDate = subDays(now, 7);
         break;
       case '30d':
-        fromDate = subDays(now, 30);
+        startDate = subDays(now, 30);
         break;
       default:
-        fromDate = subDays(now, 7);
+        startDate = subDays(now, 7);
     }
     
     return {
-      from: format(fromDate, 'yyyy-MM-dd'),
+      fromDate: startDate,
+      toDate: now,
+      from: format(startDate, 'yyyy-MM-dd'),
       to: format(now, 'yyyy-MM-dd'),
     };
   }, [period]);
@@ -67,7 +69,7 @@ const Analytics = () => {
     entityData: campaignData,
     loading: amsLoading, 
     error: amsError 
-  } = useAmsMetrics(activeConnection?.id, new Date(from), new Date(to));
+  } = useAmsMetrics(activeConnection?.id, fromDate, toDate);
 
   // Derive chart granularity from period
   const granularity = period === '30d' ? 'week' : 'day';
