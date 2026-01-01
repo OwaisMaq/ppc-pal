@@ -11,22 +11,19 @@ import {
   Plus, 
   Shield, 
   AlertTriangle, 
-  Activity, 
   Power, 
   Zap,
-  Clock,
-  History,
   ListChecks,
-  FlaskConical,
   Calendar,
-  Settings
+  ChevronDown
 } from "lucide-react";
 import { AutomationRulesList } from "@/components/AutomationRulesList";
 import { AlertsPanel } from "@/components/AlertsPanel";
 import PendingApprovals from "@/components/PendingApprovals";
 import ActionsFeed from "@/components/ActionsFeed";
 import { TrustReportCard, OutcomeAttributionPanel } from "@/components/overview";
-import { BidOptimizerStatusCard, ModelAccuracyCard, PortfolioHealthPanel, ExperimentsTab } from "@/components/automation";
+import { BidOptimizerStatusCard, ModelAccuracyCard, PortfolioHealthPanel } from "@/components/automation";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DaypartScheduler } from "@/components/dayparting";
 import { GuardrailsSettings, ProtectedEntities } from "@/components/governance";
 import { useAutomationRules, useAlerts } from "@/hooks/useAutomation";
@@ -269,7 +266,7 @@ const Governance: React.FC = () => {
 
         {selectedProfile ? (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-8">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="rules" className="gap-2">
                 <Zap className="h-4 w-4" />
                 Rules ({rules.length})
@@ -277,10 +274,6 @@ const Governance: React.FC = () => {
               <TabsTrigger value="dayparting" className="gap-2">
                 <Calendar className="h-4 w-4" />
                 Dayparting
-              </TabsTrigger>
-              <TabsTrigger value="guardrails" className="gap-2">
-                <Settings className="h-4 w-4" />
-                Guardrails
               </TabsTrigger>
               <TabsTrigger value="queue" className="gap-2">
                 <ListChecks className="h-4 w-4" />
@@ -295,21 +288,53 @@ const Governance: React.FC = () => {
                   </Badge>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="history" className="gap-2">
-                <History className="h-4 w-4" />
-                History
-              </TabsTrigger>
               <TabsTrigger value="trust" className="gap-2">
                 <Shield className="h-4 w-4" />
                 Trust
               </TabsTrigger>
-              <TabsTrigger value="experiments" className="gap-2">
-                <FlaskConical className="h-4 w-4" />
-                Experiments
-              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="rules" className="space-y-6">
+              {/* Guardrails Section - Collapsible */}
+              <Collapsible defaultOpen={false}>
+                <Card>
+                  <CollapsibleTrigger asChild>
+                    <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="text-lg flex items-center gap-2">
+                            <Shield className="h-5 w-5" />
+                            Safety Guardrails
+                          </CardTitle>
+                          <CardDescription>
+                            Bid limits, approval thresholds, and protected entities
+                          </CardDescription>
+                        </div>
+                        <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" />
+                      </div>
+                    </CardHeader>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <CardContent className="pt-0 space-y-6">
+                      <GuardrailsSettings
+                        settings={governanceSettings}
+                        saving={governanceSaving}
+                        onUpdate={updateSettings}
+                        onToggleAutomation={toggleAutomation}
+                      />
+                      <Separator />
+                      <ProtectedEntities
+                        entities={protectedEntities}
+                        saving={governanceSaving}
+                        onAdd={addProtectedEntity}
+                        onRemove={removeProtectedEntity}
+                      />
+                    </CardContent>
+                  </CollapsibleContent>
+                </Card>
+              </Collapsible>
+
+              {/* Automation Rules */}
               <div className="flex justify-between items-center">
                 <h2 className="text-xl font-semibold">Automation Rules</h2>
                 
@@ -350,27 +375,6 @@ const Governance: React.FC = () => {
               />
             </TabsContent>
 
-            <TabsContent value="guardrails" className="space-y-6">
-              <div>
-                <h2 className="text-xl font-semibold mb-2">Guardrails & Protected Entities</h2>
-                <p className="text-muted-foreground text-sm">
-                  Set bid limits, approval thresholds, and protect entities from automation
-                </p>
-              </div>
-              <GuardrailsSettings
-                settings={governanceSettings}
-                saving={governanceSaving}
-                onUpdate={updateSettings}
-                onToggleAutomation={toggleAutomation}
-              />
-              <ProtectedEntities
-                entities={protectedEntities}
-                saving={governanceSaving}
-                onAdd={addProtectedEntity}
-                onRemove={removeProtectedEntity}
-              />
-            </TabsContent>
-
             <TabsContent value="queue" className="space-y-6">
               <div>
                 <h2 className="text-xl font-semibold mb-2">Actions Queue</h2>
@@ -398,21 +402,11 @@ const Governance: React.FC = () => {
               />
             </TabsContent>
 
-            <TabsContent value="history" className="space-y-6">
-              <div>
-                <h2 className="text-xl font-semibold mb-2">Automation History</h2>
-                <p className="text-muted-foreground text-sm">
-                  Track all automation actions and changes
-                </p>
-              </div>
-              <ActionsFeed />
-            </TabsContent>
-
             <TabsContent value="trust" className="space-y-6">
               <div>
-                <h2 className="text-xl font-semibold mb-2">Automation Trust Report</h2>
+                <h2 className="text-xl font-semibold mb-2">Trust & History</h2>
                 <p className="text-muted-foreground text-sm">
-                  See how automation is performing and track model accuracy
+                  See how automation is performing, track model accuracy, and review action history
                 </p>
               </div>
               
@@ -435,10 +429,12 @@ const Governance: React.FC = () => {
                   loading={outcomesLoading}
                 />
               </div>
-            </TabsContent>
 
-            <TabsContent value="experiments" className="space-y-6">
-              <ExperimentsTab profileId={selectedProfile} />
+              {/* Action History */}
+              <div>
+                <h3 className="text-lg font-semibold mb-4">Action History</h3>
+                <ActionsFeed />
+              </div>
             </TabsContent>
           </Tabs>
         ) : (
