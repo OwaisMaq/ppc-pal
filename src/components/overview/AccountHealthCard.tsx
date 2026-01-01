@@ -238,11 +238,11 @@ export const AccountHealthCard = ({
         </CardHeader>
         <CardContent className="space-y-4">
           {/* OUTCOME-FIRST: Wasted Spend Saved is the hero metric */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
             {/* Savings - PRIMARY OUTCOME METRIC */}
             <Tooltip>
               <TooltipTrigger asChild>
-                <Link to="/analytics" className="block group col-span-2 lg:col-span-1">
+                <Link to="/analytics" className="block group">
                   <div className="p-4 rounded-lg border-2 border-success/30 bg-success/5 hover:bg-success/10 transition-colors">
                     <div className="flex items-center justify-between mb-2">
                       <div className="p-1.5 rounded-md bg-success/20">
@@ -250,7 +250,7 @@ export const AccountHealthCard = ({
                       </div>
                       <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
-                    <p className="text-3xl font-display font-bold text-success">{formatCurrency(savings)}</p>
+                    <p className="text-2xl font-display font-bold text-success">{formatCurrency(savings)}</p>
                     <p className="text-xs text-muted-foreground font-medium">Wasted Spend Saved</p>
                   </div>
                 </Link>
@@ -260,7 +260,28 @@ export const AccountHealthCard = ({
               </TooltipContent>
             </Tooltip>
 
-            {/* Spend vs Sales */}
+            {/* Spend */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Link to="/analytics" className="block group">
+                  <div className="p-4 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="p-1.5 rounded-md bg-muted">
+                        <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                    <p className="text-2xl font-display font-bold">{formatCurrency(spend)}</p>
+                    <p className="text-xs text-muted-foreground">Ad Spend</p>
+                  </div>
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Total ad spend for the selected period</p>
+              </TooltipContent>
+            </Tooltip>
+
+            {/* Sales */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Link to="/analytics" className="block group">
@@ -272,14 +293,11 @@ export const AccountHealthCard = ({
                       <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
                     <p className="text-2xl font-display font-bold">{formatCurrency(sales)}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Sales <span className="text-muted-foreground/70">({formatCurrency(spend)} spend)</span>
-                    </p>
+                    <p className="text-xs text-muted-foreground">Sales</p>
                   </div>
                 </Link>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Ad spend: {formatCurrency(spend)}</p>
                 <p>Attributed sales: {formatCurrency(sales)}</p>
                 <p>ROAS: {spend > 0 ? (sales / spend).toFixed(2) : '0'}x</p>
               </TooltipContent>
