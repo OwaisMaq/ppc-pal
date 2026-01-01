@@ -14,15 +14,12 @@ import {
   ChevronDown
 } from "lucide-react";
 import { AutomationRulesList } from "@/components/AutomationRulesList";
-import { TrustReportCard, OutcomeAttributionPanel } from "@/components/overview";
-import { BidOptimizerStatusCard, ModelAccuracyCard, PortfolioHealthPanel } from "@/components/automation";
+import { BidOptimizerStatusCard } from "@/components/automation";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DaypartScheduler } from "@/components/dayparting";
 import { GuardrailsSettings, ProtectedEntities } from "@/components/governance";
 import { useAutomationRules } from "@/hooks/useAutomation";
 import { useSubscription } from "@/hooks/useSubscription";
-import { useActionOutcomes } from "@/hooks/useActionOutcomes";
-import { useSavingsMetric } from "@/hooks/useSavingsMetric";
 import { useGovernance } from "@/hooks/useGovernance";
 import { useGlobalFilters } from "@/context/GlobalFiltersContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -45,10 +42,6 @@ const Governance: React.FC = () => {
     runRule,
     initializeRules
   } = useAutomationRules(selectedProfile);
-
-  // Fetch action outcomes and savings for trust report
-  const { outcomes, stats: outcomeStats, loading: outcomesLoading } = useActionOutcomes();
-  const { savings, loading: savingsLoading } = useSavingsMetric(selectedProfile);
 
   // Governance settings (guardrails, protected entities)
   const {
@@ -310,47 +303,6 @@ const Governance: React.FC = () => {
                       profileId={selectedProfile} 
                       campaigns={campaigns}
                     />
-                  </CardContent>
-                </CollapsibleContent>
-              </Card>
-            </Collapsible>
-
-            {/* Trust Section */}
-            <Collapsible defaultOpen={false}>
-              <Card>
-                <CollapsibleTrigger asChild>
-                  <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors py-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Shield className="h-5 w-5 text-muted-foreground" />
-                        <CardTitle className="text-base">Trust & Outcomes</CardTitle>
-                        <CardDescription className="ml-2">Model accuracy, portfolio health, outcomes</CardDescription>
-                      </div>
-                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  </CardHeader>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <CardContent className="pt-0 space-y-6">
-                    {/* Model Accuracy & Portfolio Health */}
-                    <div className="grid gap-4 lg:grid-cols-2">
-                      <ModelAccuracyCard profileId={selectedProfile} />
-                      <PortfolioHealthPanel profileId={selectedProfile} />
-                    </div>
-                    
-                    {/* Trust Report & Outcomes */}
-                    <div className="grid gap-4 lg:grid-cols-2">
-                      <TrustReportCard
-                        stats={outcomeStats}
-                        totalSavings={savings?.totalSavings || 0}
-                        actionCount={savings?.actionCount || 0}
-                        loading={outcomesLoading || savingsLoading}
-                      />
-                      <OutcomeAttributionPanel
-                        outcomes={outcomes}
-                        loading={outcomesLoading}
-                      />
-                    </div>
                   </CardContent>
                 </CollapsibleContent>
               </Card>
