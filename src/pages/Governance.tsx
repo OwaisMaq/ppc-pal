@@ -1,10 +1,9 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import DashboardShell from "@/components/DashboardShell";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { 
@@ -27,20 +26,21 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { DaypartScheduler } from "@/components/dayparting";
 import { GuardrailsSettings, ProtectedEntities } from "@/components/governance";
 import { useAutomationRules, useAlerts } from "@/hooks/useAutomation";
-import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useActionOutcomes } from "@/hooks/useActionOutcomes";
 import { useSavingsMetric } from "@/hooks/useSavingsMetric";
 import { useGovernance } from "@/hooks/useGovernance";
+import { useGlobalFilters } from "@/context/GlobalFiltersContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 const Governance: React.FC = () => {
-  const [selectedProfile, setSelectedProfile] = useState<string>("");
+  const { activeConnection, selectedProfileId } = useGlobalFilters();
+  const selectedProfile = selectedProfileId || '';
+  
   const [globalAutomationEnabled, setGlobalAutomationEnabled] = useState(true);
   const [activeTab, setActiveTab] = useState("rules");
-  const { connections, loading: connectionsLoading } = useAmazonConnections();
   const { subscription } = useSubscription();
   
   const {
@@ -236,30 +236,6 @@ const Governance: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Profile Selection */}
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-4">
-              <label className="text-sm font-medium whitespace-nowrap">Select Profile:</label>
-              <Select 
-                value={selectedProfile} 
-                onValueChange={setSelectedProfile}
-                disabled={connectionsLoading}
-              >
-                <SelectTrigger className="w-[300px]">
-                  <SelectValue placeholder="Select profile" />
-                </SelectTrigger>
-                <SelectContent>
-                  {connections?.map((connection) => (
-                    <SelectItem key={connection.id} value={connection.profile_id}>
-                      {connection.profile_name || connection.profile_id}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Bid Optimizer Status */}
         <BidOptimizerStatusCard profileId={selectedProfile} />

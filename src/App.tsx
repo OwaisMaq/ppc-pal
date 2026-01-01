@@ -8,6 +8,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import CookieConsent from "@/components/CookieConsent";
 import { DateRangeProvider } from "@/context/DateRangeContext";
+import { GlobalFiltersProvider } from "@/context/GlobalFiltersContext";
 import { OnboardingCheck } from "@/components/OnboardingCheck";
 import { useLoginSync } from "@/hooks/useLoginSync";
 
@@ -66,9 +67,10 @@ const App = () => {
           <AppContent />
           <TooltipProvider>
             <Toaster />
-            <DateRangeProvider>
-              <BrowserRouter>
-                <OnboardingCheck>
+            <GlobalFiltersProvider>
+              <DateRangeProvider>
+                <BrowserRouter>
+                  <OnboardingCheck>
                   <Suspense fallback={<PageLoader />}>
                     <Routes>
                       {/* Public routes */}
@@ -186,6 +188,7 @@ const App = () => {
               </BrowserRouter>
               <CookieConsent />
             </DateRangeProvider>
+          </GlobalFiltersProvider>
           </TooltipProvider>
         </AuthProvider>
       </QueryClientProvider>
