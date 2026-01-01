@@ -103,7 +103,7 @@ const Settings = () => {
               <h2 className="text-xl font-semibold">Automation Guardrails</h2>
             </div>
             <Card className="border-primary/20 hover:bg-muted/50 transition-colors">
-              <Link to="/governance?tab=guardrails" className="block">
+              <Link to="/governance?tab=rules" className="block">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
