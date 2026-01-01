@@ -1542,6 +1542,7 @@ export type Database = {
           last_optimized_at: string | null
           last_sampled_bid_micros: number | null
           observations_count: number
+          optimization_enabled: boolean
           prior_alpha: number
           prior_beta: number
           profile_id: string
@@ -1571,6 +1572,7 @@ export type Database = {
           last_optimized_at?: string | null
           last_sampled_bid_micros?: number | null
           observations_count?: number
+          optimization_enabled?: boolean
           prior_alpha?: number
           prior_beta?: number
           profile_id: string
@@ -1600,6 +1602,7 @@ export type Database = {
           last_optimized_at?: string | null
           last_sampled_bid_micros?: number | null
           observations_count?: number
+          optimization_enabled?: boolean
           prior_alpha?: number
           prior_beta?: number
           profile_id?: string
