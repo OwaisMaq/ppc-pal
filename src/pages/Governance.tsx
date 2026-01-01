@@ -116,8 +116,6 @@ const Governance: React.FC = () => {
   };
 
   const planInfo = getPlanFeatures();
-  const activeRules = rules.filter(r => r.enabled).length;
-
   return (
     <DashboardShell>
       <div className="space-y-6">
@@ -156,6 +154,16 @@ const Governance: React.FC = () => {
                 </div>
               </div>
               <div className="flex items-center gap-4">
+                <Button 
+                  variant="destructive" 
+                  size="sm"
+                  onClick={handleKillSwitch}
+                  disabled={!globalAutomationEnabled}
+                  className="gap-2"
+                >
+                  <Shield className="h-4 w-4" />
+                  Kill Switch
+                </Button>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">
                     {globalAutomationEnabled ? "Active" : "Paused"}
@@ -168,34 +176,6 @@ const Governance: React.FC = () => {
               </div>
             </div>
           </CardHeader>
-          <Separator />
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-6">
-                <div className="text-center">
-                  <p className="text-2xl font-bold">{activeRules}</p>
-                  <p className="text-xs text-muted-foreground">Active Rules</p>
-                </div>
-                <Separator orientation="vertical" className="h-10" />
-                <div className="text-center">
-                  <p className="text-2xl font-bold">{rules.length}</p>
-                  <p className="text-xs text-muted-foreground">Total Rules</p>
-                </div>
-              </div>
-              
-              {/* Kill Switch */}
-              <Button 
-                variant="destructive" 
-                size="lg"
-                onClick={handleKillSwitch}
-                disabled={!globalAutomationEnabled}
-                className="gap-2"
-              >
-                <Shield className="h-5 w-5" />
-                Kill Switch
-              </Button>
-            </div>
-          </CardContent>
         </Card>
 
         {selectedProfile ? (
