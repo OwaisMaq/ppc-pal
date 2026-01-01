@@ -1459,6 +1459,9 @@ const Campaigns = () => {
                           product={product}
                           dayCount={dayCount}
                           selectedCampaigns={selectedCampaigns}
+                          optimizationMap={optimizationMap}
+                          toggleOptimization={toggleOptimization}
+                          optLoading={optLoading}
                           onCampaignSelect={(campaignId, selected) => {
                             setSelectedCampaigns(prev => {
                               const next = new Set(prev);

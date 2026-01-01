@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import {
   Table,
   TableBody,
@@ -17,12 +18,19 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
   ChevronDown,
   Package,
   Play,
   Pause,
   TrendingUp,
   TrendingDown,
+  Sparkles,
 } from 'lucide-react';
 import { ProductGroup } from '@/hooks/useProductGroupedCampaigns';
 import { CampaignLevelSelector, CampaignLevel } from './CampaignLevelSelector';
@@ -33,6 +41,9 @@ interface ProductSectionProps {
   selectedCampaigns: Set<string>;
   onCampaignSelect: (campaignId: string, selected: boolean) => void;
   onSelectAllInProduct: (campaignIds: string[], selected: boolean) => void;
+  optimizationMap?: Map<string, boolean>;
+  toggleOptimization?: (entityId: string, entityType: 'campaign' | 'adgroup' | 'keyword' | 'target', enabled: boolean) => void;
+  optLoading?: boolean;
 }
 
 export const ProductSection = ({
@@ -41,6 +52,9 @@ export const ProductSection = ({
   selectedCampaigns,
   onCampaignSelect,
   onSelectAllInProduct,
+  optimizationMap,
+  toggleOptimization,
+  optLoading,
 }: ProductSectionProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [viewLevel, setViewLevel] = useState<CampaignLevel>('campaigns');
@@ -186,6 +200,21 @@ export const ProductSection = ({
                     </TableHead>
                     <TableHead>Campaign Name</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="text-center w-20">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center justify-center gap-1">
+                              <Sparkles className="h-3.5 w-3.5" />
+                              Auto-Opt
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Enable Bayesian auto-optimization</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </TableHead>
                     <TableHead className="text-right">Impressions</TableHead>
                     <TableHead className="text-right">Clicks</TableHead>
                     <TableHead className="text-right">Spend</TableHead>
@@ -209,6 +238,17 @@ export const ProductSection = ({
                       </TableCell>
                       <TableCell className="font-medium">{campaign.campaign_name}</TableCell>
                       <TableCell>{getStatusBadge(campaign.status)}</TableCell>
+                      <TableCell className="text-center">
+                        {toggleOptimization && (
+                          <Switch
+                            checked={optimizationMap?.get(campaign.campaign_id) ?? true}
+                            onCheckedChange={(checked) => 
+                              toggleOptimization(campaign.campaign_id, 'campaign', checked)
+                            }
+                            disabled={optLoading}
+                          />
+                        )}
+                      </TableCell>
                       <TableCell className="text-right">
                         {formatNumber(campaign.impressions)}
                       </TableCell>
