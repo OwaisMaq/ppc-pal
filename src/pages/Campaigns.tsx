@@ -58,7 +58,7 @@ import { subDays } from "date-fns";
 import { DateRange } from "react-day-picker";
 import { useDataAvailability } from "@/hooks/useDataAvailability";
 import { DataAvailabilityIndicator } from "@/components/DataAvailabilityIndicator";
-import { CampaignLevelSelector, CampaignLevel, BulkActionsBar, ProductSection } from "@/components/campaigns";
+import { CampaignLevelSelector, CampaignLevel, BulkActionsBar, ProductSection, PerformanceCharts } from "@/components/campaigns";
 import { useAmsMetrics } from "@/hooks/useAmsMetrics";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown } from "lucide-react";
@@ -1346,6 +1346,14 @@ const Campaigns = () => {
                 importProgress={importProgress}
               />
             </div>
+
+            {/* Performance Charts - Top/Bottom Performers */}
+            <PerformanceCharts
+              productGroups={productGroups}
+              campaigns={campaigns}
+              adGroups={adGroups}
+              loading={loading || productGroupsLoading}
+            />
 
             {/* Detailed Metrics Row */}
             <Collapsible defaultOpen>
