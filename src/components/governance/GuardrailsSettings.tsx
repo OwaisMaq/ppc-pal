@@ -1,14 +1,18 @@
 import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
-import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import { Shield, DollarSign, Zap, AlertTriangle, Loader2 } from 'lucide-react';
+import { Shield, Loader2 } from 'lucide-react';
 import { GovernanceSettings } from '@/hooks/useGovernance';
 import { toast } from 'sonner';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface GuardrailsSettingsProps {
   settings: GovernanceSettings | null;
@@ -72,179 +76,154 @@ export function GuardrailsSettings({
   if (!settings) {
     return (
       <Card>
-        <CardContent className="flex items-center justify-center py-8">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <CardContent className="flex items-center justify-center py-4">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Kill Switch */}
-      <Card className={settings.automation_paused ? 'border-destructive bg-destructive/5' : ''}>
-        <CardHeader>
+    <TooltipProvider>
+      <Card className={settings.automation_paused ? 'border-destructive/50' : ''}>
+        <CardContent className="py-4 space-y-4">
+          {/* Kill Switch Row */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-full ${settings.automation_paused ? 'bg-destructive/10' : 'bg-success/10'}`}>
-                <Shield className={`h-5 w-5 ${settings.automation_paused ? 'text-destructive' : 'text-success'}`} />
-              </div>
-              <div>
-                <CardTitle className="text-lg">Global Automation</CardTitle>
-                <CardDescription>
-                  {settings.automation_paused
-                    ? `Paused since ${new Date(settings.automation_paused_at || '').toLocaleDateString()}`
-                    : 'Automation is active and running'}
-                </CardDescription>
-              </div>
+            <div className="flex items-center gap-2">
+              <Shield className={`h-4 w-4 ${settings.automation_paused ? 'text-destructive' : 'text-success'}`} />
+              <span className="text-sm font-medium">
+                {settings.automation_paused ? 'Automation Paused' : 'Automation Active'}
+              </span>
             </div>
             <Button
+              size="sm"
               variant={settings.automation_paused ? 'default' : 'destructive'}
               onClick={handleKillSwitch}
               disabled={saving}
             >
-              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {saving && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
               {settings.automation_paused ? 'Resume' : 'Kill Switch'}
             </Button>
           </div>
-        </CardHeader>
-      </Card>
 
-      {/* Bid Guardrails */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <DollarSign className="h-5 w-5 text-brand-primary" />
-            Bid Guardrails
-          </CardTitle>
-          <CardDescription>
-            Set safe boundaries for automated bid changes
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Max Bid Change Percent */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label>Maximum bid change per action</Label>
-              <span className="text-sm font-medium">{localSettings.max_bid_change_percent || 20}%</span>
+          {/* Compact Controls Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {/* Max Change % */}
+            <div className="space-y-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Label className="text-xs text-muted-foreground cursor-help">Max Change</Label>
+                </TooltipTrigger>
+                <TooltipContent>Max bid change per action</TooltipContent>
+              </Tooltip>
+              <div className="flex items-center gap-2">
+                <Slider
+                  value={[localSettings.max_bid_change_percent || 20]}
+                  onValueChange={([value]) => handleChange('max_bid_change_percent', value)}
+                  min={5}
+                  max={50}
+                  step={5}
+                  className="flex-1"
+                />
+                <span className="text-xs font-medium w-8">{localSettings.max_bid_change_percent || 20}%</span>
+              </div>
             </div>
-            <Slider
-              value={[localSettings.max_bid_change_percent || 20]}
-              onValueChange={([value]) => handleChange('max_bid_change_percent', value)}
-              min={5}
-              max={50}
-              step={5}
-              className="w-full"
-            />
-            <p className="text-xs text-muted-foreground">
-              Automation will never change a bid by more than this percentage in a single action
-            </p>
-          </div>
 
-          <Separator />
-
-          {/* Bid Range */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="min-bid">Minimum Bid</Label>
+            {/* Min Bid */}
+            <div className="space-y-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Label className="text-xs text-muted-foreground cursor-help">Min Bid</Label>
+                </TooltipTrigger>
+                <TooltipContent>Floor for bid reductions</TooltipContent>
+              </Tooltip>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">$</span>
                 <Input
-                  id="min-bid"
                   type="number"
                   step="0.01"
                   min="0.02"
-                  className="pl-7"
+                  className="h-8 pl-5 text-sm"
                   value={formatMicros(localSettings.min_bid_micros || 100000)}
                   onChange={(e) => handleChange('min_bid_micros', parseMicros(e.target.value))}
                 />
               </div>
-              <p className="text-xs text-muted-foreground">Floor for bid reductions</p>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="max-bid">Maximum Bid</Label>
+
+            {/* Max Bid */}
+            <div className="space-y-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Label className="text-xs text-muted-foreground cursor-help">Max Bid</Label>
+                </TooltipTrigger>
+                <TooltipContent>Ceiling for bid increases</TooltipContent>
+              </Tooltip>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">$</span>
                 <Input
-                  id="max-bid"
                   type="number"
                   step="0.10"
                   min="0.10"
-                  className="pl-7"
+                  className="h-8 pl-5 text-sm"
                   value={formatMicros(localSettings.max_bid_micros || 10000000)}
                   onChange={(e) => handleChange('max_bid_micros', parseMicros(e.target.value))}
                 />
               </div>
-              <p className="text-xs text-muted-foreground">Ceiling for bid increases</p>
             </div>
+
+            {/* Daily Limit */}
+            <div className="space-y-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Label className="text-xs text-muted-foreground cursor-help">Daily Limit</Label>
+                </TooltipTrigger>
+                <TooltipContent>Max actions per day</TooltipContent>
+              </Tooltip>
+              <div className="flex items-center gap-2">
+                <Slider
+                  value={[localSettings.max_actions_per_day || 100]}
+                  onValueChange={([value]) => handleChange('max_actions_per_day', value)}
+                  min={10}
+                  max={500}
+                  step={10}
+                  className="flex-1"
+                />
+                <span className="text-xs font-medium w-8">{localSettings.max_actions_per_day || 100}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Approval Threshold + Save */}
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Label className="text-xs text-muted-foreground cursor-help whitespace-nowrap">Approval above</Label>
+                </TooltipTrigger>
+                <TooltipContent>Require manual approval for changes above this amount</TooltipContent>
+              </Tooltip>
+              <div className="relative w-24">
+                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">$</span>
+                <Input
+                  type="number"
+                  step="0.50"
+                  min="0"
+                  className="h-8 pl-5 text-sm"
+                  value={formatMicros(localSettings.require_approval_above_micros || 1000000)}
+                  onChange={(e) => handleChange('require_approval_above_micros', parseMicros(e.target.value))}
+                />
+              </div>
+            </div>
+            
+            {hasChanges && (
+              <Button size="sm" onClick={handleSave} disabled={saving}>
+                {saving && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+                Save
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
-
-      {/* Automation Limits */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Zap className="h-5 w-5 text-brand-primary" />
-            Automation Limits
-          </CardTitle>
-          <CardDescription>
-            Control how much automation can do each day
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Max Actions Per Day */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label>Maximum actions per day</Label>
-              <span className="text-sm font-medium">{localSettings.max_actions_per_day || 100}</span>
-            </div>
-            <Slider
-              value={[localSettings.max_actions_per_day || 100]}
-              onValueChange={([value]) => handleChange('max_actions_per_day', value)}
-              min={10}
-              max={500}
-              step={10}
-              className="w-full"
-            />
-            <p className="text-xs text-muted-foreground">
-              Daily limit on automated changes across all campaigns
-            </p>
-          </div>
-
-          <Separator />
-
-          {/* Approval Threshold */}
-          <div className="space-y-2">
-            <Label htmlFor="approval-threshold">Require approval for changes above</Label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-              <Input
-                id="approval-threshold"
-                type="number"
-                step="0.50"
-                min="0"
-                className="pl-7"
-                value={formatMicros(localSettings.require_approval_above_micros || 1000000)}
-                onChange={(e) => handleChange('require_approval_above_micros', parseMicros(e.target.value))}
-              />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Bid changes larger than this amount will require manual approval
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Save Button */}
-      {hasChanges && (
-        <div className="flex justify-end">
-          <Button onClick={handleSave} disabled={saving}>
-            {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Save Guardrails
-          </Button>
-        </div>
-      )}
-    </div>
+    </TooltipProvider>
   );
 }
