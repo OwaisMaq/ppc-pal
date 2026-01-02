@@ -138,6 +138,221 @@ async function processSearchTermReport(
 }
 
 /**
+ * Process conversion path report data - upsert into conversion_paths_daily and time_lag_daily
+ */
+async function processConversionPathReport(
+  supabase: any,
+  reportData: any[],
+  profileId: string
+): Promise<number> {
+  console.log(`📊 Processing ${reportData.length} conversion path records`)
+  
+  // Group by date and campaign/adgroup to create path structures
+  const pathsByDateAndCampaign: Map<string, any> = new Map()
+  
+  for (const record of reportData) {
+    const key = `${record.date}_${record.campaignId}_${record.adGroupId || ''}`
+    
+    if (!pathsByDateAndCampaign.has(key)) {
+      pathsByDateAndCampaign.set(key, {
+        date: record.date,
+        campaignId: record.campaignId,
+        adGroupId: record.adGroupId,
+        impressions: 0,
+        clicks: 0,
+        cost: 0,
+        conversions: 0,
+        sales: 0
+      })
+    }
+    
+    const existing = pathsByDateAndCampaign.get(key)!
+    existing.impressions += record.impressions || 0
+    existing.clicks += record.clicks || 0
+    existing.cost += record.cost || 0
+    existing.conversions += record.purchases7d || 0
+    existing.sales += record.sales7d || 0
+  }
+
+  // Transform into conversion_paths_daily format
+  const paths: any[] = []
+  
+  for (const [key, data] of pathsByDateAndCampaign) {
+    if (data.conversions === 0) continue // Skip non-converting paths
+    
+    // Build path structure based on clicks/views
+    const pathJson: any[] = []
+    
+    if (data.impressions > 0 && data.clicks === 0) {
+      // View-only path
+      pathJson.push({
+        type: 'sp',
+        interaction: 'view',
+        campaign_id: data.campaignId,
+        ad_group_id: data.adGroupId
+      })
+    } else if (data.clicks > 0) {
+      // Click path (may have views before)
+      if (data.impressions > data.clicks) {
+        pathJson.push({
+          type: 'sp',
+          interaction: 'view',
+          campaign_id: data.campaignId,
+          ad_group_id: data.adGroupId
+        })
+      }
+      pathJson.push({
+        type: 'sp',
+        interaction: 'click',
+        campaign_id: data.campaignId,
+        ad_group_id: data.adGroupId
+      })
+    }
+    
+    if (pathJson.length === 0) continue
+    
+    const pathFingerprint = generatePathFingerprint(pathJson)
+    
+    paths.push({
+      date: data.date,
+      source: 'v3',
+      profile_id: profileId,
+      marketplace: 'ATVPDKIKX0DER',
+      path_fingerprint: pathFingerprint,
+      path_json: pathJson,
+      conversions: data.conversions,
+      sales_micros: Math.round(data.sales * 1000000),
+      clicks: data.clicks,
+      views: data.impressions,
+      touch_count: pathJson.length
+    })
+  }
+
+  if (paths.length === 0) {
+    console.log(`No converting paths found in report data`)
+    return 0
+  }
+
+  // Aggregate paths by date and fingerprint
+  const aggregatedPaths = aggregatePathsByFingerprint(paths)
+  
+  console.log(`📊 Aggregated into ${aggregatedPaths.length} unique paths`)
+
+  // Upsert to conversion_paths_daily
+  const { error: pathsError } = await supabase
+    .from('conversion_paths_daily')
+    .upsert(aggregatedPaths, {
+      onConflict: 'date,source,profile_id,path_fingerprint'
+    })
+
+  if (pathsError) {
+    console.error(`❌ Failed to upsert conversion paths:`, pathsError)
+    return 0
+  }
+
+  // Compute and upsert time lag data (estimated distribution)
+  const timeLagData = computeTimeLagFromPaths(paths, profileId)
+  
+  if (timeLagData.length > 0) {
+    const { error: lagError } = await supabase
+      .from('time_lag_daily')
+      .upsert(timeLagData, {
+        onConflict: 'date,source,profile_id,bucket'
+      })
+
+    if (lagError) {
+      console.error(`❌ Failed to upsert time lag data:`, lagError)
+    }
+  }
+
+  console.log(`✅ Upserted ${aggregatedPaths.length} conversion paths`)
+  return aggregatedPaths.length
+}
+
+/**
+ * Aggregate paths with the same fingerprint on the same date
+ */
+function aggregatePathsByFingerprint(paths: any[]): any[] {
+  const aggregated: Map<string, any> = new Map()
+  
+  for (const path of paths) {
+    const key = `${path.date}_${path.profile_id}_${path.path_fingerprint}`
+    
+    if (!aggregated.has(key)) {
+      aggregated.set(key, { ...path })
+    } else {
+      const existing = aggregated.get(key)!
+      existing.conversions += path.conversions
+      existing.sales_micros += path.sales_micros
+      existing.clicks += path.clicks
+      existing.views += path.views
+    }
+  }
+  
+  return Array.from(aggregated.values())
+}
+
+/**
+ * Compute time lag buckets from paths (estimated distribution)
+ */
+function computeTimeLagFromPaths(paths: any[], profileId: string): any[] {
+  const buckets = ['0-1d', '2-3d', '4-7d', '8-14d']
+  const bucketWeights = [0.45, 0.25, 0.20, 0.10]
+  
+  // Group by date
+  const byDate: Map<string, { conversions: number; sales: number }> = new Map()
+  
+  for (const path of paths) {
+    if (!byDate.has(path.date)) {
+      byDate.set(path.date, { conversions: 0, sales: 0 })
+    }
+    const existing = byDate.get(path.date)!
+    existing.conversions += path.conversions
+    existing.sales += path.sales_micros
+  }
+  
+  const timeLagData: any[] = []
+  
+  for (const [date, data] of byDate) {
+    buckets.forEach((bucket, index) => {
+      const conversions = Math.round(data.conversions * bucketWeights[index])
+      const salesMicros = Math.round(data.sales * bucketWeights[index])
+      
+      if (conversions > 0) {
+        timeLagData.push({
+          date,
+          source: 'v3',
+          profile_id: profileId,
+          bucket,
+          conversions,
+          sales_micros: salesMicros
+        })
+      }
+    })
+  }
+  
+  return timeLagData
+}
+
+/**
+ * Generate a fingerprint for a conversion path
+ */
+function generatePathFingerprint(pathJson: any[]): string {
+  const pathString = JSON.stringify(pathJson.map(step => ({
+    type: step.type,
+    interaction: step.interaction
+  })))
+  
+  let hash = 0
+  for (let i = 0; i < pathString.length; i++) {
+    const char = pathString.charCodeAt(i)
+    hash = ((hash << 5) - hash) + char
+    hash = hash & hash
+  }
+  return Math.abs(hash).toString(16)
+}
+
+/**
  * Process completed report and update entities
  */
 async function processCompletedReport(
@@ -154,6 +369,11 @@ async function processCompletedReport(
   // Handle search terms separately
   if (entityType === 'searchTerms') {
     return await processSearchTermReport(supabase, reportData, profileId)
+  }
+
+  // Handle conversion paths separately
+  if (entityType === 'conversionPaths') {
+    return await processConversionPathReport(supabase, reportData, profileId)
   }
 
   const timeUnit = report.configuration.timeUnit
