@@ -10,6 +10,7 @@ interface AnomalyDetectionRequest {
   profileId?: string;
   scope?: 'campaign' | 'ad_group' | 'account';
   window?: 'intraday' | 'daily';
+  trigger?: 'manual' | 'scheduled';
 }
 
 interface MetricData {
@@ -23,6 +24,32 @@ interface BaselineData {
   median: number;
   mad: number;
 }
+
+interface UserSettings {
+  enabled: boolean;
+  intraday_enabled: boolean;
+  daily_enabled: boolean;
+  warn_threshold: number;
+  critical_threshold: number;
+  metric_thresholds: Record<string, { warn: number; critical: number }>;
+  intraday_cooldown_hours: number;
+  daily_cooldown_hours: number;
+  notify_on_warn: boolean;
+  notify_on_critical: boolean;
+}
+
+const DEFAULT_SETTINGS: UserSettings = {
+  enabled: true,
+  intraday_enabled: true,
+  daily_enabled: true,
+  warn_threshold: 3.0,
+  critical_threshold: 5.0,
+  metric_thresholds: {},
+  intraday_cooldown_hours: 6,
+  daily_cooldown_hours: 48,
+  notify_on_warn: false,
+  notify_on_critical: true,
+};
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -38,12 +65,31 @@ serve(async (req) => {
     
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-    const url = new URL(req.url);
-    const profileId = url.searchParams.get('profileId');
-    const scope = url.searchParams.get('scope') as 'campaign' | 'ad_group' | 'account' || 'campaign';
-    const window = url.searchParams.get('window') as 'intraday' | 'daily' || 'intraday';
+    // Parse params from URL or body
+    let profileId: string | null = null;
+    let scope: 'campaign' | 'ad_group' | 'account' = 'campaign';
+    let window: 'intraday' | 'daily' = 'intraday';
+    let trigger: 'manual' | 'scheduled' = 'manual';
 
-    console.log(`[${requestId}] Processing anomaly detection: profileId=${profileId}, scope=${scope}, window=${window}`);
+    if (req.method === 'GET') {
+      const url = new URL(req.url);
+      profileId = url.searchParams.get('profileId');
+      scope = url.searchParams.get('scope') as typeof scope || 'campaign';
+      window = url.searchParams.get('window') as typeof window || 'intraday';
+      trigger = url.searchParams.get('trigger') as typeof trigger || 'manual';
+    } else {
+      try {
+        const body = await req.json();
+        profileId = body.profileId || null;
+        scope = body.scope || 'campaign';
+        window = body.window || 'intraday';
+        trigger = body.trigger || 'scheduled';
+      } catch {
+        // No body or invalid JSON, use defaults
+      }
+    }
+
+    console.log(`[${requestId}] Processing anomaly detection: profileId=${profileId}, scope=${scope}, window=${window}, trigger=${trigger}`);
 
     // Start run tracking
     const runData = {
@@ -65,9 +111,10 @@ serve(async (req) => {
 
     let totalChecked = 0;
     let totalAnomalies = 0;
+    let profilesSkipped = 0;
 
     // Get active profiles to check
-    let profilesQuery = supabase.from('amazon_connections').select('profile_id');
+    let profilesQuery = supabase.from('amazon_connections').select('profile_id, user_id');
     if (profileId) {
       profilesQuery = profilesQuery.eq('profile_id', profileId);
     }
@@ -78,23 +125,57 @@ serve(async (req) => {
       throw new Error(`Failed to fetch profiles: ${profilesError.message}`);
     }
 
-    const profileIds = profiles?.map(p => p.profile_id) || [];
-    console.log(`[${requestId}] Found ${profileIds.length} profiles to check`);
+    const profileList = profiles || [];
+    console.log(`[${requestId}] Found ${profileList.length} profiles to check`);
 
-    for (const profId of profileIds) {
+    for (const profile of profileList) {
       try {
-        const anomalies = await detectAnomaliesForProfile(supabase, profId, scope, window, requestId);
+        // Fetch user settings for this profile
+        const userSettings = await getUserSettings(supabase, profile.user_id, profile.profile_id);
+        
+        // Check if detection is enabled for this window type
+        if (!userSettings.enabled) {
+          console.log(`[${requestId}] Skipping profile ${profile.profile_id}: detection disabled`);
+          profilesSkipped++;
+          continue;
+        }
+        
+        if (window === 'intraday' && !userSettings.intraday_enabled) {
+          console.log(`[${requestId}] Skipping profile ${profile.profile_id}: intraday detection disabled`);
+          profilesSkipped++;
+          continue;
+        }
+        
+        if (window === 'daily' && !userSettings.daily_enabled) {
+          console.log(`[${requestId}] Skipping profile ${profile.profile_id}: daily detection disabled`);
+          profilesSkipped++;
+          continue;
+        }
+
+        const anomalies = await detectAnomaliesForProfile(
+          supabase, 
+          profile.profile_id, 
+          profile.user_id,
+          scope, 
+          window, 
+          userSettings,
+          requestId
+        );
         totalChecked += anomalies.checked;
         totalAnomalies += anomalies.found;
 
-        // Create alerts for warn/critical anomalies
+        // Create alerts for warn/critical anomalies based on user notification settings
         for (const anomaly of anomalies.detected) {
+          const shouldNotify = 
+            (anomaly.severity === 'critical' && userSettings.notify_on_critical) ||
+            (anomaly.severity === 'warn' && userSettings.notify_on_warn);
+          
           if (anomaly.severity === 'warn' || anomaly.severity === 'critical') {
-            await createAnomalyAlert(supabase, anomaly, profId);
+            await createAnomalyAlert(supabase, anomaly, profile.profile_id, shouldNotify);
           }
         }
       } catch (error) {
-        console.error(`[${requestId}] Error processing profile ${profId}:`, error);
+        console.error(`[${requestId}] Error processing profile ${profile.profile_id}:`, error);
       }
     }
 
@@ -109,13 +190,14 @@ serve(async (req) => {
       })
       .eq('id', run.id);
 
-    console.log(`[${requestId}] Anomaly detection completed: checked=${totalChecked}, found=${totalAnomalies}`);
+    console.log(`[${requestId}] Anomaly detection completed: checked=${totalChecked}, found=${totalAnomalies}, skipped=${profilesSkipped}`);
 
     return new Response(
       JSON.stringify({
         success: true,
         runId: run.id,
-        profilesChecked: profileIds.length,
+        profilesChecked: profileList.length - profilesSkipped,
+        profilesSkipped,
         totalChecked,
         anomaliesFound: totalAnomalies,
         requestId,
@@ -137,11 +219,65 @@ serve(async (req) => {
   }
 });
 
+async function getUserSettings(
+  supabase: any,
+  userId: string,
+  profileId: string
+): Promise<UserSettings> {
+  const { data, error } = await supabase
+    .from('anomaly_detection_settings')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('profile_id', profileId)
+    .maybeSingle();
+
+  if (error) {
+    console.warn(`Failed to fetch user settings for ${profileId}: ${error.message}`);
+    return DEFAULT_SETTINGS;
+  }
+
+  if (!data) {
+    return DEFAULT_SETTINGS;
+  }
+
+  return {
+    enabled: data.enabled ?? DEFAULT_SETTINGS.enabled,
+    intraday_enabled: data.intraday_enabled ?? DEFAULT_SETTINGS.intraday_enabled,
+    daily_enabled: data.daily_enabled ?? DEFAULT_SETTINGS.daily_enabled,
+    warn_threshold: data.warn_threshold ?? DEFAULT_SETTINGS.warn_threshold,
+    critical_threshold: data.critical_threshold ?? DEFAULT_SETTINGS.critical_threshold,
+    metric_thresholds: data.metric_thresholds ?? DEFAULT_SETTINGS.metric_thresholds,
+    intraday_cooldown_hours: data.intraday_cooldown_hours ?? DEFAULT_SETTINGS.intraday_cooldown_hours,
+    daily_cooldown_hours: data.daily_cooldown_hours ?? DEFAULT_SETTINGS.daily_cooldown_hours,
+    notify_on_warn: data.notify_on_warn ?? DEFAULT_SETTINGS.notify_on_warn,
+    notify_on_critical: data.notify_on_critical ?? DEFAULT_SETTINGS.notify_on_critical,
+  };
+}
+
+function getSeverityFromZScore(
+  zScore: number, 
+  metric: string, 
+  settings: UserSettings
+): string {
+  const absZ = Math.abs(zScore);
+  
+  // Check for metric-specific thresholds
+  const metricThresholds = settings.metric_thresholds?.[metric];
+  const warnThreshold = metricThresholds?.warn ?? settings.warn_threshold;
+  const criticalThreshold = metricThresholds?.critical ?? settings.critical_threshold;
+  
+  if (absZ >= criticalThreshold) return 'critical';
+  if (absZ >= warnThreshold) return 'warn';
+  return 'info';
+}
+
 async function detectAnomaliesForProfile(
   supabase: any,
   profileId: string,
+  userId: string,
   scope: string,
   window: string,
+  settings: UserSettings,
   requestId: string
 ) {
   console.log(`[${requestId}] Detecting anomalies for profile ${profileId}, scope ${scope}, window ${window}`);
@@ -149,7 +285,12 @@ async function detectAnomaliesForProfile(
   const metrics = ['spend', 'sales', 'acos', 'cvr', 'ctr', 'cpc', 'impressions'];
   let checked = 0;
   let found = 0;
-  const detected = [];
+  const detected: any[] = [];
+
+  // Get cooldown hours from user settings
+  const cooldownHours = window === 'intraday' 
+    ? settings.intraday_cooldown_hours 
+    : settings.daily_cooldown_hours;
 
   for (const metric of metrics) {
     try {
@@ -172,7 +313,9 @@ async function detectAnomaliesForProfile(
         });
 
         const zScore = zScoreData || 0;
-        const { data: severity } = await supabase.rpc('get_anomaly_severity', { p_z_score: zScore });
+        
+        // Use user-configurable thresholds for severity
+        const severity = getSeverityFromZScore(zScore, metric, settings);
 
         // Only flag significant anomalies and relevant directions
         const shouldFlag = shouldFlagAnomaly(metric, dataPoint.value, baseline.median, severity);
@@ -192,8 +335,7 @@ async function detectAnomaliesForProfile(
           p_bucket: bucket,
         });
 
-        // Check for recent anomalies with same fingerprint
-        const cooldownHours = window === 'intraday' ? 6 : 48;
+        // Check for recent anomalies with same fingerprint using user's cooldown
         const cooldownTime = new Date(Date.now() - cooldownHours * 60 * 60 * 1000).toISOString();
 
         const { data: existingAnomalies } = await supabase
@@ -207,7 +349,7 @@ async function detectAnomaliesForProfile(
         // Skip if recent anomaly exists and severity didn't increase
         if (existingAnomalies && existingAnomalies.length > 0) {
           const existingSeverity = existingAnomalies[0].severity;
-          const severityLevels = { info: 1, warn: 2, critical: 3 };
+          const severityLevels: Record<string, number> = { info: 1, warn: 2, critical: 3 };
           if (severityLevels[severity] <= severityLevels[existingSeverity]) {
             continue;
           }
@@ -403,7 +545,7 @@ async function getBaseline(
     const currentDayOfWeek = currentDate.getUTCDay();
 
     // Build array of historical same-hour timestamps
-    const historicalHours = [];
+    const historicalHours: string[] = [];
     for (let i = 7; i <= daysBack; i += 7) {
       const histDate = new Date(currentDate.getTime() - i * 24 * 60 * 60 * 1000);
       if (histDate.getUTCDay() === currentDayOfWeek) {
@@ -431,11 +573,11 @@ async function getBaseline(
 
     // Combine and calculate metric values
     const values = historicalHours.map(hour => {
-      const traffic = trafficData?.find(t => t.hour_start === hour) || {};
-      const conversion = conversionData?.find(c => c.hour_start === hour) || {};
+      const traffic = trafficData?.find((t: any) => t.hour_start === hour) || {};
+      const conversion = conversionData?.find((c: any) => c.hour_start === hour) || {};
       const combined = { ...traffic, sales: conversion.attributed_sales || 0, conversions: conversion.attributed_conversions || 0 };
       return calculateMetricValue(combined, metric);
-    }).filter(v => v !== null);
+    }).filter((v): v is number => v !== null);
 
     return calculateBaselineStats(values);
 
@@ -452,7 +594,7 @@ async function getBaseline(
         .gte('date', startDate.toISOString().slice(0, 10))
         .lte('date', endDate.toISOString().slice(0, 10));
 
-      const values = (data || []).map((row: any) => calculateMetricValue(row, metric)).filter((v: any) => v !== null);
+      const values = (data || []).map((row: any) => calculateMetricValue(row, metric)).filter((v: any): v is number => v !== null);
       return calculateBaselineStats(values);
     }
 
@@ -485,7 +627,7 @@ function shouldFlagAnomaly(metric: string, value: number, baseline: number, seve
   const isSpike = value > baseline;
   
   // Define which directions to flag for each metric
-  const flagRules = {
+  const flagRules: Record<string, boolean> = {
     spend: isSpike, // Flag spend spikes
     sales: !isSpike, // Flag sales dips
     acos: isSpike, // Flag ACOS spikes
@@ -498,7 +640,12 @@ function shouldFlagAnomaly(metric: string, value: number, baseline: number, seve
   return flagRules[metric] || false;
 }
 
-async function createAnomalyAlert(supabase: any, anomaly: any, profileId: string) {
+async function createAnomalyAlert(
+  supabase: any, 
+  anomaly: any, 
+  profileId: string,
+  shouldNotify: boolean
+) {
   try {
     // Find user for this profile
     const { data: connection } = await supabase
@@ -530,7 +677,7 @@ async function createAnomalyAlert(supabase: any, anomaly: any, profileId: string
       level: anomaly.severity,
       state: 'new',
       data: {
-        anomaly_id: null, // Will be filled after anomaly is inserted
+        anomaly_id: null,
         metric: anomaly.metric,
         value: anomaly.value,
         baseline: anomaly.baseline,
@@ -541,6 +688,9 @@ async function createAnomalyAlert(supabase: any, anomaly: any, profileId: string
 
     await supabase.from('alerts').insert(alert);
 
+    // Only queue notifications if user has opted in for this severity level
+    if (!shouldNotify) return;
+
     // Queue notification if user has preferences
     const { data: userPrefs } = await supabase
       .from('user_prefs')
@@ -549,7 +699,7 @@ async function createAnomalyAlert(supabase: any, anomaly: any, profileId: string
       .single();
 
     if (userPrefs && (userPrefs.slack_webhook || userPrefs.email)) {
-      const notificationChannels = [];
+      const notificationChannels: string[] = [];
       if (userPrefs.slack_webhook) notificationChannels.push('slack');
       if (userPrefs.email) notificationChannels.push('email');
 

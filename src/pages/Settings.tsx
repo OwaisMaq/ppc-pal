@@ -4,9 +4,10 @@ import AmsSetup from "@/components/AmsSetup";
 import { ASINLabelManager } from "@/components/ASINLabelManager";
 import { NotificationSettings } from "@/components/NotificationSettings";
 import { ConnectionStatusAlert } from "@/components/ConnectionStatusAlert";
+import { AnomalyDetectionSettings } from "@/components/AnomalyDetectionSettings";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Settings as SettingsIcon, Info, Tag, Bell, Shield, ChevronRight } from "lucide-react";
+import { RefreshCw, Settings as SettingsIcon, Info, Tag, Bell, Shield, ChevronRight, Activity } from "lucide-react";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
@@ -117,6 +118,15 @@ const Settings = () => {
                 </CardContent>
               </Link>
             </Card>
+          </section>
+
+          {/* Anomaly Detection Section */}
+          <section>
+            <div className="flex items-center gap-2 mb-4">
+              <Activity className="h-5 w-5 text-brand-primary" />
+              <h2 className="text-xl font-semibold">Anomaly Detection</h2>
+            </div>
+            <AnomalyDetectionSettings />
           </section>
 
           {/* ASIN Labels Section */}
