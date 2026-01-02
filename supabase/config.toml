@@ -133,7 +133,6 @@ verify_jwt = true
 [functions.search-term-sync]
 verify_jwt = false
 
-
 [functions.revert-action]
 verify_jwt = true
 
@@ -165,4 +164,7 @@ verify_jwt = false
 verify_jwt = true
 
 [functions.rank-tracker-sync]
+verify_jwt = false
+
+[functions.historical-audit-scheduler]
 verify_jwt = false
