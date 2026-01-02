@@ -38,7 +38,6 @@ import {
   type MarketplaceOption,
   type BrandOption,
   MultiAccountBreakdown,
-  BudgetRecommendationsCard
 } from "@/components/overview";
 import ConfidenceMeter from "@/components/ui/ConfidenceMeter";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -413,22 +412,18 @@ const CommandCenter = () => {
               </Card>
             )}
 
-            {/* Pending Approvals & Budget Recommendations Section */}
-            <div className="grid gap-6 lg:grid-cols-2">
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <ClipboardCheck className="h-5 w-5 text-primary" />
-                  <div>
-                    <h2 className="text-xl font-semibold">Pending Approvals</h2>
-                    <p className="text-sm text-muted-foreground">
-                      Review and approve actions before they're applied
-                    </p>
-                  </div>
+            {/* Pending Approvals Section */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <ClipboardCheck className="h-5 w-5 text-primary" />
+                <div>
+                  <h2 className="text-xl font-semibold">Pending Approvals</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Review and approve actions before they're applied
+                  </p>
                 </div>
-                <PendingApprovals />
               </div>
-              
-              <BudgetRecommendationsCard />
+              <PendingApprovals />
             </div>
 
             {/* Activity Section */}
