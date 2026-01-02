@@ -371,6 +371,7 @@ const CommandCenter = () => {
                 connectionCount={connectionCount}
                 autoOptimizedAsins={autoOptimizedAsins}
                 totalAsins={totalAsins}
+                currency={baseCurrency}
               />
               
               {/* Historical Performance Chart - Full Width */}

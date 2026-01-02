@@ -44,6 +44,7 @@ interface AccountHealthCardProps {
   connectionCount?: number;
   autoOptimizedAsins?: number;
   totalAsins?: number;
+  currency?: string;
 }
 
 const healthConfig = {
@@ -105,7 +106,8 @@ export const AccountHealthCard = ({
   marketplaceOptions = [],
   connectionCount = 1,
   autoOptimizedAsins,
-  totalAsins
+  totalAsins,
+  currency = 'USD'
 }: AccountHealthCardProps) => {
   const healthInfo = healthConfig[healthStatus];
   const HealthIcon = healthInfo.icon;
@@ -116,7 +118,7 @@ export const AccountHealthCard = ({
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: currency,
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(value);
