@@ -200,28 +200,7 @@ export function AccountPicker({ isCollapsed = false }: AccountPickerProps) {
   const healthStatus = activeConnection?.health_status;
   const hasIssues = healthStatus === 'error' || healthStatus === 'warning' || isTokenExpired;
 
-  // Single account, single marketplace - just show static display (unless multiple accounts exist)
-  if (!isMultiAccount && !isMultiMarketplace && connections.length === 1) {
-    return (
-      <div className={cn(
-        "flex items-center gap-2 px-2 py-1.5 rounded-md",
-        isCollapsed && "justify-center px-0"
-      )}>
-        <span className="text-lg leading-none">{flag}</span>
-        {!isCollapsed && (
-          <span className="text-xs text-muted-foreground truncate">
-            {accountName}
-          </span>
-        )}
-        {hasIssues && (
-          <AlertCircle className={cn(
-            "h-3 w-3 text-warning shrink-0",
-            isCollapsed && "absolute top-0 right-0"
-          )} />
-        )}
-      </div>
-    );
-  }
+  // Always show the dropdown to allow access to multi-account mode
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -263,8 +242,8 @@ export function AccountPicker({ isCollapsed = false }: AccountPickerProps) {
         className="w-64"
         sideOffset={8}
       >
-        {/* All Accounts option - only show if multiple connections */}
-        {connections.length > 1 && (
+        {/* All Accounts option - always show for discoverability */}
+        {connections.length >= 1 && (
           <>
             <DropdownMenuItem
               onClick={() => {
