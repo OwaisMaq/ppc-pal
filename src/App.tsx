@@ -24,7 +24,7 @@ const Changelog = lazy(() => import("@/pages/Changelog"));
 const Privacy = lazy(() => import("@/pages/Privacy"));
 const Governance = lazy(() => import("@/pages/Governance"));
 const Analytics = lazy(() => import("@/pages/Analytics"));
-const SearchStudio = lazy(() => import("@/pages/SearchStudio").then(m => ({ default: m.SearchStudio })));
+// SearchStudio removed - consolidated into Campaigns (Ad Manager)
 const MultiAccount = lazy(() => import("@/pages/MultiAccount"));
 const PublicLanding = lazy(() => import("@/pages/PublicLanding"));
 const PublicPrivacy = lazy(() => import("@/pages/PublicPrivacy"));
@@ -154,12 +154,8 @@ const App = () => {
                       } />
                       <Route path="/analytics/ai-insights" element={<Navigate to="/analytics" replace />} />
 
-                      {/* Search Studio */}
-                      <Route path="/search-studio" element={
-                        <ProtectedRoute>
-                          <SearchStudio />
-                        </ProtectedRoute>
-                      } />
+                      {/* Redirect Search Studio to Ad Manager */}
+                      <Route path="/search-studio" element={<Navigate to="/campaigns?view=search-terms" replace />} />
 
                       {/* Settings routes */}
                       <Route path="/settings" element={

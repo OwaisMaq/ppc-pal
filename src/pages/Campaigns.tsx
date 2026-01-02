@@ -63,8 +63,10 @@ import { useAmsMetrics } from "@/hooks/useAmsMetrics";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown } from "lucide-react";
 import { useProductGroupedCampaigns } from "@/hooks/useProductGroupedCampaigns";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { NegativesPanel } from "@/components/NegativesPanel";
+import { BrandTermsManager } from "@/components/BrandTermsManager";
 import { useEntityOptimization } from "@/hooks/useEntityOptimization";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -1106,168 +1108,187 @@ const Campaigns = () => {
         );
 
       case 'search-terms':
-        if (filteredSearchTerms.length === 0) {
-          return renderEmptyState(
-            searchQuery ? 'No search terms match your search' : 'No search terms found',
-            <Search className="h-12 w-12 mx-auto text-muted-foreground" />
-          );
-        }
         return (
-          <div className="space-y-4">
-            {/* Bulk action bar */}
-            {selectedTerms.size > 0 && (
-              <div className="flex items-center justify-between p-3 bg-muted/50 border border-border rounded-lg">
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-medium">
-                    {selectedTerms.size} term{selectedTerms.size > 1 ? 's' : ''} selected
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSelectedTerms(new Set())}
-                    className="h-7 px-2"
-                  >
-                    <X className="h-3 w-3 mr-1" />
-                    Clear
-                  </Button>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Select value={bulkMatchType} onValueChange={(v) => setBulkMatchType(v as MatchType)}>
-                    <SelectTrigger className="w-28 h-8">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="exact">Exact</SelectItem>
-                      <SelectItem value="phrase">Phrase</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    size="sm"
-                    onClick={handleBulkHarvest}
-                    disabled={harvestLoading}
-                    className="gap-1.5"
-                  >
-                    {harvestLoading ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Sprout className="h-3.5 w-3.5" />
-                    )}
-                    Harvest {selectedTerms.size} Keyword{selectedTerms.size > 1 ? 's' : ''}
-                  </Button>
-                </div>
-              </div>
-            )}
+          <Tabs defaultValue="terms" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="terms">Search Terms</TabsTrigger>
+              <TabsTrigger value="negatives">Negatives</TabsTrigger>
+              <TabsTrigger value="brand-terms">Brand Terms</TabsTrigger>
+            </TabsList>
             
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-10">
-                    <Checkbox
-                      checked={selectedTerms.size === filteredSearchTerms.length && filteredSearchTerms.length > 0}
-                      onCheckedChange={toggleSelectAll}
-                      aria-label="Select all"
-                    />
-                  </TableHead>
-                  <TableHead>Search Term</TableHead>
-                  <TableHead>Matched Keyword</TableHead>
-                  <TableHead>Campaign</TableHead>
-                  <TableHead className="text-right">Clicks</TableHead>
-                  <TableHead className="text-right">Sales</TableHead>
-                  <TableHead className="text-right">ACOS</TableHead>
-                  <TableHead className="text-right w-28">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredSearchTerms.map((st) => {
-                  const isSelected = selectedTerms.has(st.id);
-                  const highPerformer = isHighPerformer(st);
-                  const isHarvesting = harvestingTermId === st.id;
-                  
-                  return (
-                    <TableRow 
-                      key={st.id}
-                      className={isSelected ? 'bg-primary/5' : undefined}
-                    >
-                      <TableCell>
-                        <Checkbox
-                          checked={isSelected}
-                          onCheckedChange={() => toggleTermSelection(st.id)}
-                          aria-label={`Select ${st.search_term}`}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{st.search_term}</span>
-                          {highPerformer && (
-                            <Badge variant="outline" className="text-xs border-success/50 text-success bg-success/10">
-                              <Sprout className="h-3 w-3 mr-1" />
-                              Harvest
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">{st.keyword_text}</TableCell>
-                      <TableCell className="text-muted-foreground text-sm max-w-[150px] truncate">{st.campaign_name}</TableCell>
-                      <TableCell className="text-right">{formatNumber(st.clicks)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(st.sales)}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          {st.acos > 30 ? (
-                            <TrendingUp className="h-3 w-3 text-destructive" />
+            <TabsContent value="terms" className="space-y-4">
+              {filteredSearchTerms.length === 0 ? (
+                renderEmptyState(
+                  searchQuery ? 'No search terms match your search' : 'No search terms found',
+                  <Search className="h-12 w-12 mx-auto text-muted-foreground" />
+                )
+              ) : (
+                <>
+                  {/* Bulk action bar */}
+                  {selectedTerms.size > 0 && (
+                    <div className="flex items-center justify-between p-3 bg-muted/50 border border-border rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-medium">
+                          {selectedTerms.size} term{selectedTerms.size > 1 ? 's' : ''} selected
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSelectedTerms(new Set())}
+                          className="h-7 px-2"
+                        >
+                          <X className="h-3 w-3 mr-1" />
+                          Clear
+                        </Button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Select value={bulkMatchType} onValueChange={(v) => setBulkMatchType(v as MatchType)}>
+                          <SelectTrigger className="w-28 h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="exact">Exact</SelectItem>
+                            <SelectItem value="phrase">Phrase</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          size="sm"
+                          onClick={handleBulkHarvest}
+                          disabled={harvestLoading}
+                          className="gap-1.5"
+                        >
+                          {harvestLoading ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
                           ) : (
-                            <TrendingDown className="h-3 w-3 text-success" />
+                            <Sprout className="h-3.5 w-3.5" />
                           )}
-                          {st.acos?.toFixed(1) || '0.0'}%
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-7 px-2 gap-1"
-                              disabled={isHarvesting || !st.campaign_id || !st.ad_group_id}
-                            >
-                              {isHarvesting ? (
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                              ) : (
-                                <Sprout className="h-3 w-3" />
-                              )}
-                              Harvest
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-40 p-2" align="end">
-                            <div className="space-y-1">
-                              <p className="text-xs text-muted-foreground mb-2">Match type:</p>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="w-full justify-start h-8"
-                                onClick={() => handleHarvestSingle(st, 'exact')}
-                              >
-                                <Check className="h-3 w-3 mr-2" />
-                                Exact
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="w-full justify-start h-8"
-                                onClick={() => handleHarvestSingle(st, 'phrase')}
-                              >
-                                <Check className="h-3 w-3 mr-2" />
-                                Phrase
-                              </Button>
-                            </div>
-                          </PopoverContent>
-                        </Popover>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
+                          Harvest {selectedTerms.size} Keyword{selectedTerms.size > 1 ? 's' : ''}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-10">
+                          <Checkbox
+                            checked={selectedTerms.size === filteredSearchTerms.length && filteredSearchTerms.length > 0}
+                            onCheckedChange={toggleSelectAll}
+                            aria-label="Select all"
+                          />
+                        </TableHead>
+                        <TableHead>Search Term</TableHead>
+                        <TableHead>Matched Keyword</TableHead>
+                        <TableHead>Campaign</TableHead>
+                        <TableHead className="text-right">Clicks</TableHead>
+                        <TableHead className="text-right">Sales</TableHead>
+                        <TableHead className="text-right">ACOS</TableHead>
+                        <TableHead className="text-right w-28">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredSearchTerms.map((st) => {
+                        const isSelected = selectedTerms.has(st.id);
+                        const highPerformer = isHighPerformer(st);
+                        const isHarvesting = harvestingTermId === st.id;
+                        
+                        return (
+                          <TableRow 
+                            key={st.id}
+                            className={isSelected ? 'bg-primary/5' : undefined}
+                          >
+                            <TableCell>
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={() => toggleTermSelection(st.id)}
+                                aria-label={`Select ${st.search_term}`}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">{st.search_term}</span>
+                                {highPerformer && (
+                                  <Badge variant="outline" className="text-xs border-success/50 text-success bg-success/10">
+                                    <Sprout className="h-3 w-3 mr-1" />
+                                    Harvest
+                                  </Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-sm">{st.keyword_text}</TableCell>
+                            <TableCell className="text-muted-foreground text-sm max-w-[150px] truncate">{st.campaign_name}</TableCell>
+                            <TableCell className="text-right">{formatNumber(st.clicks)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(st.sales)}</TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                {st.acos > 30 ? (
+                                  <TrendingUp className="h-3 w-3 text-destructive" />
+                                ) : (
+                                  <TrendingDown className="h-3 w-3 text-success" />
+                                )}
+                                {st.acos?.toFixed(1) || '0.0'}%
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 px-2 gap-1"
+                                    disabled={isHarvesting || !st.campaign_id || !st.ad_group_id}
+                                  >
+                                    {isHarvesting ? (
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                      <Sprout className="h-3 w-3" />
+                                    )}
+                                    Harvest
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-40 p-2" align="end">
+                                  <div className="space-y-1">
+                                    <p className="text-xs text-muted-foreground mb-2">Match type:</p>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="w-full justify-start h-8"
+                                      onClick={() => handleHarvestSingle(st, 'exact')}
+                                    >
+                                      <Check className="h-3 w-3 mr-2" />
+                                      Exact
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="w-full justify-start h-8"
+                                      onClick={() => handleHarvestSingle(st, 'phrase')}
+                                    >
+                                      <Check className="h-3 w-3 mr-2" />
+                                      Phrase
+                                    </Button>
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </>
+              )}
+            </TabsContent>
+            
+            <TabsContent value="negatives">
+              <NegativesPanel profileId={primaryConnection?.profile_id || ''} />
+            </TabsContent>
+            
+            <TabsContent value="brand-terms">
+              <BrandTermsManager profileId={primaryConnection?.profile_id || ''} />
+            </TabsContent>
+          </Tabs>
         );
 
       default:
@@ -1281,10 +1302,10 @@ const Campaigns = () => {
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground mb-2">
-              Campaigns
+              Ad Manager
             </h1>
             <p className="text-muted-foreground">
-              Manage and monitor your Amazon Advertising campaigns
+              Manage your Amazon advertising campaigns, keywords, and search terms
             </p>
           </div>
           <div className="flex items-center gap-3">
