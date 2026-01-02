@@ -3170,6 +3170,48 @@ export type Database = {
         }
         Relationships: []
       }
+      historical_audit_runs: {
+        Row: {
+          audit_month: string
+          created_at: string
+          error: string | null
+          finished_at: string | null
+          id: string
+          profiles_failed: number | null
+          profiles_processed: number | null
+          profiles_succeeded: number | null
+          started_at: string
+          status: string
+          trigger_type: string
+        }
+        Insert: {
+          audit_month: string
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          profiles_failed?: number | null
+          profiles_processed?: number | null
+          profiles_succeeded?: number | null
+          started_at?: string
+          status?: string
+          trigger_type?: string
+        }
+        Update: {
+          audit_month?: string
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          profiles_failed?: number | null
+          profiles_processed?: number | null
+          profiles_succeeded?: number | null
+          started_at?: string
+          status?: string
+          trigger_type?: string
+        }
+        Relationships: []
+      }
       historical_audits: {
         Row: {
           audit_month: string
