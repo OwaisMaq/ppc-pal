@@ -214,8 +214,8 @@ const CommandCenter = () => {
                       healthStatus === 'watch' ? 'medium' as const : 'high' as const;
     
     const hasEnoughData = hasData && minDate;
-    const dataAge = minDate ? differenceInDays(new Date(), new Date(minDate)) : 0;
-    const dataConfidence = hasEnoughData ? Math.min(90, 50 + dataAge * 2) : 30;
+    // Data confidence based on actual data presence, not connection age
+    const dataConfidence = hasEnoughData ? 75 : 30;
     const daysSinceManualIntervention = actions?.some(a => a.status === 'reverted') ? 2 : null;
     
     // Bid optimizer confidence
