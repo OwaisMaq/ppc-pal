@@ -15,6 +15,7 @@ import { DashboardKPIs } from "@/components/DashboardKPIs";
 import { DashboardChart } from "@/components/DashboardChart";
 import { PerformanceFilters, TimePeriod, ACOSTrendChart, CampaignTypeMixChart } from "@/components/analytics";
 import { TrustReportCard } from "@/components/overview/TrustReportCard";
+import { OutcomeAttributionPanel } from "@/components/overview/OutcomeAttributionPanel";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { useHistoricalAudit } from "@/hooks/useHistoricalAudit";
 import { useAmsMetrics } from "@/hooks/useAmsMetrics";
@@ -141,7 +142,7 @@ const Analytics = () => {
   } = useHistoricalAudit(profileId);
 
   // Automation tab data
-  const { stats: outcomeStats, loading: outcomesLoading } = useActionOutcomes();
+  const { outcomes, stats: outcomeStats, loading: outcomesLoading } = useActionOutcomes();
   const { savings, loading: savingsLoading } = useSavingsMetric(profileId, fromDate, toDate);
 
   useEffect(() => {
@@ -224,6 +225,10 @@ const Analytics = () => {
               totalSavings={savings?.totalSavings || 0}
               actionCount={savings?.actionCount || 0}
               loading={outcomesLoading || savingsLoading}
+            />
+            <OutcomeAttributionPanel
+              outcomes={outcomes}
+              loading={outcomesLoading}
             />
           </TabsContent>
 
