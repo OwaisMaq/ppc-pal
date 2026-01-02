@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import DashboardShell from '@/components/DashboardShell';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -11,7 +12,7 @@ import { NegativesPanel } from '@/components/NegativesPanel';
 import { BrandTermsManager } from '@/components/BrandTermsManager';
 import { useSearchStudio, SearchTermsFilters } from '@/hooks/useSearchStudio';
 import { useAmazonConnections } from '@/hooks/useAmazonConnections';
-import { Download, Upload, Filter, Search } from 'lucide-react';
+import { Download, Upload, Filter, Search as SearchIcon } from 'lucide-react';
 
 export const SearchStudio = () => {
   const { connections } = useAmazonConnections();
@@ -82,6 +83,7 @@ export const SearchStudio = () => {
   const avgCvr = kpis.clicks > 0 ? (kpis.conversions / kpis.clicks) : 0;
 
   return (
+    <DashboardShell>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Search Term Studio</h1>
@@ -130,7 +132,7 @@ export const SearchStudio = () => {
                   <div>
                     <Label htmlFor="search">Search Term</Label>
                     <div className="relative">
-                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <SearchIcon className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                       <Input
                         id="search"
                         placeholder="Search terms..."
@@ -311,5 +313,6 @@ export const SearchStudio = () => {
         </TabsContent>
       </Tabs>
     </div>
+    </DashboardShell>
   );
 };
