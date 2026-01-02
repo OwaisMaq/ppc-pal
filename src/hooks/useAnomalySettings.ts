@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import type { Json } from "@/integrations/supabase/types";
 
 export interface MetricThreshold {
   warn: number;
@@ -67,14 +68,14 @@ export const useAnomalySettings = (profileId?: string) => {
       if (data) {
         setSettings({
           ...data,
-          metric_thresholds: (data.metric_thresholds || {}) as Record<string, MetricThreshold>,
+          metric_thresholds: (data.metric_thresholds as unknown as Record<string, MetricThreshold>) || {},
         } as AnomalyDetectionSettings);
       } else {
         // Return defaults if no settings exist
         setSettings(null);
       }
-    } catch (err: any) {
-      const errorMessage = err.message || 'Failed to fetch anomaly settings';
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch anomaly settings';
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -92,41 +93,88 @@ export const useAnomalySettings = (profileId?: string) => {
 
     setLoading(true);
     try {
-      // Build the upsert payload
-      const payload: Record<string, unknown> = {
+      // Build the payload with proper typing for Supabase
+      const payload: {
+        user_id: string;
+        profile_id: string;
+        updated_at: string;
+        enabled?: boolean;
+        intraday_enabled?: boolean;
+        daily_enabled?: boolean;
+        warn_threshold?: number;
+        critical_threshold?: number;
+        metric_thresholds?: Json;
+        intraday_cooldown_hours?: number;
+        daily_cooldown_hours?: number;
+        notify_on_warn?: boolean;
+        notify_on_critical?: boolean;
+      } = {
         user_id: user.id,
         profile_id: profileId,
         updated_at: new Date().toISOString(),
       };
       
-      // Add each update field
-      Object.entries(updates).forEach(([key, value]) => {
-        payload[key] = value;
-      });
+      // Only add defined values
+      if (updates.enabled !== undefined) payload.enabled = updates.enabled;
+      if (updates.intraday_enabled !== undefined) payload.intraday_enabled = updates.intraday_enabled;
+      if (updates.daily_enabled !== undefined) payload.daily_enabled = updates.daily_enabled;
+      if (updates.warn_threshold !== undefined) payload.warn_threshold = updates.warn_threshold;
+      if (updates.critical_threshold !== undefined) payload.critical_threshold = updates.critical_threshold;
+      if (updates.metric_thresholds !== undefined) payload.metric_thresholds = updates.metric_thresholds as unknown as Json;
+      if (updates.intraday_cooldown_hours !== undefined) payload.intraday_cooldown_hours = updates.intraday_cooldown_hours;
+      if (updates.daily_cooldown_hours !== undefined) payload.daily_cooldown_hours = updates.daily_cooldown_hours;
+      if (updates.notify_on_warn !== undefined) payload.notify_on_warn = updates.notify_on_warn;
+      if (updates.notify_on_critical !== undefined) payload.notify_on_critical = updates.notify_on_critical;
 
-      const { data, error: upsertError } = await supabase
+      // Use insert/update pattern for better type safety
+      const { data: existing } = await supabase
         .from('anomaly_detection_settings')
-        .upsert(payload, { 
-          onConflict: 'user_id,profile_id',
-          ignoreDuplicates: false 
-        })
-        .select()
-        .single();
+        .select('id')
+        .eq('profile_id', profileId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      let data;
+      let upsertError;
+
+      if (existing) {
+        // Update existing record
+        const result = await supabase
+          .from('anomaly_detection_settings')
+          .update(payload)
+          .eq('id', existing.id)
+          .select()
+          .single();
+        data = result.data;
+        upsertError = result.error;
+      } else {
+        // Insert new record
+        const result = await supabase
+          .from('anomaly_detection_settings')
+          .insert(payload)
+          .select()
+          .single();
+        data = result.data;
+        upsertError = result.error;
+      }
 
       if (upsertError) {
         throw new Error(upsertError.message);
       }
 
-      setSettings({
-        ...data,
-        metric_thresholds: (data.metric_thresholds || {}) as Record<string, MetricThreshold>,
-      } as AnomalyDetectionSettings);
+      if (data) {
+        setSettings({
+          ...data,
+          metric_thresholds: (data.metric_thresholds as unknown as Record<string, MetricThreshold>) || {},
+        } as AnomalyDetectionSettings);
+      }
+      
       toast({
         title: "Settings saved",
         description: "Anomaly detection settings updated successfully.",
       });
-    } catch (err: any) {
-      const errorMessage = err.message || 'Failed to update settings';
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update settings';
       toast({
         title: "Error",
         description: errorMessage,

@@ -7,8 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
-import { Image, Video, FileImage, Download, RefreshCw, TrendingDown, Eye } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Image, Video, FileImage, Download, RefreshCw, TrendingDown, Eye, Wand2, Check, X, AlertTriangle, Loader2 } from "lucide-react";
 import { useCreativeDiagnostics, type CreativePerformance, type AdBreakdown } from "@/hooks/useCreativeDiagnostics";
+import { useCreativeRecommendations } from "@/hooks/useCreativeRecommendations";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { useSubscription } from "@/hooks/useSubscription";
 
@@ -40,11 +42,23 @@ export const CreativeDiagnostics = ({ dateFrom, dateTo }: CreativeDiagnosticsPro
   } = useCreativeDiagnostics();
 
   const [selectedProfile, setSelectedProfile] = useState<string>('');
+
+  const {
+    recommendations,
+    loading: recsLoading,
+    generating,
+    generateRecommendations,
+    applyRecommendation,
+    dismissRecommendation,
+    fetchRecommendations
+  } = useCreativeRecommendations(selectedProfile);
+
   const [selectedType, setSelectedType] = useState<string>('all');
   const [selectedSort, setSelectedSort] = useState<string>('impressions');
   const [selectedAsset, setSelectedAsset] = useState<CreativePerformance | null>(null);
   const [showUnderperformers, setShowUnderperformers] = useState(false);
   const [minImpressions, setMinImpressions] = useState<string>('1000');
+  const [activeTab, setActiveTab] = useState<string>('assets');
 
   const isStarter = subscription?.plan_type === 'pro'; // Only pro tier for now
 
@@ -246,148 +260,282 @@ export const CreativeDiagnostics = ({ dateFrom, dateTo }: CreativeDiagnosticsPro
         </Card>
       </div>
 
-      {/* Assets Grid/Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>
-              {showUnderperformers ? 'Underperforming' : 'Creative'} Assets 
-              ({displayAssets.length})
-            </span>
-            {showUnderperformers && (
-              <Button variant="outline" size="sm" onClick={() => setShowUnderperformers(false)}>
-                Show All
-              </Button>
+      {/* Tabbed View - Assets and Recommendations */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="assets">
+            Assets ({displayAssets.length})
+          </TabsTrigger>
+          <TabsTrigger value="recommendations" className="gap-1">
+            <Wand2 className="h-3.5 w-3.5" />
+            Recommendations
+            {recommendations.length > 0 && (
+              <Badge variant="destructive" className="ml-1 h-5 w-5 rounded-full p-0 flex items-center justify-center">
+                {recommendations.length}
+              </Badge>
             )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {displayAssets.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No assets found. Try syncing assets or adjusting filters.
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Asset</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Impressions</TableHead>
-                  <TableHead>CTR</TableHead>
-                  <TableHead>CPC</TableHead>
-                  <TableHead>Conversions</TableHead>
-                  <TableHead>ACOS</TableHead>
-                  <TableHead>Video VTR</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {displayAssets.map((asset, index) => (
-                  <TableRow key={asset.asset_id || index}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {getAssetTypeIcon(asset.asset_id?.split('_')[0] || 'image')}
-                        <span className="font-mono text-sm">
-                          {asset.asset_id?.slice(-8) || asset.ad_id.slice(-8)}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        {asset.asset_id?.split('_')[0] || 'unknown'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{asset.impressions.toLocaleString()}</TableCell>
-                    <TableCell>{formatPercentage(asset.ctr)}</TableCell>
-                    <TableCell>£{asset.cpc.toFixed(3)}</TableCell>
-                    <TableCell>{asset.conversions_7d}</TableCell>
-                    <TableCell>{formatPercentage(asset.acos)}</TableCell>
-                    <TableCell>
-                      {asset.vtr_25 !== null ? (
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 text-xs">
-                            <span>25%:</span>
-                            <Progress value={asset.vtr_25 || 0} className="w-12 h-1" />
-                            <span>{formatPercentage(asset.vtr_25 || 0)}</span>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="assets">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span>
+                  {showUnderperformers ? 'Underperforming' : 'Creative'} Assets 
+                  ({displayAssets.length})
+                </span>
+                {showUnderperformers && (
+                  <Button variant="outline" size="sm" onClick={() => setShowUnderperformers(false)}>
+                    Show All
+                  </Button>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {displayAssets.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No assets found. Try syncing assets or adjusting filters.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Asset</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Impressions</TableHead>
+                      <TableHead>CTR</TableHead>
+                      <TableHead>CPC</TableHead>
+                      <TableHead>Conversions</TableHead>
+                      <TableHead>ACOS</TableHead>
+                      <TableHead>Video VTR</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {displayAssets.map((asset, index) => (
+                      <TableRow key={asset.asset_id || index}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {getAssetTypeIcon(asset.asset_id?.split('_')[0] || 'image')}
+                            <span className="font-mono text-sm">
+                              {asset.asset_id?.slice(-8) || asset.ad_id.slice(-8)}
+                            </span>
                           </div>
-                          <div className="flex items-center gap-2 text-xs">
-                            <span>100%:</span>
-                            <Progress value={asset.vtr_100 || 0} className="w-12 h-1" />
-                            <span>{formatPercentage(asset.vtr_100 || 0)}</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">N/A</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleViewAssetBreakdown(asset)}
-                          >
-                            <Eye className="h-3 w-3 mr-1" />
-                            Used In
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-4xl">
-                          <DialogHeader>
-                            <DialogTitle>
-                              Asset Usage: {selectedAsset?.asset_id?.slice(-8) || 'N/A'}
-                            </DialogTitle>
-                          </DialogHeader>
-                          <div className="space-y-4">
-                            {adBreakdown.length === 0 ? (
-                              <div className="text-center py-8 text-muted-foreground">
-                                No ads found using this asset.
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {asset.asset_id?.split('_')[0] || 'unknown'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{asset.impressions.toLocaleString()}</TableCell>
+                        <TableCell>{formatPercentage(asset.ctr)}</TableCell>
+                        <TableCell>£{asset.cpc.toFixed(3)}</TableCell>
+                        <TableCell>{asset.conversions_7d}</TableCell>
+                        <TableCell>{formatPercentage(asset.acos)}</TableCell>
+                        <TableCell>
+                          {asset.vtr_25 !== null ? (
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2 text-xs">
+                                <span>25%:</span>
+                                <Progress value={asset.vtr_25 || 0} className="w-12 h-1" />
+                                <span>{formatPercentage(asset.vtr_25 || 0)}</span>
                               </div>
-                            ) : (
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead>Ad ID</TableHead>
-                                    <TableHead>Role</TableHead>
-                                    <TableHead>Campaign</TableHead>
-                                    <TableHead>Impressions</TableHead>
-                                    <TableHead>CTR</TableHead>
-                                    <TableHead>CPC</TableHead>
-                                    <TableHead>ACOS</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {adBreakdown.map((ad, index) => (
-                                    <TableRow key={index}>
-                                      <TableCell className="font-mono text-sm">
-                                        {ad.ad_id.slice(-8)}
-                                      </TableCell>
-                                      <TableCell>
-                                        <Badge variant="secondary">{ad.role}</Badge>
-                                      </TableCell>
-                                      <TableCell className="font-mono text-sm">
-                                        {ad.campaign_id?.slice(-8) || 'N/A'}
-                                      </TableCell>
-                                      <TableCell>{ad.impressions.toLocaleString()}</TableCell>
-                                      <TableCell>{formatPercentage(ad.ctr)}</TableCell>
-                                      <TableCell>£{ad.cpc.toFixed(3)}</TableCell>
-                                      <TableCell>{formatPercentage(ad.acos)}</TableCell>
-                                    </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
-                            )}
+                              <div className="flex items-center gap-2 text-xs">
+                                <span>100%:</span>
+                                <Progress value={asset.vtr_100 || 0} className="w-12 h-1" />
+                                <span>{formatPercentage(asset.vtr_100 || 0)}</span>
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">N/A</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleViewAssetBreakdown(asset)}
+                              >
+                                <Eye className="h-3 w-3 mr-1" />
+                                Used In
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-4xl">
+                              <DialogHeader>
+                                <DialogTitle>
+                                  Asset Usage: {selectedAsset?.asset_id?.slice(-8) || 'N/A'}
+                                </DialogTitle>
+                              </DialogHeader>
+                              <div className="space-y-4">
+                                {adBreakdown.length === 0 ? (
+                                  <div className="text-center py-8 text-muted-foreground">
+                                    No ads found using this asset.
+                                  </div>
+                                ) : (
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead>Ad ID</TableHead>
+                                        <TableHead>Role</TableHead>
+                                        <TableHead>Campaign</TableHead>
+                                        <TableHead>Impressions</TableHead>
+                                        <TableHead>CTR</TableHead>
+                                        <TableHead>CPC</TableHead>
+                                        <TableHead>ACOS</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {adBreakdown.map((ad, index) => (
+                                        <TableRow key={index}>
+                                          <TableCell className="font-mono text-sm">
+                                            {ad.ad_id.slice(-8)}
+                                          </TableCell>
+                                          <TableCell>
+                                            <Badge variant="secondary">{ad.role}</Badge>
+                                          </TableCell>
+                                          <TableCell className="font-mono text-sm">
+                                            {ad.campaign_id?.slice(-8) || 'N/A'}
+                                          </TableCell>
+                                          <TableCell>{ad.impressions.toLocaleString()}</TableCell>
+                                          <TableCell>{formatPercentage(ad.ctr)}</TableCell>
+                                          <TableCell>£{ad.cpc.toFixed(3)}</TableCell>
+                                          <TableCell>{formatPercentage(ad.acos)}</TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                )}
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="recommendations">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Wand2 className="h-5 w-5 text-brand-primary" />
+                  AI Creative Recommendations
+                </div>
+                <Button 
+                  onClick={() => generateRecommendations()}
+                  disabled={generating || !selectedProfile}
+                  size="sm"
+                >
+                  {generating ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Analyzing...
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 className="h-4 w-4 mr-2" />
+                      Generate Recommendations
+                    </>
+                  )}
+                </Button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {recsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : recommendations.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <AlertTriangle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No recommendations yet.</p>
+                  <p className="text-sm mt-2">Click "Generate Recommendations" to analyze your creatives.</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Asset</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Reason</TableHead>
+                      <TableHead>Confidence</TableHead>
+                      <TableHead>Impact</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {recommendations.map((rec) => (
+                      <TableRow key={rec.id}>
+                        <TableCell className="font-mono text-sm">
+                          {rec.asset_id.slice(-8)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant={rec.recommendation_type === 'pause' ? 'destructive' : 'secondary'}
+                          >
+                            {rec.recommendation_type}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="max-w-xs">
+                          <p className="text-sm truncate">{rec.reason}</p>
+                        </TableCell>
+                        <TableCell>
+                          <Progress 
+                            value={rec.confidence * 100} 
+                            className="w-16 h-2"
+                          />
+                          <span className="text-xs text-muted-foreground">
+                            {(rec.confidence * 100).toFixed(0)}%
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant={
+                              rec.impact_estimate === 'high' ? 'destructive' : 
+                              rec.impact_estimate === 'medium' ? 'default' : 'secondary'
+                            }
+                          >
+                            {rec.impact_estimate || 'medium'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => applyRecommendation(rec.id)}
+                              className="h-8"
+                            >
+                              <Check className="h-3 w-3 mr-1" />
+                              Apply
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => dismissRecommendation(rec.id)}
+                              className="h-8"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
                           </div>
-                        </DialogContent>
-                      </Dialog>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

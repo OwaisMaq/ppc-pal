@@ -185,6 +185,7 @@ export type Database = {
           ctr_14d: number | null
           ctr_7d: number | null
           default_bid: number | null
+          has_custom_bids: boolean | null
           id: string
           impressions: number | null
           impressions_14d: number | null
@@ -227,6 +228,7 @@ export type Database = {
           ctr_14d?: number | null
           ctr_7d?: number | null
           default_bid?: number | null
+          has_custom_bids?: boolean | null
           id?: string
           impressions?: number | null
           impressions_14d?: number | null
@@ -269,6 +271,7 @@ export type Database = {
           ctr_14d?: number | null
           ctr_7d?: number | null
           default_bid?: number | null
+          has_custom_bids?: boolean | null
           id?: string
           impressions?: number | null
           impressions_14d?: number | null
@@ -1928,6 +1931,54 @@ export type Database = {
           },
         ]
       }
+      campaign_placement_performance: {
+        Row: {
+          acos: number | null
+          campaign_id: string
+          clicks: number | null
+          created_at: string | null
+          current_adjustment: number | null
+          date: string
+          id: string
+          impressions: number | null
+          orders: number | null
+          placement: string
+          profile_id: string
+          sales: number | null
+          spend: number | null
+        }
+        Insert: {
+          acos?: number | null
+          campaign_id: string
+          clicks?: number | null
+          created_at?: string | null
+          current_adjustment?: number | null
+          date: string
+          id?: string
+          impressions?: number | null
+          orders?: number | null
+          placement: string
+          profile_id: string
+          sales?: number | null
+          spend?: number | null
+        }
+        Update: {
+          acos?: number | null
+          campaign_id?: string
+          clicks?: number | null
+          created_at?: string | null
+          current_adjustment?: number | null
+          date?: string
+          id?: string
+          impressions?: number | null
+          orders?: number | null
+          placement?: string
+          profile_id?: string
+          sales?: number | null
+          spend?: number | null
+        }
+        Relationships: []
+      }
       campaign_templates: {
         Row: {
           asin: string
@@ -2355,6 +2406,57 @@ export type Database = {
           video_q50?: number | null
           video_q75?: number | null
           video_starts?: number | null
+        }
+        Relationships: []
+      }
+      creative_recommendations: {
+        Row: {
+          ad_id: string | null
+          applied_at: string | null
+          asset_id: string
+          confidence: number | null
+          created_at: string | null
+          dismissed_at: string | null
+          id: string
+          impact_estimate: string | null
+          metrics: Json | null
+          profile_id: string
+          reason: string
+          recommendation_type: string
+          status: string | null
+          user_id: string | null
+        }
+        Insert: {
+          ad_id?: string | null
+          applied_at?: string | null
+          asset_id: string
+          confidence?: number | null
+          created_at?: string | null
+          dismissed_at?: string | null
+          id?: string
+          impact_estimate?: string | null
+          metrics?: Json | null
+          profile_id: string
+          reason: string
+          recommendation_type: string
+          status?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          ad_id?: string | null
+          applied_at?: string | null
+          asset_id?: string
+          confidence?: number | null
+          created_at?: string | null
+          dismissed_at?: string | null
+          id?: string
+          impact_estimate?: string | null
+          metrics?: Json | null
+          profile_id?: string
+          reason?: string
+          recommendation_type?: string
+          status?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
