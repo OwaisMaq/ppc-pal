@@ -2,8 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { RefreshCw, Link2, ChevronDown, Shield, Tag } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { RefreshCw, Link2, ChevronDown, Tag } from 'lucide-react';
 import { useAmazonConnections } from '@/hooks/useAmazonConnections';
 import AmazonAccountSetup from '@/components/AmazonAccountSetup';
 import AmsSetup from '@/components/AmsSetup';
@@ -78,21 +77,6 @@ export const ConnectionsSettings = () => {
         </CollapsibleContent>
       </Collapsible>
 
-      {/* Guardrails Link */}
-      <Card className="border-primary/20">
-        <Link to="/governance?tab=rules">
-          <CardContent className="flex items-center justify-between p-4">
-            <div className="flex items-center gap-3">
-              <Shield className="h-5 w-5 text-primary" />
-              <div>
-                <p className="font-medium">Automation Guardrails</p>
-                <p className="text-sm text-muted-foreground">Configure bid limits and protected entities</p>
-              </div>
-            </div>
-            <ChevronDown className="h-4 w-4 -rotate-90 text-muted-foreground" />
-          </CardContent>
-        </Link>
-      </Card>
 
       {/* ASIN Labels */}
       <Collapsible open={showLabels} onOpenChange={setShowLabels}>
