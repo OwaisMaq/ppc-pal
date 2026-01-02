@@ -2,13 +2,16 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useActionsFeed } from "@/hooks/useActionsFeed";
+import { useBudgetCopilot } from "@/hooks/useBudgetCopilot";
+import { useGlobalFilters } from "@/context/GlobalFiltersContext";
 import { supabase } from "@/integrations/supabase/client";
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import { ConfidenceBadge } from "@/components/automation";
 import { 
   ClipboardCheck,
   TrendingUp, 
+  TrendingDown,
   Ban, 
   Activity,
   DollarSign,
@@ -16,21 +19,106 @@ import {
   X,
   Loader2,
   Pause,
-  Play
+  Play,
+  Wallet,
+  Minus
 } from "lucide-react";
 
+interface UnifiedPendingItem {
+  id: string;
+  source: 'action_queue' | 'budget_recommendation';
+  type: string;
+  label: string;
+  details: string;
+  status: string;
+  createdAt: string;
+  confidence?: number;
+  originalData: any;
+  // For budget recommendations
+  currentBudget?: number;
+  suggestedBudget?: number;
+  paceRatio?: number;
+  budgetAction?: 'increase' | 'decrease' | 'hold';
+}
+
 const PendingApprovals = () => {
-  const { actions, loading, refetch } = useActionsFeed(50);
+  const { actions, loading: actionsLoading, refetch: refetchActions } = useActionsFeed(50);
+  const { selectedProfileId } = useGlobalFilters();
+  const { 
+    recommendations, 
+    loading: budgetLoading, 
+    fetchRecommendations,
+    applyRecommendation,
+    dismissRecommendation 
+  } = useBudgetCopilot();
+  
   const [processing, setProcessing] = useState<string[]>([]);
 
-  // Show both queued (awaiting approval) and skipped (blocked/can retry) actions
-  const pendingActions = actions.filter(action => 
-    action.status === 'queued' || 
-    (action.status === 'skipped' && action.error !== 'User rejected')
-  );
+  // Fetch budget recommendations on mount and when profile changes
+  useEffect(() => {
+    fetchRecommendations(selectedProfileId || undefined);
+  }, [selectedProfileId]);
 
-  const getActionIcon = (actionType: string) => {
-    switch (actionType) {
+  // Combine and normalize pending items
+  const pendingItems = useMemo(() => {
+    const items: UnifiedPendingItem[] = [];
+
+    // Add action queue items
+    const pendingActions = actions.filter(action => 
+      action.status === 'queued' || 
+      (action.status === 'skipped' && action.error !== 'User rejected')
+    );
+
+    pendingActions.forEach(action => {
+      const payload = action.payload as Record<string, unknown>;
+      const confidence = typeof payload?.confidence === 'number' 
+        ? Math.round(payload.confidence * 100) 
+        : undefined;
+      
+      items.push({
+        id: action.id,
+        source: 'action_queue',
+        type: action.action_type,
+        label: getActionLabel(action.action_type),
+        details: formatActionDetails(action),
+        status: action.status,
+        createdAt: action.created_at,
+        confidence,
+        originalData: action,
+      });
+    });
+
+    // Add budget recommendations
+    const openRecommendations = recommendations.filter(rec => rec.state === 'open');
+    openRecommendations.forEach(rec => {
+      const budgetAction = rec.action as 'increase' | 'decrease' | 'hold';
+      const currentBudgetMicros = rec.current_budget_micros ?? 0;
+      const suggestedBudgetMicros = rec.suggested_budget_micros ?? 0;
+      
+      items.push({
+        id: rec.id,
+        source: 'budget_recommendation',
+        type: `budget_${budgetAction}`,
+        label: getBudgetActionLabel(budgetAction),
+        details: rec.campaign_id ? `Campaign ${rec.campaign_id.slice(-8)}` : 'Campaign',
+        status: 'pending',
+        createdAt: rec.created_at,
+        originalData: rec,
+        currentBudget: currentBudgetMicros / 1_000_000,
+        suggestedBudget: suggestedBudgetMicros > 0 ? suggestedBudgetMicros / 1_000_000 : undefined,
+        paceRatio: rec.pace_ratio,
+        budgetAction,
+      });
+    });
+
+    // Sort by created date (most recent first)
+    return items.sort((a, b) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  }, [actions, recommendations]);
+
+  const getActionIcon = (type: string) => {
+    switch (type) {
       case 'set_bid':
         return TrendingUp;
       case 'negative_keyword':
@@ -43,6 +131,12 @@ const PendingApprovals = () => {
         return Play;
       case 'set_placement_adjust':
         return Activity;
+      case 'budget_increase':
+        return TrendingUp;
+      case 'budget_decrease':
+        return TrendingDown;
+      case 'budget_hold':
+        return Minus;
       default:
         return DollarSign;
     }
@@ -67,10 +161,20 @@ const PendingApprovals = () => {
       case 'disable_entity':
         return 'Disable Entity';
       default:
-        // Convert snake_case to Title Case
         return actionType.split('_').map(word => 
           word.charAt(0).toUpperCase() + word.slice(1)
         ).join(' ');
+    }
+  };
+
+  const getBudgetActionLabel = (action: 'increase' | 'decrease' | 'hold') => {
+    switch (action) {
+      case 'increase':
+        return 'Increase Budget';
+      case 'decrease':
+        return 'Decrease Budget';
+      case 'hold':
+        return 'Hold Budget';
     }
   };
 
@@ -93,85 +197,86 @@ const PendingApprovals = () => {
       case 'set_placement_adjust':
         return payload.placement ? `${payload.placement} placement` : 'Placement';
       default:
-        // Try to show entity name, otherwise just show action type
         return entityName || 'Action pending';
     }
   };
 
-  // Extract confidence data from action payload (for Bayesian bid actions)
-  const getConfidenceData = (action: any) => {
-    const { payload } = action;
-    if (payload?.confidence !== undefined) {
-      return {
-        confidence: Math.round(payload.confidence * 100),
-      };
-    }
-    return null;
+  const formatBudget = (value: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value);
   };
 
-  // Check if action is from Bayesian optimizer
-  const isBayesianAction = (action: any) => {
-    return action.payload?.source === 'bayesian_optimizer' || 
-           action.payload?.confidence !== undefined;
-  };
-
-  const handleApprove = async (actionId: string) => {
-    setProcessing(prev => [...prev, actionId]);
+  const handleApprove = async (item: UnifiedPendingItem) => {
+    setProcessing(prev => [...prev, item.id]);
+    
     try {
-      // First update status to queued if it was skipped
-      const action = pendingActions.find(a => a.id === actionId);
-      if (action?.status === 'skipped') {
-        const { error: updateError } = await supabase
-          .from('action_queue')
-          .update({ status: 'queued', error: null })
-          .eq('id', actionId);
+      if (item.source === 'action_queue') {
+        // Handle action queue approval
+        const action = item.originalData;
+        if (action?.status === 'skipped') {
+          const { error: updateError } = await supabase
+            .from('action_queue')
+            .update({ status: 'queued', error: null })
+            .eq('id', item.id);
+          
+          if (updateError) throw updateError;
+        }
         
-        if (updateError) throw updateError;
+        const { error } = await supabase.functions.invoke('actions-worker', {
+          body: { action_id: item.id }
+        });
+        
+        if (error) throw error;
+        toast.success('Action approved and applied');
+        refetchActions();
+      } else {
+        // Handle budget recommendation approval
+        await applyRecommendation(item.id);
       }
-      
-      // Invoke the actions worker to process this action
-      const { error } = await supabase.functions.invoke('actions-worker', {
-        body: { action_id: actionId }
-      });
-      
-      if (error) throw error;
-      
-      toast.success('Action approved and applied');
-      refetch();
     } catch (err) {
-      console.error('Failed to approve action:', err);
+      console.error('Failed to approve:', err);
       toast.error('Failed to approve action');
     } finally {
-      setProcessing(prev => prev.filter(id => id !== actionId));
+      setProcessing(prev => prev.filter(id => id !== item.id));
     }
   };
 
-  const handleReject = async (actionId: string) => {
-    setProcessing(prev => [...prev, actionId]);
+  const handleReject = async (item: UnifiedPendingItem) => {
+    setProcessing(prev => [...prev, item.id]);
+    
     try {
-      const { error } = await supabase
-        .from('action_queue')
-        .update({ status: 'skipped', error: 'User rejected' })
-        .eq('id', actionId);
-      
-      if (error) throw error;
-      
-      toast.success('Action rejected');
-      refetch();
+      if (item.source === 'action_queue') {
+        const { error } = await supabase
+          .from('action_queue')
+          .update({ status: 'skipped', error: 'User rejected' })
+          .eq('id', item.id);
+        
+        if (error) throw error;
+        toast.success('Action rejected');
+        refetchActions();
+      } else {
+        await dismissRecommendation(item.id);
+      }
     } catch (err) {
-      console.error('Failed to reject action:', err);
+      console.error('Failed to reject:', err);
       toast.error('Failed to reject action');
     } finally {
-      setProcessing(prev => prev.filter(id => id !== actionId));
+      setProcessing(prev => prev.filter(id => id !== item.id));
     }
   };
 
   const handleApproveAll = async () => {
-    const actionIds = pendingActions.map(a => a.id);
-    setProcessing(actionIds);
-    
-    const queuedActions = pendingActions.filter(a => a.status === 'queued');
+    const queuedActions = pendingItems.filter(
+      item => item.source === 'action_queue' && item.status === 'queued'
+    );
     if (queuedActions.length === 0) return;
+    
+    const actionIds = queuedActions.map(a => a.id);
+    setProcessing(actionIds);
     
     try {
       const { error } = await supabase.functions.invoke('actions-worker', {
@@ -181,12 +286,14 @@ const PendingApprovals = () => {
       if (error) throw error;
       
       toast.success(`${queuedActions.length} actions approved`);
-      refetch();
+      refetchActions();
     } catch (err) {
       console.error('Failed to approve all actions:', err);
       toast.error('Failed to approve all actions');
     }
   };
+
+  const loading = actionsLoading || budgetLoading;
 
   if (loading) {
     return (
@@ -206,7 +313,7 @@ const PendingApprovals = () => {
     );
   }
 
-  if (pendingActions.length === 0) {
+  if (pendingItems.length === 0) {
     return (
       <Card>
         <CardHeader className="pb-3">
@@ -225,8 +332,10 @@ const PendingApprovals = () => {
     );
   }
 
-  const queuedCount = pendingActions.filter(a => a.status === 'queued').length;
-  const skippedCount = pendingActions.filter(a => a.status === 'skipped').length;
+  const actionQueueItems = pendingItems.filter(i => i.source === 'action_queue');
+  const budgetItems = pendingItems.filter(i => i.source === 'budget_recommendation');
+  const queuedCount = actionQueueItems.filter(a => a.status === 'queued').length;
+  const skippedCount = actionQueueItems.filter(a => a.status === 'skipped').length;
 
   return (
     <Card>
@@ -237,13 +346,15 @@ const PendingApprovals = () => {
               <ClipboardCheck className="h-5 w-5 text-primary" />
               Pending Approvals
               <Badge variant="secondary" className="ml-2">
-                {pendingActions.length}
+                {pendingItems.length}
               </Badge>
             </CardTitle>
             <CardDescription>
-              {queuedCount > 0 && `${queuedCount} awaiting approval`}
+              {queuedCount > 0 && `${queuedCount} actions`}
               {queuedCount > 0 && skippedCount > 0 && ' · '}
               {skippedCount > 0 && `${skippedCount} blocked`}
+              {(queuedCount > 0 || skippedCount > 0) && budgetItems.length > 0 && ' · '}
+              {budgetItems.length > 0 && `${budgetItems.length} budget`}
             </CardDescription>
           </div>
           {queuedCount > 1 && (
@@ -254,45 +365,77 @@ const PendingApprovals = () => {
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        {pendingActions.slice(0, 5).map((action) => {
-          const Icon = getActionIcon(action.action_type);
-          const isProcessing = processing.includes(action.id);
-          const bayesianData = isBayesianAction(action) ? getConfidenceData(action) : null;
-          const isSkipped = action.status === 'skipped';
+        {pendingItems.slice(0, 5).map((item) => {
+          const Icon = item.source === 'budget_recommendation' 
+            ? Wallet 
+            : getActionIcon(item.type);
+          const isProcessing = processing.includes(item.id);
+          const isSkipped = item.status === 'skipped';
+          const isBudget = item.source === 'budget_recommendation';
+          
+          // Get icon color based on budget action type
+          const getIconStyles = () => {
+            if (isBudget) {
+              switch (item.budgetAction) {
+                case 'increase':
+                  return { bg: 'bg-emerald-500/10', text: 'text-emerald-600' };
+                case 'decrease':
+                  return { bg: 'bg-amber-500/10', text: 'text-amber-600' };
+                default:
+                  return { bg: 'bg-muted', text: 'text-muted-foreground' };
+              }
+            }
+            if (isSkipped) {
+              return { bg: 'bg-muted', text: 'text-muted-foreground' };
+            }
+            return { bg: 'bg-primary/10', text: 'text-primary' };
+          };
+          
+          const iconStyles = getIconStyles();
           
           return (
             <div 
-              key={action.id} 
+              key={item.id} 
               className={`flex items-start justify-between p-3 rounded-lg border ${
                 isSkipped ? 'bg-muted/50 border-muted' : 'bg-background'
               }`}
             >
               <div className="flex items-start gap-3">
-                <div className={`p-2 rounded-md ${isSkipped ? 'bg-muted' : 'bg-primary/10'}`}>
-                  <Icon className={`h-4 w-4 ${isSkipped ? 'text-muted-foreground' : 'text-primary'}`} />
+                <div className={`p-2 rounded-md ${iconStyles.bg}`}>
+                  <Icon className={`h-4 w-4 ${iconStyles.text}`} />
                 </div>
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <p className="font-medium text-sm">
-                      {getActionLabel(action.action_type)}
+                      {item.label}
                     </p>
                     {isSkipped && (
                       <Badge variant="outline" className="text-xs">
                         Blocked
                       </Badge>
                     )}
-                    {bayesianData && (
-                      <ConfidenceBadge 
-                        confidence={bayesianData.confidence} 
-                      />
+                    {isBudget && (
+                      <Badge variant="outline" className="text-xs">
+                        Budget
+                      </Badge>
+                    )}
+                    {item.confidence && (
+                      <ConfidenceBadge confidence={item.confidence} />
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {formatActionDetails(action)}
+                    {item.details}
                   </p>
-                  {isSkipped && action.error && (
+                  {isBudget && item.currentBudget !== undefined && (
+                    <p className="text-xs text-muted-foreground">
+                      {formatBudget(item.currentBudget)}
+                      {item.suggestedBudget && ` → ${formatBudget(item.suggestedBudget)}`}
+                      {item.paceRatio && ` · Pace: ${item.paceRatio.toFixed(1)}x`}
+                    </p>
+                  )}
+                  {isSkipped && item.originalData?.error && (
                     <p className="text-xs text-amber-600 dark:text-amber-400">
-                      {action.error}
+                      {item.originalData.error}
                     </p>
                   )}
                 </div>
@@ -302,7 +445,7 @@ const PendingApprovals = () => {
                   size="icon"
                   variant="ghost"
                   className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                  onClick={() => handleReject(action.id)}
+                  onClick={() => handleReject(item)}
                   disabled={isProcessing}
                 >
                   <X className="h-4 w-4" />
@@ -311,7 +454,7 @@ const PendingApprovals = () => {
                   size="icon"
                   variant="ghost"
                   className="h-8 w-8 text-emerald-600 hover:text-emerald-600 hover:bg-emerald-600/10"
-                  onClick={() => handleApprove(action.id)}
+                  onClick={() => handleApprove(item)}
                   disabled={isProcessing}
                 >
                   {isProcessing ? (
@@ -324,9 +467,9 @@ const PendingApprovals = () => {
             </div>
           );
         })}
-        {pendingActions.length > 5 && (
+        {pendingItems.length > 5 && (
           <p className="text-xs text-muted-foreground text-center pt-2">
-            +{pendingActions.length - 5} more actions
+            +{pendingItems.length - 5} more pending
           </p>
         )}
       </CardContent>
