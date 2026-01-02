@@ -2,11 +2,10 @@ import { useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import DashboardShell from '@/components/DashboardShell';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { User, Link2, Bot, Bell, CreditCard, Database } from 'lucide-react';
+import { User, Link2, Bell, CreditCard, Database } from 'lucide-react';
 import {
   AccountSettings,
   ConnectionsSettings,
-  AISettings,
   NotificationsSettings,
   BillingSettings,
   DataSettings,
@@ -15,7 +14,6 @@ import {
 const TABS = [
   { value: 'account', label: 'Account', icon: User },
   { value: 'connections', label: 'Connections', icon: Link2 },
-  { value: 'ai', label: 'AI & Automation', icon: Bot },
   { value: 'notifications', label: 'Notifications', icon: Bell },
   { value: 'billing', label: 'Billing', icon: CreditCard },
   { value: 'data', label: 'Data', icon: Database },
@@ -53,7 +51,7 @@ const Settings = () => {
         </div>
 
         <Tabs value={currentTab} onValueChange={handleTabChange} className="space-y-6">
-          <TabsList className="grid grid-cols-3 md:grid-cols-6 h-auto gap-1 p-1">
+          <TabsList className="grid grid-cols-3 md:grid-cols-5 h-auto gap-1 p-1">
             {TABS.map(tab => (
               <TabsTrigger
                 key={tab.value}
@@ -72,10 +70,6 @@ const Settings = () => {
 
           <TabsContent value="connections">
             <ConnectionsSettings />
-          </TabsContent>
-
-          <TabsContent value="ai">
-            <AISettings />
           </TabsContent>
 
           <TabsContent value="notifications">
