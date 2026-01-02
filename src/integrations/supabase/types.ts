@@ -992,6 +992,60 @@ export type Database = {
         }
         Relationships: []
       }
+      anomaly_detection_settings: {
+        Row: {
+          created_at: string | null
+          critical_threshold: number | null
+          daily_cooldown_hours: number | null
+          daily_enabled: boolean | null
+          enabled: boolean | null
+          id: string
+          intraday_cooldown_hours: number | null
+          intraday_enabled: boolean | null
+          metric_thresholds: Json | null
+          notify_on_critical: boolean | null
+          notify_on_warn: boolean | null
+          profile_id: string
+          updated_at: string | null
+          user_id: string
+          warn_threshold: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          critical_threshold?: number | null
+          daily_cooldown_hours?: number | null
+          daily_enabled?: boolean | null
+          enabled?: boolean | null
+          id?: string
+          intraday_cooldown_hours?: number | null
+          intraday_enabled?: boolean | null
+          metric_thresholds?: Json | null
+          notify_on_critical?: boolean | null
+          notify_on_warn?: boolean | null
+          profile_id: string
+          updated_at?: string | null
+          user_id: string
+          warn_threshold?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          critical_threshold?: number | null
+          daily_cooldown_hours?: number | null
+          daily_enabled?: boolean | null
+          enabled?: boolean | null
+          id?: string
+          intraday_cooldown_hours?: number | null
+          intraday_enabled?: boolean | null
+          metric_thresholds?: Json | null
+          notify_on_critical?: boolean | null
+          notify_on_warn?: boolean | null
+          profile_id?: string
+          updated_at?: string | null
+          user_id?: string
+          warn_threshold?: number | null
+        }
+        Relationships: []
+      }
       anomaly_runs: {
         Row: {
           anomalies_found: number | null

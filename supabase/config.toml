@@ -168,3 +168,6 @@ verify_jwt = false
 
 [functions.historical-audit-scheduler]
 verify_jwt = false
+
+[functions.anomalies-runner]
+verify_jwt = false
