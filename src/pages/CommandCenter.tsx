@@ -1,7 +1,7 @@
-import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import DashboardShell from "@/components/DashboardShell";
 
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
@@ -18,10 +18,9 @@ import { useSearchStudio } from "@/hooks/useSearchStudio";
 import { useActionsFeed } from "@/hooks/useActionsFeed";
 import { useAccountHealth } from "@/hooks/useAccountHealth";
 import { useAsinAutomationStats } from "@/hooks/useAsinAutomationStats";
-
+import { useBidOptimizerStatus } from "@/hooks/useBidOptimizerStatus";
 
 // Components
-
 import { Skeleton } from "@/components/ui/skeleton";
 import PendingApprovals from "@/components/PendingApprovals";
 import ActionsFeed from "@/components/ActionsFeed";
@@ -39,7 +38,9 @@ import {
   type MarketplaceOption,
   type BrandOption
 } from "@/components/overview";
-import { BidOptimizerStatusCard } from "@/components/automation";
+import ConfidenceMeter from "@/components/ui/ConfidenceMeter";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 import { DashboardKPIs as KPIData } from "@/hooks/useDashboardData";
 import { ClipboardCheck, Activity } from "lucide-react";
@@ -124,6 +125,8 @@ const CommandCenter = () => {
   const { actions, loading: actionsLoading } = useActionQueue(profileId);
   const { actions: feedActions } = useActionsFeed(50);
   
+  // Fetch bid optimizer status
+  const { data: bidOptimizerStatus } = useBidOptimizerStatus(profileId);
   
   // Fetch anomalies
   const { anomalies, loading: anomaliesLoading, fetchAnomalies } = useAnomalies();
@@ -203,7 +206,7 @@ const CommandCenter = () => {
   }, [alerts]);
 
 
-  // Confidence signals
+  // Confidence signals with unified score
   const confidenceSignals = useMemo(() => {
     const riskScore = healthStatus === 'healthy' ? 20 : healthStatus === 'watch' ? 50 : 80;
     const riskLevel = healthStatus === 'healthy' ? 'low' as const : 
@@ -211,11 +214,27 @@ const CommandCenter = () => {
     
     const hasEnoughData = hasData && minDate;
     const dataAge = minDate ? differenceInDays(new Date(), new Date(minDate)) : 0;
-    const confidenceScore = hasEnoughData ? Math.min(90, 50 + dataAge * 2) : 30;
+    const dataConfidence = hasEnoughData ? Math.min(90, 50 + dataAge * 2) : 30;
     const daysSinceManualIntervention = actions?.some(a => a.status === 'reverted') ? 2 : null;
     
-    return { riskLevel, riskScore, confidenceScore, daysSinceManualIntervention };
-  }, [healthStatus, hasData, minDate, actions]);
+    // Bid optimizer confidence
+    const optimizerConfidence = bidOptimizerStatus?.averageConfidence || 0;
+    
+    // Combined score: weighted average (60% data confidence, 40% optimizer confidence)
+    // If no optimizer data, use data confidence only
+    const combinedScore = optimizerConfidence > 0
+      ? Math.round(dataConfidence * 0.6 + optimizerConfidence * 0.4)
+      : dataConfidence;
+    
+    return { 
+      riskLevel, 
+      riskScore, 
+      dataConfidence,
+      optimizerConfidence,
+      combinedScore, 
+      daysSinceManualIntervention 
+    };
+  }, [healthStatus, hasData, minDate, actions, bidOptimizerStatus]);
 
   // Setup items
   const setupItems = useMemo(() => {
@@ -255,31 +274,71 @@ const CommandCenter = () => {
       <div className="container mx-auto py-6 px-4 space-y-6">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Command Center</h1>
-            <p className="text-muted-foreground">Your Amazon Advertising control hub</p>
-          </div>
-          <div className="flex items-center gap-3">
-            {/* Confidence signals as subtle inline badges */}
-            <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
-              <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full border ${
-                confidenceSignals.riskLevel === 'low' ? 'border-success/30 text-success' :
-                confidenceSignals.riskLevel === 'medium' ? 'border-warning/30 text-warning' :
-                'border-destructive/30 text-destructive'
-              }`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${
-                  confidenceSignals.riskLevel === 'low' ? 'bg-success' :
-                  confidenceSignals.riskLevel === 'medium' ? 'bg-warning' :
-                  'bg-destructive'
-                }`} />
-                {confidenceSignals.riskLevel === 'low' ? 'Low Risk' : 
-                 confidenceSignals.riskLevel === 'medium' ? 'Medium Risk' : 'High Risk'}
-              </span>
-              <span className="text-muted-foreground/60">•</span>
-              <span className="text-muted-foreground">
-                {confidenceSignals.confidenceScore}% confidence
-              </span>
+          <div className="flex items-center gap-6">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">Command Center</h1>
+              <p className="text-muted-foreground">Your Amazon Advertising control hub</p>
             </div>
+            
+            {/* Unified Confidence Gauge */}
+            {hasConnections && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="hidden md:block cursor-help">
+                      <ConfidenceMeter
+                        score={confidenceSignals.combinedScore}
+                        label="Automation Confidence"
+                        variant="radial"
+                        size="lg"
+                      />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="w-64 p-4">
+                    <div className="space-y-3">
+                      <p className="font-medium text-sm">Confidence Breakdown</p>
+                      
+                      {/* Risk Level */}
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Risk Level</span>
+                        <span className={cn(
+                          "font-medium",
+                          confidenceSignals.riskLevel === 'low' ? 'text-success' :
+                          confidenceSignals.riskLevel === 'medium' ? 'text-warning' :
+                          'text-destructive'
+                        )}>
+                          {confidenceSignals.riskLevel === 'low' ? 'Low' : 
+                           confidenceSignals.riskLevel === 'medium' ? 'Medium' : 'High'}
+                        </span>
+                      </div>
+                      
+                      {/* Data Confidence */}
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Data Confidence</span>
+                        <span className="font-medium">{confidenceSignals.dataConfidence}%</span>
+                      </div>
+                      
+                      {/* Optimizer Confidence */}
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Bid Optimizer</span>
+                        <span className="font-medium">
+                          {confidenceSignals.optimizerConfidence > 0 
+                            ? `${confidenceSignals.optimizerConfidence}%` 
+                            : 'Learning...'}
+                        </span>
+                      </div>
+                      
+                      <p className="text-xs text-muted-foreground pt-1 border-t">
+                        Combined from data quality and bid optimization model strength
+                      </p>
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
+          
+          <div className="flex items-center gap-3">
             {pendingActionsCount > 0 && (
               <Badge variant="destructive" className="text-sm px-3 py-1">
                 {pendingActionsCount} Pending
@@ -315,9 +374,6 @@ const CommandCenter = () => {
               
               {/* Historical Performance Chart - Full Width */}
               <HistoricalPerformanceChart profileId={profileId} />
-              
-              {/* Smart Bid Optimizer - Compact inline display */}
-              <BidOptimizerStatusCard profileId={profileId} />
               
               <div className="grid gap-6 md:grid-cols-2">
                 <ActiveAlertsCard
