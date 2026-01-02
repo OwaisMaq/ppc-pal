@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, Check, AlertCircle } from 'lucide-react';
+import { ChevronDown, Check, AlertCircle, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -9,6 +9,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { 
   useGlobalFilters, 
   getMarketplaceFlag, 
@@ -17,10 +24,19 @@ import {
 } from '@/context/GlobalFiltersContext';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 
 interface AccountPickerProps {
   isCollapsed?: boolean;
 }
+
+const CURRENCY_OPTIONS = [
+  { value: 'GBP', label: '£ GBP' },
+  { value: 'USD', label: '$ USD' },
+  { value: 'EUR', label: '€ EUR' },
+  { value: 'CAD', label: '$ CAD' },
+  { value: 'AUD', label: '$ AUD' },
+];
 
 export function AccountPicker({ isCollapsed = false }: AccountPickerProps) {
   const {
@@ -32,6 +48,11 @@ export function AccountPicker({ isCollapsed = false }: AccountPickerProps) {
     isMultiAccount,
     isMultiMarketplace,
     groupedConnections,
+    // Multi-account mode
+    isMultiAccountMode,
+    setMultiAccountMode,
+    baseCurrency,
+    setBaseCurrency,
   } = useGlobalFilters();
 
   const [open, setOpen] = useState(false);
@@ -50,6 +71,122 @@ export function AccountPicker({ isCollapsed = false }: AccountPickerProps) {
     return null;
   }
 
+  // Check if any connection has issues
+  const hasAnyIssues = connections.some(c => {
+    const isTokenExpired = c.token_expires_at 
+      ? new Date(c.token_expires_at) < new Date() 
+      : false;
+    return c.health_status === 'error' || c.health_status === 'warning' || isTokenExpired;
+  });
+
+  // Multi-account mode display
+  if (isMultiAccountMode) {
+    return (
+      <div className={cn("px-2 space-y-2", isCollapsed && "px-0")}>
+        <DropdownMenu open={open} onOpenChange={setOpen}>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size={isCollapsed ? "icon" : "sm"}
+              className={cn(
+                "w-full justify-start gap-2 relative bg-primary/10 hover:bg-primary/15",
+                isCollapsed && "justify-center px-0"
+              )}
+            >
+              <Globe className="h-4 w-4 text-primary" />
+              {!isCollapsed && (
+                <>
+                  <div className="flex-1 text-left min-w-0">
+                    <div className="text-xs font-medium truncate">All Accounts</div>
+                    <div className="text-[10px] text-muted-foreground truncate">
+                      {connections.length} profile{connections.length !== 1 ? 's' : ''}
+                    </div>
+                  </div>
+                  <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
+                </>
+              )}
+              {hasAnyIssues && (
+                <span className={cn(
+                  "absolute h-2 w-2 rounded-full bg-warning",
+                  isCollapsed ? "top-1 right-1" : "top-1.5 left-6"
+                )} />
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          
+          <DropdownMenuContent 
+            side="top" 
+            align={isCollapsed ? "center" : "start"}
+            className="w-64"
+            sideOffset={8}
+          >
+            {/* All Accounts option */}
+            <DropdownMenuItem
+              onClick={() => {
+                setMultiAccountMode(true);
+                setOpen(false);
+              }}
+              className="flex items-center gap-2 cursor-pointer bg-primary/5"
+            >
+              <Globe className="h-4 w-4 text-primary" />
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium">All Accounts</div>
+                <div className="text-xs text-muted-foreground">
+                  Aggregate {connections.length} profiles
+                </div>
+              </div>
+              <Check className="h-4 w-4 text-primary shrink-0" />
+            </DropdownMenuItem>
+            
+            <DropdownMenuSeparator />
+            
+            <DropdownMenuLabel className="text-xs font-semibold text-muted-foreground">
+              Switch to Single Account
+            </DropdownMenuLabel>
+            
+            {/* Individual account options */}
+            {Array.from(groupedConnections.entries()).map(([accountName, accountConnections]) => (
+              <div key={accountName}>
+                {isMultiAccount && (
+                  <DropdownMenuLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider pt-2">
+                    {accountName}
+                  </DropdownMenuLabel>
+                )}
+                {accountConnections.map((conn) => (
+                  <ConnectionMenuItem
+                    key={conn.profile_id}
+                    connection={conn}
+                    isSelected={false}
+                    onSelect={() => {
+                      setSelectedProfileId(conn.profile_id);
+                      setOpen(false);
+                    }}
+                  />
+                ))}
+              </div>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        
+        {/* Currency selector (visible when not collapsed and in multi-account mode) */}
+        {!isCollapsed && (
+          <Select value={baseCurrency} onValueChange={setBaseCurrency}>
+            <SelectTrigger className="h-7 text-xs">
+              <SelectValue placeholder="Currency" />
+            </SelectTrigger>
+            <SelectContent>
+              {CURRENCY_OPTIONS.map(option => (
+                <SelectItem key={option.value} value={option.value} className="text-xs">
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </div>
+    );
+  }
+
   const flag = getMarketplaceFlag(activeConnection?.marketplace_id);
   const accountName = activeConnection?.profile_name || 'Select Account';
   const marketplaceName = getMarketplaceName(activeConnection?.marketplace_id);
@@ -63,8 +200,8 @@ export function AccountPicker({ isCollapsed = false }: AccountPickerProps) {
   const healthStatus = activeConnection?.health_status;
   const hasIssues = healthStatus === 'error' || healthStatus === 'warning' || isTokenExpired;
 
-  // Single account, single marketplace - just show static display
-  if (!isMultiAccount && !isMultiMarketplace) {
+  // Single account, single marketplace - just show static display (unless multiple accounts exist)
+  if (!isMultiAccount && !isMultiMarketplace && connections.length === 1) {
     return (
       <div className={cn(
         "flex items-center gap-2 px-2 py-1.5 rounded-md",
@@ -126,6 +263,31 @@ export function AccountPicker({ isCollapsed = false }: AccountPickerProps) {
         className="w-64"
         sideOffset={8}
       >
+        {/* All Accounts option - only show if multiple connections */}
+        {connections.length > 1 && (
+          <>
+            <DropdownMenuItem
+              onClick={() => {
+                setMultiAccountMode(true);
+                setOpen(false);
+              }}
+              className="flex items-center gap-2 cursor-pointer"
+            >
+              <Globe className="h-4 w-4 text-primary" />
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium">All Accounts</div>
+                <div className="text-xs text-muted-foreground">
+                  Aggregate {connections.length} profiles
+                </div>
+              </div>
+              <Badge variant="secondary" className="text-[10px] px-1.5">
+                Multi
+              </Badge>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
+        
         {isMultiAccount ? (
           // Multi-account view - group by account name
           Array.from(groupedConnections.entries()).map(([accountName, accountConnections]) => (

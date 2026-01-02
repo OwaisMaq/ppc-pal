@@ -189,11 +189,7 @@ const App = () => {
                       <Route path="/attribution" element={<Navigate to="/analytics" replace />} />
                       <Route path="/anomalies" element={<Navigate to="/analytics" replace />} />
                       <Route path="/budget-copilot" element={<Navigate to="/analytics" replace />} />
-                      <Route path="/multi-account" element={
-                        <ProtectedRoute>
-                          <MultiAccount />
-                        </ProtectedRoute>
-                      } />
+                      <Route path="/multi-account" element={<Navigate to="/" replace />} />
                       
                       {/* 404 */}
                       <Route path="*" element={<NotFound />} />

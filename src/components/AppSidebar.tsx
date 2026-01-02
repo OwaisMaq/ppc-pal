@@ -58,7 +58,6 @@ export function AppSidebar() {
     { title: "Rank Tracker", url: "/rank-tracker", icon: TrendingUp, comingSoon: true },
     { title: "Governance", url: "/governance", icon: Shield },
     { title: "Analytics", url: "/analytics", icon: BarChart3 },
-    { title: "Multi-Account", url: "/multi-account", icon: Globe },
     { title: "Settings", url: "/settings", icon: Settings },
   ];
 
