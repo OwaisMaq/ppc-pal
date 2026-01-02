@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import DashboardShell from "@/components/DashboardShell";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -14,15 +14,17 @@ import { AIInsightsPanel } from "@/components/AIInsightsPanel";
 import { DashboardKPIs } from "@/components/DashboardKPIs";
 import { DashboardChart } from "@/components/DashboardChart";
 import { PerformanceFilters, TimePeriod, ACOSTrendChart, CampaignTypeMixChart } from "@/components/analytics";
+import { TrustReportCard } from "@/components/overview/TrustReportCard";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { useHistoricalAudit } from "@/hooks/useHistoricalAudit";
 import { useAmsMetrics } from "@/hooks/useAmsMetrics";
+import { useActionOutcomes } from "@/hooks/useActionOutcomes";
+import { useSavingsMetric } from "@/hooks/useSavingsMetric";
 import { 
   AlertTriangle, 
   ClipboardList,
   RefreshCw 
 } from "lucide-react";
-import { useEffect } from "react";
 import { subDays, subHours, format } from "date-fns";
 
 
@@ -138,6 +140,10 @@ const Analytics = () => {
     getScoreTrend,
   } = useHistoricalAudit(profileId);
 
+  // Automation tab data
+  const { stats: outcomeStats, loading: outcomesLoading } = useActionOutcomes();
+  const { savings, loading: savingsLoading } = useSavingsMetric(profileId, fromDate, toDate);
+
   useEffect(() => {
     if (profileId && activeTab === 'audit') {
       fetchAudits();
@@ -156,8 +162,9 @@ const Analytics = () => {
 
         {/* Tabs Content */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="performance">Performance</TabsTrigger>
+            <TabsTrigger value="automation">Automation</TabsTrigger>
             <TabsTrigger value="attribution">Attribution</TabsTrigger>
             <TabsTrigger value="anomalies">Anomalies</TabsTrigger>
             <TabsTrigger value="budget">Budget</TabsTrigger>
@@ -209,6 +216,15 @@ const Analytics = () => {
                 loading={amsLoading} 
               />
             </div>
+          </TabsContent>
+
+          <TabsContent value="automation" className="space-y-6">
+            <TrustReportCard
+              stats={outcomeStats}
+              totalSavings={savings?.totalSavings || 0}
+              actionCount={savings?.actionCount || 0}
+              loading={outcomesLoading || savingsLoading}
+            />
           </TabsContent>
 
           <TabsContent value="attribution">
