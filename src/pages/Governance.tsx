@@ -19,7 +19,7 @@ import {
 import { AutomationRulesList } from "@/components/AutomationRulesList";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DaypartScheduler } from "@/components/dayparting";
-import { GuardrailsSettings, ProtectedEntities } from "@/components/governance";
+import { GuardrailsSettings, ProtectedEntities, AIAutoApplyCard } from "@/components/governance";
 import { useAutomationRules } from "@/hooks/useAutomation";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useGovernance } from "@/hooks/useGovernance";
@@ -264,6 +264,9 @@ const Governance: React.FC = () => {
 
         {selectedProfile ? (
           <div className="space-y-6">
+            {/* AI Auto-Apply Settings */}
+            <AIAutoApplyCard />
+
             {/* Safety Guardrails - Compact Card */}
             <Card>
               <CardHeader className="pb-3">
