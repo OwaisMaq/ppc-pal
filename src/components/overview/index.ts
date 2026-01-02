@@ -22,3 +22,4 @@ export { QuickWinsCard } from './QuickWinsCard';
 export { ComparisonKPIs } from './ComparisonKPIs';
 export { HistoricalPerformanceChart } from './HistoricalPerformanceChart';
 export { AutomationPerformanceCard } from './AutomationPerformanceCard';
+export { MultiAccountBreakdown } from './MultiAccountBreakdown';

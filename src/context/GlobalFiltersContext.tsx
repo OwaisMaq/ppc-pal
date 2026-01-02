@@ -50,6 +50,23 @@ export const marketplaceNames: Record<string, string> = {
   'SA': 'Saudi Arabia', 'A17E79C6D8DWNP': 'Saudi Arabia',
 };
 
+// Currency codes by marketplace
+export const marketplaceCurrencies: Record<string, string> = {
+  'US': 'USD', 'USA': 'USD', 'ATVPDKIKX0DER': 'USD',
+  'UK': 'GBP', 'GB': 'GBP', 'A1F83G8C2ARO7P': 'GBP',
+  'DE': 'EUR', 'A1PA6795UKMFR9': 'EUR',
+  'FR': 'EUR', 'A13V1IB3VIYZZH': 'EUR',
+  'ES': 'EUR', 'A1RKKUPIHCS9HS': 'EUR',
+  'IT': 'EUR', 'APJ6JRA9NG5V4': 'EUR',
+  'JP': 'JPY', 'A1VC38T7YXB528': 'JPY',
+  'CA': 'CAD', 'A2EUQ1WTGCTBG2': 'CAD',
+  'MX': 'MXN', 'A1AM78C64UM0Y8': 'MXN',
+  'AU': 'AUD', 'A39IBJ37TRP1C6': 'AUD',
+  'IN': 'INR', 'A21TJRUUN4KGV': 'INR',
+  'BR': 'BRL', 'A2Q3Y263D00KWC': 'BRL',
+  'SG': 'SGD', 'A19VAU5U5O7RUS': 'SGD',
+};
+
 export function getMarketplaceFlag(marketplaceId: string | null | undefined): string {
   if (!marketplaceId) return '🌐';
   return marketplaceFlags[marketplaceId] || '🌐';
@@ -58,6 +75,11 @@ export function getMarketplaceFlag(marketplaceId: string | null | undefined): st
 export function getMarketplaceName(marketplaceId: string | null | undefined): string {
   if (!marketplaceId) return 'Unknown';
   return marketplaceNames[marketplaceId] || marketplaceId;
+}
+
+export function getMarketplaceCurrency(marketplaceId: string | null | undefined): string {
+  if (!marketplaceId) return 'USD';
+  return marketplaceCurrencies[marketplaceId] || 'USD';
 }
 
 interface GlobalFiltersContextType {
@@ -83,11 +105,21 @@ interface GlobalFiltersContextType {
   
   // All marketplaces for current account
   marketplacesForCurrentAccount: AmazonConnection[];
+  
+  // Multi-account mode (aggregate all accounts)
+  isMultiAccountMode: boolean;
+  setMultiAccountMode: (enabled: boolean) => void;
+  selectedProfileIds: string[]; // Profile IDs to include when in multi-account mode
+  setSelectedProfileIds: (ids: string[]) => void;
+  baseCurrency: string; // Base currency for FX conversion
+  setBaseCurrency: (currency: string) => void;
 }
 
 const GlobalFiltersContext = createContext<GlobalFiltersContextType | null>(null);
 
 const STORAGE_KEY = 'ppcpal_selected_profile';
+const MULTI_ACCOUNT_MODE_KEY = 'ppcpal_multi_account_mode';
+const BASE_CURRENCY_KEY = 'ppcpal_base_currency';
 
 export function GlobalFiltersProvider({ children }: { children: React.ReactNode }) {
   const { connections, loading: connectionsLoading } = useAmazonConnections();
@@ -100,6 +132,44 @@ export function GlobalFiltersProvider({ children }: { children: React.ReactNode 
   });
   
   const [selectedMarketplace, setSelectedMarketplace] = useState<string | null>(null);
+  
+  // Multi-account mode state
+  const [isMultiAccountMode, setMultiAccountModeInternal] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(MULTI_ACCOUNT_MODE_KEY) === 'true';
+    }
+    return false;
+  });
+  
+  const [selectedProfileIds, setSelectedProfileIdsInternal] = useState<string[]>([]);
+  
+  const [baseCurrency, setBaseCurrencyInternal] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(BASE_CURRENCY_KEY) || 'GBP';
+    }
+    return 'GBP';
+  });
+
+  // Persist multi-account mode to localStorage
+  const setMultiAccountMode = useCallback((enabled: boolean) => {
+    setMultiAccountModeInternal(enabled);
+    localStorage.setItem(MULTI_ACCOUNT_MODE_KEY, enabled.toString());
+    
+    // When enabling multi-account mode, select all profiles by default
+    if (enabled && connections.length > 0) {
+      const allProfileIds = connections.map(c => c.profile_id);
+      setSelectedProfileIdsInternal(allProfileIds);
+    }
+  }, [connections]);
+  
+  const setSelectedProfileIds = useCallback((ids: string[]) => {
+    setSelectedProfileIdsInternal(ids);
+  }, []);
+  
+  const setBaseCurrency = useCallback((currency: string) => {
+    setBaseCurrencyInternal(currency);
+    localStorage.setItem(BASE_CURRENCY_KEY, currency);
+  }, []);
 
   // Persist selection to localStorage
   const setSelectedProfileId = useCallback((id: string | null) => {
@@ -109,31 +179,43 @@ export function GlobalFiltersProvider({ children }: { children: React.ReactNode 
     } else {
       localStorage.removeItem(STORAGE_KEY);
     }
-  }, []);
+    // When selecting a specific profile, exit multi-account mode
+    if (id && isMultiAccountMode) {
+      setMultiAccountMode(false);
+    }
+  }, [isMultiAccountMode, setMultiAccountMode]);
 
   // Auto-select first connection if none selected
   useEffect(() => {
-    if (!connectionsLoading && connections.length > 0 && !selectedProfileId) {
+    if (!connectionsLoading && connections.length > 0 && !selectedProfileId && !isMultiAccountMode) {
       const firstConnection = connections[0];
       setSelectedProfileId(firstConnection.profile_id);
     }
-  }, [connections, connectionsLoading, selectedProfileId, setSelectedProfileId]);
+  }, [connections, connectionsLoading, selectedProfileId, setSelectedProfileId, isMultiAccountMode]);
 
   // Validate that selected profile still exists
   useEffect(() => {
-    if (selectedProfileId && connections.length > 0) {
+    if (selectedProfileId && connections.length > 0 && !isMultiAccountMode) {
       const exists = connections.some(c => c.profile_id === selectedProfileId);
       if (!exists) {
         setSelectedProfileId(connections[0]?.profile_id || null);
       }
     }
-  }, [connections, selectedProfileId, setSelectedProfileId]);
+  }, [connections, selectedProfileId, setSelectedProfileId, isMultiAccountMode]);
+  
+  // Initialize selectedProfileIds when connections load
+  useEffect(() => {
+    if (connections.length > 0 && selectedProfileIds.length === 0 && isMultiAccountMode) {
+      setSelectedProfileIdsInternal(connections.map(c => c.profile_id));
+    }
+  }, [connections, selectedProfileIds.length, isMultiAccountMode]);
 
   // Get active connection
   const activeConnection = useMemo(() => {
+    if (isMultiAccountMode) return null; // No single active connection in multi-account mode
     if (!selectedProfileId) return connections[0] || null;
     return connections.find(c => c.profile_id === selectedProfileId) || connections[0] || null;
-  }, [connections, selectedProfileId]);
+  }, [connections, selectedProfileId, isMultiAccountMode]);
 
   // Group connections by profile name (account)
   const groupedConnections = useMemo(() => {
@@ -178,6 +260,13 @@ export function GlobalFiltersProvider({ children }: { children: React.ReactNode 
     isMultiMarketplace,
     groupedConnections,
     marketplacesForCurrentAccount,
+    // Multi-account mode
+    isMultiAccountMode,
+    setMultiAccountMode,
+    selectedProfileIds,
+    setSelectedProfileIds,
+    baseCurrency,
+    setBaseCurrency,
   };
 
   return (

@@ -36,7 +36,8 @@ import {
   type ActiveAlert,
   type DatePreset,
   type MarketplaceOption,
-  type BrandOption
+  type BrandOption,
+  MultiAccountBreakdown
 } from "@/components/overview";
 import ConfidenceMeter from "@/components/ui/ConfidenceMeter";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -46,7 +47,7 @@ import { DashboardKPIs as KPIData } from "@/hooks/useDashboardData";
 import { ClipboardCheck, Activity } from "lucide-react";
 
 const CommandCenter = () => {
-  const { connections, activeConnection, selectedProfileId } = useGlobalFilters();
+  const { connections, activeConnection, selectedProfileId, isMultiAccountMode, baseCurrency } = useGlobalFilters();
   
   const hasConnections = connections.length > 0;
   const hasExpiredTokens = connections.some(c => {
@@ -374,6 +375,11 @@ const CommandCenter = () => {
               
               {/* Historical Performance Chart - Full Width */}
               <HistoricalPerformanceChart profileId={profileId} />
+              
+              {/* Multi-Account Breakdown - Show when in multi-account mode */}
+              {isMultiAccountMode && (
+                <MultiAccountBreakdown from={dateRange.from} to={dateRange.to} />
+              )}
               
               <div className="grid gap-6 md:grid-cols-2">
                 <ActiveAlertsCard
