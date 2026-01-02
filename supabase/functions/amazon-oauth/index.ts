@@ -676,6 +676,26 @@ serve(async (req) => {
         
         console.log('Successfully stored tokens for profile:', profile.profileId);
         
+        // Store profile currency for FX conversions in multi-account roll-ups
+        const profileCurrency = profile.currencyCode || 
+          (marketplaceId === 'GB' || marketplaceId === 'UK' ? 'GBP' : 
+           marketplaceId === 'CA' ? 'CAD' :
+           marketplaceId === 'AU' ? 'AUD' :
+           marketplaceId === 'DE' || marketplaceId === 'FR' || marketplaceId === 'ES' || marketplaceId === 'IT' ? 'EUR' : 'USD');
+        
+        const { error: currencyError } = await supabase
+          .from('profile_currency')
+          .upsert({
+            profile_id: profile.profileId.toString(),
+            currency: profileCurrency
+          }, { onConflict: 'profile_id' });
+        
+        if (currencyError) {
+          console.warn('Failed to store profile currency (non-blocking):', currencyError.message);
+        } else {
+          console.log('Stored profile currency:', profileCurrency, 'for profile:', profile.profileId);
+        }
+        
         // Clear any stale error flags after successful reconnection
         await supabase
           .from('amazon_connections')
