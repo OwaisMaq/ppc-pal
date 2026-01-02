@@ -190,7 +190,7 @@ const Campaigns = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [autoMode, setAutoMode] = useState(false);
   const [viewLevel, setViewLevel] = useState<CampaignLevel>('campaigns');
-  const [viewMode, setViewMode] = useState<'grouped' | 'flat'>('grouped');
+  const [viewMode, setViewMode] = useState<'grouped' | 'flat' | 'search-terms'>('grouped');
   const [selectedPreset, setSelectedPreset] = useState<DatePreset>('30d');
   const [dateRange, setDateRange] = useState<DateRange>({
     from: subDays(new Date(), 30),
@@ -1447,7 +1447,7 @@ const Campaigns = () => {
                       className="pl-9 w-64"
                     />
                   </div>
-                  <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'grouped' | 'flat')}>
+                  <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'grouped' | 'flat' | 'search-terms')}>
                     <TabsList className="h-9">
                       <TabsTrigger value="grouped" className="gap-1.5 px-3">
                         <LayoutGrid className="h-4 w-4" />
@@ -1456,6 +1456,10 @@ const Campaigns = () => {
                       <TabsTrigger value="flat" className="gap-1.5 px-3">
                         <List className="h-4 w-4" />
                         All
+                      </TabsTrigger>
+                      <TabsTrigger value="search-terms" className="gap-1.5 px-3">
+                        <Search className="h-4 w-4" />
+                        Search Terms
                       </TabsTrigger>
                     </TabsList>
                   </Tabs>
@@ -1539,6 +1543,133 @@ const Campaigns = () => {
                   </CardHeader>
                   <CardContent>
                     {renderTable()}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Search Terms View */}
+              {viewMode === 'search-terms' && (
+                <Card>
+                  <CardContent className="pt-6">
+                    <Tabs defaultValue="terms" className="space-y-4">
+                      <TabsList>
+                        <TabsTrigger value="terms">Search Terms</TabsTrigger>
+                        <TabsTrigger value="negatives">Negatives</TabsTrigger>
+                        <TabsTrigger value="brand-terms">Brand Terms</TabsTrigger>
+                      </TabsList>
+                      
+                      <TabsContent value="terms" className="space-y-4">
+                        {/* Search terms table with harvest functionality */}
+                        {loading ? (
+                          <div className="space-y-2">
+                            {[...Array(5)].map((_, i) => (
+                              <Skeleton key={i} className="h-12 w-full" />
+                            ))}
+                          </div>
+                        ) : filteredSearchTerms.length === 0 ? (
+                          <div className="text-center py-12">
+                            <Search className="h-12 w-12 mx-auto text-muted-foreground" />
+                            <p className="text-muted-foreground mt-4">No search terms found</p>
+                            <p className="text-sm text-muted-foreground">Search terms will appear after your campaigns receive traffic</p>
+                          </div>
+                        ) : (
+                          <>
+                            {selectedTerms.size > 0 && (
+                              <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+                                <span className="text-sm font-medium">{selectedTerms.size} terms selected</span>
+                                <Select value={bulkMatchType} onValueChange={(v) => setBulkMatchType(v as MatchType)}>
+                                  <SelectTrigger className="w-32">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="exact">Exact</SelectItem>
+                                    <SelectItem value="phrase">Phrase</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <Button size="sm" onClick={handleBulkHarvest} disabled={harvestLoading}>
+                                  {harvestLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Wand2 className="h-4 w-4 mr-2" />}
+                                  Harvest Selected
+                                </Button>
+                                <Button size="sm" variant="ghost" onClick={() => setSelectedTerms(new Set())}>
+                                  Clear
+                                </Button>
+                              </div>
+                            )}
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="w-10">
+                                    <Checkbox
+                                      checked={selectedTerms.size === filteredSearchTerms.length && filteredSearchTerms.length > 0}
+                                      onCheckedChange={(checked) => {
+                                        if (checked) {
+                                          setSelectedTerms(new Set(filteredSearchTerms.map(t => t.id)));
+                                        } else {
+                                          setSelectedTerms(new Set());
+                                        }
+                                      }}
+                                    />
+                                  </TableHead>
+                                  <TableHead>Search Term</TableHead>
+                                  <TableHead>Campaign</TableHead>
+                                  <TableHead className="text-right">Impressions</TableHead>
+                                  <TableHead className="text-right">Clicks</TableHead>
+                                  <TableHead className="text-right">Spend</TableHead>
+                                  <TableHead className="text-right">Sales</TableHead>
+                                  <TableHead className="text-right">ACOS</TableHead>
+                                  <TableHead className="text-right">Actions</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {filteredSearchTerms.map((term) => (
+                                  <TableRow key={term.id}>
+                                    <TableCell>
+                                      <Checkbox
+                                        checked={selectedTerms.has(term.id)}
+                                        onCheckedChange={() => toggleTermSelection(term.id)}
+                                      />
+                                    </TableCell>
+                                    <TableCell className="font-medium">{term.search_term}</TableCell>
+                                    <TableCell className="text-muted-foreground">{term.campaign_name}</TableCell>
+                                    <TableCell className="text-right">{formatNumber(term.impressions)}</TableCell>
+                                    <TableCell className="text-right">{formatNumber(term.clicks)}</TableCell>
+                                    <TableCell className="text-right">{formatCurrency(term.spend)}</TableCell>
+                                    <TableCell className="text-right">{formatCurrency(term.sales)}</TableCell>
+                                    <TableCell className="text-right">
+                                      <span className={term.acos > 30 ? "text-destructive" : term.acos < 15 ? "text-success" : ""}>
+                                        {term.acos.toFixed(1)}%
+                                      </span>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => handleHarvestSingle(term, 'exact')}
+                                        disabled={harvestingTermId === term.id}
+                                      >
+                                        {harvestingTermId === term.id ? (
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                          <Sprout className="h-4 w-4" />
+                                        )}
+                                      </Button>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </>
+                        )}
+                      </TabsContent>
+                      
+                      <TabsContent value="negatives">
+                        <NegativesPanel profileId={primaryConnection?.profile_id || ''} />
+                      </TabsContent>
+                      
+                      <TabsContent value="brand-terms">
+                        <BrandTermsManager profileId={primaryConnection?.profile_id || ''} />
+                      </TabsContent>
+                    </Tabs>
                   </CardContent>
                 </Card>
               )}
