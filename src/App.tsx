@@ -24,6 +24,7 @@ const Changelog = lazy(() => import("@/pages/Changelog"));
 const Privacy = lazy(() => import("@/pages/Privacy"));
 const Governance = lazy(() => import("@/pages/Governance"));
 const Analytics = lazy(() => import("@/pages/Analytics"));
+const SearchStudio = lazy(() => import("@/pages/SearchStudio").then(m => ({ default: m.SearchStudio })));
 const MultiAccount = lazy(() => import("@/pages/MultiAccount"));
 const PublicLanding = lazy(() => import("@/pages/PublicLanding"));
 const PublicPrivacy = lazy(() => import("@/pages/PublicPrivacy"));
@@ -153,7 +154,13 @@ const App = () => {
                       } />
                       <Route path="/analytics/ai-insights" element={<Navigate to="/analytics" replace />} />
 
-                      
+                      {/* Search Studio */}
+                      <Route path="/search-studio" element={
+                        <ProtectedRoute>
+                          <SearchStudio />
+                        </ProtectedRoute>
+                      } />
+
                       {/* Settings routes */}
                       <Route path="/settings" element={
                         <ProtectedRoute>
