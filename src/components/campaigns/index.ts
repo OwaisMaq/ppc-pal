@@ -5,3 +5,4 @@ export { PeriodComparison, useComparisonData } from './PeriodComparison';
 export { ProductSection } from './ProductSection';
 export { PerformanceCharts } from './PerformanceCharts';
 export { SearchTermsView } from './SearchTermsView';
+export { OptimizationToggle } from './OptimizationToggle';

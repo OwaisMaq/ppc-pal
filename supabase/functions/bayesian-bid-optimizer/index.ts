@@ -325,10 +325,12 @@ serve(async (req) => {
     }
 
     // Fetch bid states that have enough data
+    // Supports keywords, targets, and ad groups
     const { data: states, error: statesError } = await supabase
       .from('bid_states')
       .select('*')
       .eq('profile_id', profile_id)
+      .eq('optimization_enabled', true)
       .gte('observations_count', config.min_observations)
       .gte('total_impressions', config.min_impressions);
 
@@ -377,10 +379,12 @@ serve(async (req) => {
     const keywordIds = new Set<string>();
     const targetIds = new Set<string>();
     const adGroupIds = new Set<string>();
+    const adGroupEntityIds = new Set<string>(); // For ad groups being directly optimized
     
     for (const state of states) {
       if (state.entity_type === 'keyword') keywordIds.add(state.entity_id);
       else if (state.entity_type === 'target') targetIds.add(state.entity_id);
+      else if (state.entity_type === 'adgroup') adGroupEntityIds.add(state.entity_id);
       if (state.ad_group_id) adGroupIds.add(state.ad_group_id);
     }
 
@@ -409,11 +413,12 @@ serve(async (req) => {
       });
     }
 
-    if (adGroupIds.size > 0) {
+    if (adGroupIds.size > 0 || adGroupEntityIds.size > 0) {
+      const allAdGroupIds = new Set([...adGroupIds, ...adGroupEntityIds]);
       const { data: adGroups } = await supabase
         .from('ad_groups')
         .select('amazon_adgroup_id, name')
-        .in('amazon_adgroup_id', Array.from(adGroupIds));
+        .in('amazon_adgroup_id', Array.from(allAdGroupIds));
       adGroups?.forEach(ag => adGroupNames.set(ag.amazon_adgroup_id, ag.name));
     }
 
@@ -458,9 +463,11 @@ serve(async (req) => {
         results.bids_changed++;
 
         // Get entity name for enriched display
-        const entityName = entityNames.get(state.entity_id) || 
-          (state.ad_group_id ? adGroupNames.get(state.ad_group_id) : null) ||
-          `${state.entity_type} ...${state.entity_id.slice(-6)}`;
+        const entityName = state.entity_type === 'adgroup' 
+          ? adGroupNames.get(state.entity_id) || `Ad Group ...${state.entity_id.slice(-6)}`
+          : entityNames.get(state.entity_id) || 
+            (state.ad_group_id ? adGroupNames.get(state.ad_group_id) : null) ||
+            `${state.entity_type} ...${state.entity_id.slice(-6)}`;
 
         // Format bid change for display
         const currentBidDollars = (currentBid / 1000000).toFixed(2);
@@ -499,9 +506,12 @@ serve(async (req) => {
           // Queue action for bid change with enriched payload
           const idempotencyKey = `bid_opt_${profile_id}_${state.entity_type}_${state.entity_id}_${new Date().toISOString().split('T')[0]}`;
           
+          // Determine action type based on entity type
+          const actionType = state.entity_type === 'adgroup' ? 'set_adgroup_bid' : 'set_bid';
+          
           actions.push({
             profile_id,
-            action_type: 'set_bid',
+            action_type: actionType,
             idempotency_key: idempotencyKey,
             status: 'queued',
             payload: {

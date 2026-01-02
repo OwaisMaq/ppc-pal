@@ -44,14 +44,17 @@ const TEMPLATES: PlaybookTemplate[] = [
   {
     key: 'placement_optimizer',
     name: 'Placement Optimizer',
-    description: 'Adjust Top-of-Search up/down based on relative ACOS',
+    description: 'Adjust Top-of-Search and Product Page bid multipliers based on relative ACOS',
     defaultParams: {
-      targetACOS: 25,
-      topOfSearchBoost: 50,
-      topOfSearchReduction: 25,
-      minPerformanceDays: 7
+      targetAcos: 25,
+      maxAdjustment: 100,
+      minAdjustment: -50,
+      stepSize: 10,
+      lookbackDays: 14,
+      minSpend: 50,
+      minImpressions: 500
     },
-    requiredParams: ['targetACOS']
+    requiredParams: ['targetAcos']
   }
 ];
 
@@ -428,14 +431,154 @@ async function executeBidDownHighACOS(supabase: any, params: any, profileId: str
 }
 
 async function executePlacementOptimizer(supabase: any, params: any, profileId: string, mode: string) {
-  // Placeholder implementation
+  const { 
+    targetAcos, 
+    maxAdjustment = 100, 
+    minAdjustment = -50, 
+    stepSize = 10, 
+    lookbackDays = 14, 
+    minSpend = 50,
+    minImpressions = 500
+  } = params;
+
+  console.log(`[Placement Optimizer] Running for profile ${profileId}`, params);
+
+  // Fetch placement performance data
+  const fromDate = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  
+  const { data: placements, error: placementsError } = await supabase
+    .from('campaign_placement_performance')
+    .select('*')
+    .eq('profile_id', profileId)
+    .gte('date', fromDate)
+    .gte('impressions', minImpressions);
+
+  if (placementsError) {
+    console.error('[Placement Optimizer] Error fetching placements:', placementsError);
+    throw placementsError;
+  }
+
+  if (!placements || placements.length === 0) {
+    console.log('[Placement Optimizer] No placement data found');
+    return {
+      steps: {
+        campaignsEvaluated: 0,
+        placementAdjustments: 0,
+        actionsGenerated: 0
+      },
+      actionsEnqueued: 0,
+      alertsCreated: 0
+    };
+  }
+
+  // Aggregate by campaign + placement
+  const aggregated = new Map<string, {
+    campaign_id: string;
+    placement: string;
+    impressions: number;
+    clicks: number;
+    spend: number;
+    sales: number;
+    orders: number;
+    current_adjustment: number;
+  }>();
+
+  for (const p of placements) {
+    const key = `${p.campaign_id}_${p.placement}`;
+    const existing = aggregated.get(key);
+    
+    if (existing) {
+      existing.impressions += p.impressions || 0;
+      existing.clicks += p.clicks || 0;
+      existing.spend += p.spend || 0;
+      existing.sales += p.sales || 0;
+      existing.orders += p.orders || 0;
+      existing.current_adjustment = p.current_adjustment || 0;
+    } else {
+      aggregated.set(key, {
+        campaign_id: p.campaign_id,
+        placement: p.placement,
+        impressions: p.impressions || 0,
+        clicks: p.clicks || 0,
+        spend: p.spend || 0,
+        sales: p.sales || 0,
+        orders: p.orders || 0,
+        current_adjustment: p.current_adjustment || 0
+      });
+    }
+  }
+
+  const actions: any[] = [];
+  const campaignAdjustments = new Map<string, { top?: number; product_page?: number }>();
+
+  // Calculate optimal adjustments for each placement
+  for (const [key, data] of aggregated) {
+    if (data.spend < minSpend) continue;
+
+    const acos = data.sales > 0 ? (data.spend / data.sales) * 100 : 999;
+    let newAdjustment = data.current_adjustment;
+
+    // If ACOS is significantly above target, reduce adjustment
+    if (acos > targetAcos * 1.2) {
+      newAdjustment = Math.max(data.current_adjustment - stepSize, minAdjustment);
+    } 
+    // If ACOS is below target and we have conversions, increase adjustment
+    else if (acos < targetAcos * 0.8 && data.orders > 0) {
+      newAdjustment = Math.min(data.current_adjustment + stepSize, maxAdjustment);
+    }
+
+    if (newAdjustment !== data.current_adjustment) {
+      // Track adjustments per campaign
+      if (!campaignAdjustments.has(data.campaign_id)) {
+        campaignAdjustments.set(data.campaign_id, {});
+      }
+      
+      const campaignAdj = campaignAdjustments.get(data.campaign_id)!;
+      if (data.placement === 'TOP') {
+        campaignAdj.top = newAdjustment;
+      } else if (data.placement === 'PRODUCT_PAGE') {
+        campaignAdj.product_page = newAdjustment;
+      }
+    }
+  }
+
+  // Create actions for campaigns with adjustments
+  for (const [campaignId, adjustments] of campaignAdjustments) {
+    const action = {
+      rule_id: null,
+      profile_id: profileId,
+      action_type: 'set_placement_adjust',
+      payload: {
+        campaign_id: campaignId,
+        placement_top: adjustments.top,
+        placement_product_page: adjustments.product_page,
+        source: 'placement_optimizer'
+      },
+      idempotency_key: `placement_opt_${campaignId}_${Date.now()}`
+    };
+    actions.push(action);
+  }
+
+  let actionsEnqueued = 0;
+  if (mode === 'auto' && actions.length > 0) {
+    const { error: insertError } = await supabase.from('action_queue').insert(actions);
+    if (insertError) {
+      console.error('[Placement Optimizer] Error inserting actions:', insertError);
+    } else {
+      actionsEnqueued = actions.length;
+    }
+  }
+
+  console.log(`[Placement Optimizer] Completed: ${aggregated.size} placements evaluated, ${actions.length} adjustments`);
+
   return {
     steps: {
-      campaignsEvaluated: 0,
-      placementAdjustments: 0,
-      actionsGenerated: 0
+      campaignsEvaluated: new Set(Array.from(aggregated.values()).map(a => a.campaign_id)).size,
+      placementsEvaluated: aggregated.size,
+      placementAdjustments: actions.length,
+      actionsGenerated: actions.length
     },
-    actionsEnqueued: 0,
+    actionsEnqueued,
     alertsCreated: 0
   };
 }

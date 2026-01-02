@@ -171,3 +171,9 @@ verify_jwt = false
 
 [functions.anomalies-runner]
 verify_jwt = false
+
+[functions.creative-recommendations]
+verify_jwt = true
+
+[functions.realtime-bid-trigger]
+verify_jwt = false
