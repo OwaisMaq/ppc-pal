@@ -163,9 +163,10 @@ const App = () => {
                           <Settings />
                         </ProtectedRoute>
                       } />
-                      <Route path="/settings/accounts" element={<Navigate to="/settings" replace />} />
+                      <Route path="/settings/accounts" element={<Navigate to="/settings?tab=connections" replace />} />
+                      <Route path="/data-management" element={<Navigate to="/settings?tab=data" replace />} />
 
-                      
+
                       {/* Other protected routes */}
                       <Route path="/feedback" element={
                         <ProtectedRoute>
