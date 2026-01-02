@@ -41,6 +41,66 @@ interface UnifiedPendingItem {
   budgetAction?: 'increase' | 'decrease' | 'hold';
 }
 
+// Helper functions defined outside component to avoid temporal dead zone
+const getActionLabel = (actionType: string) => {
+  switch (actionType) {
+    case 'set_bid':
+      return 'Adjust Bid';
+    case 'negative_keyword':
+      return 'Add Negative Keyword';
+    case 'negative_product':
+      return 'Add Negative Product';
+    case 'pause_target':
+      return 'Pause Target';
+    case 'set_placement_adjust':
+      return 'Adjust Placement';
+    case 'create_keyword':
+      return 'Add Keyword';
+    case 'enable_entity':
+      return 'Re-enable Entity';
+    case 'disable_entity':
+      return 'Disable Entity';
+    default:
+      return actionType.split('_').map(word => 
+        word.charAt(0).toUpperCase() + word.slice(1)
+      ).join(' ');
+  }
+};
+
+const getBudgetActionLabel = (action: 'increase' | 'decrease' | 'hold') => {
+  switch (action) {
+    case 'increase':
+      return 'Increase Budget';
+    case 'decrease':
+      return 'Decrease Budget';
+    case 'hold':
+      return 'Hold Budget';
+  }
+};
+
+const formatActionDetails = (action: any) => {
+  const { action_type, payload } = action;
+  const entityName = payload.entity_name || payload.keyword_text || payload.target_name;
+  
+  switch (action_type) {
+    case 'set_bid':
+      const bidInfo = payload.new_bid ? `$${payload.new_bid}` : '';
+      return entityName ? `${entityName}${bidInfo ? ` → ${bidInfo}` : ''}` : bidInfo || 'Bid change';
+    case 'negative_keyword':
+      return payload.keyword_text ? `"${payload.keyword_text}"` : 'Keyword';
+    case 'negative_product':
+      return payload.asin ? `ASIN: ${payload.asin}` : 'Product';
+    case 'pause_target':
+    case 'enable_entity':
+    case 'disable_entity':
+      return entityName || 'Target';
+    case 'set_placement_adjust':
+      return payload.placement ? `${payload.placement} placement` : 'Placement';
+    default:
+      return entityName || 'Action pending';
+  }
+};
+
 const PendingApprovals = () => {
   const { actions, loading: actionsLoading, refetch: refetchActions } = useActionsFeed(50);
   const { selectedProfileId } = useGlobalFilters();
@@ -139,65 +199,6 @@ const PendingApprovals = () => {
         return Minus;
       default:
         return DollarSign;
-    }
-  };
-
-  const getActionLabel = (actionType: string) => {
-    switch (actionType) {
-      case 'set_bid':
-        return 'Adjust Bid';
-      case 'negative_keyword':
-        return 'Add Negative Keyword';
-      case 'negative_product':
-        return 'Add Negative Product';
-      case 'pause_target':
-        return 'Pause Target';
-      case 'set_placement_adjust':
-        return 'Adjust Placement';
-      case 'create_keyword':
-        return 'Add Keyword';
-      case 'enable_entity':
-        return 'Re-enable Entity';
-      case 'disable_entity':
-        return 'Disable Entity';
-      default:
-        return actionType.split('_').map(word => 
-          word.charAt(0).toUpperCase() + word.slice(1)
-        ).join(' ');
-    }
-  };
-
-  const getBudgetActionLabel = (action: 'increase' | 'decrease' | 'hold') => {
-    switch (action) {
-      case 'increase':
-        return 'Increase Budget';
-      case 'decrease':
-        return 'Decrease Budget';
-      case 'hold':
-        return 'Hold Budget';
-    }
-  };
-
-  const formatActionDetails = (action: any) => {
-    const { action_type, payload } = action;
-    const entityName = payload.entity_name || payload.keyword_text || payload.target_name;
-    
-    switch (action_type) {
-      case 'set_bid':
-        const bidInfo = payload.new_bid ? `$${payload.new_bid}` : '';
-        return entityName ? `${entityName}${bidInfo ? ` → ${bidInfo}` : ''}` : bidInfo || 'Bid change';
-      case 'negative_keyword':
-        return payload.keyword_text ? `"${payload.keyword_text}"` : 'Keyword';
-      case 'negative_product':
-        return payload.asin ? `ASIN: ${payload.asin}` : 'Product';
-      case 'pause_target':
-      case 'enable_entity':
-      case 'disable_entity':
-        return entityName || 'Target';
-      case 'set_placement_adjust':
-        return payload.placement ? `${payload.placement} placement` : 'Placement';
-      default:
-        return entityName || 'Action pending';
     }
   };
 
