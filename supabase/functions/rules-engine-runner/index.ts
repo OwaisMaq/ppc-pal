@@ -1,4 +1,10 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
+import {
+  isAutomationPaused,
+  isEntityProtected,
+  applyBidGuardrails,
+  clearGovernanceCache,
+} from '../_shared/governance-checker.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -500,6 +506,20 @@ async function checkThrottle(supabase: any, rule: AutomationRule): Promise<boole
   return true;
 }
 
+/**
+ * Get entity type from action for governance checks
+ */
+function getEntityTypeFromAction(action: any): 'campaign' | 'ad_group' | 'keyword' | 'target' | null {
+  const actionType = action.action_type;
+  
+  if (actionType.includes('campaign')) return 'campaign';
+  if (actionType.includes('adgroup') || actionType.includes('ad_group')) return 'ad_group';
+  if (actionType.includes('keyword') || actionType.includes('negative')) return 'keyword';
+  if (actionType.includes('target') || action.payload?.target_id) return 'target';
+  
+  return null;
+}
+
 Deno.serve(async (req) => {
   const requestId = crypto.randomUUID();
   
@@ -546,6 +566,16 @@ Deno.serve(async (req) => {
 
     for (const rule of rules || []) {
       try {
+        // Clear governance cache for each rule
+        clearGovernanceCache();
+        
+        // === GOVERNANCE CHECK: Kill Switch ===
+        const pauseCheck = await isAutomationPaused(supabase, rule.profile_id);
+        if (pauseCheck.paused) {
+          console.log(`Rule ${rule.id} skipped - automation paused for profile: ${pauseCheck.reason}`);
+          continue;
+        }
+        
         // Check entitlements
         const hasAccess = await checkEntitlements(supabase, rule.user_id, rule.rule_type);
         if (!hasAccess) {
@@ -593,6 +623,42 @@ Deno.serve(async (req) => {
             continue;
         }
 
+        // === GOVERNANCE: Filter actions for protected entities and apply bid guardrails ===
+        const filteredActions: any[] = [];
+        for (const action of actions) {
+          // Determine entity type and ID
+          const entityType = getEntityTypeFromAction(action);
+          const entityId = action.payload?.campaign_id || action.payload?.ad_group_id || 
+                          action.payload?.keyword_id || action.payload?.target_id;
+          
+          if (entityType && entityId) {
+            const protectedCheck = await isEntityProtected(supabase, rule.profile_id, entityType, entityId);
+            if (protectedCheck.protected) {
+              console.log(`Action for ${entityType} ${entityId} skipped - protected: ${protectedCheck.reason}`);
+              continue;
+            }
+          }
+          
+          // Apply bid guardrails if this is a bid action
+          if (action.payload?.bid_micros) {
+            const currentBid = action.payload.current_bid_micros || action.payload.bid_micros;
+            const bidCheck = await applyBidGuardrails(
+              supabase, 
+              rule.profile_id, 
+              currentBid, 
+              action.payload.bid_micros
+            );
+            
+            if (bidCheck.wasAdjusted) {
+              action.payload.bid_micros = bidCheck.bidMicros;
+              action.payload.governance_adjustment = bidCheck.reason;
+              console.log(`Bid adjusted for action: ${bidCheck.reason}`);
+            }
+          }
+          
+          filteredActions.push(action);
+        }
+
         // Insert alerts
         if (alerts.length > 0) {
           const { error: alertError } = await supabase
@@ -604,18 +670,18 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Insert actions (only if not dry_run)
+        // Insert filtered actions (only if not dry_run)
         let actionCount = 0;
-        if (actions.length > 0 && rule.mode !== 'dry_run') {
+        if (filteredActions.length > 0 && rule.mode !== 'dry_run') {
           const { error: actionError } = await supabase
             .from('action_queue')
-            .insert(actions)
+            .insert(filteredActions)
             .select();
           
           if (actionError) {
             console.error(`Failed to insert actions for rule ${rule.id}:`, actionError);
           } else {
-            actionCount = actions.length;
+            actionCount = filteredActions.length;
           }
         }
 

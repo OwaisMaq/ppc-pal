@@ -1,5 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  getGovernanceWithDefaults,
+  isAutomationPaused,
+  isEntityProtected,
+  applyBidGuardrails,
+} from '../_shared/governance-checker.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -304,9 +310,48 @@ serve(async (req) => {
       );
     }
 
-    const config: OptimizerConfig = { ...DEFAULT_CONFIG, ...userConfig };
+    // === GOVERNANCE CHECK: Kill Switch ===
+    const pauseCheck = await isAutomationPaused(supabase, profile_id);
+    if (pauseCheck.paused) {
+      console.log(`[Bayesian Optimizer] Profile ${profile_id} automation is paused: ${pauseCheck.reason}`);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Automation paused', 
+          reason: pauseCheck.reason,
+          profile_id 
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
-    console.log(`[Bayesian Optimizer] Starting for profile ${profile_id}`, { config, dry_run });
+    // Load governance settings and merge with user config
+    const governanceSettings = await getGovernanceWithDefaults(supabase, profile_id);
+    
+    // Build config from governance settings + user overrides
+    const config: OptimizerConfig = { 
+      ...DEFAULT_CONFIG, 
+      // Apply governance settings (these take precedence over defaults)
+      max_bid_change_percent: governanceSettings.max_bid_change_percent / 100, // Convert from percentage
+      min_bid_micros: governanceSettings.min_bid_micros,
+      max_bid_micros: governanceSettings.max_bid_micros,
+      // Allow userConfig to override other settings (not guardrails)
+      ...userConfig,
+      // But ensure guardrails from governance are always enforced
+      max_bid_change_percent: Math.min(
+        userConfig?.max_bid_change_percent ?? DEFAULT_CONFIG.max_bid_change_percent,
+        governanceSettings.max_bid_change_percent / 100
+      ),
+    };
+
+    console.log(`[Bayesian Optimizer] Starting for profile ${profile_id}`, { 
+      config, 
+      dry_run,
+      governance: {
+        max_change: governanceSettings.max_bid_change_percent,
+        min_bid: governanceSettings.min_bid_micros / 1000000,
+        max_bid: governanceSettings.max_bid_micros / 1000000
+      }
+    });
 
     // Create optimizer run record
     const { data: run, error: runError } = await supabase
@@ -427,13 +472,34 @@ serve(async (req) => {
     const actions: any[] = [];
 
     for (const state of states) {
+      // === GOVERNANCE CHECK: Protected Entities ===
+      const entityType = state.entity_type === 'adgroup' ? 'ad_group' : state.entity_type as 'keyword' | 'target';
+      const protectedCheck = await isEntityProtected(supabase, profile_id, entityType, state.entity_id);
+      if (protectedCheck.protected) {
+        console.log(`[Bayesian Optimizer] Entity ${state.entity_id} skipped - protected: ${protectedCheck.reason}`);
+        continue;
+      }
+      
       results.entities_eligible++;
       
-      const { newBidMicros, sampledCvr, expectedValue, confidence } = calculateOptimalBid(
+      const { newBidMicros: rawBidMicros, sampledCvr, expectedValue, confidence } = calculateOptimalBid(
         state as BidState,
         config,
         avgOrderValue
       );
+
+      // === GOVERNANCE: Apply bid guardrails ===
+      const bidGuardrails = await applyBidGuardrails(
+        supabase,
+        profile_id,
+        state.current_bid_micros,
+        rawBidMicros
+      );
+      const newBidMicros = bidGuardrails.bidMicros;
+      
+      if (bidGuardrails.wasAdjusted) {
+        console.log(`[Bayesian Optimizer] Bid adjusted for ${state.entity_id}: ${bidGuardrails.reason}`);
+      }
 
       results.bids_sampled++;
 

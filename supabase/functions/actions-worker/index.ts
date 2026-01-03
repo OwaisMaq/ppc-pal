@@ -9,6 +9,14 @@ import {
   AmazonAdsApiClient, 
   ApiResponse 
 } from '../_shared/amazon-ads-api.ts';
+import {
+  isAutomationPaused,
+  isEntityProtected,
+  checkActionQuota,
+  applyBidGuardrails,
+  requiresApproval,
+  clearGovernanceCache,
+} from '../_shared/governance-checker.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -518,6 +526,41 @@ async function checkAutoApplyPermission(
 }
 
 /**
+ * Get entity type from action for governance checks
+ */
+function getEntityType(action: QueuedAction): 'campaign' | 'ad_group' | 'keyword' | 'target' | null {
+  const payload = action.payload;
+  
+  if (action.action_type.includes('campaign')) return 'campaign';
+  if (action.action_type.includes('ad_group') || action.action_type.includes('adgroup')) return 'ad_group';
+  if (action.action_type.includes('keyword')) return 'keyword';
+  if (action.action_type.includes('target') || payload.target_id) return 'target';
+  
+  // Infer from payload
+  if (payload.campaign_id && !payload.ad_group_id && !payload.keyword_id && !payload.target_id) return 'campaign';
+  if (payload.keyword_id) return 'keyword';
+  if (payload.target_id) return 'target';
+  if (payload.ad_group_id) return 'ad_group';
+  
+  return null;
+}
+
+/**
+ * Get entity ID from action for governance checks
+ */
+function getEntityId(action: QueuedAction): string | null {
+  const payload = action.payload;
+  
+  // Order matters - check most specific first
+  if (payload.keyword_id) return payload.keyword_id;
+  if (payload.target_id) return payload.target_id;
+  if (payload.ad_group_id) return payload.ad_group_id;
+  if (payload.campaign_id) return payload.campaign_id;
+  
+  return null;
+}
+
+/**
  * Main handler
  */
 Deno.serve(async (req) => {
@@ -573,6 +616,51 @@ Deno.serve(async (req) => {
 
     // Process actions grouped by profile
     for (const [profileId, profileActions] of actionsByProfile) {
+      // Clear governance cache for fresh reads per profile batch
+      clearGovernanceCache();
+      
+      // === GOVERNANCE CHECK: Kill Switch ===
+      const pauseCheck = await isAutomationPaused(supabase, profileId);
+      if (pauseCheck.paused) {
+        console.log(`[ActionsWorker] Profile ${profileId} automation is paused: ${pauseCheck.reason}`);
+        
+        // Mark all actions for this profile as blocked
+        for (const action of profileActions) {
+          await supabase
+            .from('action_queue')
+            .update({
+              status: 'blocked_by_governance',
+              error: pauseCheck.reason || 'Automation paused by user',
+              applied_at: new Date().toISOString(),
+            })
+            .eq('id', action.id);
+          
+          results.skipped_actions++;
+        }
+        continue;
+      }
+      
+      // === GOVERNANCE CHECK: Daily Quota ===
+      const quotaCheck = await checkActionQuota(supabase, profileId);
+      if (!quotaCheck.allowed) {
+        console.log(`[ActionsWorker] Profile ${profileId} exceeded daily quota: ${quotaCheck.reason}`);
+        
+        // Mark all actions for this profile as blocked
+        for (const action of profileActions) {
+          await supabase
+            .from('action_queue')
+            .update({
+              status: 'blocked_by_governance',
+              error: quotaCheck.reason || 'Daily action limit reached',
+              applied_at: new Date().toISOString(),
+            })
+            .eq('id', action.id);
+          
+          results.skipped_actions++;
+        }
+        continue;
+      }
+
       // Create Amazon API client for this profile
       const client = await createAmazonAdsClient(supabase, profileId);
       
@@ -603,6 +691,67 @@ Deno.serve(async (req) => {
 
       for (const action of profileActions) {
         try {
+          // === GOVERNANCE CHECK: Protected Entities ===
+          const entityType = getEntityType(action);
+          const entityId = getEntityId(action);
+          
+          if (entityType && entityId) {
+            const protectedCheck = await isEntityProtected(supabase, profileId, entityType, entityId);
+            if (protectedCheck.protected) {
+              console.log(`[ActionsWorker] Action ${action.id} blocked - entity protected: ${protectedCheck.reason}`);
+              
+              await supabase
+                .from('action_queue')
+                .update({
+                  status: 'blocked_by_governance',
+                  error: protectedCheck.reason || 'Entity is protected from automation',
+                  applied_at: new Date().toISOString(),
+                })
+                .eq('id', action.id);
+              
+              results.skipped_actions++;
+              continue;
+            }
+          }
+          
+          // === GOVERNANCE CHECK: Bid Guardrails ===
+          let adjustedPayload = { ...action.payload };
+          if (action.payload.bid_micros) {
+            const currentBid = action.payload.current_bid_micros || action.payload.bid_micros;
+            const bidCheck = await applyBidGuardrails(
+              supabase, 
+              profileId, 
+              currentBid, 
+              action.payload.bid_micros
+            );
+            
+            if (bidCheck.wasAdjusted) {
+              console.log(`[ActionsWorker] Action ${action.id} bid adjusted: ${bidCheck.reason}`);
+              adjustedPayload.bid_micros = bidCheck.bidMicros;
+              adjustedPayload.governance_adjustment = bidCheck.reason;
+            }
+          }
+          
+          // === GOVERNANCE CHECK: Approval Threshold ===
+          const impactMicros = action.payload.bid_micros || action.payload.daily_budget_micros || 0;
+          const needsApproval = await requiresApproval(supabase, profileId, impactMicros);
+          
+          if (needsApproval && action.rule_id) {
+            // Only apply approval check to rule-based actions, not manually approved ones
+            console.log(`[ActionsWorker] Action ${action.id} requires approval - impact exceeds threshold`);
+            
+            await supabase
+              .from('action_queue')
+              .update({
+                status: 'requires_approval',
+                applied_at: new Date().toISOString(),
+              })
+              .eq('id', action.id);
+            
+            results.skipped_actions++;
+            continue;
+          }
+          
           // Check if user can auto-apply this action
           const canAutoApply = await checkAutoApplyPermission(supabase, action.rule_id, action.action_type);
           
@@ -625,8 +774,9 @@ Deno.serve(async (req) => {
           // Capture before metrics for tracking outcomes
           const beforeMetrics = await captureBeforeMetrics(supabase, action);
           
-          // Process the action
-          const result = await processor.processAction(action);
+          // Process the action with adjusted payload
+          const actionWithAdjustedPayload = { ...action, payload: adjustedPayload };
+          const result = await processor.processAction(actionWithAdjustedPayload);
           
           // Prepare update data
           const updateData: any = {
