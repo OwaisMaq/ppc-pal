@@ -62,20 +62,7 @@ export const useASINs = () => {
         if (item.asin) asinSet.add(item.asin.toUpperCase());
       });
 
-      // 4. Get ASINs from targets.expression_value where expression_type contains ASIN
-      const { data: targetExpressions, error: targetExprError } = await supabase
-        .from('targets')
-        .select('expression_value, expression_type')
-        .or('expression_type.ilike.%ASIN%,expression_type.eq.asinSameAs,expression_type.eq.asinExpandedFrom');
-
-      if (targetExprError) throw targetExprError;
-      targetExpressions?.forEach(item => {
-        if (item.expression_value && /^B0[A-Z0-9]{8,10}$/i.test(item.expression_value)) {
-          asinSet.add(item.expression_value.toUpperCase());
-        }
-      });
-
-      // 5. Get ASINs from keywords.asin column (if populated)
+      // 4. Get ASINs from keywords.asin column (if populated)
       const { data: keywordASINs, error: keywordError } = await supabase
         .from('keywords')
         .select('asin')
