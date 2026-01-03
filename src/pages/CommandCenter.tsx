@@ -340,6 +340,13 @@ const CommandCenter = () => {
           </div>
           
           <div className="flex items-center gap-3">
+            {/* Compact Alerts Indicator */}
+            <ActiveAlertsCard
+              alerts={activeAlerts}
+              loading={alertsLoading}
+              compact
+            />
+            
             {pendingActionsCount > 0 && (
               <Badge variant="destructive" className="text-sm px-3 py-1">
                 {pendingActionsCount} Pending
@@ -382,19 +389,13 @@ const CommandCenter = () => {
                 <MultiAccountBreakdown from={dateRange.from} to={dateRange.to} />
               )}
               
-              <div className="grid gap-6 md:grid-cols-2">
-                <ActiveAlertsCard
-                  alerts={activeAlerts}
-                  loading={alertsLoading}
+              {showOnboarding && (
+                <OnboardingGuidanceCard
+                  items={setupItems}
+                  automationExplainer={automationExplainer}
+                  loading={rulesLoading}
                 />
-                {showOnboarding && (
-                  <OnboardingGuidanceCard
-                    items={setupItems}
-                    automationExplainer={automationExplainer}
-                    loading={rulesLoading}
-                  />
-                )}
-              </div>
+              )}
             </div>
 
             {hasExpiredTokens && (

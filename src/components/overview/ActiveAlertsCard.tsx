@@ -19,6 +19,7 @@ export interface ActiveAlert {
 interface ActiveAlertsCardProps {
   alerts: ActiveAlert[];
   loading?: boolean;
+  compact?: boolean;
 }
 
 const alertTypeIcons = {
@@ -34,10 +35,61 @@ const alertLevelStyles = {
   critical: 'bg-destructive/10 text-destructive border-destructive/20'
 };
 
-export const ActiveAlertsCard = ({ alerts, loading }: ActiveAlertsCardProps) => {
+export const ActiveAlertsCard = ({ alerts, loading, compact }: ActiveAlertsCardProps) => {
   const displayAlerts = alerts.slice(0, 5);
   const hasMore = alerts.length > 5;
 
+  // Compact variant for header placement
+  if (compact) {
+    if (loading) {
+      return (
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-card">
+          <div className="h-4 w-4 bg-muted rounded animate-pulse" />
+          <div className="h-3 w-12 bg-muted rounded animate-pulse" />
+        </div>
+      );
+    }
+
+    const hasAlerts = alerts.length > 0;
+    const criticalCount = alerts.filter(a => a.level === 'critical').length;
+    const warnCount = alerts.filter(a => a.level === 'warn').length;
+
+    return (
+      <Link 
+        to="/governance" 
+        className={cn(
+          "flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors",
+          hasAlerts 
+            ? criticalCount > 0 
+              ? "bg-destructive/10 border-destructive/20 hover:bg-destructive/15" 
+              : "bg-warning/10 border-warning/20 hover:bg-warning/15"
+            : "bg-card border-border hover:bg-muted/50"
+        )}
+      >
+        {hasAlerts ? (
+          <>
+            <Bell className={cn(
+              "h-4 w-4",
+              criticalCount > 0 ? "text-destructive" : "text-warning"
+            )} />
+            <span className={cn(
+              "text-sm font-medium",
+              criticalCount > 0 ? "text-destructive" : "text-warning"
+            )}>
+              {alerts.length} Alert{alerts.length !== 1 ? 's' : ''}
+            </span>
+          </>
+        ) : (
+          <>
+            <CheckCircle className="h-4 w-4 text-emerald-500" />
+            <span className="text-sm text-muted-foreground">All clear</span>
+          </>
+        )}
+      </Link>
+    );
+  }
+
+  // Full card variant (original)
   if (loading) {
     return (
       <Card>
