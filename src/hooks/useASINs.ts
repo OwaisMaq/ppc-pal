@@ -8,6 +8,9 @@ export interface ASINInfo {
   label?: string; // Custom user-defined label for the ASIN
 }
 
+// Regex to match Amazon ASINs (B0 followed by 8-10 alphanumeric characters)
+const ASIN_REGEX = /\b(B0[A-Z0-9]{8,10})\b/gi;
+
 export const useASINs = () => {
   const { user } = useAuth();
   const { labels } = useASINLabels();
@@ -22,49 +25,65 @@ export const useASINs = () => {
     setError(null);
     
     try {
-      // Get ASINs from campaigns
+      const asinSet = new Set<string>();
+
+      // 1. Get ASINs from campaigns.asin column (if populated)
       const { data: campaignASINs, error: campaignError } = await supabase
         .from('campaigns')
         .select('asin')
         .not('asin', 'is', null);
 
       if (campaignError) throw campaignError;
+      campaignASINs?.forEach(item => {
+        if (item.asin) asinSet.add(item.asin.toUpperCase());
+      });
 
-      // Get ASINs from targets
+      // 2. Extract ASINs from campaign names (e.g., SP_Product_B0DLQZ71J1_Exact)
+      const { data: campaignNames, error: campaignNamesError } = await supabase
+        .from('campaigns')
+        .select('name');
+
+      if (campaignNamesError) throw campaignNamesError;
+      campaignNames?.forEach(item => {
+        if (item.name) {
+          const matches = item.name.match(ASIN_REGEX);
+          matches?.forEach(asin => asinSet.add(asin.toUpperCase()));
+        }
+      });
+
+      // 3. Get ASINs from targets.asin column (if populated)
       const { data: targetASINs, error: targetError } = await supabase
         .from('targets')
         .select('asin')
         .not('asin', 'is', null);
 
       if (targetError) throw targetError;
+      targetASINs?.forEach(item => {
+        if (item.asin) asinSet.add(item.asin.toUpperCase());
+      });
 
-      // Get ASINs from keywords
+      // 4. Get ASINs from targets.expression_value where expression_type contains ASIN
+      const { data: targetExpressions, error: targetExprError } = await supabase
+        .from('targets')
+        .select('expression_value, expression_type')
+        .or('expression_type.ilike.%ASIN%,expression_type.eq.asinSameAs,expression_type.eq.asinExpandedFrom');
+
+      if (targetExprError) throw targetExprError;
+      targetExpressions?.forEach(item => {
+        if (item.expression_value && /^B0[A-Z0-9]{8,10}$/i.test(item.expression_value)) {
+          asinSet.add(item.expression_value.toUpperCase());
+        }
+      });
+
+      // 5. Get ASINs from keywords.asin column (if populated)
       const { data: keywordASINs, error: keywordError } = await supabase
         .from('keywords')
         .select('asin')
         .not('asin', 'is', null);
 
       if (keywordError) throw keywordError;
-
-      // Combine and deduplicate ASINs
-      const asinSet = new Set<string>();
-
-      campaignASINs?.forEach(item => {
-        if (item.asin) {
-          asinSet.add(item.asin);
-        }
-      });
-
-      targetASINs?.forEach(item => {
-        if (item.asin) {
-          asinSet.add(item.asin);
-        }
-      });
-
       keywordASINs?.forEach(item => {
-        if (item.asin) {
-          asinSet.add(item.asin);
-        }
+        if (item.asin) asinSet.add(item.asin.toUpperCase());
       });
 
       // Create ASIN list with labels
