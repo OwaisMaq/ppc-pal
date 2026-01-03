@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
-import { Bell, AlertTriangle, TrendingUp, ChevronRight, Settings } from "lucide-react";
+import { Bell, AlertTriangle, TrendingUp, ChevronRight, Settings, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface ActiveAlert {
@@ -54,7 +54,33 @@ export const ActiveAlertsCard = ({ alerts, loading }: ActiveAlertsCardProps) => 
   }
 
   if (alerts.length === 0) {
-    return null;
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Bell className="h-5 w-5 text-primary" />
+              Active Alerts
+              <Badge variant="secondary" className="ml-1">0</Badge>
+            </CardTitle>
+            <Link 
+              to="/settings" 
+              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+            >
+              <Settings className="h-3.5 w-3.5" />
+              Configure
+            </Link>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center py-6 text-center">
+            <CheckCircle className="h-8 w-8 text-emerald-500 mb-2" />
+            <p className="text-sm font-medium">All clear</p>
+            <p className="text-xs text-muted-foreground">No active alerts at this time</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
