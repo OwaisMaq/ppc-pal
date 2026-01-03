@@ -5,12 +5,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { User, Globe, Shield, Save } from 'lucide-react';
+import { User, Globe, Shield, Save, Package } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfileSettings } from '@/hooks/useProfileSettings';
 import { useTheme } from 'next-themes';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { ASINLabelManager } from '@/components/ASINLabelManager';
 
 const TIMEZONES = [
   { value: 'UTC', label: 'UTC' },
@@ -221,6 +222,19 @@ export const AccountSettings = () => {
             </div>
             <Badge variant="secondary">Coming Soon</Badge>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Product Labels */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Package className="h-5 w-5" />
+            Product Labels
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ASINLabelManager />
         </CardContent>
       </Card>
     </div>
