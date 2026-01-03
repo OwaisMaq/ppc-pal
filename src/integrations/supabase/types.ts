@@ -4411,6 +4411,36 @@ export type Database = {
         }
         Relationships: []
       }
+      product_governance: {
+        Row: {
+          asin: string
+          created_at: string
+          id: string
+          profile_id: string
+          target_acos: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          asin: string
+          created_at?: string
+          id?: string
+          profile_id: string
+          target_acos?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          asin?: string
+          created_at?: string
+          id?: string
+          profile_id?: string
+          target_acos?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profile_currency: {
         Row: {
           currency: string

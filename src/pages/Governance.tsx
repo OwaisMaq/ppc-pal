@@ -19,7 +19,7 @@ import {
 import { AutomationRulesList } from "@/components/AutomationRulesList";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DaypartScheduler } from "@/components/dayparting";
-import { GuardrailsSettings, ProtectedEntities, AIAutoApplyCard } from "@/components/governance";
+import { GuardrailsSettings, ProtectedEntities, AIAutoApplyCard, ProductTargetsCard } from "@/components/governance";
 import { useAutomationRules } from "@/hooks/useAutomation";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useGovernance } from "@/hooks/useGovernance";
@@ -291,6 +291,12 @@ const Governance: React.FC = () => {
                 />
               </CardContent>
             </Card>
+
+            {/* Product-Level Targets */}
+            <ProductTargetsCard 
+              profileId={selectedProfile} 
+              globalTargetAcos={30} 
+            />
 
             {/* Automation Rules Section */}
             <section className="space-y-4">

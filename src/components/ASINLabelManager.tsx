@@ -1,13 +1,17 @@
 import { useState } from "react";
-import { Pencil, Plus, X, Check } from "lucide-react";
+import { Pencil, Plus, X, Check, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useASINs } from "@/hooks/useASINs";
 import { useASINLabels } from "@/hooks/useASINLabels";
 
-export const ASINLabelManager = () => {
+interface ASINLabelManagerProps {
+  showEmptyState?: boolean;
+}
+
+export const ASINLabelManager = ({ showEmptyState = true }: ASINLabelManagerProps) => {
   const { asins, loading: asinsLoading } = useASINs();
   const { labels, createLabel, updateLabel, deleteLabel } = useASINLabels();
   const [editingAsin, setEditingAsin] = useState<string | null>(null);
@@ -38,117 +42,110 @@ export const ASINLabelManager = () => {
 
   if (asinsLoading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>ASIN Labels</CardTitle>
-          <CardDescription>Loading ASINs...</CardDescription>
-        </CardHeader>
-      </Card>
+      <div className="space-y-2">
+        {[1, 2, 3].map(i => (
+          <Skeleton key={i} className="h-14 w-full" />
+        ))}
+      </div>
     );
   }
 
   if (asins.length === 0) {
+    if (!showEmptyState) return null;
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>ASIN Labels</CardTitle>
-          <CardDescription>No ASINs found. Connect your Amazon account and sync data first.</CardDescription>
-        </CardHeader>
-      </Card>
+      <p className="text-sm text-muted-foreground">
+        No products detected. Connect your Amazon account and sync data first.
+      </p>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>ASIN Labels</CardTitle>
-        <CardDescription>
-          Set custom labels for your ASINs to make them easier to identify
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {asins.map((asinInfo) => {
-          const isEditing = editingAsin === asinInfo.asin;
-          const existingLabelId = asinInfo.label ? 
-            labels.find(l => l.asin === asinInfo.asin)?.id : undefined;
+    <div className="space-y-2">
+      <p className="text-sm text-muted-foreground mb-3">
+        Set custom labels for your products to make them easier to identify
+      </p>
+      {asins.map((asinInfo) => {
+        const isEditing = editingAsin === asinInfo.asin;
+        const existingLabelId = asinInfo.label ? 
+          labels.find(l => l.asin === asinInfo.asin)?.id : undefined;
 
-          return (
-            <div key={asinInfo.asin} className="flex items-center gap-3 p-3 border rounded-lg">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="font-mono text-xs">
-                    {asinInfo.asin}
+        return (
+          <div 
+            key={asinInfo.asin} 
+            className="flex items-center gap-3 p-2.5 border border-border rounded-md bg-muted/30"
+          >
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <code className="text-xs font-mono text-muted-foreground">
+                  {asinInfo.asin}
+                </code>
+                {asinInfo.label && !isEditing && (
+                  <Badge variant="secondary" className="text-xs truncate max-w-[150px]">
+                    {asinInfo.label}
                   </Badge>
-                </div>
-                {isEditing ? (
-                  <div className="mt-2 flex items-center gap-2">
-                    <Input
-                      value={newLabel}
-                      onChange={(e) => setNewLabel(e.target.value)}
-                      placeholder="Enter custom label..."
-                      className="h-8"
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter') {
-                          handleSaveLabel(asinInfo.asin, existingLabelId);
-                        }
-                        if (e.key === 'Escape') {
-                          handleCancelEdit();
-                        }
-                      }}
-                      autoFocus
-                    />
-                    <Button
-                      size="sm"
-                      onClick={() => handleSaveLabel(asinInfo.asin, existingLabelId)}
-                      className="h-8 w-8 p-0"
-                    >
-                      <Check className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={handleCancelEdit}
-                      className="h-8 w-8 p-0"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="mt-1">
-                    {asinInfo.label ? (
-                      <span className="text-sm text-muted-foreground">{asinInfo.label}</span>
-                    ) : (
-                      <span className="text-sm text-muted-foreground italic">No label set</span>
-                    )}
-                  </div>
                 )}
               </div>
-              {!isEditing && (
-                <div className="flex items-center gap-2">
+              {isEditing && (
+                <div className="mt-2 flex items-center gap-2">
+                  <Input
+                    value={newLabel}
+                    onChange={(e) => setNewLabel(e.target.value)}
+                    placeholder="Enter custom label..."
+                    className="h-8 text-sm"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleSaveLabel(asinInfo.asin, existingLabelId);
+                      }
+                      if (e.key === 'Escape') {
+                        handleCancelEdit();
+                      }
+                    }}
+                    autoFocus
+                  />
                   <Button
-                    size="sm"
+                    size="icon"
                     variant="ghost"
-                    onClick={() => handleEditLabel(asinInfo.asin, asinInfo.label)}
-                    className="h-8 w-8 p-0"
+                    onClick={() => handleSaveLabel(asinInfo.asin, existingLabelId)}
+                    className="h-7 w-7"
                   >
-                    {asinInfo.label ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                    <Check className="h-3.5 w-3.5 text-success" />
                   </Button>
-                  {asinInfo.label && existingLabelId && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => deleteLabel(existingLabelId)}
-                      className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  )}
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={handleCancelEdit}
+                    className="h-7 w-7"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
               )}
             </div>
-          );
-        })}
-      </CardContent>
-    </Card>
+            {!isEditing && (
+              <div className="flex items-center gap-1">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => handleEditLabel(asinInfo.asin, asinInfo.label)}
+                  className="h-7 text-xs px-2"
+                >
+                  {asinInfo.label ? <Pencil className="h-3.5 w-3.5" /> : "Add label"}
+                </Button>
+                {asinInfo.label && existingLabelId && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => deleteLabel(existingLabelId)}
+                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 };
