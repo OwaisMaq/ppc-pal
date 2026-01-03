@@ -16,7 +16,13 @@ import {
   Clock, 
   XCircle, 
   Undo2,
-  History
+  History,
+  Plus,
+  Minus,
+  Bot,
+  BookOpen,
+  Zap,
+  User
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -25,10 +31,11 @@ type StatusFilter = 'all' | 'applied' | 'queued' | 'failed';
 
 // Map action_type to entity category
 const getEntityType = (actionType: string): EntityType => {
-  if (actionType.includes('campaign') || actionType === 'update_budget') return 'campaign';
+  if (actionType.includes('campaign') && !actionType.includes('negative')) return 'campaign';
   if (actionType.includes('ad_group') || actionType.includes('adgroup')) return 'ad_group';
-  if (actionType.includes('keyword') || actionType === 'create_negative') return 'keyword';
+  if (actionType.includes('keyword') || actionType.includes('negative') || actionType === 'create_keyword' || actionType === 'harvest_keyword' || actionType === 'st_harvest' || actionType === 'st_prune') return 'keyword';
   if (actionType.includes('target') || actionType === 'set_bid') return 'target';
+  if (actionType === 'update_budget') return 'campaign';
   return 'campaign';
 };
 
@@ -46,12 +53,56 @@ const getActionLabel = (actionType: string): string => {
     'set_keyword_bid': 'Bid Changed',
     'create_negative': 'Added Negative',
     'negative_keyword': 'Added Negative',
+    'add_campaign_negative': 'Added Negative',
+    'add_adgroup_negative': 'Added Negative',
     'pause_target': 'Paused',
     'enable_target': 'Enabled',
     'set_bid': 'Bid Changed',
     'set_target_bid': 'Bid Changed',
+    'create_keyword': 'Keyword Harvested',
+    'harvest_keyword': 'Keyword Harvested',
+    'st_harvest': 'Keyword Harvested',
+    'st_prune': 'Added Negative',
   };
   return labels[actionType] || actionType.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+};
+
+// Check if action is a harvest (add positive) or prune (add negative) action
+const isHarvestAction = (actionType: string): boolean => {
+  return ['create_keyword', 'harvest_keyword', 'st_harvest'].includes(actionType);
+};
+
+const isPruneAction = (actionType: string): boolean => {
+  return ['add_campaign_negative', 'add_adgroup_negative', 'create_negative', 'negative_keyword', 'st_prune'].includes(actionType);
+};
+
+// Get source of the action
+const getActionSource = (action: ActionItem): { label: string; icon: typeof Bot } => {
+  const actionType = action.action_type;
+  
+  // Check if from bid optimizer
+  if (actionType === 'set_bid' || actionType === 'set_target_bid' || actionType === 'set_keyword_bid') {
+    if (action.rule_id === null && action.user_id === null) {
+      return { label: 'Optimizer', icon: Zap };
+    }
+  }
+  
+  // Check if from a rule/playbook
+  if (action.rule_id) {
+    // Check payload for playbook indicator
+    const payload = action.payload as Record<string, any>;
+    if (payload?.playbook_id || payload?.source === 'playbook') {
+      return { label: 'Playbook', icon: BookOpen };
+    }
+    return { label: 'Rule', icon: Bot };
+  }
+  
+  // Manual action
+  if (action.user_id) {
+    return { label: 'Manual', icon: User };
+  }
+  
+  return { label: 'Auto', icon: Bot };
 };
 
 // Get status icon and color
@@ -211,9 +262,16 @@ const Changelog = () => {
               const details = getActionDetails(action);
               const hasDetails = details.length > 0;
               
+              const isHarvest = isHarvestAction(action.action_type);
+              const isPrune = isPruneAction(action.action_type);
+              const source = getActionSource(action);
+              const SourceIcon = source.icon;
+              
               const rowContent = (
                 <div 
-                  className="flex items-center gap-4 p-4 border rounded-lg bg-card hover:bg-muted/30 transition-colors cursor-default"
+                  className={`flex items-center gap-4 p-4 border rounded-lg bg-card hover:bg-muted/30 transition-colors cursor-default ${
+                    isHarvest ? 'border-l-4 border-l-emerald-500' : isPrune ? 'border-l-4 border-l-amber-500' : ''
+                  }`}
                 >
                   {/* Status Icon */}
                   <div className={`h-8 w-8 rounded-full ${statusDisplay.bg} flex items-center justify-center shrink-0`}>
@@ -223,9 +281,17 @@ const Changelog = () => {
                   {/* Content */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
+                      {/* Harvest/Prune indicator */}
+                      {isHarvest && <Plus className="h-3.5 w-3.5 text-emerald-600" />}
+                      {isPrune && <Minus className="h-3.5 w-3.5 text-amber-600" />}
                       <span className="font-medium text-sm">{getActionLabel(action.action_type)}</span>
                       <Badge variant="outline" className="text-xs font-normal">
                         {getEntityType(action.action_type).replace('_', ' ')}
+                      </Badge>
+                      {/* Source indicator */}
+                      <Badge variant="secondary" className="text-xs font-normal gap-1">
+                        <SourceIcon className="h-3 w-3" />
+                        {source.label}
                       </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground truncate">
