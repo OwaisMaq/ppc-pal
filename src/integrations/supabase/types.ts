@@ -1157,6 +1157,45 @@ export type Database = {
         }
         Relationships: []
       }
+      archive_status: {
+        Row: {
+          created_at: string | null
+          earliest_date: string | null
+          entity_type: string
+          gaps_detected: Json | null
+          id: string
+          last_archived_at: string | null
+          latest_date: string | null
+          profile_id: string
+          total_records: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          earliest_date?: string | null
+          entity_type: string
+          gaps_detected?: Json | null
+          id?: string
+          last_archived_at?: string | null
+          latest_date?: string | null
+          profile_id: string
+          total_records?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          earliest_date?: string | null
+          entity_type?: string
+          gaps_detected?: Json | null
+          id?: string
+          last_archived_at?: string | null
+          latest_date?: string | null
+          profile_id?: string
+          total_records?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       asin_labels: {
         Row: {
           asin: string

@@ -526,6 +526,22 @@ async function processCompletedReport(
         }
 
         case 'adGroups': {
+          // First check if the adgroup exists
+          const { data: existingAdgroup, error: checkError } = await supabase
+            .from('ad_groups')
+            .select('id, amazon_adgroup_id')
+            .eq('amazon_adgroup_id', record.adGroupId)
+            .eq('profile_id', profileId)
+            .maybeSingle()
+
+          if (!existingAdgroup) {
+            notFound++
+            if (notFound <= 5) {
+              console.warn(`⚠️ Ad group not found: amazon_adgroup_id=${record.adGroupId}, profile_id=${profileId}`)
+            }
+            break
+          }
+
           const updateData: any = {
             // Update both legacy and attribution-windowed fields
             impressions: record.impressions || 0,
@@ -584,6 +600,37 @@ async function processCompletedReport(
                   payload: {}
                 })
             }
+
+            // Insert into adgroup_performance_history for historical data
+            const spend = record.cost || 0
+            const sales = record.sales7d || 0
+            const clicks = record.clicks || 0
+            const impressions = record.impressions || 0
+            const orders = record.purchases7d || 0
+
+            const { error: historyError } = await supabase
+              .from('adgroup_performance_history')
+              .upsert({
+                adgroup_id: existingAdgroup.id,
+                date: record.date,
+                attribution_window: '7d',
+                impressions,
+                clicks,
+                spend,
+                sales,
+                orders,
+                acos: sales > 0 ? (spend / sales) * 100 : null,
+                roas: spend > 0 ? sales / spend : null,
+                ctr: impressions > 0 ? (clicks / impressions) * 100 : null,
+                cpc: clicks > 0 ? spend / clicks : null,
+                conversion_rate: clicks > 0 ? (orders / clicks) * 100 : null
+              }, {
+                onConflict: 'adgroup_id,date,attribution_window'
+              })
+
+            if (historyError) {
+              console.warn(`⚠️ Failed to upsert adgroup_performance_history for ${existingAdgroup.id}:`, historyError.message)
+            }
           }
           break
         }
@@ -616,11 +663,54 @@ async function processCompletedReport(
             .eq('profile_id', profileId)
 
           if (!error) updated++
+
+          // Insert into fact_target_daily for historical data
+          if (timeUnit === 'DAILY' && record.date) {
+            const { error: historyError } = await supabase
+              .from('fact_target_daily')
+              .upsert({
+                date: record.date,
+                profile_id: profileId,
+                campaign_id: record.campaignId || '',
+                ad_group_id: record.adGroupId || '',
+                target_id: record.targetId,
+                target_type: record.targetingType || 'UNKNOWN',
+                expression: record.targetingExpression ? { value: record.targetingExpression } : null,
+                impressions: record.impressions || 0,
+                clicks: record.clicks || 0,
+                cost_micros: Math.round((record.cost || 0) * 1000000),
+                attributed_conversions_7d: record.purchases7d || 0,
+                attributed_sales_7d_micros: Math.round((record.sales7d || 0) * 1000000)
+              }, {
+                onConflict: 'date,profile_id,target_id'
+              })
+
+            if (historyError) {
+              console.warn(`⚠️ Failed to upsert fact_target_daily for ${record.targetId}:`, historyError.message)
+            }
+          }
           break
         }
 
         case 'keywords': {
           const keywordId = record.keywordId || record.targetId // v3 API uses targetId for keywords
+          
+          // First check if the keyword exists
+          const { data: existingKeyword, error: checkError } = await supabase
+            .from('keywords')
+            .select('id, amazon_keyword_id')
+            .eq('amazon_keyword_id', keywordId)
+            .eq('profile_id', profileId)
+            .maybeSingle()
+
+          if (!existingKeyword) {
+            notFound++
+            if (notFound <= 5) {
+              console.warn(`⚠️ Keyword not found: amazon_keyword_id=${keywordId}, profile_id=${profileId}`)
+            }
+            break
+          }
+
           const updateData: any = {
             // Update both legacy and attribution-windowed fields
             impressions: record.impressions || 0,
@@ -648,6 +738,39 @@ async function processCompletedReport(
             .eq('profile_id', profileId)
 
           if (!error) updated++
+
+          // Insert into keyword_performance_history for historical data
+          if (timeUnit === 'DAILY' && record.date) {
+            const spend = record.cost || 0
+            const sales = record.sales7d || 0
+            const clicks = record.clicks || 0
+            const impressions = record.impressions || 0
+            const orders = record.purchases7d || 0
+
+            const { error: historyError } = await supabase
+              .from('keyword_performance_history')
+              .upsert({
+                keyword_id: existingKeyword.id,
+                date: record.date,
+                attribution_window: '7d',
+                impressions,
+                clicks,
+                spend,
+                sales,
+                orders,
+                acos: sales > 0 ? (spend / sales) * 100 : null,
+                roas: spend > 0 ? sales / spend : null,
+                ctr: impressions > 0 ? (clicks / impressions) * 100 : null,
+                cpc: clicks > 0 ? spend / clicks : null,
+                conversion_rate: clicks > 0 ? (orders / clicks) * 100 : null
+              }, {
+                onConflict: 'keyword_id,date,attribution_window'
+              })
+
+            if (historyError) {
+              console.warn(`⚠️ Failed to upsert keyword_performance_history for ${existingKeyword.id}:`, historyError.message)
+            }
+          }
           break
         }
       }
