@@ -6,12 +6,17 @@ import { Download, Trash2, Calendar, HelpCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAmazonConnections } from '@/hooks/useAmazonConnections';
+import { HistoricalDataImport } from '@/components/HistoricalDataImport';
 
 export const DataSettings = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { connections } = useAmazonConnections();
   const [isDeleting, setIsDeleting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+
+  const activeConnection = connections?.find(c => c.status === 'active');
 
   const handleExportData = async () => {
     if (!user) return;
@@ -108,6 +113,11 @@ export const DataSettings = () => {
 
   return (
     <div className="space-y-6">
+      {/* Historical Data Import - Show if connected */}
+      {activeConnection && (
+        <HistoricalDataImport profileId={activeConnection.profile_id} />
+      )}
+
       {/* Data Export */}
       <Card>
         <CardHeader>

@@ -22,8 +22,9 @@ export const HistoricalDataImport = ({ profileId }: HistoricalDataImportProps) =
 
   const quickRanges = [
     { label: "Last 30 Days", days: 30 },
-    { label: "Last 60 Days", days: 60 },
     { label: "Last 90 Days", days: 90 },
+    { label: "Last 180 Days", days: 180 },
+    { label: "Last 365 Days", days: 365 },
   ];
 
   const handleQuickRange = (days: number) => {
@@ -53,10 +54,10 @@ export const HistoricalDataImport = ({ profileId }: HistoricalDataImportProps) =
     }
 
     const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-    if (daysDiff > 90) {
+    if (daysDiff > 365) {
       toast({
         title: "Date range too large",
-        description: "Maximum import range is 90 days",
+        description: "Maximum import range is 365 days",
         variant: "destructive",
       });
       return;
@@ -102,7 +103,7 @@ export const HistoricalDataImport = ({ profileId }: HistoricalDataImportProps) =
           Historical Data Import
         </CardTitle>
         <CardDescription>
-          Import historical performance data from Amazon Ads (up to 90 days)
+          Import historical performance data from Amazon Ads (up to 365 days)
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -146,7 +147,7 @@ export const HistoricalDataImport = ({ profileId }: HistoricalDataImportProps) =
                   selected={startDate}
                   onSelect={setStartDate}
                   disabled={(date) =>
-                    date > new Date() || date < subDays(new Date(), 90)
+                    date > new Date() || date < subDays(new Date(), 365)
                   }
                   initialFocus
                 />
@@ -175,7 +176,7 @@ export const HistoricalDataImport = ({ profileId }: HistoricalDataImportProps) =
                   selected={endDate}
                   onSelect={setEndDate}
                   disabled={(date) =>
-                    date > new Date() || date < subDays(new Date(), 90)
+                    date > new Date() || date < subDays(new Date(), 365)
                   }
                   initialFocus
                 />
