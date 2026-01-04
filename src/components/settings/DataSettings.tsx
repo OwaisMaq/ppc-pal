@@ -7,7 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAmazonConnections } from '@/hooks/useAmazonConnections';
-import { HistoricalDataImport } from '@/components/HistoricalDataImport';
+import { ArchivingStatus } from '@/components/ArchivingStatus';
 
 export const DataSettings = () => {
   const { user } = useAuth();
@@ -113,9 +113,9 @@ export const DataSettings = () => {
 
   return (
     <div className="space-y-6">
-      {/* Historical Data Import - Show if connected */}
+      {/* Data Archiving Status - Show if connected */}
       {activeConnection && (
-        <HistoricalDataImport profileId={activeConnection.profile_id} />
+        <ArchivingStatus profileId={activeConnection.profile_id} />
       )}
 
       {/* Data Export */}

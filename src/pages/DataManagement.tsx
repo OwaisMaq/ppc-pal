@@ -11,7 +11,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAmazonConnections } from '@/hooks/useAmazonConnections';
-import { HistoricalDataImport } from '@/components/HistoricalDataImport';
+import { ArchivingStatus } from '@/components/ArchivingStatus';
 
 const DataManagement = () => {
   const { user } = useAuth();
@@ -174,9 +174,9 @@ const DataManagement = () => {
             </CardContent>
           </Card>
 
-          {/* Historical Data Import */}
+          {/* Data Archiving Status */}
           {connections && connections.length > 0 && (
-            <HistoricalDataImport profileId={connections[0].profile_id} />
+            <ArchivingStatus profileId={connections[0].profile_id} />
           )}
 
           {/* Data Export */}

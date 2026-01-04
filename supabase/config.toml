@@ -177,3 +177,6 @@ verify_jwt = true
 
 [functions.realtime-bid-trigger]
 verify_jwt = false
+
+[functions.daily-archive-scheduler]
+verify_jwt = false
