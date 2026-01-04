@@ -330,7 +330,9 @@ const CommandCenter = () => {
                       </div>
                       
                       <p className="text-xs text-muted-foreground pt-1 border-t">
-                        Combined from data quality and bid optimization model strength
+                        {confidenceSignals.optimizerConfidence === 0 
+                          ? 'The optimizer needs campaign activity data (impressions, clicks) to build confidence.'
+                          : 'Combined from data quality and bid optimization model strength'}
                       </p>
                     </div>
                   </TooltipContent>

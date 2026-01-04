@@ -102,6 +102,12 @@ export const HistoricalPerformanceChart = ({ profileId }: HistoricalPerformanceC
   }
 
   if (error || data.length === 0) {
+    const emptyMessage = error 
+      ? error 
+      : automatedOnly 
+        ? 'No automated campaign data available yet. The optimizer needs active campaigns with spend to track performance.'
+        : 'No historical performance data yet. Data will appear once your campaigns have activity (impressions, clicks, spend).';
+
     return (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -124,8 +130,11 @@ export const HistoricalPerformanceChart = ({ profileId }: HistoricalPerformanceC
           </div>
         </CardHeader>
         <CardContent>
-          <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-            {error || (automatedOnly ? 'No automated campaign data available yet' : 'No historical data available yet')}
+          <div className="h-[300px] flex flex-col items-center justify-center text-center px-8">
+            <TrendingUp className="h-12 w-12 text-muted-foreground/30 mb-4" />
+            <p className="text-muted-foreground text-sm max-w-md">
+              {emptyMessage}
+            </p>
           </div>
         </CardContent>
       </Card>
