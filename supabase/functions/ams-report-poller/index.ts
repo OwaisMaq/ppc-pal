@@ -94,13 +94,28 @@ async function processSearchTermReport(
   reportData: any[],
   profileId: string
 ): Promise<number> {
-  console.log(`📊 Processing ${reportData.length} search term records`)
+  console.log(`📊 [SEARCH_TERM_DEBUG] Processing ${reportData.length} search term records for profile ${profileId}`)
+  
+  // Debug: Log if report is empty
+  if (!reportData || reportData.length === 0) {
+    console.log(`⚠️ [SEARCH_TERM_DEBUG] Search term report is EMPTY - no data to process for profile ${profileId}`)
+    return 0
+  }
+  
+  // Debug: Log sample record structure to verify field mapping
+  console.log(`🔍 [SEARCH_TERM_DEBUG] Sample record (first of ${reportData.length}):`, JSON.stringify(reportData[0], null, 2))
+  console.log(`🔍 [SEARCH_TERM_DEBUG] Available fields in first record:`, Object.keys(reportData[0]))
   
   const BATCH_SIZE = 500
   let totalUpserted = 0
 
   for (let i = 0; i < reportData.length; i += BATCH_SIZE) {
     const batch = reportData.slice(i, i + BATCH_SIZE)
+    
+    // Debug: Log first batch transformation
+    if (i === 0) {
+      console.log(`🔍 [SEARCH_TERM_DEBUG] Processing first batch of ${batch.length} records`)
+    }
     
     const records = batch.map((record: any) => ({
       date: record.date,
@@ -120,20 +135,27 @@ async function processSearchTermReport(
       attributed_sales_7d_micros: Math.round((record.sales7d || 0) * 1000000)
     }))
 
-    const { error } = await supabase
+    // Debug: Log first transformed batch
+    if (i === 0 && records.length > 0) {
+      console.log(`🔍 [SEARCH_TERM_DEBUG] First transformed record:`, JSON.stringify(records[0], null, 2))
+    }
+
+    const { error, count } = await supabase
       .from('fact_search_term_daily')
       .upsert(records, {
         onConflict: 'date,profile_id,campaign_id,ad_group_id,search_term,match_type'
       })
 
     if (error) {
-      console.error(`❌ Batch upsert error:`, error)
+      console.error(`❌ [SEARCH_TERM_DEBUG] Batch upsert error at index ${i}:`, error.message, error.details, error.hint)
+      console.error(`❌ [SEARCH_TERM_DEBUG] Failed batch sample record:`, JSON.stringify(records[0], null, 2))
     } else {
       totalUpserted += records.length
+      console.log(`✅ [SEARCH_TERM_DEBUG] Batch ${i / BATCH_SIZE + 1} upserted ${records.length} records successfully`)
     }
   }
 
-  console.log(`✅ Upserted ${totalUpserted} search term records`)
+  console.log(`✅ [SEARCH_TERM_DEBUG] Total upserted: ${totalUpserted} search term records for profile ${profileId}`)
   return totalUpserted
 }
 
