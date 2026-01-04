@@ -77,6 +77,32 @@ Deno.serve(async (req) => {
         if (syncResponse.ok) {
           results.succeeded++;
           console.log(`[performance-sync-scheduler] Successfully requested reports for ${connection.profile_id}`);
+          
+          // Trigger bid observation collection for this profile
+          try {
+            console.log(`[performance-sync-scheduler] Triggering bid observation collection for ${connection.profile_id}`);
+            const bidObsUrl = `${supabaseUrl}/functions/v1/bid-observation-collector`;
+            const bidObsResponse = await fetch(bidObsUrl, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${supabaseServiceKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                profile_id: connection.profile_id,
+              }),
+            });
+
+            if (bidObsResponse.ok) {
+              const bidObsResult = await bidObsResponse.json();
+              console.log(`[performance-sync-scheduler] Bid observation collection completed for ${connection.profile_id}:`, bidObsResult);
+            } else {
+              const bidObsError = await bidObsResponse.text();
+              console.error(`[performance-sync-scheduler] Bid observation collection failed for ${connection.profile_id}:`, bidObsError);
+            }
+          } catch (bidObsErr) {
+            console.error(`[performance-sync-scheduler] Exception in bid observation collection for ${connection.profile_id}:`, bidObsErr);
+          }
         } else {
           const errorText = await syncResponse.text();
           results.failed++;
