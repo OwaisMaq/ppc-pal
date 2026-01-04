@@ -66,7 +66,7 @@ serve(async (req) => {
     // Fetch keyword performance from keywords table
     const { data: keywords, error: kwError } = await supabase
       .from('keywords')
-      .select('id, keyword_id, campaign_id, ad_group_id, bid, impressions, clicks, orders, spend, sales')
+      .select('id, amazon_keyword_id, campaign_id, adgroup_id, bid, impressions, clicks, orders, spend, sales')
       .eq('profile_id', profile_id);
 
     if (kwError) {
@@ -74,10 +74,12 @@ serve(async (req) => {
       throw kwError;
     }
 
+    console.log(`[Bid Observation Collector] Found ${keywords?.length || 0} keywords`);
+
     // Fetch target performance from targets table
     const { data: targets, error: tgtError } = await supabase
       .from('targets')
-      .select('id, target_id, campaign_id, ad_group_id, bid, impressions, clicks, orders, spend, sales')
+      .select('id, amazon_target_id, campaign_id, adgroup_id, bid, impressions, clicks, orders, spend, sales')
       .eq('profile_id', profile_id);
 
     if (tgtError) {
@@ -85,12 +87,14 @@ serve(async (req) => {
       throw tgtError;
     }
 
+    console.log(`[Bid Observation Collector] Found ${targets?.length || 0} targets`);
+
     const observations: any[] = [];
     const stateUpdates: any[] = [];
 
     // Process keywords
     for (const kw of keywords || []) {
-      const entityId = kw.keyword_id || kw.id;
+      const entityId = kw.amazon_keyword_id || kw.id;
       
       // Create observation
       observations.push({
@@ -114,9 +118,8 @@ serve(async (req) => {
         entity_type: 'keyword',
         entity_id: entityId,
         campaign_id: kw.campaign_id,
-        ad_group_id: kw.ad_group_id,
+        ad_group_id: kw.adgroup_id,
         current_bid_micros: Math.round((kw.bid || 0) * 1000000),
-        // Will be updated with aggregates after upsert
         impressions: kw.impressions || 0,
         clicks: kw.clicks || 0,
         conversions: kw.orders || 0,
@@ -127,7 +130,7 @@ serve(async (req) => {
 
     // Process targets
     for (const tgt of targets || []) {
-      const entityId = tgt.target_id || tgt.id;
+      const entityId = tgt.amazon_target_id || tgt.id;
       
       observations.push({
         profile_id,
@@ -149,7 +152,7 @@ serve(async (req) => {
         entity_type: 'target',
         entity_id: entityId,
         campaign_id: tgt.campaign_id,
-        ad_group_id: tgt.ad_group_id,
+        ad_group_id: tgt.adgroup_id,
         current_bid_micros: Math.round((tgt.bid || 0) * 1000000),
         impressions: tgt.impressions || 0,
         clicks: tgt.clicks || 0,
