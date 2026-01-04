@@ -244,7 +244,9 @@ Deno.serve(async (req) => {
           // Check if this is a retention date error from Amazon
           try {
             const errorData = JSON.parse(errorText)
-            const retentionMatch = errorData.message?.match(/retention start date \((\d{4}-\d{2}-\d{2})\)/)
+            // Amazon returns error in 'detail' field, not 'message'
+            const errorMessage = errorData.detail || errorData.message || ''
+            const retentionMatch = errorMessage.match(/retention start date \((\d{4}-\d{2}-\d{2})\)/)
             
             if (retentionMatch && retentionMatch[1]) {
               const amazonRetentionDate = retentionMatch[1]
