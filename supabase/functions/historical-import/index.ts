@@ -68,14 +68,14 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Validate date range (max 90 days)
+    // Validate date range (max 365 days)
     const start = new Date(startDate)
     const end = new Date(endDate)
     const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
 
-    if (daysDiff > 90) {
+    if (daysDiff > 365) {
       return new Response(
-        JSON.stringify({ error: 'Date range cannot exceed 90 days' }),
+        JSON.stringify({ error: 'Date range cannot exceed 365 days' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
