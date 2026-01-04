@@ -12,6 +12,32 @@ interface HistoricalImportRequest {
   reportTypes?: string[]
 }
 
+// Helper function to chunk date ranges into max 31-day intervals (Amazon API limit)
+function chunkDateRange(startDate: string, endDate: string, maxDays: number = 31): Array<{start: string, end: string}> {
+  const chunks: Array<{start: string, end: string}> = []
+  let currentStart = new Date(startDate)
+  const finalEnd = new Date(endDate)
+  
+  while (currentStart <= finalEnd) {
+    const chunkEnd = new Date(currentStart)
+    chunkEnd.setDate(chunkEnd.getDate() + maxDays - 1)
+    
+    // Don't exceed the final end date
+    const actualEnd = chunkEnd > finalEnd ? finalEnd : chunkEnd
+    
+    chunks.push({
+      start: currentStart.toISOString().split('T')[0],
+      end: actualEnd.toISOString().split('T')[0]
+    })
+    
+    // Move to next chunk
+    currentStart = new Date(actualEnd)
+    currentStart.setDate(currentStart.getDate() + 1)
+  }
+  
+  return chunks
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -86,6 +112,24 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+
+    // Amazon data retention is typically ~90 days - adjust start date if needed
+    const dataRetentionDays = 90
+    const retentionStart = new Date()
+    retentionStart.setDate(retentionStart.getDate() - dataRetentionDays)
+    const retentionDateStr = retentionStart.toISOString().split('T')[0]
+    
+    // Use the later of user's start date or retention start
+    const effectiveStartDate = startDate < retentionDateStr ? retentionDateStr : startDate
+    const effectiveEndDate = endDate
+    
+    if (effectiveStartDate !== startDate) {
+      console.log(`📅 Adjusted start date from ${startDate} to ${effectiveStartDate} due to Amazon data retention limit`)
+    }
+
+    // Chunk date range into 31-day intervals (Amazon API limit)
+    const dateChunks = chunkDateRange(effectiveStartDate, effectiveEndDate, 31)
+    console.log(`📅 Date range split into ${dateChunks.length} chunks of up to 31 days each`)
 
     // Service role client already created above
 
@@ -168,88 +212,96 @@ Deno.serve(async (req) => {
       }
 
       const entityType = entityTypeMap[reportType]
-      console.log(`📊 Creating ${reportType} performance report (entityType: ${entityType}) for ${startDate} to ${endDate}`)
+      
+      // Create a report for each date chunk
+      for (const chunk of dateChunks) {
+        console.log(`📊 Creating ${reportType} performance report (entityType: ${entityType}) for ${chunk.start} to ${chunk.end}`)
 
-      const reportBody = {
-        startDate,
-        endDate,
-        configuration: {
-          adProduct: 'SPONSORED_PRODUCTS',
-          groupBy: config.groupBy,
-          columns: config.columns,
-          reportTypeId: config.reportTypeId,
-          timeUnit: 'DAILY',
-          format: 'GZIP_JSON'
-        }
-      }
-
-      // Request report from Amazon Ads API
-      const reportResponse = await fetch(
-        `${apiEndpoint}/reporting/reports`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Amazon-Advertising-API-ClientId': Deno.env.get('AMAZON_CLIENT_ID') || '',
-            'Amazon-Advertising-API-Scope': profileId,
-            'Content-Type': 'application/vnd.createasyncreportrequest.v3+json',
-          },
-          body: JSON.stringify(reportBody)
-        }
-      )
-
-      if (!reportResponse.ok) {
-        const errorText = await reportResponse.text()
-        console.error(`❌ Failed to create ${reportType} report:`, errorText)
-        continue
-      }
-
-      const reportData = await reportResponse.json()
-      console.log(`✅ Created ${reportType} report:`, reportData.reportId)
-
-      // Store report request in pending_amazon_reports with full configuration
-      // This is critical for ams-report-poller to process correctly
-      const { error: insertError } = await supabaseAdmin
-        .from('pending_amazon_reports')
-        .insert({
-          report_id: reportData.reportId,
-          report_type: `${reportType}_performance`,
-          connection_id: connection.id,
-          status: 'pending',
+        const reportBody = {
+          startDate: chunk.start,
+          endDate: chunk.end,
           configuration: {
-            startDate,
-            endDate,
-            historical: true,
-            entityType, // Required by ams-report-poller
-            timeUnit: 'DAILY', // Required for daily data processing
-            columns: config.columns, // Track which columns were requested
-            profile_id: profileId
+            adProduct: 'SPONSORED_PRODUCTS',
+            groupBy: config.groupBy,
+            columns: config.columns,
+            reportTypeId: config.reportTypeId,
+            timeUnit: 'DAILY',
+            format: 'GZIP_JSON'
           }
-        })
+        }
 
-      if (insertError) {
-        console.error(`❌ Failed to store report request:`, insertError)
-      } else {
-        reportRequests.push({
-          reportType,
-          reportId: reportData.reportId,
-          status: reportData.status
-        })
+        // Request report from Amazon Ads API
+        const reportResponse = await fetch(
+          `${apiEndpoint}/reporting/reports`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Amazon-Advertising-API-ClientId': Deno.env.get('AMAZON_CLIENT_ID') || '',
+              'Amazon-Advertising-API-Scope': profileId,
+              'Content-Type': 'application/vnd.createasyncreportrequest.v3+json',
+            },
+            body: JSON.stringify(reportBody)
+          }
+        )
+
+        if (!reportResponse.ok) {
+          const errorText = await reportResponse.text()
+          console.error(`❌ Failed to create ${reportType} report for ${chunk.start}-${chunk.end}:`, errorText)
+          continue
+        }
+
+        const reportData = await reportResponse.json()
+        console.log(`✅ Created ${reportType} report for ${chunk.start}-${chunk.end}:`, reportData.reportId)
+
+        // Store report request in pending_amazon_reports with full configuration
+        // This is critical for ams-report-poller to process correctly
+        const { error: insertError } = await supabaseAdmin
+          .from('pending_amazon_reports')
+          .insert({
+            report_id: reportData.reportId,
+            report_type: `${reportType}_performance`,
+            connection_id: connection.id,
+            status: 'pending',
+            configuration: {
+              startDate: chunk.start,
+              endDate: chunk.end,
+              historical: true,
+              entityType, // Required by ams-report-poller
+              timeUnit: 'DAILY', // Required for daily data processing
+              columns: config.columns, // Track which columns were requested
+              profile_id: profileId
+            }
+          })
+
+        if (insertError) {
+          console.error(`❌ Failed to store report request:`, insertError)
+        } else {
+          reportRequests.push({
+            reportType,
+            reportId: reportData.reportId,
+            status: reportData.status,
+            dateRange: `${chunk.start} to ${chunk.end}`
+          })
+        }
       }
     }
 
-    console.log(`✅ Created ${reportRequests.length} historical report requests`)
+    const effectiveDaysDiff = Math.ceil((new Date(effectiveEndDate).getTime() - new Date(effectiveStartDate).getTime()) / (1000 * 60 * 60 * 24))
+    console.log(`✅ Created ${reportRequests.length} historical report requests across ${dateChunks.length} date chunks`)
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Historical import started for ${daysDiff} days`,
+        message: `Historical import started for ${effectiveDaysDiff} days (${dateChunks.length} report chunks per type)`,
         reportsCreated: reportRequests.length,
         reports: reportRequests,
         dateRange: {
-          startDate,
-          endDate,
-          days: daysDiff
+          requestedStartDate: startDate,
+          effectiveStartDate,
+          endDate: effectiveEndDate,
+          days: effectiveDaysDiff,
+          chunks: dateChunks.length
         }
       }),
       { 
