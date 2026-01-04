@@ -113,22 +113,14 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Amazon data retention is typically ~90 days - adjust start date if needed
-    const dataRetentionDays = 90
-    const retentionStart = new Date()
-    retentionStart.setDate(retentionStart.getDate() - dataRetentionDays)
-    const retentionDateStr = retentionStart.toISOString().split('T')[0]
-    
-    // Use the later of user's start date or retention start
-    const effectiveStartDate = startDate < retentionDateStr ? retentionDateStr : startDate
+    // Start with user's requested dates - we'll adjust if Amazon returns retention errors
+    let effectiveStartDate = startDate
     const effectiveEndDate = endDate
     
-    if (effectiveStartDate !== startDate) {
-      console.log(`📅 Adjusted start date from ${startDate} to ${effectiveStartDate} due to Amazon data retention limit`)
-    }
+    console.log(`📅 Attempting import from ${effectiveStartDate} to ${effectiveEndDate}`)
 
     // Chunk date range into 31-day intervals (Amazon API limit)
-    const dateChunks = chunkDateRange(effectiveStartDate, effectiveEndDate, 31)
+    let dateChunks = chunkDateRange(effectiveStartDate, effectiveEndDate, 31)
     console.log(`📅 Date range split into ${dateChunks.length} chunks of up to 31 days each`)
 
     // Service role client already created above
@@ -248,6 +240,32 @@ Deno.serve(async (req) => {
         if (!reportResponse.ok) {
           const errorText = await reportResponse.text()
           console.error(`❌ Failed to create ${reportType} report for ${chunk.start}-${chunk.end}:`, errorText)
+          
+          // Check if this is a retention date error from Amazon
+          try {
+            const errorData = JSON.parse(errorText)
+            const retentionMatch = errorData.message?.match(/retention start date \((\d{4}-\d{2}-\d{2})\)/)
+            
+            if (retentionMatch && retentionMatch[1]) {
+              const amazonRetentionDate = retentionMatch[1]
+              console.log(`📅 Amazon data retention limit detected: ${amazonRetentionDate}`)
+              
+              // If this is the first chunk failing due to retention, update effectiveStartDate
+              // and regenerate chunks for remaining report types
+              if (amazonRetentionDate > effectiveStartDate) {
+                effectiveStartDate = amazonRetentionDate
+                dateChunks = chunkDateRange(effectiveStartDate, effectiveEndDate, 31)
+                console.log(`📅 Adjusted start date to ${effectiveStartDate}, regenerated ${dateChunks.length} chunks`)
+                
+                // Skip remaining chunks for this report type - they'll use wrong dates
+                // The next report type iteration will use the corrected dates
+                break
+              }
+            }
+          } catch (parseError) {
+            // Not JSON or no retention date in error - just continue
+          }
+          
           continue
         }
 
