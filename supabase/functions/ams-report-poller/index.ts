@@ -487,6 +487,40 @@ async function processCompletedReport(
                   payload: {}
                 })
             }
+
+            // Insert into campaign_performance_history for historical charts
+            // This powers the Historical Performance Chart in Command Center
+            if (existing?.id) {
+              const spend = record.cost || 0
+              const sales = record.sales7d || 0
+              const clicks = record.clicks || 0
+              const impressions = record.impressions || 0
+              const orders = record.purchases7d || 0
+
+              const { error: historyError } = await supabase
+                .from('campaign_performance_history')
+                .upsert({
+                  campaign_id: existing.id,
+                  date: record.date,
+                  attribution_window: '7d',
+                  impressions,
+                  clicks,
+                  spend,
+                  sales,
+                  orders,
+                  acos: sales > 0 ? (spend / sales) * 100 : null,
+                  roas: spend > 0 ? sales / spend : null,
+                  ctr: impressions > 0 ? (clicks / impressions) * 100 : null,
+                  cpc: clicks > 0 ? spend / clicks : null,
+                  conversion_rate: clicks > 0 ? (orders / clicks) * 100 : null
+                }, {
+                  onConflict: 'campaign_id,date,attribution_window'
+                })
+
+              if (historyError) {
+                console.warn(`⚠️ Failed to upsert campaign_performance_history for ${existing.id}:`, historyError.message)
+              }
+            }
           }
           break
         }

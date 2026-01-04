@@ -152,6 +152,14 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Map report types to entityType values expected by ams-report-poller
+    const entityTypeMap: Record<string, string> = {
+      campaign: 'campaigns',
+      adgroup: 'adGroups',
+      keyword: 'searchTerms', // keyword report is actually search terms
+      target: 'targets'
+    }
+
     for (const reportType of reportTypes) {
       const config = reportConfigs[reportType]
       if (!config) {
@@ -159,7 +167,8 @@ Deno.serve(async (req) => {
         continue
       }
 
-      console.log(`📊 Creating ${reportType} performance report for ${startDate} to ${endDate}`)
+      const entityType = entityTypeMap[reportType]
+      console.log(`📊 Creating ${reportType} performance report (entityType: ${entityType}) for ${startDate} to ${endDate}`)
 
       const reportBody = {
         startDate,
@@ -198,7 +207,8 @@ Deno.serve(async (req) => {
       const reportData = await reportResponse.json()
       console.log(`✅ Created ${reportType} report:`, reportData.reportId)
 
-      // Store report request in pending_amazon_reports
+      // Store report request in pending_amazon_reports with full configuration
+      // This is critical for ams-report-poller to process correctly
       const { error: insertError } = await supabaseAdmin
         .from('pending_amazon_reports')
         .insert({
@@ -209,7 +219,11 @@ Deno.serve(async (req) => {
           configuration: {
             startDate,
             endDate,
-            historical: true
+            historical: true,
+            entityType, // Required by ams-report-poller
+            timeUnit: 'DAILY', // Required for daily data processing
+            columns: config.columns, // Track which columns were requested
+            profile_id: profileId
           }
         })
 
