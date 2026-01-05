@@ -28,10 +28,12 @@ import {
   Check,
   TrendingUp,
   History,
-  Globe
+  Globe,
+  UserCheck
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useSyncStatus } from "@/hooks/useSyncStatus";
+import { useAdminRole } from "@/hooks/useAdminRole";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -48,6 +50,7 @@ import { Separator } from "@/components/ui/separator";
 export function AppSidebar() {
   const { user, signOut } = useAuth();
   const { status, refresh } = useSyncStatus();
+  const { isAdmin } = useAdminRole();
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
 
@@ -59,6 +62,7 @@ export function AppSidebar() {
     { title: "Governance", url: "/governance", icon: Shield },
     { title: "Analytics", url: "/analytics", icon: BarChart3 },
     { title: "Settings", url: "/settings", icon: Settings },
+    ...(isAdmin ? [{ title: "User Approvals", url: "/admin/approvals", icon: UserCheck }] : []),
   ];
 
   return (
