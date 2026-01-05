@@ -509,6 +509,7 @@ export type Database = {
           health_issues: string[] | null
           health_status: string | null
           id: string
+          is_managed: boolean
           last_health_check: string | null
           last_sync_at: string | null
           marketplace_id: string | null
@@ -534,6 +535,7 @@ export type Database = {
           health_issues?: string[] | null
           health_status?: string | null
           id?: string
+          is_managed?: boolean
           last_health_check?: string | null
           last_sync_at?: string | null
           marketplace_id?: string | null
@@ -559,6 +561,7 @@ export type Database = {
           health_issues?: string[] | null
           health_status?: string | null
           id?: string
+          is_managed?: boolean
           last_health_check?: string | null
           last_sync_at?: string | null
           marketplace_id?: string | null
@@ -5212,18 +5215,21 @@ export type Database = {
           id: string
           optimization_limit: number
           plan_type: Database["public"]["Enums"]["subscription_plan"]
+          profile_limit: number
         }
         Insert: {
           created_at?: string
           id?: string
           optimization_limit: number
           plan_type: Database["public"]["Enums"]["subscription_plan"]
+          profile_limit?: number
         }
         Update: {
           created_at?: string
           id?: string
           optimization_limit?: number
           plan_type?: Database["public"]["Enums"]["subscription_plan"]
+          profile_limit?: number
         }
         Relationships: []
       }
@@ -5671,6 +5677,7 @@ export type Database = {
         Args: { profile_user_id: string }
         Returns: boolean
       }
+      can_add_profile: { Args: { user_uuid: string }; Returns: boolean }
       can_user_optimize: { Args: { user_uuid: string }; Returns: boolean }
       cleanup_and_create_sync_job: {
         Args: { p_connection_id: string; p_user_id: string }
@@ -5729,6 +5736,14 @@ export type Database = {
           total_impressions: number
           total_sales: number
           total_spend: number
+        }[]
+      }
+      get_profile_limit_info: {
+        Args: { user_uuid: string }
+        Returns: {
+          can_add: boolean
+          current_count: number
+          max_allowed: number
         }[]
       }
       get_tokens: {

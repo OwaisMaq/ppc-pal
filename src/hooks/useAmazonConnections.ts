@@ -53,7 +53,8 @@ export const useAmazonConnections = () => {
           reporting_api_version,
           supported_attribution_models,
           health_status,
-          health_issues
+          health_issues,
+          is_managed
         `)
         .eq('user_id', userId)
         .order('created_at', { ascending: false });

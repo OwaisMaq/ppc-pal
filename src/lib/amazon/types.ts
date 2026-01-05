@@ -17,6 +17,8 @@ export interface AmazonConnection {
   health_issues?: string[];
   // Optional denormalized metrics
   campaign_count?: number;
+  // Ownership indicator - true if this is a managed/delegated profile
+  is_managed?: boolean;
 }
 
 export interface Campaign {

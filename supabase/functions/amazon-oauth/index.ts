@@ -611,8 +611,47 @@ serve(async (req) => {
       // Encryption key retrieved; will pass directly to DB function
       console.log('Encryption key retrieved; passing directly to DB function');
 
-      // Store connection for each supported profile
-      for (const profile of validProfiles) {
+      // Check profile limit before storing connections
+      const { data: limitInfo, error: limitError } = await supabase
+        .rpc('get_profile_limit_info', { user_uuid: user.id });
+      
+      let currentCount = 0;
+      let maxAllowed = 1;
+      if (!limitError && limitInfo && limitInfo.length > 0) {
+        currentCount = limitInfo[0].current_count || 0;
+        maxAllowed = limitInfo[0].max_allowed || 1;
+      }
+      
+      const remainingSlots = Math.max(0, maxAllowed - currentCount);
+      const profilesToStore = validProfiles.slice(0, remainingSlots);
+      const skippedProfiles = validProfiles.slice(remainingSlots);
+      
+      console.log(`[${timestamp}] Profile limit check: ${currentCount}/${maxAllowed} used, ${remainingSlots} slots available`);
+      console.log(`[${timestamp}] Will store ${profilesToStore.length} profiles, skipping ${skippedProfiles.length}`);
+      
+      if (profilesToStore.length === 0) {
+        return new Response(
+          JSON.stringify({ 
+            error: 'Profile limit reached',
+            details: `You have reached your limit of ${maxAllowed} advertising profile(s). Upgrade your plan to connect more profiles.`,
+            currentCount,
+            maxAllowed,
+            skippedProfiles: skippedProfiles.map(p => ({
+              profileId: p.profileId,
+              name: p.accountInfo?.name || `Profile ${p.profileId}`,
+              marketplace: p._analysis?.marketplace || 'Unknown'
+            })),
+            requiresUpgrade: true
+          }),
+          { 
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+
+      // Store connection for each supported profile (up to limit)
+      for (const profile of profilesToStore) {
         const expiresAt = new Date(Date.now() + (tokenData.expires_in * 1000))
         
         // Get the marketplace from profile analysis
