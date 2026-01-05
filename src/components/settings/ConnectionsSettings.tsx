@@ -5,6 +5,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { RefreshCw, Link2, Plus, Users, AlertTriangle, Crown } from 'lucide-react';
 import { useAmazonConnections } from '@/hooks/useAmazonConnections';
 import { useProfileLimits } from '@/hooks/useProfileLimits';
+import { getMarketplaceFlag } from '@/context/GlobalFiltersContext';
 import AmazonAccountSetup from '@/components/AmazonAccountSetup';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -87,6 +88,7 @@ export const ConnectionsSettings = () => {
             connections.map(conn => (
               <div key={conn.id} className="flex items-center justify-between p-3 border rounded-lg">
                 <div className="flex items-center gap-3">
+                  <span className="text-xl">{getMarketplaceFlag(conn.marketplace_id)}</span>
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="font-medium text-sm">{conn.profile_name || 'Unnamed Profile'}</p>
