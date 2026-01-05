@@ -85,31 +85,34 @@ export const ConnectionsSettings = () => {
           {connections.length === 0 && !showSetup ? (
             <p className="text-muted-foreground text-sm py-2">No Amazon accounts connected yet.</p>
           ) : (
-            connections.map(conn => (
-              <div key={conn.id} className="flex items-center justify-between p-3 border rounded-lg">
-                <div className="flex items-center gap-3">
-                  <span className="text-xl">{getMarketplaceFlag(conn.marketplace_id)}</span>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium text-sm">{conn.profile_name || 'Unnamed Profile'}</p>
-                      {conn.is_managed && (
-                        <Badge variant="secondary" className="text-xs px-1.5 py-0">
-                          <Users className="h-3 w-3 mr-1" />
-                          Managed
-                        </Badge>
-                      )}
+            connections.map(conn => {
+              console.log('Connection marketplace_id:', conn.marketplace_id, 'flag:', getMarketplaceFlag(conn.marketplace_id));
+              return (
+                <div key={conn.id} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xl">{getMarketplaceFlag(conn.marketplace_id)}</span>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-sm">{conn.profile_name || 'Unnamed Profile'}</p>
+                        {conn.is_managed && (
+                          <Badge variant="secondary" className="text-xs px-1.5 py-0">
+                            <Users className="h-3 w-3 mr-1" />
+                            Managed
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {conn.profile_id}
+                        {conn.last_sync_at && ` • ${new Date(conn.last_sync_at).toLocaleDateString()}`}
+                      </p>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      {conn.profile_id}
-                      {conn.last_sync_at && ` • ${new Date(conn.last_sync_at).toLocaleDateString()}`}
-                    </p>
                   </div>
+                  <Badge className={getStatusColor(conn.status)} variant="secondary">
+                    {conn.status}
+                  </Badge>
                 </div>
-                <Badge className={getStatusColor(conn.status)} variant="secondary">
-                  {conn.status}
-                </Badge>
-              </div>
-            ))
+              );
+            })
           )}
 
           {showSetup && canAdd && (
