@@ -385,8 +385,17 @@ async function processCompletedReport(
   profileId: string
 ) {
   const entityType = report.configuration.entityType
-  console.log(`📊 Processing ${reportData.length} records for ${report.report_type}, entityType: ${entityType}`)
+  const timeUnit = report.configuration.timeUnit
+  
+  console.log(`📊 Processing ${reportData.length} records for ${report.report_type}, entityType: ${entityType}, timeUnit: ${timeUnit}`)
   console.log(`🔍 DEBUG: First 3 records sample:`, reportData.slice(0, 3))
+  
+  // [HISTORY] Log if this is a DAILY report that should write to history tables
+  if (timeUnit === 'DAILY') {
+    console.log(`[HISTORY] ======= DAILY REPORT DETECTED =======`)
+    console.log(`[HISTORY] entityType: ${entityType}, records: ${reportData.length}, profile: ${profileId}`)
+    console.log(`[HISTORY] This report SHOULD write to history tables`)
+  }
   
   // Handle search terms separately
   if (entityType === 'searchTerms') {
@@ -398,10 +407,14 @@ async function processCompletedReport(
     return await processConversionPathReport(supabase, reportData, profileId)
   }
 
-  const timeUnit = report.configuration.timeUnit
   let updated = 0
   let notFound = 0
   let errors = 0
+  
+  // [HISTORY] Track history write stats
+  let historyWritesAttempted = 0
+  let historyWritesSucceeded = 0
+  let historyWritesFailed = 0
 
   for (const record of reportData) {
     try {
@@ -491,11 +504,14 @@ async function processCompletedReport(
             // Insert into campaign_performance_history for historical charts
             // This powers the Historical Performance Chart in Command Center
             if (existing?.id) {
+              historyWritesAttempted++
               const spend = record.cost || 0
               const sales = record.sales7d || 0
               const clicks = record.clicks || 0
               const impressions = record.impressions || 0
               const orders = record.purchases7d || 0
+
+              console.log(`[HISTORY] Attempting campaign_performance_history upsert: campaign_id=${existing.id}, date=${record.date}, spend=${spend}, sales=${sales}`)
 
               const { error: historyError } = await supabase
                 .from('campaign_performance_history')
@@ -518,8 +534,14 @@ async function processCompletedReport(
                 })
 
               if (historyError) {
-                console.warn(`⚠️ Failed to upsert campaign_performance_history for ${existing.id}:`, historyError.message)
+                historyWritesFailed++
+                console.error(`[HISTORY] FAILED campaign_performance_history for campaign_id=${existing.id}, date=${record.date}: ${historyError.message}`, historyError.details, historyError.hint)
+              } else {
+                historyWritesSucceeded++
+                console.log(`[HISTORY] SUCCESS campaign_performance_history: campaign_id=${existing.id}, date=${record.date}`)
               }
+            } else {
+              console.log(`[HISTORY] SKIPPED campaign_performance_history: no existing.id found for campaignId=${record.campaignId}`)
             }
           }
           break
@@ -602,11 +624,14 @@ async function processCompletedReport(
             }
 
             // Insert into adgroup_performance_history for historical data
+            historyWritesAttempted++
             const spend = record.cost || 0
             const sales = record.sales7d || 0
             const clicks = record.clicks || 0
             const impressions = record.impressions || 0
             const orders = record.purchases7d || 0
+
+            console.log(`[HISTORY] Attempting adgroup_performance_history upsert: adgroup_id=${existingAdgroup.id}, date=${record.date}, spend=${spend}`)
 
             const { error: historyError } = await supabase
               .from('adgroup_performance_history')
@@ -629,7 +654,11 @@ async function processCompletedReport(
               })
 
             if (historyError) {
-              console.warn(`⚠️ Failed to upsert adgroup_performance_history for ${existingAdgroup.id}:`, historyError.message)
+              historyWritesFailed++
+              console.error(`[HISTORY] FAILED adgroup_performance_history for adgroup_id=${existingAdgroup.id}, date=${record.date}: ${historyError.message}`, historyError.details, historyError.hint)
+            } else {
+              historyWritesSucceeded++
+              console.log(`[HISTORY] SUCCESS adgroup_performance_history: adgroup_id=${existingAdgroup.id}, date=${record.date}`)
             }
           }
           break
@@ -666,6 +695,9 @@ async function processCompletedReport(
 
           // Insert into fact_target_daily for historical data
           if (timeUnit === 'DAILY' && record.date) {
+            historyWritesAttempted++
+            console.log(`[HISTORY] Attempting fact_target_daily upsert: target_id=${record.targetId}, date=${record.date}`)
+            
             const { error: historyError } = await supabase
               .from('fact_target_daily')
               .upsert({
@@ -686,7 +718,11 @@ async function processCompletedReport(
               })
 
             if (historyError) {
-              console.warn(`⚠️ Failed to upsert fact_target_daily for ${record.targetId}:`, historyError.message)
+              historyWritesFailed++
+              console.error(`[HISTORY] FAILED fact_target_daily for target_id=${record.targetId}, date=${record.date}: ${historyError.message}`, historyError.details, historyError.hint)
+            } else {
+              historyWritesSucceeded++
+              console.log(`[HISTORY] SUCCESS fact_target_daily: target_id=${record.targetId}, date=${record.date}`)
             }
           }
           break
@@ -741,11 +777,14 @@ async function processCompletedReport(
 
           // Insert into keyword_performance_history for historical data
           if (timeUnit === 'DAILY' && record.date) {
+            historyWritesAttempted++
             const spend = record.cost || 0
             const sales = record.sales7d || 0
             const clicks = record.clicks || 0
             const impressions = record.impressions || 0
             const orders = record.purchases7d || 0
+
+            console.log(`[HISTORY] Attempting keyword_performance_history upsert: keyword_id=${existingKeyword.id}, date=${record.date}`)
 
             const { error: historyError } = await supabase
               .from('keyword_performance_history')
@@ -768,7 +807,11 @@ async function processCompletedReport(
               })
 
             if (historyError) {
-              console.warn(`⚠️ Failed to upsert keyword_performance_history for ${existingKeyword.id}:`, historyError.message)
+              historyWritesFailed++
+              console.error(`[HISTORY] FAILED keyword_performance_history for keyword_id=${existingKeyword.id}, date=${record.date}: ${historyError.message}`, historyError.details, historyError.hint)
+            } else {
+              historyWritesSucceeded++
+              console.log(`[HISTORY] SUCCESS keyword_performance_history: keyword_id=${existingKeyword.id}, date=${record.date}`)
             }
           }
           break
@@ -781,6 +824,17 @@ async function processCompletedReport(
 
   console.log(`✅ Updated ${updated} of ${reportData.length} ${entityType} records`)
   console.log(`📊 DEBUG Summary: updated=${updated}, notFound=${notFound}, errors=${errors}`)
+  
+  // [HISTORY] Final summary for DAILY reports
+  if (timeUnit === 'DAILY') {
+    console.log(`[HISTORY] ======= HISTORY WRITE SUMMARY =======`)
+    console.log(`[HISTORY] entityType: ${entityType}`)
+    console.log(`[HISTORY] attempted: ${historyWritesAttempted}`)
+    console.log(`[HISTORY] succeeded: ${historyWritesSucceeded}`)
+    console.log(`[HISTORY] failed: ${historyWritesFailed}`)
+    console.log(`[HISTORY] skipped (entity not found): ${notFound}`)
+    console.log(`[HISTORY] =====================================`)
+  }
   
   if (notFound > 0) {
     console.warn(`⚠️ ${notFound} records had no matching entities - check if entity sync has completed`)
