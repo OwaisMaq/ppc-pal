@@ -4500,6 +4500,9 @@ export type Database = {
       }
       profiles: {
         Row: {
+          approval_status: Database["public"]["Enums"]["approval_status"] | null
+          approved_at: string | null
+          approved_by: string | null
           created_at: string
           date_format: string | null
           display_name: string | null
@@ -4512,6 +4515,11 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          approval_status?:
+            | Database["public"]["Enums"]["approval_status"]
+            | null
+          approved_at?: string | null
+          approved_by?: string | null
           created_at?: string
           date_format?: string | null
           display_name?: string | null
@@ -4524,6 +4532,11 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          approval_status?:
+            | Database["public"]["Enums"]["approval_status"]
+            | null
+          approved_at?: string | null
+          approved_by?: string | null
           created_at?: string
           date_format?: string | null
           display_name?: string | null
@@ -5738,6 +5751,15 @@ export type Database = {
           total_spend: number
         }[]
       }
+      get_pending_users: {
+        Args: never
+        Returns: {
+          approval_status: Database["public"]["Enums"]["approval_status"]
+          created_at: string
+          email: string
+          id: string
+        }[]
+      }
       get_profile_limit_info: {
         Args: { user_uuid: string }
         Returns: {
@@ -5777,6 +5799,7 @@ export type Database = {
         Args: { user_uuid: string }
         Returns: undefined
       }
+      is_user_approved: { Args: { user_uuid: string }; Returns: boolean }
       "private.store_tokens": {
         Args: {
           p_access_token: string
@@ -5821,6 +5844,13 @@ export type Database = {
         Args: { connection_uuid: string }
         Returns: undefined
       }
+      update_user_approval: {
+        Args: {
+          new_status: Database["public"]["Enums"]["approval_status"]
+          target_user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       api_connection_status:
@@ -5831,6 +5861,7 @@ export type Database = {
         | "warning"
         | "setup_required"
       app_role: "admin" | "user"
+      approval_status: "pending" | "approved" | "rejected"
       campaign_status: "enabled" | "paused" | "archived"
       documentation_source_type:
         | "manual"
@@ -5977,6 +6008,7 @@ export const Constants = {
         "setup_required",
       ],
       app_role: ["admin", "user"],
+      approval_status: ["pending", "approved", "rejected"],
       campaign_status: ["enabled", "paused", "archived"],
       documentation_source_type: [
         "manual",

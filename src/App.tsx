@@ -38,6 +38,8 @@ const AmazonCallback = lazy(() => import("@/pages/AmazonCallback"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const Onboarding = lazy(() => import("@/pages/Onboarding"));
 const DevTools = lazy(() => import("@/pages/DevTools"));
+const PendingApproval = lazy(() => import("@/pages/PendingApproval"));
+const AdminApprovals = lazy(() => import("@/pages/AdminApprovals"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -173,6 +175,17 @@ const App = () => {
                           <Feedback />
                         </ProtectedRoute>
                       } />
+                      
+                      {/* Admin routes */}
+                      <Route path="/admin/approvals" element={
+                        <ProtectedRoute>
+                          <AdminApprovals />
+                        </ProtectedRoute>
+                      } />
+                      
+                      {/* Pending approval page */}
+                      <Route path="/pending-approval" element={<PendingApproval />} />
+                      
                       <Route path="/dev-tools" element={
                         <ProtectedRoute>
                           <DevTools />
