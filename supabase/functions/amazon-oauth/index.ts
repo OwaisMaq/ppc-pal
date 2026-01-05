@@ -502,39 +502,50 @@ serve(async (req) => {
         )
       }
 
-      // Enhanced profile detection for major English-speaking markets
+      // Comprehensive marketplace support for all Amazon Advertising regions
+      function getRegion(countryCode: string): 'NA' | 'EU' | 'FE' | 'UNKNOWN' {
+        const NA = ['US', 'CA', 'MX', 'BR'];
+        const FE = ['JP', 'AU', 'SG'];
+        if (NA.includes(countryCode)) return 'NA';
+        if (FE.includes(countryCode)) return 'FE';
+        // EU region includes Europe, Middle East, India
+        const EU = ['GB', 'UK', 'DE', 'FR', 'ES', 'IT', 'NL', 'BE', 'PL', 'SE', 'TR', 'EG', 'SA', 'AE', 'IN'];
+        if (EU.includes(countryCode)) return 'EU';
+        return 'UNKNOWN';
+      }
+
       function isSupportedProfile(profile: any) {
         const cc = (profile.countryCode || profile.country || '').toUpperCase();
         const currency = (profile.currencyCode || '').toUpperCase();
-        const mk = (profile.marketplaceString || profile.marketplace || profile.accountInfo?.marketplaceString || '').toLowerCase();
-        const name = (profile.accountInfo?.name || '').toLowerCase();
         
-        // Support major English-speaking markets
-        const supportedCountries = ['GB', 'UK', 'US', 'CA', 'AU'];
-        const supportedCurrencies = ['GBP', 'USD', 'CAD', 'AUD'];
+        // All major Amazon Advertising marketplaces
+        const supportedCountries = [
+          // North America
+          'US', 'CA', 'MX', 'BR',
+          // Europe
+          'GB', 'UK', 'DE', 'FR', 'ES', 'IT', 'NL', 'BE', 'PL', 'SE', 'TR',
+          // Middle East & India
+          'EG', 'SA', 'AE', 'IN',
+          // Far East
+          'JP', 'AU', 'SG'
+        ];
         
-        // UK detection
-        const hasUKDomain = mk.includes('.co.uk') || mk.includes('united kingdom');
-        const hasUKToken = /\buk\b/.test(mk) || /\buk\b/.test(name);
-        const isUK = cc === 'GB' || cc === 'UK' || currency === 'GBP' || hasUKDomain || hasUKToken;
+        const supportedCurrencies = [
+          'USD', 'CAD', 'MXN', 'BRL',           // Americas
+          'GBP', 'EUR', 'PLN', 'SEK', 'TRY',    // Europe
+          'EGP', 'SAR', 'AED', 'INR',           // Middle East / India
+          'JPY', 'AUD', 'SGD'                   // Far East
+        ];
         
-        // US detection
-        const hasUSDomain = mk.includes('.com') && !mk.includes('.co.uk') && !mk.includes('.ca') && !mk.includes('.au');
-        const isUS = cc === 'US' || currency === 'USD' || hasUSDomain;
-        
-        // Canada detection  
-        const hasCaDomain = mk.includes('.ca') || mk.includes('canada');
-        const isCA = cc === 'CA' || currency === 'CAD' || hasCaDomain;
-        
-        // Australia detection
-        const hasAuDomain = mk.includes('.au') || mk.includes('australia');
-        const isAU = cc === 'AU' || currency === 'AUD' || hasAuDomain;
+        const isSupported = supportedCountries.includes(cc) || supportedCurrencies.includes(currency);
+        const region = getRegion(cc);
         
         return {
-          isSupported: isUK || isUS || isCA || isAU,
-          marketplace: isUK ? 'UK' : isUS ? 'US' : isCA ? 'CA' : isAU ? 'AU' : 'UNKNOWN',
+          isSupported,
+          marketplace: cc || 'UNKNOWN',
           countryCode: cc,
-          currency: currency
+          currency: currency,
+          region: region
         };
       }
 
@@ -577,24 +588,23 @@ serve(async (req) => {
           };
         });
         
-        console.warn(`[${timestamp}] No supported profiles found. Supported markets: US, UK, CA, AU`);
+        console.warn(`[${timestamp}] No supported profiles found.`);
         console.warn(`[${timestamp}] Found countries:`, foundCountryCodes, 'currencies:', foundCurrencies);
         console.warn(`[${timestamp}] Rejected profiles:`, JSON.stringify(rejectedProfiles, null, 2));
         
         return new Response(
           JSON.stringify({ 
             error: 'No supported advertising profiles found',
-            details: `We found ${profiles.length} advertising profile(s) but none are from supported marketplaces (US, UK, Canada, Australia). Currently supported: USD, GBP, CAD, AUD currencies.`,
+            details: `We found ${profiles.length} advertising profile(s) but none are from supported Amazon marketplaces. Found: ${foundCountryCodes.join(', ')}. Please contact support if you need access.`,
             profileCount: profiles.length,
             foundCountryCodes,
             foundCurrencies,
             marketplacesSample: marketplaces,
-            rejectedProfiles: rejectedProfiles.slice(0, 5), // Show first 5 for debugging
-            supportedMarkets: ['United States (USD)', 'United Kingdom (GBP)', 'Canada (CAD)', 'Australia (AUD)'],
+            rejectedProfiles: rejectedProfiles.slice(0, 5),
             requiresSetup: true
           }),
           { 
-            status: 200, // Setup issue, not a server error
+            status: 200,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           }
         )
