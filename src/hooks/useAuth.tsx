@@ -26,8 +26,6 @@ export const useAuth = () => {
 
 // Only cleanup on explicit sign out - don't touch valid session data
 const cleanupAuthState = () => {
-  console.log('AuthProvider: Cleaning up auth state on sign out');
-  
   try {
     // Only clear cookies, leave localStorage alone (Supabase manages it)
     const cookiesToClear = [
@@ -46,10 +44,8 @@ const cleanupAuthState = () => {
         document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.${rootDomain};`;
       }
     });
-
-    console.log('AuthProvider: Auth cleanup completed');
   } catch (error) {
-    console.error('AuthProvider: Error during auth cleanup:', error);
+    // Auth cleanup error - non-critical, continue
   }
 };
 
@@ -66,53 +62,39 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log('AuthProvider: Setting up auth state listener');
-    
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        console.log('AuthProvider: Auth event:', event, 'User:', session?.user?.email || 'No user');
-        console.log('AuthProvider: Current path:', window.location.pathname);
-        
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
         
         // Clean up on sign out
         if (event === 'SIGNED_OUT') {
-          console.log('AuthProvider: User signed out, cleaning up');
           cleanupAuthState();
         }
         
         // CRITICAL: Do NOT check subscription or redirect for any events
         // Let the components handle their own routing logic
-        console.log('AuthProvider: Auth state updated, no automatic redirects');
       }
     );
 
     // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('AuthProvider: Existing session check:', session?.user?.email || 'No existing session');
-      console.log('AuthProvider: Current path during session check:', window.location.pathname);
-      
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
       
       // CRITICAL: Do NOT perform any automatic redirects here
-      console.log('AuthProvider: Session loaded, letting components handle routing');
     });
 
     return () => {
-      console.log('AuthProvider: Cleaning up auth state listener');
       subscription.unsubscribe();
     };
   }, []);
 
   const signOut = async () => {
     try {
-      console.log('AuthProvider: Signing out user');
-      
       // Clean up auth state first
       cleanupAuthState();
       
@@ -122,14 +104,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // Navigate to landing page instead of forcing reload
       window.location.href = '/';
     } catch (error) {
-      console.error('AuthProvider: Error signing out:', error);
       // Even if sign out fails, clean up and redirect
       cleanupAuthState();
       window.location.href = '/';
     }
   };
-
-  console.log('AuthProvider: Rendering with user:', user?.email || 'No user', 'loading:', loading, 'current path:', window.location.pathname);
 
   const value = {
     user,

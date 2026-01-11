@@ -1,10 +1,23 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
 import { S3Client, ListObjectsV2Command, GetObjectCommand, DeleteObjectCommand } from 'https://esm.sh/@aws-sdk/client-s3@3.400.0';
+import { z } from 'https://esm.sh/zod@3.22.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Input validation schemas
+const RequestSchema = z.object({
+  connectionId: z.string().uuid('connectionId must be a valid UUID'),
+});
+
+// Schema for S3 data records
+const S3RecordSchema = z.object({
+  profileId: z.string().optional(),
+  dataset: z.string().optional(),
+  records: z.array(z.record(z.unknown())).optional(),
+}).passthrough();
 
 // Initialize S3 client
 function createS3Client(region: string) {
@@ -24,7 +37,7 @@ function parseBucketArn(arn: string): string {
   return parts[parts.length - 1];
 }
 
-// Download and parse S3 object
+// Download and parse S3 object with validation
 async function downloadS3Object(s3Client: S3Client, bucket: string, key: string): Promise<any> {
   const command = new GetObjectCommand({ Bucket: bucket, Key: key });
   const response = await s3Client.send(command);
@@ -37,7 +50,18 @@ async function downloadS3Object(s3Client: S3Client, bucket: string, key: string)
   const reader = response.Body.transformToString();
   const content = await reader;
   
-  return JSON.parse(content);
+  // Parse JSON
+  const parsed = JSON.parse(content);
+  
+  // Validate the structure
+  const validationResult = S3RecordSchema.safeParse(parsed);
+  if (!validationResult.success) {
+    console.warn(`S3 object ${key} has unexpected structure:`, validationResult.error.format());
+    // Return parsed data but log the warning - don't fail completely
+    // as the data structure might be intentionally different
+  }
+  
+  return parsed;
 }
 
 // Delete S3 object after processing
@@ -99,14 +123,21 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { connectionId } = await req.json();
+    // Parse and validate request body
+    const rawBody = await req.json();
+    const validationResult = RequestSchema.safeParse(rawBody);
     
-    if (!connectionId) {
+    if (!validationResult.success) {
       return new Response(
-        JSON.stringify({ error: 'Missing connectionId' }),
+        JSON.stringify({ 
+          error: 'Invalid request', 
+          details: validationResult.error.format() 
+        }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    const { connectionId } = validationResult.data;
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -179,7 +210,7 @@ Deno.serve(async (req) => {
       try {
         console.log(`Processing file: ${obj.Key}`);
         
-        // Download and parse the file
+        // Download and parse the file with validation
         const data = await downloadS3Object(s3Client, bucketName, obj.Key);
         
         // Extract dataset and records from the file

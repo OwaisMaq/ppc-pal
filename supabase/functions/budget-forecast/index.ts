@@ -1,10 +1,17 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.0";
+import { z } from "https://esm.sh/zod@3.22.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Input validation schema
+const RequestSchema = z.object({
+  profileId: z.string().min(1, "profileId is required").max(100),
+  monthsToForecast: z.number().int().min(1).max(24).optional().default(3),
+});
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -33,7 +40,21 @@ serve(async (req) => {
       throw new Error('Unauthorized');
     }
 
-    const { profileId, monthsToForecast = 3 } = await req.json();
+    // Parse and validate request body
+    const rawBody = await req.json();
+    const validationResult = RequestSchema.safeParse(rawBody);
+    
+    if (!validationResult.success) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid request', 
+          details: validationResult.error.format() 
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { profileId, monthsToForecast } = validationResult.data;
 
     // Fetch historical spend data (last 6 months for better predictions)
     const sixMonthsAgo = new Date();
