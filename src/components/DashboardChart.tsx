@@ -3,6 +3,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Skeleton } from "@/components/ui/skeleton";
 import { TimeseriesPoint } from "@/hooks/useDashboardData";
 import { format, parseISO } from "date-fns";
+import { ReportIssueButton } from "@/components/ui/ReportIssueButton";
 
 interface DashboardChartProps {
   data: { points: TimeseriesPoint[]; duration_ms?: number } | null;
@@ -115,11 +116,18 @@ export const DashboardChart: React.FC<DashboardChartProps> = ({
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold">Performance Trend</h3>
-        {data.duration_ms && (
-          <p className="text-xs text-muted-foreground">
-            Query time: {data.duration_ms}ms
-          </p>
-        )}
+        <div className="flex items-center gap-2">
+          {data.duration_ms && (
+            <p className="text-xs text-muted-foreground">
+              Query time: {data.duration_ms}ms
+            </p>
+          )}
+          <ReportIssueButton 
+            featureId="dashboard_chart" 
+            featureLabel="Performance Chart"
+            variant="minimal"
+          />
+        </div>
       </div>
 
       <div className="h-[400px] w-full">

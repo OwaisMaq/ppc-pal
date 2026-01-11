@@ -5,6 +5,7 @@ import { useBudgetForecast } from "@/hooks/useBudgetForecast";
 import { TrendingUp, Calendar, AlertCircle, Sparkles } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState } from "react";
+import { ReportIssueButton } from "@/components/ui/ReportIssueButton";
 
 interface BudgetForecastPanelProps {
   profileId?: string;
@@ -54,6 +55,11 @@ export function BudgetForecastPanel({ profileId }: BudgetForecastPanelProps) {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <ReportIssueButton 
+            featureId="budget_forecast" 
+            featureLabel="Budget Forecast"
+            variant="minimal"
+          />
           <Select
             value={monthsToForecast.toString()}
             onValueChange={(value) => setMonthsToForecast(parseInt(value))}

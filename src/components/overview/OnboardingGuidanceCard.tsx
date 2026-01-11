@@ -13,6 +13,7 @@ import {
   Lightbulb
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ReportIssueButton } from "@/components/ui/ReportIssueButton";
 
 interface SetupItem {
   id: string;
@@ -63,10 +64,17 @@ export const OnboardingGuidanceCard = ({
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg flex items-center gap-2">
-          <Rocket className="h-5 w-5 text-primary" />
-          {isComplete ? "What PPC Pal is Doing" : "Setup Progress"}
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Rocket className="h-5 w-5 text-primary" />
+            {isComplete ? "What PPC Pal is Doing" : "Setup Progress"}
+          </CardTitle>
+          <ReportIssueButton 
+            featureId="onboarding_card" 
+            featureLabel="Onboarding Guide"
+            variant="minimal"
+          />
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {!isComplete && (

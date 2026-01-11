@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { AlertTriangle, CheckCircle, Loader2 } from "lucide-react"
 import { useSyncProgress } from "@/hooks/useSyncProgress"
+import { ReportIssueButton } from "@/components/ui/ReportIssueButton"
 
 interface SyncProgressIndicatorProps {
   connectionId: string
@@ -52,19 +53,26 @@ export function SyncProgressIndicator({ connectionId }: SyncProgressIndicatorPro
   return (
     <Card className="border-muted">
       <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-base">
-          {error ? (
-            <AlertTriangle className="h-4 w-4 text-destructive" />
-          ) : progress === 100 ? (
-            <CheckCircle className="h-4 w-4 text-success" />
-          ) : (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          )}
-          Data Sync in Progress
-          <Badge variant={getStatusVariant()}>
-            {error ? 'Failed' : progress === 100 ? 'Complete' : 'Running'}
-          </Badge>
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-base">
+            {error ? (
+              <AlertTriangle className="h-4 w-4 text-destructive" />
+            ) : progress === 100 ? (
+              <CheckCircle className="h-4 w-4 text-success" />
+            ) : (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            )}
+            Data Sync in Progress
+            <Badge variant={getStatusVariant()}>
+              {error ? 'Failed' : progress === 100 ? 'Complete' : 'Running'}
+            </Badge>
+          </CardTitle>
+          <ReportIssueButton 
+            featureId="data_sync" 
+            featureLabel="Data Sync"
+            variant="minimal"
+          />
+        </div>
         <CardDescription>
           {getPhaseDisplay(phase)}
         </CardDescription>

@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useASINs } from "@/hooks/useASINs";
+import { ReportIssueButton } from "@/components/ui/ReportIssueButton";
 
 export type HealthStatus = 'healthy' | 'watch' | 'at_risk';
 export type AutomationStatus = 'on' | 'limited' | 'paused';
@@ -217,7 +218,7 @@ export const AccountHealthCard = ({
                 </ToggleGroupItem>
               </ToggleGroup>
               
-              {/* ASIN filter */}
+            {/* ASIN filter */}
               <Select
                 value={selectedASIN || "all"}
                 onValueChange={(value) => onASINChange?.(value === "all" ? null : value)}
@@ -235,6 +236,11 @@ export const AccountHealthCard = ({
                   ))}
                 </SelectContent>
               </Select>
+              <ReportIssueButton 
+                featureId="health_card" 
+                featureLabel="Account Health Card"
+                variant="minimal"
+              />
             </div>
           </div>
         </CardHeader>

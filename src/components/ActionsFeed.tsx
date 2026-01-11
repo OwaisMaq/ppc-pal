@@ -25,6 +25,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { ReportIssueButton } from "@/components/ui/ReportIssueButton";
 
 const ActionsFeed = () => {
   const { actions, loading } = useActionsFeed(15);
@@ -264,13 +265,22 @@ const ActionsFeed = () => {
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg flex items-center gap-2">
-          <ShieldCheck className="h-5 w-5 text-primary" />
-          Recent Activity
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          Actions taken by PPC Pal to protect your margins
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-primary" />
+              Recent Activity
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Actions taken by PPC Pal to protect your margins
+            </p>
+          </div>
+          <ReportIssueButton 
+            featureId="actions_feed" 
+            featureLabel="Actions Feed"
+            variant="minimal"
+          />
+        </div>
       </CardHeader>
       <CardContent>
         <ScrollArea className="h-[400px] pr-4">

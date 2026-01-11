@@ -17,6 +17,7 @@ import {
 import { format, parseISO } from 'date-fns';
 import { useHistoricalPerformance } from '@/hooks/useHistoricalPerformance';
 import { TrendingUp } from 'lucide-react';
+import { ReportIssueButton } from '@/components/ui/ReportIssueButton';
 
 interface HistoricalPerformanceChartProps {
   profileId: string | undefined;
@@ -162,6 +163,11 @@ export const HistoricalPerformanceChart = ({ profileId }: HistoricalPerformanceC
           <Label htmlFor="automated-toggle" className="text-sm text-muted-foreground cursor-pointer">
             Automated only
           </Label>
+          <ReportIssueButton 
+            featureId="performance_chart" 
+            featureLabel="Historical Performance Chart"
+            variant="minimal"
+          />
         </div>
       </CardHeader>
       <CardContent>
