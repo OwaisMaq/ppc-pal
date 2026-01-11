@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 interface ActionableInsight {
-  type: 'bid_adjustment' | 'keyword_suggestion' | 'negative_keyword' | 'budget_change';
+  type: 'keyword_suggestion' | 'negative_keyword' | 'budget_change';
   campaign: string;
   action: string;
   reason: string;
@@ -211,9 +211,9 @@ ${JSON.stringify(mlPredictions.map(p => ({
     const strategy = parsedAI.strategy || 'Analyzing your campaigns...';
 
     // Map ML predictions to actionable insights with AI explanations
+    // Note: Bid adjustments are handled exclusively by the Bayesian Bid Optimizer
     const mapActionType = (predictionType: string): string => {
       const mapping: Record<string, string> = {
-        'bid_adjustment': 'set_bid',
         'budget_change': 'set_budget',
         'negative_keyword': 'add_negative',
         'keyword_suggestion': 'suggest_keyword',
@@ -223,10 +223,6 @@ ${JSON.stringify(mlPredictions.map(p => ({
 
     const mapAction = (prediction: any): string => {
       const { prediction_type, action_numeric } = prediction;
-      if (prediction_type === 'bid_adjustment') {
-        const percent = Math.round(action_numeric * 100);
-        return percent < 0 ? `Decrease bid by ${Math.abs(percent)}%` : `Increase bid by ${percent}%`;
-      }
       if (prediction_type === 'budget_change') {
         const percent = Math.round(action_numeric * 100);
         return percent < 0 ? `Decrease budget by ${Math.abs(percent)}%` : `Increase budget by ${percent}%`;

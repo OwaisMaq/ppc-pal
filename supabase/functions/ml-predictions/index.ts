@@ -29,8 +29,8 @@ interface CampaignMetrics {
 interface StatisticalPrediction {
   campaign_id: string;
   campaign_name: string;
-  prediction_type: 'bid_adjustment' | 'keyword_suggestion' | 'negative_keyword' | 'budget_change';
-  action_numeric: number; // e.g., -0.15 for "decrease bid 15%"
+  prediction_type: 'keyword_suggestion' | 'negative_keyword' | 'budget_change';
+  action_numeric: number; // e.g., 0.25 for "increase budget 25%"
   reason_code: string;
   metrics: {
     cpc_7d: number;
@@ -347,22 +347,7 @@ function generateStatisticalPredictions(
       });
     }
 
-    // Rule 3: High ACOS anomaly (Z-score > 2)
-    if (acos_zscore > 2 && acos_30d > 30) {
-      predictions.push({
-        campaign_id: campaign.campaign_id,
-        campaign_name: campaign.campaign_name,
-        prediction_type: 'bid_adjustment',
-        action_numeric: -0.15, // Decrease bid by 15%
-        reason_code: 'high_acos_anomaly',
-        metrics,
-        anomaly_scores,
-        confidence: 'high',
-        impact: 'medium',
-      });
-    }
-
-    // Rule 4: Low CTR anomaly (Z-score < -2)
+    // Rule 3: Low CTR anomaly (Z-score < -2) - suggest keyword/targeting review
     if (ctr_zscore < -2 && ctr_30d < 0.5) {
       predictions.push({
         campaign_id: campaign.campaign_id,
@@ -377,35 +362,9 @@ function generateStatisticalPredictions(
       });
     }
 
-    // Rule 5: High CPC without results (Z-score > 1.5 and CVR < 2%)
-    if (cpc_zscore > 1.5 && cvr_14d < 2 && campaign.clicks_14d > 30) {
-      predictions.push({
-        campaign_id: campaign.campaign_id,
-        campaign_name: campaign.campaign_name,
-        prediction_type: 'bid_adjustment',
-        action_numeric: -0.20, // Decrease bid by 20%
-        reason_code: 'high_cpc_low_cvr',
-        metrics,
-        anomaly_scores,
-        confidence: 'high',
-        impact: 'medium',
-      });
-    }
-
-    // Rule 6: Declining performance (7d ROAS < 14d ROAS by 30%+)
-    if (roas_14d > 0 && roas_7d < roas_14d * 0.7 && campaign.spend_7d > 50) {
-      predictions.push({
-        campaign_id: campaign.campaign_id,
-        campaign_name: campaign.campaign_name,
-        prediction_type: 'bid_adjustment',
-        action_numeric: -0.10, // Decrease bid by 10%
-        reason_code: 'declining_performance',
-        metrics,
-        anomaly_scores,
-        confidence: 'medium',
-        impact: 'low',
-      });
-    }
+    // Note: Bid adjustments are now handled exclusively by the Bayesian Bid Optimizer
+    // Rules for high_acos_anomaly, high_cpc_low_cvr, and declining_performance
+    // have been removed to prevent conflicts with the optimizer
   });
 
   // Sort by impact (high first) and confidence
