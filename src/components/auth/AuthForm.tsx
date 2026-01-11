@@ -16,6 +16,7 @@ interface AuthFormProps {
   onTogglePassword: () => void;
   onSignIn: (e: React.FormEvent) => void;
   onSignUp: (e: React.FormEvent) => void;
+  onForgotPassword: () => void;
 }
 
 const AuthForm = ({
@@ -25,7 +26,8 @@ const AuthForm = ({
   onInputChange,
   onTogglePassword,
   onSignIn,
-  onSignUp
+  onSignUp,
+  onForgotPassword
 }: AuthFormProps) => {
   return (
     <Card>
@@ -50,6 +52,7 @@ const AuthForm = ({
               onInputChange={onInputChange}
               onTogglePassword={onTogglePassword}
               onSubmit={onSignIn}
+              onForgotPassword={onForgotPassword}
             />
           </TabsContent>
           

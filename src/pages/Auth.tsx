@@ -167,6 +167,29 @@ const Auth = () => {
     }
   };
 
+  const handleForgotPassword = async () => {
+    if (!formData.email) {
+      toast.error("Please enter your email address first");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
+        redirectTo: `${window.location.origin}/auth/reset-password`,
+      });
+
+      if (error) throw error;
+
+      toast.success("Password reset email sent! Check your inbox.");
+    } catch (error: any) {
+      console.error("Password reset error:", error);
+      toast.error(error.message || "Failed to send password reset email");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Show loading only when we're specifically on the auth page and auth is loading
   if (loading && location.pathname === '/auth') {
     console.log('Auth: Showing loading spinner while auth state loads');
@@ -202,6 +225,7 @@ const Auth = () => {
           onTogglePassword={() => setShowPassword(!showPassword)}
           onSignIn={handleSignIn}
           onSignUp={handleSignUp}
+          onForgotPassword={handleForgotPassword}
         />
         
         <AuthFooter />
