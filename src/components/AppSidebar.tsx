@@ -30,7 +30,8 @@ import {
   History,
   Globe,
   UserCheck,
-  Sparkles
+  Sparkles,
+  FlaskConical
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useSyncStatus } from "@/hooks/useSyncStatus";
@@ -64,7 +65,10 @@ export function AppSidebar() {
     { title: "Governance", url: "/governance", icon: Shield },
     { title: "Analytics", url: "/analytics", icon: BarChart3 },
     { title: "Settings", url: "/settings", icon: Settings },
-    ...(isAdmin ? [{ title: "User Approvals", url: "/admin/approvals", icon: UserCheck }] : []),
+    ...(isAdmin ? [
+      { title: "User Approvals", url: "/admin/approvals", icon: UserCheck },
+      { title: "Test Suite", url: "/test-suite", icon: FlaskConical }
+    ] : []),
   ];
 
   return (

@@ -5143,6 +5143,42 @@ export type Database = {
           },
         ]
       }
+      test_results: {
+        Row: {
+          category: string
+          created_at: string | null
+          details: Json | null
+          id: string
+          notes: string | null
+          status: string
+          test_name: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          notes?: string | null
+          status?: string
+          test_name: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          notes?: string | null
+          status?: string
+          test_name?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       time_lag_daily: {
         Row: {
           bucket: string

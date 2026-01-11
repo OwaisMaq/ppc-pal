@@ -42,6 +42,7 @@ const DevTools = lazy(() => import("@/pages/DevTools"));
 const PendingApproval = lazy(() => import("@/pages/PendingApproval"));
 const AdminApprovals = lazy(() => import("@/pages/AdminApprovals"));
 const BetaGuide = lazy(() => import("@/pages/BetaGuide"));
+const TestSuite = lazy(() => import("@/pages/TestSuite"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -190,6 +191,11 @@ const App = () => {
                       <Route path="/admin/approvals" element={
                         <ProtectedRoute>
                           <AdminApprovals />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="/test-suite" element={
+                        <ProtectedRoute>
+                          <TestSuite />
                         </ProtectedRoute>
                       } />
                       
