@@ -16,6 +16,7 @@ import { DashboardChart } from "@/components/DashboardChart";
 import { PerformanceFilters, TimePeriod, ACOSTrendChart, CampaignTypeMixChart } from "@/components/analytics";
 import { TrustReportCard } from "@/components/overview/TrustReportCard";
 import { OutcomeAttributionPanel } from "@/components/overview/OutcomeAttributionPanel";
+import { ReportIssueButton } from "@/components/ui/ReportIssueButton";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { useHistoricalAudit } from "@/hooks/useHistoricalAudit";
 import { useAmsMetrics } from "@/hooks/useAmsMetrics";
@@ -154,11 +155,18 @@ const Analytics = () => {
   return (
     <DashboardShell>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Analytics</h1>
-          <p className="text-muted-foreground mt-2">
-            Performance insights, attribution, anomalies, and budget analysis
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Analytics</h1>
+            <p className="text-muted-foreground mt-2">
+              Performance insights, attribution, anomalies, and budget analysis
+            </p>
+          </div>
+          <ReportIssueButton 
+            featureId="analytics_page" 
+            featureLabel="Analytics Page"
+            variant="text"
+          />
         </div>
 
         {/* Tabs Content */}

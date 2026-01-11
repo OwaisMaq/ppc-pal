@@ -3254,6 +3254,48 @@ export type Database = {
         }
         Relationships: []
       }
+      feature_issue_reports: {
+        Row: {
+          context: Json | null
+          created_at: string | null
+          feature_id: string
+          feature_label: string | null
+          id: string
+          issue_type: string | null
+          page_route: string | null
+          resolved: boolean | null
+          resolved_at: string | null
+          resolved_by: string | null
+          user_id: string
+        }
+        Insert: {
+          context?: Json | null
+          created_at?: string | null
+          feature_id: string
+          feature_label?: string | null
+          id?: string
+          issue_type?: string | null
+          page_route?: string | null
+          resolved?: boolean | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          user_id: string
+        }
+        Update: {
+          context?: Json | null
+          created_at?: string | null
+          feature_id?: string
+          feature_label?: string | null
+          id?: string
+          issue_type?: string | null
+          page_route?: string | null
+          resolved?: boolean | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       feedback: {
         Row: {
           created_at: string

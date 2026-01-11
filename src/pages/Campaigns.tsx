@@ -58,6 +58,7 @@ import { subDays } from "date-fns";
 import { DateRange } from "react-day-picker";
 import { useDataAvailability } from "@/hooks/useDataAvailability";
 import { DataAvailabilityIndicator } from "@/components/DataAvailabilityIndicator";
+import { ReportIssueButton } from "@/components/ui/ReportIssueButton";
 import { CampaignLevelSelector, CampaignLevel, BulkActionsBar, ProductSection, PerformanceCharts, SearchTermsView } from "@/components/campaigns";
 import { useAmsMetrics } from "@/hooks/useAmsMetrics";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -1134,6 +1135,11 @@ const Campaigns = () => {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            <ReportIssueButton 
+              featureId="campaigns_page" 
+              featureLabel="Ad Manager"
+              variant="text"
+            />
             <Label htmlFor="auto-mode" className="text-sm font-medium">Auto-Mode</Label>
             <Switch
               id="auto-mode"

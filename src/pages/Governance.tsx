@@ -20,6 +20,7 @@ import { AutomationRulesList } from "@/components/AutomationRulesList";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DaypartScheduler } from "@/components/dayparting";
 import { GuardrailsSettings, ProtectedEntities, AIAutoApplyCard, ProductTargetsCard } from "@/components/governance";
+import { ReportIssueButton } from "@/components/ui/ReportIssueButton";
 import { useAutomationRules } from "@/hooks/useAutomation";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useGovernance } from "@/hooks/useGovernance";
@@ -215,9 +216,16 @@ const Governance: React.FC = () => {
             </p>
           </div>
           
-          <Badge className={planInfo.color}>
-            {planInfo.name} Plan
-          </Badge>
+          <div className="flex items-center gap-3">
+            <ReportIssueButton 
+              featureId="governance_page" 
+              featureLabel="Governance Page"
+              variant="text"
+            />
+            <Badge className={planInfo.color}>
+              {planInfo.name} Plan
+            </Badge>
+          </div>
         </div>
 
         {/* Global Controls */}

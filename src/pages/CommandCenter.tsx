@@ -24,6 +24,7 @@ import { useBidOptimizerStatus } from "@/hooks/useBidOptimizerStatus";
 import { Skeleton } from "@/components/ui/skeleton";
 import PendingApprovals from "@/components/PendingApprovals";
 import ActionsFeed from "@/components/ActionsFeed";
+import { ReportIssueButton } from "@/components/ui/ReportIssueButton";
 import {
   AccountHealthCard,
   ActiveAlertsCard,
@@ -280,6 +281,13 @@ const CommandCenter = () => {
               <h1 className="text-3xl font-bold text-foreground">Command Center</h1>
               <p className="text-muted-foreground">Your Amazon Advertising control hub</p>
             </div>
+            
+            <ReportIssueButton 
+              featureId="command_center" 
+              featureLabel="Command Center"
+              variant="minimal"
+              className="hidden md:flex"
+            />
             
             {/* Unified Confidence Gauge */}
             {hasConnections && (

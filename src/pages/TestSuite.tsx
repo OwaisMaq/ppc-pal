@@ -1,10 +1,10 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FlaskConical, RefreshCw } from 'lucide-react';
+import { FlaskConical, RefreshCw, Flag } from 'lucide-react';
 import DashboardShell from '@/components/DashboardShell';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAdminRole } from '@/hooks/useAdminRole';
-import { FeatureChecklist, EdgeFunctionTester, DataValidator, FlowSimulator } from '@/components/testing';
+import { FeatureChecklist, EdgeFunctionTester, DataValidator, FlowSimulator, IssueReportsPanel } from '@/components/testing';
 
 export default function TestSuite() {
   const { isAdmin, loading: adminLoading } = useAdminRole();
@@ -43,13 +43,21 @@ export default function TestSuite() {
           </div>
         </div>
 
-        <Tabs defaultValue="features" className="space-y-4">
+        <Tabs defaultValue="issues" className="space-y-4">
           <TabsList>
+            <TabsTrigger value="issues" className="gap-1.5">
+              <Flag className="h-4 w-4" />
+              Issue Reports
+            </TabsTrigger>
             <TabsTrigger value="features">Feature Checklist</TabsTrigger>
             <TabsTrigger value="functions">Edge Functions</TabsTrigger>
             <TabsTrigger value="data">Data Validation</TabsTrigger>
             <TabsTrigger value="flows">Flow Simulator</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="issues">
+            <IssueReportsPanel />
+          </TabsContent>
 
           <TabsContent value="features">
             <FeatureChecklist />
