@@ -29,7 +29,8 @@ import {
   TrendingUp,
   History,
   Globe,
-  UserCheck
+  UserCheck,
+  Sparkles
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useSyncStatus } from "@/hooks/useSyncStatus";
@@ -56,6 +57,7 @@ export function AppSidebar() {
 
   const menuItems = [
     { title: "Command Center", url: "/command-center", icon: LayoutDashboard },
+    { title: "Beta Guide", url: "/beta-guide", icon: Sparkles, badge: "Beta" },
     { title: "Ad Manager", url: "/campaigns", icon: Target },
     { title: "Changelog", url: "/changelog", icon: History },
     { title: "Rank Tracker", url: "/rank-tracker", icon: TrendingUp, comingSoon: true },
@@ -99,6 +101,11 @@ export function AppSidebar() {
                       {item.comingSoon && !isCollapsed && (
                         <span className="ml-auto text-[10px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
                           Soon
+                        </span>
+                      )}
+                      {item.badge && !isCollapsed && (
+                        <span className="ml-auto text-[10px] font-medium text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                          {item.badge}
                         </span>
                       )}
                     </NavLink>
