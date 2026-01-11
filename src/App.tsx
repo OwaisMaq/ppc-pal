@@ -41,6 +41,7 @@ const Onboarding = lazy(() => import("@/pages/Onboarding"));
 const DevTools = lazy(() => import("@/pages/DevTools"));
 const PendingApproval = lazy(() => import("@/pages/PendingApproval"));
 const AdminApprovals = lazy(() => import("@/pages/AdminApprovals"));
+const BetaGuide = lazy(() => import("@/pages/BetaGuide"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -99,6 +100,13 @@ const App = () => {
                       <Route path="/command-center" element={
                         <ProtectedRoute>
                           <CommandCenter />
+                        </ProtectedRoute>
+                      } />
+                      
+                      {/* Beta Guide */}
+                      <Route path="/beta-guide" element={
+                        <ProtectedRoute>
+                          <BetaGuide />
                         </ProtectedRoute>
                       } />
                       
