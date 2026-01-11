@@ -6,6 +6,7 @@ import { useGlobalFilters, getMarketplaceFlag, getMarketplaceName } from '@/cont
 import { useRollups, RollupBreakdown } from '@/hooks/useRollups';
 import { Globe, TrendingUp, TrendingDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ReportIssueButton } from '@/components/ui/ReportIssueButton';
 
 interface MultiAccountBreakdownProps {
   from: Date;
@@ -48,9 +49,16 @@ export function MultiAccountBreakdown({ from, to }: MultiAccountBreakdownProps) 
             <Globe className="h-4 w-4 text-primary" />
             <CardTitle className="text-base">Performance by Profile</CardTitle>
           </div>
-          <Badge variant="secondary" className="text-xs">
-            {baseCurrency}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="text-xs">
+              {baseCurrency}
+            </Badge>
+            <ReportIssueButton 
+              featureId="multi_account" 
+              featureLabel="Multi-Account Breakdown"
+              variant="minimal"
+            />
+          </div>
         </div>
       </CardHeader>
       <CardContent>

@@ -10,6 +10,7 @@ import { useAIInsights } from "@/hooks/useAIInsights";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { useActionsFeed } from "@/hooks/useActionsFeed";
 import ActionsHistory from "@/components/ActionsHistory";
+import { ReportIssueButton } from "@/components/ui/ReportIssueButton";
 import { 
   Sparkles, 
   TrendingUp, 
@@ -125,6 +126,11 @@ export const AIInsightsPanel = () => {
             />
           </div>
         </div>
+        <ReportIssueButton 
+          featureId="ai_insights" 
+          featureLabel="AI Insights"
+          variant="minimal"
+        />
       </div>
 
       {/* Strategy Summary */}

@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ReportIssueButton } from "@/components/ui/ReportIssueButton";
 
 export const SearchTermsPanel = () => {
   const { data: searchTerms, isLoading } = useSearchTerms();
@@ -131,6 +132,11 @@ export const SearchTermsPanel = () => {
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
+              <ReportIssueButton 
+                featureId="search_studio" 
+                featureLabel="Search Terms Analysis"
+                variant="minimal"
+              />
               <Select value={filterAction} onValueChange={setFilterAction}>
                 <SelectTrigger className="w-48">
                   <SelectValue placeholder="Filter by action" />

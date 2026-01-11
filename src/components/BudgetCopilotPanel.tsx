@@ -11,6 +11,7 @@ import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
+import { ReportIssueButton } from "@/components/ui/ReportIssueButton";
 
 const ACTION_COLORS = {
   increase: 'bg-success/10 text-success border-success/20',
@@ -91,10 +92,17 @@ export const BudgetCopilotPanel = () => {
       {/* Header & Controls */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Zap className="h-5 w-5 text-brand-primary" />
-            Budget Copilot
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Zap className="h-5 w-5 text-brand-primary" />
+              Budget Copilot
+            </CardTitle>
+            <ReportIssueButton 
+              featureId="budget_copilot" 
+              featureLabel="Budget Copilot"
+              variant="minimal"
+            />
+          </div>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-4 items-center">

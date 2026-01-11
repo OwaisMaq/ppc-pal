@@ -8,6 +8,7 @@ import { AlertTriangle, TrendingUp, TrendingDown, Activity, Eye, EyeOff } from "
 import { useAnomalies, type Anomaly } from "@/hooks/useAnomalies";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { formatDistanceToNow } from "date-fns";
+import { ReportIssueButton } from "@/components/ui/ReportIssueButton";
 
 const SEVERITY_ICONS = {
   info: Activity,
@@ -69,10 +70,17 @@ export const AnomaliesPanel = () => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <AlertTriangle className="h-5 w-5 text-warning" />
-          Anomaly Detection
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-warning" />
+            Anomaly Detection
+          </CardTitle>
+          <ReportIssueButton 
+            featureId="anomalies" 
+            featureLabel="Anomaly Detection"
+            variant="minimal"
+          />
+        </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">

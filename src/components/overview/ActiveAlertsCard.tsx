@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
 import { Bell, AlertTriangle, TrendingUp, ChevronRight, Settings, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ReportIssueButton } from "@/components/ui/ReportIssueButton";
 
 export interface ActiveAlert {
   id: string;
@@ -144,13 +145,20 @@ export const ActiveAlertsCard = ({ alerts, loading, compact }: ActiveAlertsCardP
             Active Alerts
             <Badge variant="secondary" className="ml-1">{alerts.length}</Badge>
           </CardTitle>
-          <Link 
-            to="/settings" 
-            className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
-          >
-            <Settings className="h-3.5 w-3.5" />
-            Configure
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link 
+              to="/settings" 
+              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+            >
+              <Settings className="h-3.5 w-3.5" />
+              Configure
+            </Link>
+            <ReportIssueButton 
+              featureId="alerts_card" 
+              featureLabel="Active Alerts"
+              variant="minimal"
+            />
+          </div>
         </div>
       </CardHeader>
       <CardContent>

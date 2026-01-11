@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import { ConfidenceBadge } from "@/components/automation";
+import { ReportIssueButton } from "@/components/ui/ReportIssueButton";
 import { 
   ClipboardCheck,
   TrendingUp, 
@@ -358,11 +359,18 @@ const PendingApprovals = () => {
               {budgetItems.length > 0 && `${budgetItems.length} budget`}
             </CardDescription>
           </div>
-          {queuedCount > 1 && (
-            <Button size="sm" onClick={handleApproveAll}>
-              Approve All
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {queuedCount > 1 && (
+              <Button size="sm" onClick={handleApproveAll}>
+                Approve All
+              </Button>
+            )}
+            <ReportIssueButton 
+              featureId="pending_approvals" 
+              featureLabel="Pending Approvals"
+              variant="minimal"
+            />
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">

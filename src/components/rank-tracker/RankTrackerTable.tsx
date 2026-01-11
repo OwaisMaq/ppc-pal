@@ -3,6 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { ReportIssueButton } from "@/components/ui/ReportIssueButton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Trash2, TrendingUp, TrendingDown, Minus, ChevronRight, Search } from "lucide-react";
 import { TrackedKeyword } from "@/hooks/useRankTracker";
@@ -71,7 +72,7 @@ export function RankTrackerTable({
   return (
     <div className="space-y-4">
       {/* Filters */}
-      <div className="flex gap-4">
+      <div className="flex items-center gap-4">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -81,6 +82,11 @@ export function RankTrackerTable({
             className="pl-10"
           />
         </div>
+        <ReportIssueButton 
+          featureId="rank_tracker" 
+          featureLabel="Rank Tracker"
+          variant="minimal"
+        />
         <Select value={asinFilter} onValueChange={setAsinFilter}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Filter by ASIN" />

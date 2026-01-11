@@ -8,6 +8,7 @@ import KpiChip from "./KpiChip";
 import { DashboardKPIs as KPIData } from "@/hooks/useDashboardData";
 import { TimeseriesDataPoint } from "@/hooks/useAmsMetrics";
 import { LineChart, Line, ResponsiveContainer } from "recharts";
+import { ReportIssueButton } from "@/components/ui/ReportIssueButton";
 
 interface DashboardKPIsProps {
   data: KPIData | null;
@@ -165,6 +166,13 @@ export const DashboardKPIs: React.FC<DashboardKPIsProps> = ({
   return (
     <div className="space-y-6">
       {/* Primary KPIs - Always Visible */}
+      <div className="flex items-center justify-end mb-2">
+        <ReportIssueButton 
+          featureId="dashboard_kpis" 
+          featureLabel="Dashboard KPIs"
+          variant="minimal"
+        />
+      </div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {primaryKpis.map((kpi) => (
           <KpiChip
