@@ -1,6 +1,5 @@
 
-import { useEffect } from "react";
-import { useNavigate, useLocation, Navigate } from "react-router-dom";
+import { useLocation, Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useApprovalStatus } from "@/hooks/useApprovalStatus";
 import { useAdminRole } from "@/hooks/useAdminRole";
@@ -8,12 +7,6 @@ import { useAdminRole } from "@/hooks/useAdminRole";
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
-
-const PROTECTED_ROUTES = ['/dashboard', '/feedback', '/data-management', '/command-center', '/campaigns', '/governance', '/analytics', '/settings', '/rank-tracker', '/changelog', '/onboarding', '/dev-tools', '/admin'];
-
-const isProtectedRoute = (pathname: string) => {
-  return PROTECTED_ROUTES.some(route => pathname.startsWith(route));
-};
 
 const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const { user, loading: authLoading } = useAuth();
@@ -34,17 +27,14 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 
   // No user - redirect to auth
   if (!user) {
-    console.log('ProtectedRoute: No user, redirecting to auth');
     return <Navigate to="/auth" replace />;
   }
 
   // User exists but not approved and not admin - redirect to pending approval
   if (!isApproved && !isAdmin) {
-    console.log('ProtectedRoute: User not approved, redirecting to pending-approval');
     return <Navigate to="/pending-approval" replace />;
   }
 
-  console.log('ProtectedRoute: Rendering protected content for:', location.pathname);
   return <>{children}</>;
 };
 
