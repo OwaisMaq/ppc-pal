@@ -12,7 +12,6 @@ import { useActionsFeed } from "@/hooks/useActionsFeed";
 import ActionsHistory from "@/components/ActionsHistory";
 import { 
   Sparkles, 
-  TrendingDown, 
   TrendingUp, 
   DollarSign,
   Target,
@@ -55,8 +54,6 @@ export const AIInsightsPanel = () => {
 
   const getTypeIcon = (type: string) => {
     switch (type) {
-      case 'bid_adjustment':
-        return <TrendingDown className="h-4 w-4" />;
       case 'keyword_suggestion':
         return <Lightbulb className="h-4 w-4" />;
       case 'negative_keyword':
@@ -83,8 +80,8 @@ export const AIInsightsPanel = () => {
   };
 
   const getTypeLabel = (type: string) => {
+    // Note: Bid adjustments are now handled by the Bayesian Bid Optimizer
     const labels: Record<string, string> = {
-      bid_adjustment: 'Bid Adjustment',
       keyword_suggestion: 'Keyword Suggestion',
       negative_keyword: 'Negative Keyword',
       budget_change: 'Budget Change',

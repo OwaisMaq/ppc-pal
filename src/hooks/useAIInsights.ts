@@ -15,7 +15,7 @@ export interface ActionablePayload {
 
 export interface AIInsight {
   id?: string;
-  type: 'bid_adjustment' | 'keyword_suggestion' | 'negative_keyword' | 'budget_change';
+  type: 'keyword_suggestion' | 'negative_keyword' | 'budget_change';
   campaign: string;
   action: string;
   reason: string;
