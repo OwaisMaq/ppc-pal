@@ -14,6 +14,7 @@ import { useLoginSync } from "@/hooks/useLoginSync";
 
 // Lazy load pages for better performance
 const Auth = lazy(() => import("@/pages/Auth"));
+const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
 const CommandCenter = lazy(() => import("@/pages/CommandCenter"));
 const Feedback = lazy(() => import("@/pages/Feedback"));
 const Campaigns = lazy(() => import("@/pages/Campaigns"));
@@ -86,6 +87,7 @@ const App = () => {
                       <Route path="/contact" element={<Contact />} />
                       <Route path="/company" element={<Company />} />
                       <Route path="/auth" element={<Auth />} />
+                      <Route path="/auth/reset-password" element={<ResetPassword />} />
                       <Route path="/auth/amazon/callback" element={<AmazonCallback />} />
                       <Route path="/onboarding" element={
                         <ProtectedRoute>

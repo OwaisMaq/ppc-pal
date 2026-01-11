@@ -14,6 +14,7 @@ interface SignInFormProps {
   onInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onTogglePassword: () => void;
   onSubmit: (e: React.FormEvent) => void;
+  onForgotPassword: () => void;
 }
 
 const SignInForm = ({
@@ -22,7 +23,8 @@ const SignInForm = ({
   isLoading,
   onInputChange,
   onTogglePassword,
-  onSubmit
+  onSubmit,
+  onForgotPassword
 }: SignInFormProps) => {
   return (
     <form onSubmit={onSubmit} className="space-y-4">
@@ -44,7 +46,16 @@ const SignInForm = ({
       </div>
       
       <div className="space-y-2">
-        <Label htmlFor="signin-password">Password</Label>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="signin-password">Password</Label>
+          <button
+            type="button"
+            onClick={onForgotPassword}
+            className="text-sm text-primary hover:text-primary/80 hover:underline"
+          >
+            Forgot password?
+          </button>
+        </div>
         <div className="relative">
           <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
           <Input
