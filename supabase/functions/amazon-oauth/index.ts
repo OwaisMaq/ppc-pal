@@ -88,13 +88,23 @@ serve(async (req) => {
       const clientId = Deno.env.get('AMAZON_CLIENT_ID')
       const redirectUri = Deno.env.get('AMAZON_REDIRECT_URI')
       
+      // DEBUG: Log exact configuration values (safe to log - no secrets)
+      console.log(`[${timestamp}] OAuth INITIATE - Configuration Debug:`, {
+        clientIdPrefix: clientId ? clientId.substring(0, 15) + '...' : 'NOT SET',
+        redirectUri: redirectUri || 'NOT SET',
+        expectedRedirectUri: 'https://ppcpal.online/auth/amazon/callback',
+        redirectUriMatch: redirectUri === 'https://ppcpal.online/auth/amazon/callback',
+        userId: user.id,
+        userEmail: user.email
+      });
+      
       if (!clientId) {
-        console.error('Amazon Client ID not configured');
+        console.error(`[${timestamp}] Amazon Client ID not configured`);
         throw new Error('Amazon Client ID not configured')
       }
       
       if (!redirectUri) {
-        console.error('Amazon Redirect URI not configured');
+        console.error(`[${timestamp}] Amazon Redirect URI not configured`);
         throw new Error('Amazon Redirect URI not configured')
       }
 
@@ -118,7 +128,7 @@ serve(async (req) => {
         });
       
       if (stateError) {
-        console.error('Failed to store OAuth state:', stateError);
+        console.error(`[${timestamp}] Failed to store OAuth state:`, stateError);
         throw new Error('Failed to store OAuth state');
       }
       
@@ -130,10 +140,18 @@ serve(async (req) => {
         `state=${stateParam}&` +
         `prompt=consent`; // Ensure user sees all permissions being requested
 
-      console.log('Generated auth URL and stored state for user:', user.id)
+      // DEBUG: Log the full auth URL (safe - no secrets in URL)
+      console.log(`[${timestamp}] OAuth INITIATE - Generated Auth URL:`, {
+        authUrlHost: 'https://www.amazon.com/ap/oa',
+        redirectUri: redirectUri,
+        redirectUriEncoded: encodeURIComponent(redirectUri),
+        statePrefix: stateParam.substring(0, 50),
+        scope: scope,
+        fullUrlLength: authUrl.length
+      });
       
       return new Response(
-        JSON.stringify({ authUrl }),
+        JSON.stringify({ authUrl, debug: { redirectUri, timestamp } }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
