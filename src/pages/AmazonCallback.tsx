@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAmazonConnections } from '@/hooks/useAmazonConnections';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { CheckCircle, AlertCircle, Loader2, Wifi, ExternalLink } from 'lucide-react';
+import { CheckCircle, AlertCircle, Loader2, Wifi, ExternalLink, LogOut, RefreshCw, HelpCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const AmazonCallback = () => {
   const navigate = useNavigate();
@@ -12,6 +13,7 @@ const AmazonCallback = () => {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('Processing Amazon connection...');
   const [diagnosticInfo, setDiagnosticInfo] = useState<any>(null);
+  const [amazonEmail, setAmazonEmail] = useState<string | null>(null);
 
   useEffect(() => {
     let processed = false;
@@ -53,6 +55,11 @@ const AmazonCallback = () => {
         if (result?.requiresSetup) {
           setStatus('error');
           
+          // Capture Amazon email if provided
+          if ((result as any).amazonEmail) {
+            setAmazonEmail((result as any).amazonEmail);
+          }
+          
           // Provide specific guidance based on diagnostics if available
           let detailedMessage = result.details || 'Amazon Advertising account setup required.';
           
@@ -60,9 +67,9 @@ const AmazonCallback = () => {
           if (diagnostics?.issueType === 'infrastructure_dns') {
             detailedMessage = 'Network connectivity issues preventing connection to Amazon\'s advertising servers. This appears to be a temporary infrastructure problem.';
           } else if (diagnostics?.issueType === 'no_advertising_account') {
-            detailedMessage = 'Successfully connected to Amazon\'s servers, but no advertising profiles were found. This usually means you don\'t have an active Amazon Advertising account.';
+            detailedMessage = 'Successfully connected to Amazon\'s servers, but no advertising profiles were found.';
           } else if (diagnostics?.issueType === 'partial_connectivity') {
-            detailedMessage = 'Some Amazon advertising regions are temporarily unavailable, but we successfully connected to others. However, no advertising profiles were found.';
+            detailedMessage = 'Some Amazon advertising regions are temporarily unavailable. However, no advertising profiles were found in the available regions.';
           }
           
           setMessage(detailedMessage);
@@ -113,31 +120,49 @@ const AmazonCallback = () => {
     processCallback();
   }, []); // Empty dependency array to run only once
 
+  const handleSignOutAndRetry = () => {
+    // Open Amazon sign-out in a popup, then redirect to settings to retry
+    const signOutWindow = window.open('https://www.amazon.com/gp/flex/sign-out.html', '_blank', 'width=600,height=400');
+    
+    // After a short delay, navigate to settings to retry
+    setTimeout(() => {
+      if (signOutWindow) {
+        signOutWindow.close();
+      }
+      navigate('/settings?tab=connections');
+    }, 2000);
+  };
+
   const getIcon = () => {
     switch (status) {
       case 'loading':
-        return <Loader2 className="h-8 w-8 animate-spin text-blue-600" />;
+        return <Loader2 className="h-8 w-8 animate-spin text-primary" />;
       case 'success':
-        return <CheckCircle className="h-8 w-8 text-green-600" />;
+        return <CheckCircle className="h-8 w-8 text-success" />;
       case 'error':
-        return <AlertCircle className="h-8 w-8 text-red-600" />;
+        return <AlertCircle className="h-8 w-8 text-destructive" />;
     }
   };
 
   const getColor = () => {
     switch (status) {
       case 'loading':
-        return 'text-blue-600';
+        return 'text-primary';
       case 'success':
-        return 'text-green-600';
+        return 'text-success';
       case 'error':
-        return 'text-red-600';
+        return 'text-destructive';
     }
   };
 
+  // Check if this is a "0 profiles found" scenario (successful connection but no profiles)
+  const isNoProfilesFound = status === 'error' && 
+    diagnosticInfo?.successfulEndpoints > 0 && 
+    (diagnosticInfo?.issueType === 'no_advertising_account' || diagnosticInfo?.issueType === 'partial_connectivity');
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50 flex items-center justify-center">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen bg-gradient-to-br from-muted via-background to-muted/50 flex items-center justify-center p-4">
+      <Card className="w-full max-w-lg">
         <CardHeader>
           <CardTitle className="flex items-center gap-3">
             {getIcon()}
@@ -148,11 +173,106 @@ const AmazonCallback = () => {
             </span>
           </CardTitle>
         </CardHeader>
-        <CardContent className="text-center space-y-4">
-          <p className="text-gray-600">{message}</p>
+        <CardContent className="space-y-4">
+          <p className="text-muted-foreground">{message}</p>
           
-          {/* Show diagnostic information for setup issues */}
-          {status === 'error' && diagnosticInfo && (
+          {/* Show which Amazon account was used */}
+          {status === 'error' && amazonEmail && (
+            <Alert className="border-primary/20 bg-primary/5">
+              <HelpCircle className="h-4 w-4 text-primary" />
+              <AlertDescription>
+                <strong>You logged in as:</strong> {amazonEmail}
+                <br />
+                <span className="text-sm text-muted-foreground">
+                  Is this the email associated with your Amazon Advertising account?
+                </span>
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          {/* Enhanced troubleshooting for "0 profiles found" */}
+          {isNoProfilesFound && (
+            <div className="space-y-4">
+              <Alert className="border-warning/50 bg-warning/10">
+                <Wifi className="h-4 w-4 text-warning" />
+                <AlertDescription>
+                  <strong className="text-warning">Connection Successful, But No Profiles Found</strong>
+                  <p className="text-sm mt-1">
+                    We connected to Amazon ({diagnosticInfo.successfulEndpoints} of 3 regions), but found 0 advertising profiles.
+                  </p>
+                </AlertDescription>
+              </Alert>
+
+              {/* Troubleshooting Checklist */}
+              <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+                <h4 className="font-medium text-sm">Troubleshooting Checklist</h4>
+                
+                <div className="space-y-2 text-sm">
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <Checkbox className="mt-0.5" disabled />
+                    <span>
+                      <strong>Wrong Amazon Account?</strong>
+                      <br />
+                      <span className="text-muted-foreground">You may have logged into a personal Amazon account instead of your Advertising account.</span>
+                    </span>
+                  </label>
+                  
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <Checkbox className="mt-0.5" disabled />
+                    <span>
+                      <strong>API Access Not Enabled?</strong>
+                      <br />
+                      <span className="text-muted-foreground">API access must be enabled in your Amazon Advertising settings.</span>
+                    </span>
+                  </label>
+                  
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <Checkbox className="mt-0.5" disabled />
+                    <span>
+                      <strong>No Active Campaigns?</strong>
+                      <br />
+                      <span className="text-muted-foreground">You need at least one campaign in Amazon Advertising to connect.</span>
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Action Buttons for No Profiles Found */}
+              <div className="flex flex-col gap-2">
+                <Button 
+                  onClick={() => window.open('https://advertising.amazon.com/', '_blank')}
+                  className="w-full"
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Check Amazon Advertising Settings
+                </Button>
+                
+                <Button 
+                  onClick={handleSignOutAndRetry}
+                  variant="outline"
+                  className="w-full"
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Sign Out of Amazon & Try Again
+                </Button>
+                
+                <Button 
+                  onClick={() => navigate('/dashboard')} 
+                  variant="ghost"
+                  className="w-full"
+                >
+                  Return to Dashboard
+                </Button>
+              </div>
+
+              <p className="text-xs text-muted-foreground text-center">
+                Need help? Contact us at support@ppcpal.online
+              </p>
+            </div>
+          )}
+          
+          {/* Show diagnostic information for other setup issues */}
+          {status === 'error' && diagnosticInfo && !isNoProfilesFound && (
             <Alert className="text-left">
               <Wifi className="h-4 w-4" />
               <AlertDescription>
@@ -170,66 +290,40 @@ const AmazonCallback = () => {
                   </>
                 )}
                 <br />
-                
-                {/* Show different guidance based on issue type */}
-                {diagnosticInfo.issueType === 'partial_connectivity' && diagnosticInfo.successfulEndpoints > 0 ? (
-                  <div className="mt-2 p-3 bg-amber-50 rounded-md">
-                    <strong className="text-amber-800">Amazon Account Setup Required</strong>
-                    <br />
-                    <span className="text-amber-700">
-                      Your Amazon login worked, but no advertising profiles were found. This usually means:
-                    </span>
-                    <ul className="list-disc ml-4 mt-1 text-sm text-amber-700">
-                      <li>You don't have an Amazon Advertising account yet</li>
-                      <li>Your advertising account needs activation</li>
-                      <li>You didn't grant advertising permissions during sign-in</li>
-                    </ul>
-                    <div className="mt-2">
-                      <a 
-                        href="https://advertising.amazon.com/get-started" 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-amber-800 underline hover:text-amber-900"
-                      >
-                        Set up Amazon Advertising account →
-                      </a>
-                    </div>
-                  </div>
-                ) : (
+                <strong>Recommendation:</strong> {diagnosticInfo.recommendation || 'Check your Amazon Advertising account setup and try again.'}
+                {diagnosticInfo.userAction && (
                   <>
-                    <strong>Recommendation:</strong> {diagnosticInfo.recommendation || 'Check your Amazon Advertising account setup and try again.'}
-                    {diagnosticInfo.userAction && (
-                      <>
-                        <br />
-                        <strong>Next Steps:</strong> {diagnosticInfo.userAction}
-                      </>
-                    )}
+                    <br />
+                    <strong>Next Steps:</strong> {diagnosticInfo.userAction}
                   </>
                 )}
               </AlertDescription>
             </Alert>
           )}
           
-          <div className="flex gap-2">
-            {status === 'error' && diagnosticInfo?.issueType === 'partial_connectivity' && diagnosticInfo.successfulEndpoints > 0 && (
+          {/* Default buttons for non-profile issues */}
+          {status === 'error' && !isNoProfilesFound && (
+            <div className="flex gap-2">
               <Button 
-                onClick={() => window.open('https://advertising.amazon.com/get-started', '_blank')} 
+                onClick={() => navigate('/settings?tab=connections')} 
+                variant="outline"
                 className="flex-1"
               >
-                Set Up Advertising Account
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Try Again
               </Button>
-            )}
-            <Button 
-              onClick={() => navigate('/dashboard')} 
-              variant="outline"
-              className={diagnosticInfo?.issueType === 'partial_connectivity' && diagnosticInfo.successfulEndpoints > 0 ? 'flex-1' : 'w-full'}
-            >
-              Return to Dashboard
-            </Button>
-          </div>
+              <Button 
+                onClick={() => navigate('/dashboard')} 
+                variant="ghost"
+                className="flex-1"
+              >
+                Return to Dashboard
+              </Button>
+            </div>
+          )}
           
           {status === 'success' && (
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-foreground text-center">
               Redirecting to dashboard...
             </p>
           )}

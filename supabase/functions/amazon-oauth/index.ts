@@ -258,6 +258,31 @@ serve(async (req) => {
         timestamp
       });
 
+      // Fetch Amazon user profile to get email for error diagnostics
+      let amazonEmail: string | null = null;
+      try {
+        const userProfileResponse = await fetch('https://api.amazon.com/user/profile', {
+          headers: {
+            'Authorization': `Bearer ${tokenData.access_token}`,
+            'Accept': 'application/json'
+          }
+        });
+        
+        if (userProfileResponse.ok) {
+          const userProfile = await userProfileResponse.json();
+          amazonEmail = userProfile.email || null;
+          console.log(`[${timestamp}] Amazon user profile:`, {
+            email: amazonEmail,
+            name: userProfile.name,
+            userId: userProfile.user_id
+          });
+        } else {
+          console.log(`[${timestamp}] Could not fetch Amazon user profile:`, userProfileResponse.status);
+        }
+      } catch (profileError) {
+        console.log(`[${timestamp}] Error fetching Amazon user profile:`, (profileError as Error).message);
+      }
+
       // Get profile information - try multiple regional endpoints with enhanced error handling and DNS fallbacks
       console.log(`[${timestamp}] Fetching Amazon profiles...`);
       
@@ -493,6 +518,7 @@ serve(async (req) => {
             profileCount: 0,
             requiresSetup: true,
             isTemporary: hasAnyDnsErrors || noSuccessfulConnections,
+            amazonEmail, // Include the Amazon account email for verification
             diagnostics
           }),
           { 
