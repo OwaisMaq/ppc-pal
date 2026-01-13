@@ -22,25 +22,43 @@ const AmazonCallback = () => {
       if (processed) return;
       processed = true;
       
-      // Give auth context time to restore session after redirect
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const timestamp = new Date().toISOString();
+      console.log(`[${timestamp}] AmazonCallback: Starting callback processing`);
       
+      // Log URL parameters immediately
       const urlParams = new URLSearchParams(window.location.search);
       const code = urlParams.get('code');
       const state = urlParams.get('state');
       const error = urlParams.get('error');
+      const errorDescription = urlParams.get('error_description');
+      
+      console.log(`[${timestamp}] AmazonCallback: URL params:`, { 
+        hasCode: !!code, 
+        codeLength: code?.length,
+        hasState: !!state, 
+        statePrefix: state?.substring(0, 20),
+        error, 
+        errorDescription,
+        fullUrl: window.location.href.substring(0, 100)
+      });
 
       if (error) {
+        console.error(`[${timestamp}] AmazonCallback: Amazon returned error:`, { error, errorDescription });
         setStatus('error');
-        setMessage(`Amazon authorization failed: ${error}`);
+        setMessage(`Amazon authorization failed: ${error}${errorDescription ? ` - ${errorDescription}` : ''}`);
         return;
       }
 
       if (!code || !state) {
+        console.error(`[${timestamp}] AmazonCallback: Missing parameters - code: ${!!code}, state: ${!!state}`);
         setStatus('error');
-        setMessage('Missing authorization parameters');
+        setMessage('Missing authorization parameters. This could mean Amazon did not complete the authorization or the redirect was interrupted.');
         return;
       }
+
+      // Give auth context time to restore session after redirect
+      console.log(`[${timestamp}] AmazonCallback: Waiting for session restoration...`);
+      await new Promise(resolve => setTimeout(resolve, 1500));
 
       try {
         const timestamp = new Date().toISOString();
