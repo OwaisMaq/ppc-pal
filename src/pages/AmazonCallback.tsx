@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useAmazonConnections } from '@/hooks/useAmazonConnections';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { CheckCircle, AlertCircle, Loader2, Wifi, ExternalLink, LogOut, RefreshCw, HelpCircle } from 'lucide-react';
+import { CheckCircle, AlertCircle, Loader2, Wifi, ExternalLink, LogOut, RefreshCw, HelpCircle, Copy, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { toast } from 'sonner';
 
 const AmazonCallback = () => {
   const navigate = useNavigate();
@@ -14,6 +15,9 @@ const AmazonCallback = () => {
   const [message, setMessage] = useState('Processing Amazon connection...');
   const [diagnosticInfo, setDiagnosticInfo] = useState<any>(null);
   const [amazonEmail, setAmazonEmail] = useState<string | null>(null);
+  const [attemptId, setAttemptId] = useState<string>('');
+  const [urlParams, setUrlParams] = useState<Record<string, string>>({});
+  const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
 
   useEffect(() => {
     let processed = false;
@@ -25,14 +29,35 @@ const AmazonCallback = () => {
       const timestamp = new Date().toISOString();
       console.log(`[${timestamp}] AmazonCallback: Starting callback processing`);
       
+      // Generate attempt ID for tracking
+      const generatedAttemptId = `attempt_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      setAttemptId(generatedAttemptId);
+      
       // Log URL parameters immediately
-      const urlParams = new URLSearchParams(window.location.search);
-      const code = urlParams.get('code');
-      const state = urlParams.get('state');
-      const error = urlParams.get('error');
-      const errorDescription = urlParams.get('error_description');
+      const searchParams = new URLSearchParams(window.location.search);
+      const code = searchParams.get('code');
+      const state = searchParams.get('state');
+      const error = searchParams.get('error');
+      const errorDescription = searchParams.get('error_description');
+      
+      // Store URL params for diagnostic display
+      const capturedParams: Record<string, string> = {};
+      searchParams.forEach((value, key) => {
+        // Truncate sensitive values for display
+        if (key === 'code') {
+          capturedParams[key] = value.substring(0, 10) + '...';
+        } else {
+          capturedParams[key] = value.substring(0, 50);
+        }
+      });
+      capturedParams['attemptId'] = generatedAttemptId;
+      capturedParams['timestamp'] = timestamp;
+      capturedParams['currentDomain'] = window.location.hostname;
+      capturedParams['fullPath'] = window.location.pathname;
+      setUrlParams(capturedParams);
       
       console.log(`[${timestamp}] AmazonCallback: URL params:`, { 
+        attemptId: generatedAttemptId,
         hasCode: !!code, 
         codeLength: code?.length,
         hasState: !!state, 
@@ -124,14 +149,13 @@ const AmazonCallback = () => {
         const timestamp = new Date().toISOString();
         console.error(`[${timestamp}] Callback processing error:`, error);
         console.error(`[${timestamp}] Full error details:`, JSON.stringify({
-          message: error.message,
-          stack: error.stack,
-          name: error.name,
-          cause: error.cause,
+          message: (error as Error).message,
+          stack: (error as Error).stack,
+          name: (error as Error).name,
           timestamp
         }, null, 2));
         setStatus('error');
-        setMessage(`Connection error: ${error.message || 'Unknown error'}`);
+        setMessage(`Connection error: ${(error as Error).message || 'Unknown error'}`);
       }
     };
 
@@ -149,6 +173,34 @@ const AmazonCallback = () => {
       }
       navigate('/settings?tab=connections');
     }, 2000);
+  };
+
+  const copyTechnicalDetails = () => {
+    const details = {
+      attemptId,
+      timestamp: new Date().toISOString(),
+      status,
+      message,
+      amazonEmail,
+      urlParams,
+      diagnosticInfo: diagnosticInfo ? {
+        issueType: diagnosticInfo.issueType,
+        successfulEndpoints: diagnosticInfo.successfulEndpoints,
+        dnsFailureCount: diagnosticInfo.dnsFailureCount,
+        endpointResults: diagnosticInfo.endpointResults?.map((r: any) => ({
+          region: r.region,
+          status: r.status,
+          httpStatus: r.httpStatus,
+          profileCount: r.profileCount,
+          error: r.error?.substring(0, 100)
+        }))
+      } : null,
+      userAgent: navigator.userAgent,
+      currentUrl: window.location.href
+    };
+    
+    navigator.clipboard.writeText(JSON.stringify(details, null, 2));
+    toast.success('Technical details copied to clipboard');
   };
 
   const getIcon = () => {
@@ -283,8 +335,50 @@ const AmazonCallback = () => {
                 </Button>
               </div>
 
+              {/* Per-Region Breakdown */}
+              {diagnosticInfo?.endpointResults && (
+                <div className="bg-muted/30 rounded-lg p-3 space-y-2">
+                  <button 
+                    onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
+                    className="flex items-center justify-between w-full text-sm font-medium text-muted-foreground hover:text-foreground"
+                  >
+                    <span>Region Details</span>
+                    {showTechnicalDetails ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </button>
+                  
+                  {showTechnicalDetails && (
+                    <div className="space-y-1 text-xs">
+                      {diagnosticInfo.endpointResults.map((r: any, i: number) => (
+                        <div key={i} className="flex justify-between items-center py-1 border-b border-muted last:border-0">
+                          <span className="font-medium">{r.region}</span>
+                          <span className={r.status === 'success' ? 'text-success' : 'text-destructive'}>
+                            {r.status === 'success' 
+                              ? `✓ ${r.profileCount || 0} profiles` 
+                              : `✗ ${r.httpStatus || 'Failed'}${r.isDnsError ? ' (DNS)' : ''}`
+                            }
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Copy Technical Details */}
+              <Button 
+                onClick={copyTechnicalDetails}
+                variant="ghost"
+                size="sm"
+                className="w-full text-xs text-muted-foreground"
+              >
+                <Copy className="h-3 w-3 mr-1" />
+                Copy Technical Details for Support
+              </Button>
+
               <p className="text-xs text-muted-foreground text-center">
                 Need help? Contact us at support@ppcpal.online
+                <br />
+                <span className="font-mono text-[10px]">Attempt: {attemptId}</span>
               </p>
             </div>
           )}
@@ -321,22 +415,41 @@ const AmazonCallback = () => {
           
           {/* Default buttons for non-profile issues */}
           {status === 'error' && !isNoProfilesFound && (
-            <div className="flex gap-2">
+            <div className="space-y-3">
+              <div className="flex gap-2">
+                <Button 
+                  onClick={() => navigate('/settings?tab=connections')} 
+                  variant="outline"
+                  className="flex-1"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Try Again
+                </Button>
+                <Button 
+                  onClick={() => navigate('/dashboard')} 
+                  variant="ghost"
+                  className="flex-1"
+                >
+                  Return to Dashboard
+                </Button>
+              </div>
+              
+              {/* Copy Technical Details for error cases */}
               <Button 
-                onClick={() => navigate('/settings?tab=connections')} 
-                variant="outline"
-                className="flex-1"
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Try Again
-              </Button>
-              <Button 
-                onClick={() => navigate('/dashboard')} 
+                onClick={copyTechnicalDetails}
                 variant="ghost"
-                className="flex-1"
+                size="sm"
+                className="w-full text-xs text-muted-foreground"
               >
-                Return to Dashboard
+                <Copy className="h-3 w-3 mr-1" />
+                Copy Technical Details for Support
               </Button>
+              
+              {attemptId && (
+                <p className="text-xs text-muted-foreground text-center font-mono">
+                  Attempt: {attemptId}
+                </p>
+              )}
             </div>
           )}
           

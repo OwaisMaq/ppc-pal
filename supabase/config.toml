@@ -180,3 +180,6 @@ verify_jwt = false
 
 [functions.daily-archive-scheduler]
 verify_jwt = false
+
+[functions.profiles-debug]
+verify_jwt = true
