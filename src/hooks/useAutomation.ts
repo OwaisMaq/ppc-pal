@@ -211,6 +211,68 @@ export function useAutomationRules(profileId?: string) {
     }
   }, [user, profileId]);
 
+  const createRule = async (data: {
+    profile_id: string;
+    name: string;
+    rule_type: string;
+    mode?: string;
+    severity?: string;
+    params?: any;
+    action?: any;
+    throttle?: any;
+  }) => {
+    if (!user) return;
+    try {
+      const { data: authData } = await supabase.auth.getSession();
+      const token = authData.session?.access_token;
+      const response = await fetch(`https://ucbkcxupzjbblnzyiyui.supabase.co/functions/v1/rules-api/rules`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error('Failed to create rule');
+      await fetchRules();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+      throw err;
+    }
+  };
+
+  const updateRule = async (ruleId: string, data: Record<string, any>) => {
+    if (!user) return;
+    try {
+      const { data: authData } = await supabase.auth.getSession();
+      const token = authData.session?.access_token;
+      const response = await fetch(`https://ucbkcxupzjbblnzyiyui.supabase.co/functions/v1/rules-api/rules?ruleId=${ruleId}`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error('Failed to update rule');
+      await fetchRules();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+      throw err;
+    }
+  };
+
+  const deleteRule = async (ruleId: string) => {
+    if (!user) return;
+    try {
+      const { data: authData } = await supabase.auth.getSession();
+      const token = authData.session?.access_token;
+      const response = await fetch(`https://ucbkcxupzjbblnzyiyui.supabase.co/functions/v1/rules-api/rules?ruleId=${ruleId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      });
+      if (!response.ok) throw new Error('Failed to delete rule');
+      await fetchRules();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+      throw err;
+    }
+  };
+
   return {
     rules,
     loading,
@@ -219,6 +281,9 @@ export function useAutomationRules(profileId?: string) {
     changeMode,
     runRule,
     initializeRules,
+    createRule,
+    updateRule,
+    deleteRule,
     refetch: fetchRules
   };
 }

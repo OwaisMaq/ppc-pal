@@ -38,7 +38,6 @@ const Governance: React.FC = () => {
   const { activeConnection, selectedProfileId } = useGlobalFilters();
   const selectedProfile = selectedProfileId || '';
   
-  const [globalAutomationEnabled, setGlobalAutomationEnabled] = useState(true);
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [playbookParams, setPlaybookParams] = useState<Record<string, any>>({});
@@ -77,6 +76,8 @@ const Governance: React.FC = () => {
     removeProtectedEntity,
   } = useGovernance(selectedProfile || null);
 
+  const globalAutomationEnabled = !(governanceSettings?.automation_paused);
+
   // Fetch campaigns for dayparting
   const { data: campaigns = [] } = useQuery({
     queryKey: ['campaigns-for-dayparting', selectedProfile],
@@ -98,11 +99,23 @@ const Governance: React.FC = () => {
 
   const plan = subscription?.plan_type || 'free';
 
-  const handleKillSwitch = () => {
-    setGlobalAutomationEnabled(false);
-    toast.warning("Kill Switch activated - All automation paused", {
-      description: "No automatic changes will be applied until you re-enable automation."
-    });
+  const handleKillSwitch = async () => {
+    try {
+      await toggleAutomation(true, 'Kill switch activated');
+      toast.warning("Kill Switch activated - All automation paused", {
+        description: "No automatic changes will be applied until you re-enable automation."
+      });
+    } catch {
+      toast.error("Failed to activate kill switch");
+    }
+  };
+
+  const handleToggleAutomation = async (enabled: boolean) => {
+    try {
+      await toggleAutomation(!enabled);
+    } catch {
+      toast.error("Failed to toggle automation");
+    }
   };
 
   const handleInitializeRules = async () => {
@@ -262,7 +275,7 @@ const Governance: React.FC = () => {
                   </span>
                   <Switch
                     checked={globalAutomationEnabled}
-                    onCheckedChange={setGlobalAutomationEnabled}
+                    onCheckedChange={handleToggleAutomation}
                   />
                 </div>
               </div>

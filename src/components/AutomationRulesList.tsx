@@ -5,9 +5,10 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Play, Settings, Clock, AlertTriangle, Activity, ChevronDown, ChevronRight } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Play, Settings, Clock, AlertTriangle, ChevronDown, ChevronRight, Pencil, Trash2 } from "lucide-react";
 import { AutomationRule } from "@/hooks/useAutomation";
-import { useSubscription } from "@/hooks/useSubscription";
+import { useEntitlements } from "@/hooks/useEntitlements";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { ReportIssueButton } from "@/components/ui/ReportIssueButton";
@@ -18,6 +19,8 @@ interface AutomationRulesListProps {
   onToggleRule: (ruleId: string, enabled: boolean) => void;
   onChangeMode: (ruleId: string, mode: 'dry_run' | 'suggestion' | 'auto') => void;
   onRunRule: (ruleId: string) => Promise<any>;
+  onEditRule?: (rule: AutomationRule) => void;
+  onDeleteRule?: (ruleId: string) => void;
 }
 
 const RULE_TYPE_LABELS: Record<string, string> = {
@@ -36,38 +39,30 @@ const SEVERITY_STYLES: Record<string, string> = {
   critical: 'bg-destructive/10 text-destructive border-destructive/20'
 };
 
-const MODE_STYLES: Record<string, string> = {
-  dry_run: 'bg-muted text-muted-foreground',
-  suggestion: 'bg-primary/10 text-primary',
-  auto: 'bg-success/10 text-success'
-};
-
-const MODE_LABELS: Record<string, string> = {
-  dry_run: 'Dry Run',
-  suggestion: 'Suggest',
-  auto: 'Auto'
-};
-
 export const AutomationRulesList: React.FC<AutomationRulesListProps> = ({
   rules,
   loading,
   onToggleRule,
   onChangeMode,
-  onRunRule
+  onRunRule,
+  onEditRule,
+  onDeleteRule,
 }) => {
   const [runningRules, setRunningRules] = useState<Set<string>>(new Set());
   const [expandedRule, setExpandedRule] = useState<string | null>(null);
-  const { subscription } = useSubscription();
-  const plan = subscription?.plan_type || 'free';
+  const { plan } = useEntitlements();
 
   const canAutoApply = (ruleType: string) => {
     switch (plan) {
       case 'free':
         return false;
+      case 'starter':
+        return ['budget_depletion', 'spend_spike', 'st_harvest', 'st_prune'].includes(ruleType);
       case 'pro':
+      case 'agency':
         return true;
       default:
-        return ['st_harvest', 'st_prune'].includes(ruleType);
+        return false;
     }
   };
 
@@ -131,8 +126,8 @@ export const AutomationRulesList: React.FC<AutomationRulesListProps> = ({
             <div className="col-span-3">Rule</div>
             <div className="col-span-2">Type</div>
             <div className="col-span-2">Mode</div>
-            <div className="col-span-2">Last Run</div>
-            <div className="col-span-2 text-right">Actions</div>
+            <div className="col-span-1">Last Run</div>
+            <div className="col-span-3 text-right">Actions</div>
           </div>
 
           {/* Rules rows */}
@@ -144,7 +139,6 @@ export const AutomationRulesList: React.FC<AutomationRulesListProps> = ({
               
               return (
                 <div key={rule.id} className="group">
-                  {/* Compact row */}
                   <div 
                     className={cn(
                       "grid grid-cols-12 gap-2 px-4 py-3 items-center text-sm transition-colors",
@@ -153,7 +147,6 @@ export const AutomationRulesList: React.FC<AutomationRulesListProps> = ({
                     )}
                     onClick={() => setExpandedRule(isExpanded ? null : rule.id)}
                   >
-                    {/* Toggle */}
                     <div className="col-span-1" onClick={(e) => e.stopPropagation()}>
                       <Switch
                         checked={rule.enabled}
@@ -162,7 +155,6 @@ export const AutomationRulesList: React.FC<AutomationRulesListProps> = ({
                       />
                     </div>
 
-                    {/* Name */}
                     <div className="col-span-3 flex items-center gap-2">
                       {isExpanded ? (
                         <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
@@ -174,14 +166,12 @@ export const AutomationRulesList: React.FC<AutomationRulesListProps> = ({
                       </span>
                     </div>
 
-                    {/* Type & Severity */}
                     <div className="col-span-2 flex items-center gap-1.5">
                       <Badge variant="outline" className={cn("text-xs px-1.5 py-0", SEVERITY_STYLES[rule.severity])}>
                         {RULE_TYPE_LABELS[rule.rule_type] || rule.rule_type}
                       </Badge>
                     </div>
 
-                    {/* Mode */}
                     <div className="col-span-2" onClick={(e) => e.stopPropagation()}>
                       <Select
                         value={rule.mode}
@@ -200,8 +190,7 @@ export const AutomationRulesList: React.FC<AutomationRulesListProps> = ({
                       </Select>
                     </div>
 
-                    {/* Last Run */}
-                    <div className="col-span-2 text-xs text-muted-foreground">
+                    <div className="col-span-1 text-xs text-muted-foreground">
                       {lastRun ? (
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -212,7 +201,6 @@ export const AutomationRulesList: React.FC<AutomationRulesListProps> = ({
                           </TooltipTrigger>
                           <TooltipContent side="top">
                             <p>{lastRun.alerts_created} alerts, {lastRun.actions_enqueued} actions</p>
-                            {lastRun.error && <p className="text-destructive text-xs">Error occurred</p>}
                           </TooltipContent>
                         </Tooltip>
                       ) : (
@@ -220,8 +208,33 @@ export const AutomationRulesList: React.FC<AutomationRulesListProps> = ({
                       )}
                     </div>
 
-                    {/* Actions */}
-                    <div className="col-span-2 flex justify-end" onClick={(e) => e.stopPropagation()}>
+                    <div className="col-span-3 flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                      {onEditRule && (
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onEditRule(rule)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                      {onDeleteRule && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Rule</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Delete "{rule.name}"? This cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => onDeleteRule(rule.id)}>Delete</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"
@@ -241,11 +254,9 @@ export const AutomationRulesList: React.FC<AutomationRulesListProps> = ({
                     </div>
                   </div>
 
-                  {/* Expanded details */}
                   {isExpanded && (
                     <div className="px-4 pb-3 pt-1 bg-muted/10 border-t border-dashed">
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-                        {/* Parameters */}
                         <div className="col-span-2">
                           <p className="font-medium text-muted-foreground mb-1">Parameters</p>
                           <div className="space-y-0.5">
@@ -258,7 +269,6 @@ export const AutomationRulesList: React.FC<AutomationRulesListProps> = ({
                           </div>
                         </div>
 
-                        {/* Throttle */}
                         {rule.throttle && (
                           <div>
                             <p className="font-medium text-muted-foreground mb-1">Throttle</p>
@@ -269,7 +279,6 @@ export const AutomationRulesList: React.FC<AutomationRulesListProps> = ({
                           </div>
                         )}
 
-                        {/* Last run stats */}
                         {lastRun && (
                           <div>
                             <p className="font-medium text-muted-foreground mb-1">Last Run Stats</p>

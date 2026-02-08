@@ -173,7 +173,7 @@ Deno.serve(async (req) => {
         
         if (req.method === 'POST' && user) {
           const body = await req.json();
-          const { profile_id, rule_type, name, params, action, mode = 'dry_run' } = body;
+          const { profile_id, rule_type, name, params, action, mode = 'dry_run', severity, throttle } = body;
           
           if (!profile_id || !rule_type) {
             return new Response(
@@ -190,9 +190,10 @@ Deno.serve(async (req) => {
               name: name || DEFAULT_RULES[rule_type as keyof typeof DEFAULT_RULES]?.name || 'Custom Rule',
               rule_type,
               mode,
+              severity: severity || DEFAULT_RULES[rule_type as keyof typeof DEFAULT_RULES]?.severity || 'warn',
               params: params || DEFAULT_RULES[rule_type as keyof typeof DEFAULT_RULES]?.params || {},
               action: action || DEFAULT_RULES[rule_type as keyof typeof DEFAULT_RULES]?.action || {},
-              throttle: DEFAULT_RULES[rule_type as keyof typeof DEFAULT_RULES]?.throttle
+              throttle: throttle || DEFAULT_RULES[rule_type as keyof typeof DEFAULT_RULES]?.throttle
             })
             .select()
             .single();
@@ -201,6 +202,64 @@ Deno.serve(async (req) => {
           
           return new Response(
             JSON.stringify({ rule }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        if (req.method === 'PUT' && user) {
+          const ruleId = url.searchParams.get('ruleId');
+          if (!ruleId) {
+            return new Response(
+              JSON.stringify({ error: 'Missing ruleId' }),
+              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+          const body = await req.json();
+          const { name, params, action, mode, severity, throttle } = body;
+          const updates: Record<string, any> = {};
+          if (name !== undefined) updates.name = name;
+          if (params !== undefined) updates.params = params;
+          if (action !== undefined) updates.action = action;
+          if (mode !== undefined) updates.mode = mode;
+          if (severity !== undefined) updates.severity = severity;
+          if (throttle !== undefined) updates.throttle = throttle;
+          updates.updated_at = new Date().toISOString();
+
+          const { data: rule, error } = await supabase
+            .from('automation_rules')
+            .update(updates)
+            .eq('id', ruleId)
+            .eq('user_id', user.id)
+            .select()
+            .single();
+
+          if (error) throw error;
+
+          return new Response(
+            JSON.stringify({ rule }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        if (req.method === 'DELETE' && user) {
+          const ruleId = url.searchParams.get('ruleId');
+          if (!ruleId) {
+            return new Response(
+              JSON.stringify({ error: 'Missing ruleId' }),
+              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+
+          const { error } = await supabase
+            .from('automation_rules')
+            .delete()
+            .eq('id', ruleId)
+            .eq('user_id', user.id);
+
+          if (error) throw error;
+
+          return new Response(
+            JSON.stringify({ success: true }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
