@@ -16,7 +16,7 @@ import { useEntitlements } from "@/hooks/useEntitlements";
 import { toast } from "sonner";
 
 const STARTER_TYPES = ['budget_depletion', 'spend_spike', 'st_harvest', 'st_prune'];
-const ALL_TYPES = [...STARTER_TYPES, 'bid_down', 'bid_up'];
+const ALL_TYPES = [...STARTER_TYPES, 'bid_down', 'bid_up', 'placement_opt'];
 
 const AutomationPage: React.FC = () => {
   const [selectedProfile, setSelectedProfile] = useState<string>("");

@@ -3,9 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { FlaskConical, Play, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { FlaskConical, Play, CheckCircle, Clock, XCircle, ChevronDown } from 'lucide-react';
 import { useExperiments, Experiment } from '@/hooks/useExperiments';
 import { NewExperimentDialog } from './NewExperimentDialog';
+import { ExperimentResultsPanel } from './ExperimentResultsPanel';
 import { formatDistanceToNow } from 'date-fns';
 
 interface ExperimentsTabProps {
@@ -64,45 +66,62 @@ export function ExperimentsTab({ profileId }: ExperimentsTabProps) {
         <div className="space-y-4">
           {experiments.map((exp) => (
             <Card key={exp.id}>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-lg">{exp.name}</CardTitle>
-                    <CardDescription>{exp.entityType}: {exp.entityId}</CardDescription>
-                  </div>
-                  {getStatusBadge(exp.status)}
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div className="flex gap-6">
-                    {exp.incrementalLiftPercent !== null && (
-                      <div>
-                        <p className="text-xs text-muted-foreground">Lift</p>
-                        <p className={`text-xl font-bold ${exp.incrementalLiftPercent > 0 ? 'text-success' : 'text-destructive'}`}>
-                          {exp.incrementalLiftPercent > 0 ? '+' : ''}{exp.incrementalLiftPercent.toFixed(1)}%
-                        </p>
-                      </div>
-                    )}
-                    {exp.statisticalSignificance !== null && (
-                      <div>
-                        <p className="text-xs text-muted-foreground">Confidence</p>
-                        <p className="text-xl font-bold">{(exp.statisticalSignificance * 100).toFixed(0)}%</p>
-                      </div>
-                    )}
+              <Collapsible defaultOpen={exp.status === 'completed'}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs text-muted-foreground">Created</p>
-                      <p className="text-sm">{formatDistanceToNow(new Date(exp.createdAt), { addSuffix: true })}</p>
+                      <CardTitle className="text-lg">{exp.name}</CardTitle>
+                      <CardDescription>{exp.entityType}: {exp.entityId}</CardDescription>
+                    </div>
+                    {getStatusBadge(exp.status)}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between">
+                    <div className="flex gap-6">
+                      {exp.incrementalLiftPercent !== null && (
+                        <div>
+                          <p className="text-xs text-muted-foreground">Lift</p>
+                          <p className={`text-xl font-bold ${exp.incrementalLiftPercent > 0 ? 'text-success' : 'text-destructive'}`}>
+                            {exp.incrementalLiftPercent > 0 ? '+' : ''}{exp.incrementalLiftPercent.toFixed(1)}%
+                          </p>
+                        </div>
+                      )}
+                      {exp.statisticalSignificance !== null && (
+                        <div>
+                          <p className="text-xs text-muted-foreground">Confidence</p>
+                          <p className="text-xl font-bold">{(exp.statisticalSignificance * 100).toFixed(0)}%</p>
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-xs text-muted-foreground">Created</p>
+                        <p className="text-sm">{formatDistanceToNow(new Date(exp.createdAt), { addSuffix: true })}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {exp.status === 'pending' && (
+                        <Button size="sm" onClick={() => runAnalysis(exp.id)} disabled={isAnalyzing}>
+                          <Play className="h-4 w-4 mr-1" />
+                          Run Analysis
+                        </Button>
+                      )}
+                      {exp.status === 'completed' && (
+                        <CollapsibleTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <ChevronDown className="h-4 w-4" />
+                          </Button>
+                        </CollapsibleTrigger>
+                      )}
                     </div>
                   </div>
-                  {exp.status === 'pending' && (
-                    <Button size="sm" onClick={() => runAnalysis(exp.id)} disabled={isAnalyzing}>
-                      <Play className="h-4 w-4 mr-1" />
-                      Run Analysis
-                    </Button>
+
+                  {exp.status === 'completed' && (
+                    <CollapsibleContent>
+                      <ExperimentResultsPanel experiment={exp} />
+                    </CollapsibleContent>
                   )}
-                </div>
-              </CardContent>
+                </CardContent>
+              </Collapsible>
             </Card>
           ))}
         </div>

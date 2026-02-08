@@ -36,7 +36,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const STARTER_TYPES = ['budget_depletion', 'spend_spike', 'st_harvest', 'st_prune'];
-const ALL_TYPES = [...STARTER_TYPES, 'bid_down', 'bid_up'];
+const ALL_TYPES = [...STARTER_TYPES, 'bid_down', 'bid_up', 'placement_opt'];
 
 const Governance: React.FC = () => {
   const { activeConnection, selectedProfileId } = useGlobalFilters();
