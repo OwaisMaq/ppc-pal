@@ -597,24 +597,61 @@ class RuleEvaluator {
   }
 }
 
-// Check user entitlements
+// Check user entitlements using plan_entitlements table
 async function checkEntitlements(supabase: any, userId: string, ruleType: string): Promise<boolean> {
-  const { data: subscription } = await supabase
+  // Try billing_subscriptions first, then legacy subscriptions table
+  let plan = 'free';
+
+  const { data: billing } = await supabase
     .from('billing_subscriptions')
-    .select('plan')
+    .select('plan, status')
     .eq('user_id', userId)
-    .single();
-  
-  const plan = subscription?.plan || 'free';
-  
+    .maybeSingle();
+
+  if (billing && (billing.status === 'active' || billing.status === 'trialing')) {
+    plan = billing.plan || 'free';
+  } else {
+    const { data: legacySub } = await supabase
+      .from('subscriptions')
+      .select('plan_type, status')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (legacySub?.status === 'active') {
+      plan = legacySub.plan_type || 'free';
+    }
+  }
+
+  // Query plan_entitlements for dynamic feature checks
+  const { data: entitlements } = await supabase
+    .from('plan_entitlements')
+    .select('features, limits')
+    .eq('plan', plan)
+    .maybeSingle();
+
+  if (entitlements) {
+    const features = entitlements.features as Record<string, any> || {};
+    const limits = entitlements.limits as Record<string, any> || {};
+
+    // Check if rules are allowed at all
+    if (limits.rules === 0) return false;
+
+    // Check if the specific rule type is allowed via features
+    const allowedTypes = features.rule_types as string[] | undefined;
+    if (allowedTypes && !allowedTypes.includes(ruleType)) return false;
+
+    return true;
+  }
+
+  // Fallback to hardcoded logic if no plan_entitlements row
   switch (plan) {
     case 'free':
-      return false; // 0 rules allowed
+      return false;
     case 'starter':
       return ['budget_depletion', 'spend_spike', 'st_harvest', 'st_prune'].includes(ruleType);
     case 'pro':
     case 'agency':
-      return true; // all rule types
+      return true;
     default:
       return false;
   }

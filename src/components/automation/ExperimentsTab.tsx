@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FlaskConical, Play, CheckCircle, Clock, XCircle } from 'lucide-react';
 import { useExperiments, Experiment } from '@/hooks/useExperiments';
+import { NewExperimentDialog } from './NewExperimentDialog';
 import { formatDistanceToNow } from 'date-fns';
 
 interface ExperimentsTabProps {
@@ -12,7 +13,8 @@ interface ExperimentsTabProps {
 }
 
 export function ExperimentsTab({ profileId }: ExperimentsTabProps) {
-  const { experiments, isLoading, runAnalysis, isAnalyzing } = useExperiments(profileId);
+  const { experiments, isLoading, runAnalysis, isAnalyzing, createExperiment, isCreating } = useExperiments(profileId);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -44,7 +46,7 @@ export function ExperimentsTab({ profileId }: ExperimentsTabProps) {
           <h2 className="text-xl font-semibold">Incrementality Experiments</h2>
           <p className="text-muted-foreground text-sm">Measure true incremental lift with synthetic control tests</p>
         </div>
-        <Button disabled>
+        <Button onClick={() => setDialogOpen(true)}>
           <FlaskConical className="h-4 w-4 mr-2" />
           New Experiment
         </Button>
@@ -105,6 +107,13 @@ export function ExperimentsTab({ profileId }: ExperimentsTabProps) {
           ))}
         </div>
       )}
+
+      <NewExperimentDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        onSubmit={createExperiment}
+        isCreating={isCreating}
+      />
     </div>
   );
 }
