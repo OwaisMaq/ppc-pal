@@ -1,55 +1,73 @@
 
 
-## Complete Automation Engine - Final 10%
+## Operational Cost Reduction
 
-Three remaining gaps to reach 100% completion.
-
----
-
-### 1. Add `placement_opt` Rule Type (Evaluator + UI)
-
-The placement optimizer already exists as a playbook (`supabase/functions/playbooks/index.ts`) with full logic for adjusting Top-of-Search and Product Page bid multipliers. The rule engine and CreateRuleDialog need to support it as an automation rule type.
-
-**Rules Engine (`supabase/functions/rules-engine-runner/index.ts`):**
-- Add `evaluatePlacementOpt` method to `RuleEvaluator` class
-- Params: `targetAcos`, `lookbackDays`, `minImpressions`, `minSpend`, `maxAdjustment`
-- Query `campaign_placement_performance` table, aggregate by campaign + placement
-- Calculate optimal bid adjustments when placement ACoS deviates from target
-- Generate `set_placement_adjust` actions in auto mode
-- Add `case 'placement_opt':` to the switch statement (line 801)
-
-**CreateRuleDialog (`src/components/automation/CreateRuleDialog.tsx`):**
-- Add `{ value: 'placement_opt', label: 'Placement Optimizer' }` to `RULE_TYPES`
-- Add default params: `{ targetAcos: 30, lookbackDays: 14, minImpressions: 100, minSpend: 5, maxAdjustment: 300 }`
-- Add default action: `{ type: 'set_placement_adjust' }`
-- Add param labels for the new fields
-
-**AutomationPage.tsx and Governance.tsx:**
-- Add `'placement_opt'` to `ALL_TYPES` array so Pro/Agency users can create this rule type
+Targeted changes to reduce edge function invocations, AI gateway calls, and redundant database queries.
 
 ---
 
-### 2. Deploy Daypart Executor Cron Job
+### 1. Fix Token Refresh Frequency (biggest single saving)
 
-The `daypart-executor` edge function is fully implemented but has no cron trigger. It needs to run every hour to check schedules and pause/enable campaigns.
+The `amazon-token-refresh` cron job runs every **30 seconds** (2,880/day). Amazon tokens last 1 hour and `refresh-all-tokens` already filters to tokens expiring within 45 minutes. Change to every **20 minutes** (72/day) -- a 97.5% reduction.
 
-- Deploy the edge function
-- Set up a `pg_cron` job to invoke `daypart-executor` every hour via `net.http_post`
-- Uses the existing `daypart_schedules` and `daypart_execution_history` tables
+**Action:** Run SQL to unschedule and reschedule the cron job at `*/20 * * * *`.
 
 ---
 
-### 3. Experiment Results Visualization
+### 2. Increase Login Sync Cooldown
 
-The ExperimentsTab shows basic lift and confidence numbers inline but completed experiments need a richer results view with before/after metric comparison.
+`useLoginSync.ts` currently triggers entity + performance sync if last sync was >30 minutes ago. Increase to **4 hours** since background cron jobs already handle syncing every 2 hours.
 
-**Update `src/components/automation/ExperimentsTab.tsx`:**
-- For completed experiments, add an expandable detail section showing:
-  - Treatment vs Baseline metrics side-by-side (spend, sales, ACoS, conversions)
-  - Lift percentage with color coding (green positive, red negative)
-  - Confidence level with a visual indicator (progress bar or meter)
-  - Statistical significance badge (significant at 95% or not)
-  - Duration of treatment period
+**File:** `src/hooks/useLoginSync.ts`
+- Change `thirtyMinutes = 30 * 60 * 1000` to `fourHours = 4 * 60 * 60 * 1000`
+
+---
+
+### 3. Move Entitlement Checks Client-Side
+
+The `check-entitlement` edge function does two simple DB queries (`billing_subscriptions` + `plan_entitlements`). The frontend `useEntitlements` hook already does the same thing directly. Remove the edge function invocation overhead by having entitlement checks happen exclusively through the existing `useEntitlements` hook (which queries Supabase directly).
+
+**File:** `src/hooks/useEntitlements.ts`
+- Add a `checkEntitlementServer` method that calls the edge function only when needed from backend contexts (rules engine already does its own check)
+- No frontend code currently calls `check-entitlement` edge function directly, so this is already optimized -- confirm and document
+
+---
+
+### 4. Cache AI Insights with Data Hash
+
+Avoid regenerating identical LLM insights when campaign data hasn't changed significantly.
+
+**File:** `supabase/functions/ai-insights/index.ts`
+- Before calling the LLM, compute a simple hash of the key metrics (total spend, sales, ACoS, top 5 campaign spends)
+- Check `ai_insights` table for a recent entry (last 12 hours) with matching `data_hash`
+- If match found, return cached insights instead of making an LLM call
+- Store `data_hash` alongside new insights
+
+**File:** `supabase/functions/ai-insights-scheduler/index.ts`
+- Reduce frequency recommendation from every 6 hours to every 12 hours (via cron update SQL)
+
+---
+
+### 5. Consolidate Hourly Cron Jobs
+
+Three functions run at the top of every hour: `ams-hourly-aggregation`, `daypart-executor`, and `rules-engine-runner` (at :30). Create a single orchestrator that runs all three sequentially, reducing cold-start overhead.
+
+**New file:** `supabase/functions/hourly-orchestrator/index.ts`
+- Sequentially invoke `ams-aggregate`, `daypart-executor`, and `rules-engine-runner`
+- Early-exit each step if no active users/connections exist
+- Single cron job replaces 3 separate jobs
+
+**Action:** SQL migration to unschedule the 3 individual hourly jobs and schedule the orchestrator once per hour.
+
+---
+
+### 6. Guard Subscription Check
+
+`useSubscription.ts` calls `check-subscription` edge function (which hits Stripe API) on every mount. Add caching: skip the Stripe call if `subscriptions` table was updated within the last hour.
+
+**File:** `src/hooks/useSubscription.ts`
+- Before calling `check-subscription`, check if `subscriptions.updated_at` is within the last hour
+- If recent, use the cached DB value and skip the edge function call
 
 ---
 
@@ -57,12 +75,20 @@ The ExperimentsTab shows basic lift and confidence numbers inline but completed 
 
 | File | Action |
 |---|---|
-| `supabase/functions/rules-engine-runner/index.ts` | Update - add `evaluatePlacementOpt` method and wire to switch |
-| `src/components/automation/CreateRuleDialog.tsx` | Update - add `placement_opt` type, params, labels |
-| `src/pages/AutomationPage.tsx` | Update - add `placement_opt` to `ALL_TYPES` |
-| `src/pages/Governance.tsx` | Update - add `placement_opt` to `ALL_TYPES` |
-| `src/components/automation/ExperimentsTab.tsx` | Update - add expandable results view for completed experiments |
-| `supabase/functions/daypart-executor/index.ts` | Deploy edge function |
+| `src/hooks/useLoginSync.ts` | Update - increase cooldown from 30 min to 4 hours |
+| `src/hooks/useSubscription.ts` | Update - cache Stripe check, skip if updated < 1 hour ago |
+| `supabase/functions/ai-insights/index.ts` | Update - add data hash caching to skip redundant LLM calls |
+| `supabase/functions/hourly-orchestrator/index.ts` | Create - consolidate 3 hourly cron jobs into one |
+| `supabase/config.toml` | Update - add hourly-orchestrator function config |
+| SQL (run directly) | Reschedule token refresh to every 20 min; replace 3 hourly crons with 1 orchestrator; reduce AI insights scheduler to every 12 hours |
 
-Additionally, a SQL statement will be run to create the hourly cron job for the daypart executor.
+### Estimated Savings
+
+| Area | Before (daily) | After (daily) | Reduction |
+|---|---|---|---|
+| Token refresh invocations | ~2,880 | 72 | 97.5% |
+| Hourly cron cold starts | 72 (3 x 24) | 24 | 67% |
+| AI insights LLM calls | ~4 per user | ~1-2 per user | 50-75% |
+| Stripe API calls | Every page load | 1 per hour max | ~90% |
+| Login sync invocations | Every 30 min | Every 4 hours | 87.5% |
 
