@@ -1,76 +1,82 @@
 
 
-## Complete the Automation Engine
+## Complete Automation Engine - Remaining Gaps
 
-The automation engine has strong backend infrastructure (rules engine, actions worker, governance, bid optimizer) but several UI and functional gaps prevent it from being fully usable. Here is what needs to be built:
+After reviewing the current codebase, there are several functional gaps that need to be addressed to bring the automation engine to full completion.
 
 ---
 
-### Gap Analysis
+### Gap Summary
 
-| Component | Status | Gap |
+| Issue | Location | Impact |
 |---|---|---|
-| Rules Engine (backend) | 90% | Missing `bid_down`, `bid_up`, `placement_opt` evaluators |
-| Actions Worker (backend) | 95% | Solid - handles 15+ action types |
-| Governance/Guardrails | 85% | Kill switch uses local state, not persisted |
-| Custom Rule Creation | 0% | "Add Rule" button does nothing |
-| Audit Log Tab | 0% | Placeholder "coming soon" |
-| Tier-based entitlements | 40% | Hardcoded old plan logic in multiple places |
-| Rule editing/deletion | 0% | No way to edit params or delete rules |
+| Governance "Add Rule" button is inert | `Governance.tsx` line 337 | Users can't create rules from Governance page |
+| Governance rules list missing edit/delete | `Governance.tsx` line 352 | No rule management from Governance |
+| Governance uses old 3-tier plan logic | `Governance.tsx` line 144 | Shows wrong plan names (no Starter/Agency) |
+| `checkEntitlements` uses hardcoded logic | `rules-engine-runner` line 601 | Doesn't query `plan_entitlements` table |
+| AutomationPage missing Experiments tab | `AutomationPage.tsx` | ExperimentsTab exists but isn't wired in |
+| AuditLogTab missing date range filter | `AuditLogTab.tsx` | Can't filter by date as planned |
+| "New Experiment" button disabled | `ExperimentsTab.tsx` line 47 | No way to create experiments |
 
 ---
 
 ### Implementation Plan
 
-#### 1. Custom Rule Creation Dialog
-Create a `CreateRuleDialog` component that lets users create automation rules from the UI:
-- Rule name, type selector (budget_depletion, spend_spike, st_harvest, st_prune, bid_down, bid_up)
-- Dynamic parameter form based on selected type (thresholds, lookback windows, etc.)
-- Mode selector (dry_run, suggestion, auto)
-- Severity selector
-- Throttle settings (cooldown hours, max actions/day)
-- Calls the `rules-api/rules` POST endpoint
+#### 1. Fix Governance Page Rule Management
+Wire the "Add Rule" button to `CreateRuleDialog` and pass `onEditRule`/`onDeleteRule` to `AutomationRulesList`. Update `getPlanFeatures` to use all four tiers.
 
-**Files:** Create `src/components/automation/CreateRuleDialog.tsx`
+**File:** `src/pages/Governance.tsx`
 
-#### 2. Rule Editing and Deletion
-- Add edit button to `AutomationRulesList` that opens CreateRuleDialog in edit mode
-- Add delete button with confirmation
-- Add PUT and DELETE handlers to `useAutomation` hook
-- Update `rules-api` edge function to support PUT/DELETE on rules
+#### 2. Use `plan_entitlements` Table in Rules Engine
+Replace the hardcoded `checkEntitlements` function in the rules engine runner to query the `plan_entitlements` table and check both `billing_subscriptions` and `subscriptions` tables for the user's plan.
 
-**Files:** Update `src/components/AutomationRulesList.tsx`, `src/hooks/useAutomation.ts`, `supabase/functions/rules-api/index.ts`
+**File:** `supabase/functions/rules-engine-runner/index.ts`
 
-#### 3. Audit Log Tab
-Replace the "coming soon" placeholder with a real audit log showing:
-- All rule runs from `automation_rule_runs` table with timestamps, status, alerts/actions counts
-- All executed actions from `action_queue` with status, entity details, before/after metrics
-- Filter by date range and action type
-- Expandable rows showing full action details
+#### 3. Add Experiments Tab to AutomationPage
+Add a 4th tab "Experiments" to AutomationPage that renders the existing `ExperimentsTab` component.
 
-**Files:** Create `src/components/automation/AuditLogTab.tsx`, update `src/pages/AutomationPage.tsx`
+**File:** `src/pages/AutomationPage.tsx`
 
-#### 4. Add Missing Rule Evaluators (bid_down, bid_up)
-Add `evaluateBidDown` and `evaluateBidUp` methods to the `RuleEvaluator` class in `rules-engine-runner`:
-- `bid_down`: Lower bids on high-ACOS keywords/targets (params: maxAcos, minClicks, lookbackDays, decreasePercent)
-- `bid_up`: Raise bids on high-converting low-impression keywords (params: minConversions, maxAcos, minImpressions, increasePercent)
-- Wire into the switch statement in the main handler
+#### 4. Add Date Range Filter to Audit Log
+Add a date range selector (last 7d / 30d / 90d) to the AuditLogTab so users can filter historical data.
 
-**Files:** Update `supabase/functions/rules-engine-runner/index.ts`
+**File:** `src/components/automation/AuditLogTab.tsx`
 
-#### 5. Fix Kill Switch Persistence
-The Governance page kill switch currently only sets local React state. Wire it to the `governance_settings.automation_paused` field via the existing `useGovernance` hook's `toggleAutomation` function.
+#### 5. Enable "New Experiment" Button
+Wire the disabled "New Experiment" button in ExperimentsTab to a creation dialog for setting up incrementality tests.
 
-**Files:** Update `src/pages/Governance.tsx`
+**File:** `src/components/automation/ExperimentsTab.tsx`
 
-#### 6. Update Tier Entitlements in Automation
-Replace hardcoded plan checks in `AutomationRulesList` (`canAutoApply`), `AutomationPage` (`getPlanFeatures`), and `rules-engine-runner` (`checkEntitlements`) with the new four-tier system:
-- Free: 0 rules allowed
-- Starter: 5 rules, budget_depletion + spend_spike + st_harvest + st_prune
-- Pro: unlimited rules, all types including bid_down/bid_up
-- Agency: unlimited, all types
+---
 
-**Files:** Update `src/components/AutomationRulesList.tsx`, `src/pages/AutomationPage.tsx`, `supabase/functions/rules-engine-runner/index.ts`
+### Technical Details
+
+**Governance.tsx changes:**
+- Import `CreateRuleDialog` and `useEntitlements`
+- Add state for `createDialogOpen` and `editingRule`
+- Wire "Add Rule" button to open dialog
+- Pass `onEditRule`, `onDeleteRule` to `AutomationRulesList`
+- Add `createRule`, `updateRule`, `deleteRule` from `useAutomationRules`
+- Update `getPlanFeatures` to handle `starter` and `agency`
+
+**rules-engine-runner checkEntitlements:**
+- Query `plan_entitlements` table for the user's plan
+- Check both `billing_subscriptions` and `subscriptions` tables as fallback
+- Use the `limits.rules` and `features` fields from `plan_entitlements` instead of hardcoded switch
+
+**AutomationPage.tsx:**
+- Add `TabsTrigger` for "Experiments"
+- Import `ExperimentsTab`, render in new `TabsContent`
+- Update grid from `grid-cols-3` to `grid-cols-4`
+
+**AuditLogTab.tsx:**
+- Add date range state (default 30 days)
+- Add filter buttons (7d / 30d / 90d)
+- Apply `.gte('started_at', cutoffDate)` to queries
+
+**ExperimentsTab.tsx:**
+- Create a `NewExperimentDialog` with fields for: name, entity type, entity ID, holdout percentage, duration
+- Wire to the `incrementality-analyzer` edge function
 
 ---
 
@@ -78,13 +84,9 @@ Replace hardcoded plan checks in `AutomationRulesList` (`canAutoApply`), `Automa
 
 | File | Action |
 |---|---|
-| `src/components/automation/CreateRuleDialog.tsx` | Create |
-| `src/components/automation/AuditLogTab.tsx` | Create |
-| `src/components/automation/index.ts` | Update - add exports |
-| `src/components/AutomationRulesList.tsx` | Update - add edit/delete, fix tier logic |
-| `src/pages/AutomationPage.tsx` | Update - wire CreateRuleDialog, AuditLogTab, fix tier logic |
-| `src/pages/Governance.tsx` | Update - fix kill switch persistence |
-| `src/hooks/useAutomation.ts` | Update - add updateRule, deleteRule methods |
-| `supabase/functions/rules-api/index.ts` | Update - add PUT/DELETE endpoints |
-| `supabase/functions/rules-engine-runner/index.ts` | Update - add bid_down/bid_up evaluators, fix tier check |
+| `src/pages/Governance.tsx` | Update - wire CreateRuleDialog, edit/delete, fix tier logic |
+| `supabase/functions/rules-engine-runner/index.ts` | Update - use plan_entitlements table |
+| `src/pages/AutomationPage.tsx` | Update - add Experiments tab |
+| `src/components/automation/AuditLogTab.tsx` | Update - add date range filter |
+| `src/components/automation/ExperimentsTab.tsx` | Update - enable New Experiment with dialog |
 
