@@ -591,6 +591,89 @@ class RuleEvaluator {
     return { alerts, actions };
   }
 
+  async evaluatePlacementOpt(rule: AutomationRule): Promise<{alerts: any[], actions: any[]}> {
+    const { targetAcos = 30, lookbackDays = 14, minImpressions = 100, minSpend = 5, maxAdjustment = 300 } = rule.params;
+    const alerts: any[] = [];
+    const actions: any[] = [];
+
+    console.log(`Evaluating placement optimization for profile ${rule.profile_id}`);
+
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - lookbackDays);
+
+    const { data: placementData, error } = await this.supabase
+      .from('campaign_placement_performance')
+      .select('*')
+      .eq('profile_id', rule.profile_id)
+      .gte('date', cutoffDate.toISOString().split('T')[0]);
+
+    if (error || !placementData?.length) {
+      console.log('No placement performance data found');
+      return { alerts, actions };
+    }
+
+    // Aggregate by campaign + placement
+    const agg = new Map<string, { spend: number; sales: number; impressions: number; clicks: number; orders: number; campaignId: string; placement: string }>();
+    for (const row of placementData) {
+      const key = `${row.campaign_id}:${row.placement}`;
+      const existing = agg.get(key) || { spend: 0, sales: 0, impressions: 0, clicks: 0, orders: 0, campaignId: row.campaign_id, placement: row.placement };
+      existing.spend += row.spend || 0;
+      existing.sales += row.sales || 0;
+      existing.impressions += row.impressions || 0;
+      existing.clicks += row.clicks || 0;
+      existing.orders += row.orders || 0;
+      agg.set(key, existing);
+    }
+
+    for (const [, data] of agg) {
+      if (data.impressions < minImpressions || data.spend < minSpend) continue;
+      const acos = data.sales > 0 ? (data.spend / data.sales) * 100 : 999;
+      const deviation = acos - targetAcos;
+
+      // Only act if ACoS deviates significantly (>5pp)
+      if (Math.abs(deviation) < 5) continue;
+
+      // Calculate suggested multiplier adjustment
+      let suggestedAdjust = 0;
+      if (deviation > 0) {
+        // ACoS too high → decrease multiplier
+        suggestedAdjust = Math.max(-50, -Math.round(deviation * 1.5));
+      } else {
+        // ACoS below target → increase multiplier to capture more
+        suggestedAdjust = Math.min(maxAdjustment, Math.round(Math.abs(deviation) * 1.5));
+      }
+
+      alerts.push({
+        rule_id: rule.id,
+        profile_id: rule.profile_id,
+        entity_type: 'campaign',
+        entity_id: data.campaignId,
+        level: Math.abs(deviation) > 20 ? 'critical' : 'warn',
+        title: `Placement ${data.placement} ACoS ${deviation > 0 ? 'High' : 'Low'}`,
+        message: `Campaign ${data.campaignId} ${data.placement}: ${acos.toFixed(1)}% ACoS vs ${targetAcos}% target (${data.orders} orders, $${data.spend.toFixed(2)} spend)`,
+        data: { acos, targetAcos, deviation, placement: data.placement, suggestedAdjust, orders: data.orders, spend: data.spend },
+      });
+
+      if (rule.mode === 'auto') {
+        actions.push({
+          rule_id: rule.id,
+          profile_id: rule.profile_id,
+          action_type: 'set_placement_adjust',
+          payload: {
+            campaign_id: data.campaignId,
+            placement: data.placement,
+            adjust_percent: suggestedAdjust,
+            reason: `${data.placement} ACoS ${acos.toFixed(0)}% vs target ${targetAcos}% – adjust by ${suggestedAdjust}%`,
+            trigger_metrics: { acos, orders: data.orders, spend: data.spend, impressions: data.impressions },
+          },
+          idempotency_key: this.generateIdempotencyKey(rule.profile_id, 'placement_opt', `${data.campaignId}_${data.placement}`),
+        });
+      }
+    }
+
+    return { alerts, actions };
+  }
+
   private generateIdempotencyKey(profileId: string, actionType: string, entityId: string): string {
     const data = `${profileId}:${actionType}:${entityId}:${new Date().toISOString().split('T')[0]}`;
     return btoa(data).replace(/[^a-zA-Z0-9]/g, '').substring(0, 32);
@@ -797,6 +880,9 @@ Deno.serve(async (req) => {
             break;
           case 'bid_up':
             ({ alerts, actions } = await evaluator.evaluateBidUp(rule));
+            break;
+          case 'placement_opt':
+            ({ alerts, actions } = await evaluator.evaluatePlacementOpt(rule));
             break;
           default:
             console.log(`Unknown rule type: ${rule.rule_type}`);

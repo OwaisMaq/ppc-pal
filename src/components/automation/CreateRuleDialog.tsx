@@ -32,6 +32,7 @@ const RULE_TYPES = [
   { value: 'st_prune', label: 'Search Term Prune' },
   { value: 'bid_down', label: 'Bid Down' },
   { value: 'bid_up', label: 'Bid Up' },
+  { value: 'placement_opt', label: 'Placement Optimizer' },
 ];
 
 const DEFAULT_PARAMS: Record<string, Record<string, number | string>> = {
@@ -41,6 +42,7 @@ const DEFAULT_PARAMS: Record<string, Record<string, number | string>> = {
   st_prune: { windowDays: 14, minClicks: 20, minSpend: 10, maxConvs: 0, negateScope: 'ad_group' },
   bid_down: { maxAcos: 40, minClicks: 10, lookbackDays: 14, decreasePercent: 15 },
   bid_up: { minConversions: 2, maxAcos: 25, maxImpressionShare: 50, increasePercent: 10 },
+  placement_opt: { targetAcos: 30, lookbackDays: 14, minImpressions: 100, minSpend: 5, maxAdjustment: 300 },
 };
 
 const DEFAULT_ACTIONS: Record<string, Record<string, any>> = {
@@ -50,6 +52,7 @@ const DEFAULT_ACTIONS: Record<string, Record<string, any>> = {
   st_prune: { type: 'negative_keyword' },
   bid_down: { type: 'adjust_bid', direction: 'down' },
   bid_up: { type: 'adjust_bid', direction: 'up' },
+  placement_opt: { type: 'set_placement_adjust' },
 };
 
 const PARAM_LABELS: Record<string, string> = {
@@ -69,6 +72,9 @@ const PARAM_LABELS: Record<string, string> = {
   minConversions: 'Min Conversions',
   maxImpressionShare: 'Max Impression Share (%)',
   increasePercent: 'Increase %',
+  targetAcos: 'Target ACoS (%)',
+  minImpressions: 'Min Impressions',
+  maxAdjustment: 'Max Adjustment (%)',
 };
 
 export const CreateRuleDialog: React.FC<CreateRuleDialogProps> = ({
