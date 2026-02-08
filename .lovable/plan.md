@@ -1,127 +1,90 @@
 
 
-## Updated Subscription Tiers
+## Complete the Automation Engine
 
-Based on your feedback, here are the revised tiers with three key changes:
-
-1. **Sync limits removed** -- all tiers get unlimited syncs
-2. **Data granularity unlocked** -- all tiers see campaign, ad group, target, and search term data
-3. **AI Insights available to all** -- no longer gated by tier
-4. **Free tier limited to 1 campaign** (down from 10)
+The automation engine has strong backend infrastructure (rules engine, actions worker, governance, bid optimizer) but several UI and functional gaps prevent it from being fully usable. Here is what needs to be built:
 
 ---
 
-### Revised Tier Comparison
+### Gap Analysis
 
-| Feature | Free ($0) | Starter ($29/mo) | Pro ($79/mo) | Agency ($199/mo) |
-|---|---|---|---|---|
-| **Profiles** | 1 | 3 | 10 | Unlimited |
-| **Campaigns** | 1 | 100 | 1,000 | Unlimited |
-| **Data History** | 7 days | 30 days | 90 days | 365 days |
-| **Sync Frequency** | Real-time | Real-time | Real-time | Real-time |
-| **Monthly Syncs** | Unlimited | Unlimited | Unlimited | Unlimited |
-| **Data Granularity** | All levels | All levels | All levels | All levels |
-| **AI Insights** | Yes | Yes | Yes | Yes |
-| **Automation Rules** | 0 | 5 | Unlimited | Unlimited |
-| **Alerts** | No | Email only | Email + in-app | Email + in-app + webhook |
-| **Playbooks** | No | No | Yes | Yes + custom |
-| **Budget Copilot** | No | No | Yes | Yes |
-| **Anomaly Detection** | No | No | Yes | Yes |
-| **Multi-Account** | No | No | View only | Full management |
-| **White Label** | No | No | No | Yes |
-| **API Access** | No | No | No | Yes |
+| Component | Status | Gap |
+|---|---|---|
+| Rules Engine (backend) | 90% | Missing `bid_down`, `bid_up`, `placement_opt` evaluators |
+| Actions Worker (backend) | 95% | Solid - handles 15+ action types |
+| Governance/Guardrails | 85% | Kill switch uses local state, not persisted |
+| Custom Rule Creation | 0% | "Add Rule" button does nothing |
+| Audit Log Tab | 0% | Placeholder "coming soon" |
+| Tier-based entitlements | 40% | Hardcoded old plan logic in multiple places |
+| Rule editing/deletion | 0% | No way to edit params or delete rules |
 
 ---
 
-### What Changes vs. the Previous Plan
+### Implementation Plan
 
-**Removed gates:**
-- `monthly_syncs` limit removed from all tiers (was 10 / 100 / 5,000 / unlimited)
-- `ams_realtime` feature flag removed (all tiers get real-time)
-- `data_adgroup`, `data_target`, `data_search_term` flags removed (all tiers get all data levels)
-- `ai_insights` feature flag removed (all tiers get AI insights)
+#### 1. Custom Rule Creation Dialog
+Create a `CreateRuleDialog` component that lets users create automation rules from the UI:
+- Rule name, type selector (budget_depletion, spend_spike, st_harvest, st_prune, bid_down, bid_up)
+- Dynamic parameter form based on selected type (thresholds, lookback windows, etc.)
+- Mode selector (dry_run, suggestion, auto)
+- Severity selector
+- Throttle settings (cooldown hours, max actions/day)
+- Calls the `rules-api/rules` POST endpoint
 
-**Tightened:**
-- Free tier campaigns: 10 down to 1
+**Files:** Create `src/components/automation/CreateRuleDialog.tsx`
+
+#### 2. Rule Editing and Deletion
+- Add edit button to `AutomationRulesList` that opens CreateRuleDialog in edit mode
+- Add delete button with confirmation
+- Add PUT and DELETE handlers to `useAutomation` hook
+- Update `rules-api` edge function to support PUT/DELETE on rules
+
+**Files:** Update `src/components/AutomationRulesList.tsx`, `src/hooks/useAutomation.ts`, `supabase/functions/rules-api/index.ts`
+
+#### 3. Audit Log Tab
+Replace the "coming soon" placeholder with a real audit log showing:
+- All rule runs from `automation_rule_runs` table with timestamps, status, alerts/actions counts
+- All executed actions from `action_queue` with status, entity details, before/after metrics
+- Filter by date range and action type
+- Expandable rows showing full action details
+
+**Files:** Create `src/components/automation/AuditLogTab.tsx`, update `src/pages/AutomationPage.tsx`
+
+#### 4. Add Missing Rule Evaluators (bid_down, bid_up)
+Add `evaluateBidDown` and `evaluateBidUp` methods to the `RuleEvaluator` class in `rules-engine-runner`:
+- `bid_down`: Lower bids on high-ACOS keywords/targets (params: maxAcos, minClicks, lookbackDays, decreasePercent)
+- `bid_up`: Raise bids on high-converting low-impression keywords (params: minConversions, maxAcos, minImpressions, increasePercent)
+- Wire into the switch statement in the main handler
+
+**Files:** Update `supabase/functions/rules-engine-runner/index.ts`
+
+#### 5. Fix Kill Switch Persistence
+The Governance page kill switch currently only sets local React state. Wire it to the `governance_settings.automation_paused` field via the existing `useGovernance` hook's `toggleAutomation` function.
+
+**Files:** Update `src/pages/Governance.tsx`
+
+#### 6. Update Tier Entitlements in Automation
+Replace hardcoded plan checks in `AutomationRulesList` (`canAutoApply`), `AutomationPage` (`getPlanFeatures`), and `rules-engine-runner` (`checkEntitlements`) with the new four-tier system:
+- Free: 0 rules allowed
+- Starter: 5 rules, budget_depletion + spend_spike + st_harvest + st_prune
+- Pro: unlimited rules, all types including bid_down/bid_up
+- Agency: unlimited, all types
+
+**Files:** Update `src/components/AutomationRulesList.tsx`, `src/pages/AutomationPage.tsx`, `supabase/functions/rules-engine-runner/index.ts`
 
 ---
 
-### Technical Implementation
-
-**1. Database migration -- update `plan_entitlements`**
-
-```sql
-INSERT INTO plan_entitlements (plan, features, limits) VALUES
-('free',
-  '{"alerts": false, "playbooks": false, "budget_copilot": false,
-    "anomaly_detection": false, "multi_account": false,
-    "api_access": false, "white_label": false}'::jsonb,
-  '{"profiles": 1, "campaigns": 1, "rules": 0,
-    "history_days": 7}'::jsonb
-),
-('starter',
-  '{"alerts": true, "alerts_email_only": true,
-    "playbooks": false, "budget_copilot": false,
-    "anomaly_detection": false, "multi_account": false,
-    "api_access": false, "white_label": false}'::jsonb,
-  '{"profiles": 3, "campaigns": 100, "rules": 5,
-    "history_days": 30}'::jsonb
-),
-('pro',
-  '{"alerts": true, "playbooks": true, "budget_copilot": true,
-    "anomaly_detection": true, "multi_account": "view_only",
-    "api_access": false, "white_label": false}'::jsonb,
-  '{"profiles": 10, "campaigns": 1000, "rules": -1,
-    "history_days": 90}'::jsonb
-),
-('agency',
-  '{"alerts": true, "alerts_webhook": true, "playbooks": true,
-    "custom_playbooks": true, "budget_copilot": true,
-    "anomaly_detection": true, "multi_account": true,
-    "rollups": true, "white_label": true, "api_access": true}'::jsonb,
-  '{"profiles": -1, "campaigns": -1, "rules": -1,
-    "history_days": 365}'::jsonb
-);
-```
-
-**2. Update `check-entitlement` edge function**
-- Remove checks for `monthly_syncs`, `ams_realtime`, `data_adgroup`, `data_target`, `data_search_term`, `ai_insights`
-- Keep checks for: `profiles`, `campaigns`, `rules`, `history_days`, `alerts`, `playbooks`, `budget_copilot`, `anomaly_detection`, `multi_account`, `api_access`, `white_label`
-- Treat `-1` as unlimited in limit checks
-
-**3. Update `useSubscription` hook**
-- Remove sync-related usage tracking
-- Remove data-level gating logic
-
-**4. Update Stripe products**
-- Create Starter ($29/mo, $278/yr), Pro ($79/mo, $758/yr), Agency ($199/mo, $1,910/yr)
-- Map Stripe price IDs to plan names in `create-checkout` and `stripe-webhook`
-
-**5. Create `useEntitlements` hook**
-- `checkFeature(feature)` and `checkLimit(limit, currentValue)` for client-side gating
-- Returns upgrade prompt info when a feature is blocked
-
-**6. UI updates**
-- Update `BillingSettings` to show the four tiers
-- Create `UpgradePrompt` component for gated features
-- Update landing page pricing section
-- Add tier badge in sidebar/header
-
-**7. Enforce campaign limit for Free tier**
-- Add check in campaign creation flow: if free tier and campaigns >= 1, show upgrade prompt
-
-### Files to create/modify
+### Files Summary
 
 | File | Action |
 |---|---|
-| `supabase/migrations/xxx_tier_entitlements.sql` | Create -- schema + seed data |
-| `supabase/functions/check-entitlement/index.ts` | Update -- simplified checks |
-| `supabase/functions/create-checkout/index.ts` | Update -- four tier price mapping |
-| `supabase/functions/stripe-webhook/index.ts` | Update -- plan mapping |
-| `src/hooks/useEntitlements.ts` | Create -- client-side entitlement hook |
-| `src/hooks/useSubscription.ts` | Update -- remove sync/data gating |
-| `src/components/UpgradePrompt.tsx` | Create -- reusable upgrade modal |
-| `src/components/TierBadge.tsx` | Create -- plan indicator |
-| `src/components/settings/BillingSettings.tsx` | Update -- four-tier display |
-| `src/pages/PublicLanding.tsx` | Update -- pricing section |
+| `src/components/automation/CreateRuleDialog.tsx` | Create |
+| `src/components/automation/AuditLogTab.tsx` | Create |
+| `src/components/automation/index.ts` | Update - add exports |
+| `src/components/AutomationRulesList.tsx` | Update - add edit/delete, fix tier logic |
+| `src/pages/AutomationPage.tsx` | Update - wire CreateRuleDialog, AuditLogTab, fix tier logic |
+| `src/pages/Governance.tsx` | Update - fix kill switch persistence |
+| `src/hooks/useAutomation.ts` | Update - add updateRule, deleteRule methods |
+| `supabase/functions/rules-api/index.ts` | Update - add PUT/DELETE endpoints |
+| `supabase/functions/rules-engine-runner/index.ts` | Update - add bid_down/bid_up evaluators, fix tier check |
 
