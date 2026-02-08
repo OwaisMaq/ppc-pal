@@ -455,6 +455,142 @@ class RuleEvaluator {
     return { alerts, actions };
   }
 
+  async evaluateBidDown(rule: AutomationRule): Promise<{alerts: any[], actions: any[]}> {
+    const { maxAcos = 40, minClicks = 10, lookbackDays = 14, decreasePercent = 15 } = rule.params;
+    const alerts: any[] = [];
+    const actions: any[] = [];
+
+    console.log(`Evaluating bid_down for profile ${rule.profile_id}`);
+
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - lookbackDays);
+
+    // Query keywords/targets with high ACoS
+    const { data: perfData, error } = await this.supabase
+      .from('keyword_performance_history')
+      .select('keyword_id, date, spend, sales, clicks, acos')
+      .eq('profile_id', rule.profile_id)
+      .gte('date', startDate.toISOString().split('T')[0]);
+
+    if (error || !perfData?.length) return { alerts, actions };
+
+    // Aggregate by keyword
+    const kwAgg = new Map<string, { clicks: number; spend: number; sales: number }>();
+    for (const row of perfData) {
+      const existing = kwAgg.get(row.keyword_id) || { clicks: 0, spend: 0, sales: 0 };
+      existing.clicks += row.clicks || 0;
+      existing.spend += row.spend || 0;
+      existing.sales += row.sales || 0;
+      kwAgg.set(row.keyword_id, existing);
+    }
+
+    for (const [kwId, agg] of kwAgg) {
+      if (agg.clicks < minClicks) continue;
+      const acos = agg.sales > 0 ? (agg.spend / agg.sales) * 100 : 999;
+      if (acos <= maxAcos) continue;
+
+      alerts.push({
+        rule_id: rule.id,
+        profile_id: rule.profile_id,
+        entity_type: 'keyword',
+        entity_id: kwId,
+        level: 'warn',
+        title: 'High ACoS – Bid Down Candidate',
+        message: `Keyword ${kwId} has ${acos.toFixed(1)}% ACoS over ${lookbackDays}d (${agg.clicks} clicks)`,
+        data: { acos, clicks: agg.clicks, spend: agg.spend, sales: agg.sales },
+      });
+
+      if (rule.mode === 'auto') {
+        actions.push({
+          rule_id: rule.id,
+          profile_id: rule.profile_id,
+          action_type: 'adjust_bid',
+          payload: {
+            keyword_id: kwId,
+            entity_type: 'keyword',
+            entity_name: `Keyword ${kwId.slice(-6)}`,
+            direction: 'down',
+            adjust_percent: decreasePercent,
+            reason: `ACoS ${acos.toFixed(0)}% > ${maxAcos}% threshold`,
+            trigger_metrics: { acos, clicks: agg.clicks, spend: agg.spend },
+            estimated_impact: `Reduce bid ${decreasePercent}% to lower ACoS from ${acos.toFixed(0)}%`,
+          },
+          idempotency_key: this.generateIdempotencyKey(rule.profile_id, 'bid_down', kwId),
+        });
+      }
+    }
+
+    return { alerts, actions };
+  }
+
+  async evaluateBidUp(rule: AutomationRule): Promise<{alerts: any[], actions: any[]}> {
+    const { minConversions = 2, maxAcos = 25, maxImpressionShare = 50, increasePercent = 10 } = rule.params;
+    const alerts: any[] = [];
+    const actions: any[] = [];
+
+    console.log(`Evaluating bid_up for profile ${rule.profile_id}`);
+
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 14);
+
+    const { data: perfData, error } = await this.supabase
+      .from('keyword_performance_history')
+      .select('keyword_id, date, spend, sales, clicks, orders, impressions, acos')
+      .eq('profile_id', rule.profile_id)
+      .gte('date', startDate.toISOString().split('T')[0]);
+
+    if (error || !perfData?.length) return { alerts, actions };
+
+    const kwAgg = new Map<string, { clicks: number; spend: number; sales: number; orders: number; impressions: number }>();
+    for (const row of perfData) {
+      const existing = kwAgg.get(row.keyword_id) || { clicks: 0, spend: 0, sales: 0, orders: 0, impressions: 0 };
+      existing.clicks += row.clicks || 0;
+      existing.spend += row.spend || 0;
+      existing.sales += row.sales || 0;
+      existing.orders += row.orders || 0;
+      existing.impressions += row.impressions || 0;
+      kwAgg.set(row.keyword_id, existing);
+    }
+
+    for (const [kwId, agg] of kwAgg) {
+      if (agg.orders < minConversions) continue;
+      const acos = agg.sales > 0 ? (agg.spend / agg.sales) * 100 : 999;
+      if (acos > maxAcos) continue;
+
+      alerts.push({
+        rule_id: rule.id,
+        profile_id: rule.profile_id,
+        entity_type: 'keyword',
+        entity_id: kwId,
+        level: 'info',
+        title: 'High Performer – Bid Up Candidate',
+        message: `Keyword ${kwId} has ${agg.orders} conversions at ${acos.toFixed(1)}% ACoS – room to grow`,
+        data: { acos, orders: agg.orders, spend: agg.spend, sales: agg.sales, impressions: agg.impressions },
+      });
+
+      if (rule.mode === 'auto') {
+        actions.push({
+          rule_id: rule.id,
+          profile_id: rule.profile_id,
+          action_type: 'adjust_bid',
+          payload: {
+            keyword_id: kwId,
+            entity_type: 'keyword',
+            entity_name: `Keyword ${kwId.slice(-6)}`,
+            direction: 'up',
+            adjust_percent: increasePercent,
+            reason: `${agg.orders} conversions at ${acos.toFixed(0)}% ACoS (< ${maxAcos}%)`,
+            trigger_metrics: { acos, orders: agg.orders, spend: agg.spend, impressions: agg.impressions },
+            estimated_impact: `Increase bid ${increasePercent}% to capture more volume at profitable ACoS`,
+          },
+          idempotency_key: this.generateIdempotencyKey(rule.profile_id, 'bid_up', kwId),
+        });
+      }
+    }
+
+    return { alerts, actions };
+  }
+
   private generateIdempotencyKey(profileId: string, actionType: string, entityId: string): string {
     const data = `${profileId}:${actionType}:${entityId}:${new Date().toISOString().split('T')[0]}`;
     return btoa(data).replace(/[^a-zA-Z0-9]/g, '').substring(0, 32);
@@ -473,10 +609,11 @@ async function checkEntitlements(supabase: any, userId: string, ruleType: string
   
   switch (plan) {
     case 'free':
-      return ['budget_depletion', 'spend_spike'].includes(ruleType); // alerts only
+      return false; // 0 rules allowed
     case 'starter':
       return ['budget_depletion', 'spend_spike', 'st_harvest', 'st_prune'].includes(ruleType);
     case 'pro':
+    case 'agency':
       return true; // all rule types
     default:
       return false;
@@ -617,6 +754,12 @@ Deno.serve(async (req) => {
             break;
           case 'st_prune':
             ({ alerts, actions } = await evaluator.evaluateSearchTermPrune(rule));
+            break;
+          case 'bid_down':
+            ({ alerts, actions } = await evaluator.evaluateBidDown(rule));
+            break;
+          case 'bid_up':
+            ({ alerts, actions } = await evaluator.evaluateBidUp(rule));
             break;
           default:
             console.log(`Unknown rule type: ${rule.rule_type}`);
