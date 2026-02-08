@@ -89,6 +89,81 @@ serve(async (req) => {
     const primaryConnection = connections[0];
     const profileId = primaryConnection.profile_id;
 
+    // --- Data hash caching: skip LLM if campaign data hasn't changed ---
+    // Fetch top campaign metrics to build a hash
+    const { data: topCampaigns } = await supabase
+      .from('campaigns')
+      .select('id, spend, sales, acos')
+      .eq('profile_id', profileId)
+      .order('spend', { ascending: false })
+      .limit(10);
+
+    const hashInput = JSON.stringify(
+      (topCampaigns || []).map(c => ({
+        id: c.id,
+        spend: Math.round((c.spend || 0) * 100),
+        sales: Math.round((c.sales || 0) * 100),
+        acos: Math.round((c.acos || 0) * 10),
+      }))
+    );
+
+    // Simple string hash
+    let dataHash = 0;
+    for (let i = 0; i < hashInput.length; i++) {
+      const chr = hashInput.charCodeAt(i);
+      dataHash = ((dataHash << 5) - dataHash) + chr;
+      dataHash |= 0;
+    }
+    const dataHashStr = String(dataHash);
+
+    // Check for recent insights with same hash (last 12 hours)
+    const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
+    const { data: cachedInsights } = await supabase
+      .from('ai_insights')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('profile_id', profileId)
+      .eq('reason_code', `hash:${dataHashStr}`)
+      .gte('created_at', twelveHoursAgo)
+      .limit(1);
+
+    if (cachedInsights && cachedInsights.length > 0) {
+      console.log(`Cache hit: data hash ${dataHashStr} matches recent insights, skipping LLM`);
+      // Return all recent pending insights
+      const { data: allCached } = await supabase
+        .from('ai_insights')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('profile_id', profileId)
+        .gte('created_at', twelveHoursAgo);
+
+      return new Response(JSON.stringify({
+        insights: (allCached || []).map(i => ({
+          type: i.insight_type,
+          campaign: i.entity_name,
+          action: i.action_type,
+          reason: i.explanation,
+          impact: i.impact,
+          timestamp: i.created_at,
+          actionable: {
+            action_type: i.action_type,
+            payload: i.payload,
+            entity_id: i.entity_id,
+            entity_name: i.entity_name,
+            confidence: i.confidence,
+            reason_code: i.reason_code,
+          }
+        })),
+        strategy: 'Returning cached insights — campaign data has not changed significantly.',
+        autoApply: false,
+        cached: true,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log(`Cache miss: data hash ${dataHashStr}, proceeding with LLM`);
+
     // Call ML predictions function to get statistical predictions
     console.log('Calling ml-predictions for statistical analysis...');
     const mlAuthHeader = isScheduledRun ? `Bearer ${serviceRoleKey}` : authHeader!;
@@ -263,7 +338,8 @@ ${JSON.stringify(mlPredictions.map(p => ({
     });
 
     // Store insights in the database for persistence
-    const insightsToStore = insights.map(insight => ({
+    // Tag the first insight with the data hash for cache lookups
+    const insightsToStore = insights.map((insight, idx) => ({
       user_id: user.id,
       profile_id: profileId,
       insight_type: insight.type,
@@ -272,7 +348,7 @@ ${JSON.stringify(mlPredictions.map(p => ({
       action_type: insight.actionable.action_type,
       payload: insight.actionable.payload,
       explanation: insight.reason,
-      reason_code: insight.actionable.reason_code,
+      reason_code: idx === 0 ? `hash:${dataHashStr}` : insight.actionable.reason_code,
       impact: insight.impact,
       confidence: insight.actionable.confidence,
       status: 'pending',

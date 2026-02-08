@@ -27,10 +27,10 @@ export const useLoginSync = () => {
       if (lastLoginSync) {
         const lastSyncTime = new Date(lastLoginSync).getTime();
         const now = Date.now();
-        const thirtyMinutes = 30 * 60 * 1000;
+        const fourHours = 4 * 60 * 60 * 1000;
 
-        if (now - lastSyncTime < thirtyMinutes) {
-          console.log('🔄 Synced recently (within 30 min), skipping login sync');
+        if (now - lastSyncTime < fourHours) {
+          console.log('🔄 Synced recently (within 4 hours), skipping login sync');
           lastSyncRef.current = sessionKey;
           return;
         }

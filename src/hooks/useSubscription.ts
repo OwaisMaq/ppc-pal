@@ -41,7 +41,21 @@ export const useSubscription = () => {
     try {
       setLoading(true);
 
-      await checkStripeSubscription();
+      // Only call Stripe if local subscription data is stale (>1 hour old)
+      const { data: existingSub } = await supabase
+        .from('subscriptions')
+        .select('updated_at')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      const isStale = !existingSub?.updated_at ||
+        Date.now() - new Date(existingSub.updated_at).getTime() > 60 * 60 * 1000;
+
+      if (isStale) {
+        await checkStripeSubscription();
+      } else {
+        console.log('⏭️ Subscription data fresh (<1hr), skipping Stripe check');
+      }
 
       const { data: subscriptionData, error: subError } = await supabase
         .from('subscriptions')
