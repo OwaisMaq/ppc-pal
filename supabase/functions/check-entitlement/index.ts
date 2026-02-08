@@ -107,6 +107,16 @@ async function checkEntitlement(
 
     const currentValue = check.value || 0;
     
+    // -1 means unlimited
+    if (limitValue === -1) {
+      return {
+        allowed: true,
+        plan,
+        limit_value: -1,
+        current_usage: currentValue,
+      };
+    }
+    
     return {
       allowed: currentValue < limitValue,
       plan,

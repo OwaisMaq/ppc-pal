@@ -8,6 +8,12 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const PLAN_PRICES: Record<string, { name: string; description: string; monthly: number }> = {
+  starter: { name: "PPC Pal Starter", description: "3 profiles, 100 campaigns, email alerts", monthly: 2900 },
+  pro:     { name: "PPC Pal Pro",     description: "10 profiles, 1,000 campaigns, full automation", monthly: 7900 },
+  agency:  { name: "PPC Pal Agency",  description: "Unlimited profiles & campaigns, white-label, API", monthly: 19900 },
+};
+
 const logStep = (step: string, details?: any) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
   console.log(`[CREATE-CHECKOUT] ${step}${detailsStr}`);
@@ -34,6 +40,20 @@ serve(async (req) => {
     
     logStep("User authenticated", { userId: user.id, email: user.email });
 
+    // Parse requested plan from body
+    let requestedPlan = 'starter';
+    try {
+      const body = await req.json();
+      if (body.plan && PLAN_PRICES[body.plan]) {
+        requestedPlan = body.plan;
+      }
+    } catch {
+      // No body or invalid JSON, default to starter
+    }
+
+    const planConfig = PLAN_PRICES[requestedPlan];
+    logStep("Plan selected", { plan: requestedPlan, amount: planConfig.monthly });
+
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", { apiVersion: "2023-10-16" });
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
     let customerId;
@@ -53,21 +73,25 @@ serve(async (req) => {
           price_data: {
             currency: "usd",
             product_data: { 
-              name: "PPC Pal Pro Plan",
-              description: "Unlimited AI-powered advertising optimizations"
+              name: planConfig.name,
+              description: planConfig.description,
+              metadata: { plan: requestedPlan },
             },
-            unit_amount: 1000, // $10.00
+            unit_amount: planConfig.monthly,
             recurring: { interval: "month" },
           },
           quantity: 1,
         },
       ],
       mode: "subscription",
-      success_url: `${req.headers.get("origin")}/?success=true`,
-      cancel_url: `${req.headers.get("origin")}/?canceled=true`,
+      subscription_data: {
+        metadata: { plan: requestedPlan },
+      },
+      success_url: `${req.headers.get("origin")}/settings?tab=billing&success=true`,
+      cancel_url: `${req.headers.get("origin")}/settings?tab=billing&canceled=true`,
     });
 
-    logStep("Checkout session created", { sessionId: session.id, url: session.url });
+    logStep("Checkout session created", { sessionId: session.id, url: session.url, plan: requestedPlan });
 
     return new Response(JSON.stringify({ url: session.url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

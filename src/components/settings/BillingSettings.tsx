@@ -1,21 +1,37 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { CreditCard, Crown, Zap, ExternalLink } from 'lucide-react';
+import { CreditCard, Crown, Zap, Shield, Sparkles, ExternalLink, Check } from 'lucide-react';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useEntitlements } from '@/hooks/useEntitlements';
+import type { PlanName } from '@/hooks/useEntitlements';
+
+const TIERS: { plan: PlanName; label: string; price: string; icon: React.ReactNode; features: string[] }[] = [
+  {
+    plan: 'free', label: 'Free', price: '$0/mo',
+    icon: <Sparkles className="h-5 w-5" />,
+    features: ['1 profile', '1 campaign', '7 days history', 'AI Insights', 'All data levels'],
+  },
+  {
+    plan: 'starter', label: 'Starter', price: '$29/mo',
+    icon: <Zap className="h-5 w-5" />,
+    features: ['3 profiles', '100 campaigns', '30 days history', '5 automation rules', 'Email alerts'],
+  },
+  {
+    plan: 'pro', label: 'Pro', price: '$79/mo',
+    icon: <Crown className="h-5 w-5" />,
+    features: ['10 profiles', '1,000 campaigns', '90 days history', 'Unlimited rules', 'Playbooks & Budget Copilot', 'Anomaly Detection'],
+  },
+  {
+    plan: 'agency', label: 'Agency', price: '$199/mo',
+    icon: <Shield className="h-5 w-5" />,
+    features: ['Unlimited profiles', 'Unlimited campaigns', '365 days history', 'White-label & API access', 'Full multi-account management'],
+  },
+];
 
 export const BillingSettings = () => {
-  const {
-    subscription,
-    usage,
-    usageLimit,
-    loading,
-    isFreeTier,
-    isProTier,
-    createCheckoutSession,
-    openCustomerPortal
-  } = useSubscription();
+  const { loading, createCheckoutSession, openCustomerPortal } = useSubscription();
+  const { plan, planLabel, entitlements } = useEntitlements();
 
   if (loading) {
     return (
@@ -31,14 +47,9 @@ export const BillingSettings = () => {
     );
   }
 
-  const currentUsage = usage?.optimizations_used || 0;
-  const progressPercentage = usageLimit > 0 ? (currentUsage / usageLimit) * 100 : 0;
-
-  const handleUpgrade = async () => {
-    const checkoutUrl = await createCheckoutSession();
-    if (checkoutUrl) {
-      window.open(checkoutUrl, '_blank');
-    }
+  const handleUpgrade = async (targetPlan: PlanName) => {
+    const url = await createCheckoutSession(targetPlan);
+    if (url) window.open(url, '_blank');
   };
 
   return (
@@ -46,77 +57,62 @@ export const BillingSettings = () => {
       {/* Current Plan */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            {isProTier ? <Crown className="h-5 w-5 text-warning" /> : <Zap className="h-5 w-5" />}
-            Current Plan
-          </CardTitle>
+          <CardTitle className="text-lg">Current Plan</CardTitle>
+          <CardDescription>You are on the <strong>{planLabel}</strong> plan.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xl font-semibold">
-                  {isProTier ? 'Pro' : 'Free'}
-                </span>
-                <Badge variant={subscription?.status === 'active' ? 'default' : 'secondary'}>
-                  {subscription?.status || 'Active'}
-                </Badge>
-              </div>
-              {subscription?.current_period_end && (
-                <p className="text-sm text-muted-foreground">
-                  {isProTier ? 'Renews' : 'Resets'}: {new Date(subscription.current_period_end).toLocaleDateString()}
-                </p>
-              )}
-            </div>
-            {isFreeTier ? (
-              <Button onClick={handleUpgrade}>
-                <Crown className="h-4 w-4 mr-2" />
-                Upgrade to Pro
-              </Button>
-            ) : (
-              <Button variant="outline" onClick={openCustomerPortal}>
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Manage Subscription
-              </Button>
-            )}
-          </div>
-        </CardContent>
+        {plan !== 'free' && (
+          <CardContent>
+            <Button variant="outline" onClick={openCustomerPortal}>
+              <ExternalLink className="h-4 w-4 mr-2" />
+              Manage Subscription
+            </Button>
+          </CardContent>
+        )}
       </Card>
 
-      {/* Usage This Period */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Usage This Period</CardTitle>
-          <CardDescription>
-            {usage?.period_start && usage?.period_end && (
-              <>
-                {new Date(usage.period_start).toLocaleDateString()} – {new Date(usage.period_end).toLocaleDateString()}
-              </>
-            )}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium">Optimizations</span>
-              <span className="text-sm text-muted-foreground">
-                {currentUsage} / {isProTier ? '∞' : usageLimit}
-              </span>
-            </div>
-            {!isProTier && (
-              <Progress value={Math.min(progressPercentage, 100)} className="h-2" />
-            )}
-          </div>
-          {isFreeTier && progressPercentage >= 80 && (
-            <p className="text-sm text-warning">
-              You're approaching your monthly limit. Upgrade for unlimited optimizations.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+      {/* Plan Comparison */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {TIERS.map((tier) => {
+          const isCurrent = tier.plan === plan;
+          const isUpgrade = TIERS.findIndex(t => t.plan === tier.plan) > TIERS.findIndex(t => t.plan === plan);
+
+          return (
+            <Card key={tier.plan} className={isCurrent ? 'border-primary ring-1 ring-primary' : ''}>
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-2">
+                  {tier.icon}
+                  <CardTitle className="text-base">{tier.label}</CardTitle>
+                </div>
+                <p className="text-2xl font-bold">{tier.price}</p>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <ul className="space-y-1.5">
+                  {tier.features.map((f) => (
+                    <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
+                      <Check className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                {isCurrent ? (
+                  <Badge variant="secondary" className="w-full justify-center">Current Plan</Badge>
+                ) : isUpgrade ? (
+                  <Button className="w-full" size="sm" onClick={() => handleUpgrade(tier.plan)}>
+                    Upgrade
+                  </Button>
+                ) : (
+                  <Button variant="outline" className="w-full" size="sm" disabled>
+                    Included
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
 
       {/* Billing Portal */}
-      {isProTier && (
+      {plan !== 'free' && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
