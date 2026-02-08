@@ -4,11 +4,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Bot, AlertTriangle, Activity } from "lucide-react";
+import { Plus, Bot, AlertTriangle, Activity, FlaskConical } from "lucide-react";
 import { AutomationRulesList } from "@/components/AutomationRulesList";
 import { AlertsPanel } from "@/components/AlertsPanel";
 import { CreateRuleDialog, CreateRuleData } from "@/components/automation/CreateRuleDialog";
 import { AuditLogTab } from "@/components/automation/AuditLogTab";
+import { ExperimentsTab } from "@/components/automation/ExperimentsTab";
 import { useAutomationRules, useAlerts, AutomationRule } from "@/hooks/useAutomation";
 import { useAmazonConnections } from "@/hooks/useAmazonConnections";
 import { useEntitlements } from "@/hooks/useEntitlements";
@@ -190,13 +191,17 @@ const AutomationPage: React.FC = () => {
 
       {selectedProfile ? (
         <Tabs defaultValue="rules" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="rules">Rules ({rules.length})</TabsTrigger>
             <TabsTrigger value="alerts">
               Alerts ({alerts.length})
               {newAlerts > 0 && <Badge variant="destructive" className="ml-2 text-xs">{newAlerts}</Badge>}
             </TabsTrigger>
             <TabsTrigger value="audit">Audit Log</TabsTrigger>
+            <TabsTrigger value="experiments">
+              <FlaskConical className="h-3.5 w-3.5 mr-1" />
+              Experiments
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="rules" className="space-y-6">
@@ -256,6 +261,10 @@ const AutomationPage: React.FC = () => {
 
           <TabsContent value="audit" className="space-y-6">
             <AuditLogTab profileId={selectedProfile} />
+          </TabsContent>
+
+          <TabsContent value="experiments" className="space-y-6">
+            <ExperimentsTab profileId={selectedProfile} />
           </TabsContent>
         </Tabs>
       ) : (

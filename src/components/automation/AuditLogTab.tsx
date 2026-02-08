@@ -53,21 +53,27 @@ export const AuditLogTab: React.FC<AuditLogTabProps> = ({ profileId }) => {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'runs' | 'actions'>('runs');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [dateRange, setDateRange] = useState<7 | 30 | 90>(30);
 
   const fetchData = async () => {
     setLoading(true);
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - dateRange);
+    const cutoffISO = cutoff.toISOString();
     try {
       const [runsRes, actionsRes] = await Promise.all([
         supabase
           .from('automation_rule_runs')
           .select('*, automation_rules(name, rule_type)')
           .eq('profile_id', profileId)
+          .gte('started_at', cutoffISO)
           .order('started_at', { ascending: false })
           .limit(50),
         supabase
           .from('action_queue')
           .select('id, action_type, status, created_at, applied_at, payload, error, before_state, rule_id')
           .eq('profile_id', profileId)
+          .gte('created_at', cutoffISO)
           .order('created_at', { ascending: false })
           .limit(50),
       ]);
@@ -83,7 +89,7 @@ export const AuditLogTab: React.FC<AuditLogTabProps> = ({ profileId }) => {
 
   useEffect(() => {
     fetchData();
-  }, [profileId]);
+  }, [profileId, dateRange]);
 
   const toggleExpanded = (id: string) =>
     setExpandedId(prev => (prev === id ? null : id));
@@ -104,26 +110,25 @@ export const AuditLogTab: React.FC<AuditLogTabProps> = ({ profileId }) => {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex gap-2">
-          <Button
-            variant={view === 'runs' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setView('runs')}
-          >
+          <Button variant={view === 'runs' ? 'default' : 'outline'} size="sm" onClick={() => setView('runs')}>
             Rule Runs ({runs.length})
           </Button>
-          <Button
-            variant={view === 'actions' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setView('actions')}
-          >
+          <Button variant={view === 'actions' ? 'default' : 'outline'} size="sm" onClick={() => setView('actions')}>
             Actions ({actions.length})
           </Button>
         </div>
-        <Button variant="ghost" size="sm" onClick={fetchData}>
-          <RefreshCw className="h-4 w-4" />
-        </Button>
+        <div className="flex gap-1 items-center">
+          {([7, 30, 90] as const).map(d => (
+            <Button key={d} variant={dateRange === d ? 'default' : 'ghost'} size="sm" className="text-xs px-2" onClick={() => setDateRange(d)}>
+              {d}d
+            </Button>
+          ))}
+          <Button variant="ghost" size="sm" onClick={fetchData}>
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       <Card>

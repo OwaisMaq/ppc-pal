@@ -17,12 +17,13 @@ import {
   Settings2
 } from "lucide-react";
 import { AutomationRulesList } from "@/components/AutomationRulesList";
+import { CreateRuleDialog, CreateRuleData } from "@/components/automation/CreateRuleDialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DaypartScheduler } from "@/components/dayparting";
 import { GuardrailsSettings, ProtectedEntities, AIAutoApplyCard, ProductTargetsCard } from "@/components/governance";
 import { ReportIssueButton } from "@/components/ui/ReportIssueButton";
-import { useAutomationRules } from "@/hooks/useAutomation";
-import { useSubscription } from "@/hooks/useSubscription";
+import { useAutomationRules, AutomationRule } from "@/hooks/useAutomation";
+import { useEntitlements } from "@/hooks/useEntitlements";
 import { useGovernance } from "@/hooks/useGovernance";
 import { usePlaybooks } from "@/hooks/usePlaybooks";
 import { useGlobalFilters } from "@/context/GlobalFiltersContext";
@@ -34,6 +35,9 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+const STARTER_TYPES = ['budget_depletion', 'spend_spike', 'st_harvest', 'st_prune'];
+const ALL_TYPES = [...STARTER_TYPES, 'bid_down', 'bid_up'];
+
 const Governance: React.FC = () => {
   const { activeConnection, selectedProfileId } = useGlobalFilters();
   const selectedProfile = selectedProfileId || '';
@@ -42,8 +46,10 @@ const Governance: React.FC = () => {
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [playbookParams, setPlaybookParams] = useState<Record<string, any>>({});
   const [playbookMode, setPlaybookMode] = useState<'dry_run' | 'auto'>('dry_run');
+  const [createRuleOpen, setCreateRuleOpen] = useState(false);
+  const [editingRule, setEditingRule] = useState<AutomationRule | null>(null);
   
-  const { subscription } = useSubscription();
+  const { plan } = useEntitlements();
   
   const {
     rules,
@@ -52,7 +58,10 @@ const Governance: React.FC = () => {
     toggleRule,
     changeMode,
     runRule,
-    initializeRules
+    initializeRules,
+    createRule,
+    updateRule,
+    deleteRule,
   } = useAutomationRules(selectedProfile);
 
   const {
@@ -97,7 +106,34 @@ const Governance: React.FC = () => {
     enabled: !!selectedProfile,
   });
 
-  const plan = subscription?.plan_type || 'free';
+  const allowedTypes = (() => {
+    if (plan === 'pro' || plan === 'agency') return ALL_TYPES;
+    if (plan === 'starter') return STARTER_TYPES;
+    return [];
+  })();
+
+  const handleCreateOrUpdate = async (data: CreateRuleData) => {
+    if (editingRule) {
+      await updateRule(editingRule.id, data);
+      toast.success("Rule updated");
+    } else {
+      await createRule({ profile_id: selectedProfile, ...data });
+      toast.success("Rule created");
+    }
+    setEditingRule(null);
+  };
+
+  const handleEditRule = (rule: AutomationRule) => {
+    setEditingRule(rule);
+    setCreateRuleOpen(true);
+  };
+
+  const handleDeleteRule = async (ruleId: string) => {
+    try {
+      await deleteRule(ruleId);
+      toast.success("Rule deleted");
+    } catch { toast.error("Failed to delete rule"); }
+  };
 
   const handleKillSwitch = async () => {
     try {
@@ -145,10 +181,14 @@ const Governance: React.FC = () => {
     switch (plan) {
       case 'free':
         return { name: 'Free', color: 'bg-muted text-muted-foreground' };
+      case 'starter':
+        return { name: 'Starter', color: 'bg-primary/10 text-primary' };
       case 'pro':
         return { name: 'Pro', color: 'bg-success/10 text-success' };
+      case 'agency':
+        return { name: 'Agency', color: 'bg-success/10 text-success' };
       default:
-        return { name: 'Starter', color: 'bg-primary/10 text-primary' };
+        return { name: 'Free', color: 'bg-muted text-muted-foreground' };
     }
   };
 
@@ -334,7 +374,7 @@ const Governance: React.FC = () => {
                     Create Default Rules
                   </Button>
                 ) : (
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" onClick={() => { setEditingRule(null); setCreateRuleOpen(true); }}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Rule
                   </Button>
@@ -355,6 +395,8 @@ const Governance: React.FC = () => {
                 onToggleRule={toggleRule}
                 onChangeMode={changeMode}
                 onRunRule={handleRunRule}
+                onEditRule={handleEditRule}
+                onDeleteRule={handleDeleteRule}
               />
             </section>
 
@@ -466,26 +508,20 @@ const Governance: React.FC = () => {
             <Dialog open={configDialogOpen} onOpenChange={setConfigDialogOpen}>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>
-                    Configure Playbook
-                  </DialogTitle>
+                  <DialogTitle>Configure Playbook</DialogTitle>
                 </DialogHeader>
-                
                 {selectedTemplate && (
                   <div className="space-y-4 py-4">
                     <div className="space-y-2">
                       <Label>Mode</Label>
                       <Select value={playbookMode} onValueChange={(v) => setPlaybookMode(v as 'dry_run' | 'auto')}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="dry_run">Dry Run (Preview Only)</SelectItem>
                           <SelectItem value="auto">Auto (Apply Changes)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
-                    
                     {Object.entries(playbookParams).map(([key, value]) => (
                       <div key={key} className="space-y-2">
                         <Label className="capitalize">{key.replace(/_/g, ' ')}</Label>
@@ -501,17 +537,22 @@ const Governance: React.FC = () => {
                     ))}
                   </div>
                 )}
-                
                 <DialogFooter>
-                  <Button variant="outline" onClick={() => setConfigDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleSaveAndRunPlaybook}>
-                    Save & Run
-                  </Button>
+                  <Button variant="outline" onClick={() => setConfigDialogOpen(false)}>Cancel</Button>
+                  <Button onClick={handleSaveAndRunPlaybook}>Save & Run</Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+
+            {/* Create/Edit Rule Dialog */}
+            <CreateRuleDialog
+              open={createRuleOpen}
+              onOpenChange={(open) => { setCreateRuleOpen(open); if (!open) setEditingRule(null); }}
+              profileId={selectedProfile}
+              editRule={editingRule}
+              onSubmit={handleCreateOrUpdate}
+              allowedTypes={allowedTypes}
+            />
           </div>
         ) : (
           <Card className="text-center py-12">

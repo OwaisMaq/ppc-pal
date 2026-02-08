@@ -5,3 +5,4 @@ export { PortfolioHealthPanel } from './PortfolioHealthPanel';
 export { ExperimentsTab } from './ExperimentsTab';
 export { CreateRuleDialog } from './CreateRuleDialog';
 export { AuditLogTab } from './AuditLogTab';
+export { NewExperimentDialog } from './NewExperimentDialog';
