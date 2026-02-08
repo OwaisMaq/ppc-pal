@@ -1,15 +1,15 @@
 
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
-import { useSubscription } from "@/hooks/useSubscription";
-import { LogOut, User, Crown, Bot, Shield, Database, BarChart3, Settings as SettingsIcon } from "lucide-react";
+import { useEntitlements } from "@/hooks/useEntitlements";
+import TierBadge from "@/components/TierBadge";
+import { LogOut, User, Bot, Shield, Database, Settings as SettingsIcon } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 
 
 const Header = () => {
   const { user, signOut } = useAuth();
-  const { subscription, loading } = useSubscription();
+  const { plan, loading } = useEntitlements();
   const location = useLocation();
 
   if (!user) return null;
@@ -30,15 +30,7 @@ const Header = () => {
             <span className="text-sm text-muted-foreground">{user.email}</span>
           </div>
           
-          {!loading && subscription && (
-            <Badge 
-              variant={subscription.plan_type === 'pro' ? 'default' : 'outline'}
-              className={subscription.plan_type === 'pro' ? 'bg-accent text-accent-foreground' : ''}
-            >
-              {subscription.plan_type === 'pro' && <Crown className="h-3 w-3 mr-1" />}
-              {subscription.plan_type === 'pro' ? 'Pro Plan' : 'Free Plan'}
-            </Badge>
-          )}
+          {!loading && <TierBadge plan={plan} />}
         </div>
         
         <div className="flex items-center gap-4">

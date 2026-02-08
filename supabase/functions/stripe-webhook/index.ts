@@ -6,37 +6,23 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, stripe-signature',
 };
 
-async function verifyStripeSignature(
-  body: string,
-  signature: string,
-  secret: string
-): Promise<boolean> {
-  try {
-    const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
-      apiVersion: '2023-10-16',
-    });
-    
-    stripe.webhooks.constructEvent(body, signature, secret);
-    return true;
-  } catch (error) {
-    console.error('Stripe signature verification failed:', error);
-    return false;
+// Map Stripe price amounts (cents) to plan names
+function determinePlan(subscription: any): string {
+  // First check subscription metadata
+  const metaPlan = subscription.metadata?.plan;
+  if (metaPlan && ['starter', 'pro', 'agency'].includes(metaPlan)) {
+    return metaPlan;
   }
-}
 
-function determinePlan(priceId: string, amount: number): string {
-  // Map price amounts to plan names
-  if (amount <= 999) { // $9.99 or less
-    return 'starter';
-  } else if (amount <= 2999) { // $29.99 or less
-    return 'pro';
-  } else {
-    return 'enterprise';
-  }
+  // Fallback: determine from price amount
+  const amount = subscription.items?.data?.[0]?.price?.unit_amount || 0;
+  if (amount >= 19000) return 'agency';   // $190+
+  if (amount >= 7000)  return 'pro';      // $70+
+  if (amount >= 2000)  return 'starter';  // $20+
+  return 'free';
 }
 
 Deno.serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -62,7 +48,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Get the raw body and signature
     const rawBody = await req.text();
     const signature = req.headers.get('stripe-signature');
 
@@ -74,23 +59,23 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Verify Stripe signature
-    const isValidSignature = await verifyStripeSignature(rawBody, signature, webhookSecret);
-    if (!isValidSignature) {
-      console.error('Invalid Stripe signature');
+    const stripe = new Stripe(stripeSecretKey, { apiVersion: '2023-10-16' });
+    
+    // Verify signature
+    try {
+      stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
+    } catch (err) {
+      console.error('Invalid Stripe signature:', err);
       return new Response(
         JSON.stringify({ error: 'Invalid signature' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Parse the event
     const event = JSON.parse(rawBody);
     console.log(`Processing Stripe webhook: ${event.type}`);
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const stripe = new Stripe(stripeSecretKey, { apiVersion: '2023-10-16' });
-
     let processed = false;
 
     switch (event.type) {
@@ -99,43 +84,31 @@ Deno.serve(async (req) => {
         console.log(`Checkout completed for customer: ${session.customer}`);
 
         if (session.mode === 'subscription' && session.customer) {
-          // Get customer details
           const customer = await stripe.customers.retrieve(session.customer as string);
-          if (customer.deleted) {
-            throw new Error('Customer was deleted');
-          }
+          if (customer.deleted) throw new Error('Customer was deleted');
 
-          // Find user by email
           const { data: userData, error: userError } = await supabase.auth.admin.getUserByEmail(customer.email!);
           if (userError || !userData.user) {
             console.error(`User not found for email: ${customer.email}`);
             break;
           }
 
-          // Get subscription details
           const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
-          const priceId = subscription.items.data[0].price.id;
-          const price = await stripe.prices.retrieve(priceId);
-          
-          const plan = determinePlan(priceId, price.unit_amount || 0);
+          const plan = determinePlan(subscription);
 
-          // Upsert billing subscription
           const { error: billingError } = await supabase
             .from('billing_subscriptions')
             .upsert({
               user_id: userData.user.id,
               stripe_customer_id: customer.id,
               stripe_subscription_id: subscription.id,
-              plan: plan,
+              plan,
               status: subscription.status,
               current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
               trial_end: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null,
               cancel_at_period_end: subscription.cancel_at_period_end,
               updated_at: new Date().toISOString()
-            }, {
-              onConflict: 'user_id',
-              ignoreDuplicates: false
-            });
+            }, { onConflict: 'user_id', ignoreDuplicates: false });
 
           if (billingError) {
             console.error('Failed to update billing subscription:', billingError);
@@ -151,46 +124,35 @@ Deno.serve(async (req) => {
         const subscription = event.data.object;
         console.log(`Subscription updated: ${subscription.id}`);
 
-        // Get customer
         const customer = await stripe.customers.retrieve(subscription.customer as string);
-        if (customer.deleted) {
-          throw new Error('Customer was deleted');
-        }
+        if (customer.deleted) throw new Error('Customer was deleted');
 
-        // Find user by email
         const { data: userData, error: userError } = await supabase.auth.admin.getUserByEmail(customer.email!);
         if (userError || !userData.user) {
           console.error(`User not found for email: ${customer.email}`);
           break;
         }
 
-        // Get price details
-        const priceId = subscription.items.data[0].price.id;
-        const price = await stripe.prices.retrieve(priceId);
-        const plan = determinePlan(priceId, price.unit_amount || 0);
+        const plan = determinePlan(subscription);
 
-        // Update billing subscription
         const { error: billingError } = await supabase
           .from('billing_subscriptions')
           .upsert({
             user_id: userData.user.id,
             stripe_customer_id: customer.id,
             stripe_subscription_id: subscription.id,
-            plan: plan,
+            plan,
             status: subscription.status,
             current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
             trial_end: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null,
             cancel_at_period_end: subscription.cancel_at_period_end,
             updated_at: new Date().toISOString()
-          }, {
-            onConflict: 'user_id',
-            ignoreDuplicates: false
-          });
+          }, { onConflict: 'user_id', ignoreDuplicates: false });
 
         if (billingError) {
           console.error('Failed to update billing subscription:', billingError);
         } else {
-          console.log(`Updated subscription for user ${userData.user.id}: ${subscription.status}`);
+          console.log(`Updated subscription for user ${userData.user.id}: plan=${plan} status=${subscription.status}`);
           processed = true;
         }
         break;
@@ -200,7 +162,6 @@ Deno.serve(async (req) => {
         const subscription = event.data.object;
         console.log(`Subscription deleted: ${subscription.id}`);
 
-        // Find billing subscription by stripe subscription id
         const { data: billingData, error: billingFindError } = await supabase
           .from('billing_subscriptions')
           .select('user_id')
@@ -213,7 +174,6 @@ Deno.serve(async (req) => {
         }
 
         if (billingData) {
-          // Update to free plan
           const { error: billingError } = await supabase
             .from('billing_subscriptions')
             .update({
@@ -242,29 +202,15 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ 
-        received: true, 
-        processed,
-        event_type: event.type 
-      }),
-      { 
-        status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      JSON.stringify({ received: true, processed, event_type: event.type }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
     console.error('Stripe webhook error:', error);
-    
     return new Response(
-      JSON.stringify({ 
-        error: 'Webhook processing failed',
-        message: (error as Error).message 
-      }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      JSON.stringify({ error: 'Webhook processing failed', message: (error as Error).message }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
