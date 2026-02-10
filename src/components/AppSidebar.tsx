@@ -66,6 +66,7 @@ export function AppSidebar() {
     { title: "Governance", url: "/governance", icon: Shield },
     { title: "Analytics", url: "/analytics", icon: BarChart3 },
     { title: "Report Card", url: "/report-card", icon: FileText },
+    { title: "Help", url: "/help", icon: HelpCircle },
     { title: "Settings", url: "/settings", icon: Settings },
     ...(isAdmin ? [
       { title: "User Approvals", url: "/admin/approvals", icon: UserCheck },

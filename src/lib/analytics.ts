@@ -28,6 +28,9 @@ export function initAnalytics() {
     api_host: POSTHOG_HOST,
     capture_pageview: true,
     autocapture: false,
+    session_recording: {
+      maskAllInputs: true,
+    },
   });
 
   isInit = true;
@@ -40,4 +43,9 @@ export function track(event: string, props?: Record<string, unknown>) {
   if (!isInit) return;
 
   posthog.capture(event, props);
+}
+
+export function identifyUser(userId: string, traits?: Record<string, unknown>) {
+  if (!isInit) return;
+  posthog.identify(userId, traits);
 }

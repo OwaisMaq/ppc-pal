@@ -2,6 +2,8 @@ import { PropsWithChildren } from "react";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Bot } from "lucide-react";
+import { FloatingFeedbackButton } from "@/components/FloatingFeedbackButton";
+import { NPSPrompt } from "@/components/NPSPrompt";
 
 const DashboardShell = ({ children }: PropsWithChildren) => {
   return (
@@ -31,6 +33,8 @@ const DashboardShell = ({ children }: PropsWithChildren) => {
             </div>
           </main>
         </SidebarInset>
+        <FloatingFeedbackButton />
+        <NPSPrompt />
       </div>
     </SidebarProvider>
   );

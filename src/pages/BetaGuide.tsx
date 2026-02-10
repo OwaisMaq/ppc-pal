@@ -97,6 +97,22 @@ const BetaGuide = () => {
                 <MessageSquare className="h-5 w-5 text-primary" />
               </div>
               <div>
+                <CardTitle className="text-lg">Need Help?</CardTitle>
+                <CardDescription>
+                  Visit our <a href="/help" className="text-primary hover:underline">Help & Support</a> page for FAQs, glossary, and getting started guide.
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <MessageSquare className="h-5 w-5 text-primary" />
+              </div>
+              <div>
                 <CardTitle className="text-lg">Share Your Feedback</CardTitle>
                 <CardDescription>
                   Your input is invaluable during the beta period
