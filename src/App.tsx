@@ -43,6 +43,7 @@ const PendingApproval = lazy(() => import("@/pages/PendingApproval"));
 const AdminApprovals = lazy(() => import("@/pages/AdminApprovals"));
 const BetaGuide = lazy(() => import("@/pages/BetaGuide"));
 const TestSuite = lazy(() => import("@/pages/TestSuite"));
+const ReportCard = lazy(() => import("@/pages/ReportCard"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -166,6 +167,13 @@ const App = () => {
                         </ProtectedRoute>
                       } />
                       <Route path="/analytics/ai-insights" element={<Navigate to="/analytics" replace />} />
+
+                      {/* Report Card */}
+                      <Route path="/report-card" element={
+                        <ProtectedRoute>
+                          <ReportCard />
+                        </ProtectedRoute>
+                      } />
 
                       {/* Redirect Search Studio to Ad Manager */}
                       <Route path="/search-studio" element={<Navigate to="/campaigns?view=search-terms" replace />} />

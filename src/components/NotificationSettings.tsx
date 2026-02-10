@@ -151,10 +151,16 @@ export const NotificationSettings = () => {
                       <SelectItem value="instant">Instant (as they happen)</SelectItem>
                       <SelectItem value="hourly">Hourly digest</SelectItem>
                       <SelectItem value="daily">Daily digest</SelectItem>
+                      <SelectItem value="weekly">Weekly Profit Pulse</SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground mt-1">
-                    How often you want to receive grouped notifications
+                    How often you want to receive grouped notifications.
+                    {formData.digest_frequency === 'weekly' && (
+                      <span className="block mt-1 text-primary">
+                        Weekly Profit Pulse includes savings breakdown, win rate, week-over-week trends, and quick wins — delivered every Monday.
+                      </span>
+                    )}
                   </p>
                 </div>
               </div>
