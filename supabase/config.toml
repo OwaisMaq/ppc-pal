@@ -186,3 +186,6 @@ verify_jwt = true
 
 [functions.hourly-orchestrator]
 verify_jwt = false
+
+[functions.profit-pulse]
+verify_jwt = false

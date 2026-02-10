@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 export interface NotificationPreferences {
   slack_webhook?: string;
   email?: string;
-  digest_frequency: 'instant' | 'hourly' | 'daily';
+  digest_frequency: 'instant' | 'hourly' | 'daily' | 'weekly';
 }
 
 export const useNotificationPrefs = () => {
@@ -40,7 +40,7 @@ export const useNotificationPrefs = () => {
         setPreferences({
           slack_webhook: data.slack_webhook || undefined,
           email: data.email || undefined,
-          digest_frequency: (data.digest_frequency || 'hourly') as 'instant' | 'hourly' | 'daily',
+          digest_frequency: (data.digest_frequency || 'hourly') as 'instant' | 'hourly' | 'daily' | 'weekly',
         });
       }
     } catch (err: any) {
