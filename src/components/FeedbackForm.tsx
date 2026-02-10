@@ -13,6 +13,7 @@ import { MessageSquare, Send } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { track } from '@/lib/analytics';
 
 const feedbackSchema = z.object({
   feedback_type: z.string().min(1, 'Please select a feedback type'),
@@ -66,6 +67,8 @@ const FeedbackForm = ({ onSuccess }: FeedbackFormProps) => {
         title: "Success",
         description: "Your feedback has been submitted successfully!",
       });
+
+      track("feedback_submitted", { type: data.feedback_type });
 
       form.reset();
       onSuccess?.();

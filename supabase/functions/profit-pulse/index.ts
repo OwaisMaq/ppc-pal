@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
+import { Resend } from 'npm:resend@2.0.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -368,11 +369,49 @@ Deno.serve(async (req) => {
             errors.push(`Slack failed for ${pref.user_id}: ${slackResp.status}`);
           }
 
-          // Email placeholder — requires RESEND_API_KEY
+          // Email delivery via Resend
           const resendKey = Deno.env.get('RESEND_API_KEY');
           if (resendKey && pref.email) {
-            console.log(`Would send email to ${pref.email} (Resend integration ready)`);
-            // Future: implement Resend email sending here
+            try {
+              const resend = new Resend(resendKey);
+              const breakdownHtml = [];
+              if (pulseData.savings.negativeKeywords > 0) breakdownHtml.push(`<li>Wasted clicks blocked: ${formatCurrency(pulseData.savings.negativeKeywords)}</li>`);
+              if (pulseData.savings.bidOptimisation > 0) breakdownHtml.push(`<li>Bids optimised: ${formatCurrency(pulseData.savings.bidOptimisation)}</li>`);
+              if (pulseData.savings.pausedTargets > 0) breakdownHtml.push(`<li>Underperformers paused: ${formatCurrency(pulseData.savings.pausedTargets)}</li>`);
+              if (pulseData.savings.acosImprovement > 0) breakdownHtml.push(`<li>ACoS improvements: ${formatCurrency(pulseData.savings.acosImprovement)}</li>`);
+
+              await resend.emails.send({
+                from: 'PPC Pal <noreply@ppc-pal.com>',
+                to: [pref.email],
+                subject: `Weekly Profit Pulse — ${formatCurrency(pulseData.savings.total)} saved`,
+                html: `
+                  <h2>📊 PPC Pal Weekly Profit Pulse</h2>
+                  <p><strong>Profile:</strong> ${pulseData.profileName}</p>
+                  <p><strong>Week of</strong> ${pulseData.weekStart} – ${pulseData.weekEnd}</p>
+                  <hr/>
+                  <h3>Savings This Week: +${formatCurrency(pulseData.savings.total)}</h3>
+                  <p>Actions Applied: ${pulseData.actionsApplied}</p>
+                  ${pulseData.totalOutcomes > 0 ? `<p>Win Rate: ${pulseData.winRate.toFixed(0)}% positive outcomes</p>` : ''}
+                  ${breakdownHtml.length > 0 ? `<h4>Breakdown:</h4><ul>${breakdownHtml.join('')}</ul>` : ''}
+                  ${pulseData.wow.thisWeekSpend > 0 ? `
+                    <h4>Week-over-Week:</h4>
+                    <ul>
+                      <li>Spend: ${formatCurrency(pulseData.wow.thisWeekSpend)} (${formatPercent(pulseData.wow.spendDelta)})</li>
+                      <li>Sales: ${formatCurrency(pulseData.wow.thisWeekSales)} (${formatPercent(pulseData.wow.salesDelta)})</li>
+                      <li>ACoS: ${pulseData.wow.thisWeekAcos.toFixed(1)}%</li>
+                    </ul>
+                  ` : ''}
+                  ${pulseData.quickWinsCount > 0 ? `<p><strong>Quick Wins:</strong> ${pulseData.quickWinsDetail}</p>` : ''}
+                  <hr/>
+                  <p style="color:#666;font-size:12px;">Sent by PPC Pal • <a href="https://ppc-pal.lovable.app/settings">Manage preferences</a></p>
+                `,
+              });
+              totalSent++;
+              console.log(`Email sent to ${pref.email} for profile ${conn.profile_id}`);
+            } catch (emailErr) {
+              console.error(`Email send failed for ${pref.email}:`, emailErr);
+              errors.push(`Email failed for ${pref.email}: ${emailErr instanceof Error ? emailErr.message : 'Unknown'}`);
+            }
           }
         }
       } catch (userErr) {

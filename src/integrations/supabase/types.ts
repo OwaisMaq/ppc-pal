@@ -2286,6 +2286,33 @@ export type Database = {
           },
         ]
       }
+      client_errors: {
+        Row: {
+          component_stack: string | null
+          created_at: string
+          error_message: string
+          id: string
+          page_url: string | null
+          user_id: string | null
+        }
+        Insert: {
+          component_stack?: string | null
+          created_at?: string
+          error_message: string
+          id?: string
+          page_url?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          component_stack?: string | null
+          created_at?: string
+          error_message?: string
+          id?: string
+          page_url?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       code_validation_results: {
         Row: {
           api_spec_reference: string | null
@@ -4550,6 +4577,7 @@ export type Database = {
           display_name: string | null
           email: string | null
           id: string
+          nps_prompted_at: string | null
           onboarding_completed: boolean | null
           preferred_currency: string | null
           theme: string | null
@@ -4567,6 +4595,7 @@ export type Database = {
           display_name?: string | null
           email?: string | null
           id: string
+          nps_prompted_at?: string | null
           onboarding_completed?: boolean | null
           preferred_currency?: string | null
           theme?: string | null
@@ -4584,6 +4613,7 @@ export type Database = {
           display_name?: string | null
           email?: string | null
           id?: string
+          nps_prompted_at?: string | null
           onboarding_completed?: boolean | null
           preferred_currency?: string | null
           theme?: string | null

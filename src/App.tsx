@@ -1,8 +1,8 @@
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -11,6 +11,7 @@ import { DateRangeProvider } from "@/context/DateRangeContext";
 import { GlobalFiltersProvider } from "@/context/GlobalFiltersContext";
 import { OnboardingCheck } from "@/components/OnboardingCheck";
 import { useLoginSync } from "@/hooks/useLoginSync";
+import { initAnalytics, track } from "@/lib/analytics";
 
 // Lazy load pages for better performance
 const Auth = lazy(() => import("@/pages/Auth"));
@@ -44,6 +45,7 @@ const AdminApprovals = lazy(() => import("@/pages/AdminApprovals"));
 const BetaGuide = lazy(() => import("@/pages/BetaGuide"));
 const TestSuite = lazy(() => import("@/pages/TestSuite"));
 const ReportCard = lazy(() => import("@/pages/ReportCard"));
+const Help = lazy(() => import("@/pages/Help"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -57,6 +59,15 @@ const queryClient = new QueryClient({
 
 const AppContent = () => {
   useLoginSync();
+  useEffect(() => { initAnalytics(); }, []);
+  return null;
+};
+
+const RouteTracker = () => {
+  const location = useLocation();
+  useEffect(() => {
+    track("page_viewed", { route: location.pathname });
+  }, [location.pathname]);
   return null;
 };
 
@@ -79,6 +90,7 @@ const App = () => {
               <DateRangeProvider>
                 <BrowserRouter>
                   <OnboardingCheck>
+                  <RouteTracker />
                   <Suspense fallback={<PageLoader />}>
                     <Routes>
                       {/* Public routes */}
@@ -172,6 +184,13 @@ const App = () => {
                       <Route path="/report-card" element={
                         <ProtectedRoute>
                           <ReportCard />
+                        </ProtectedRoute>
+                      } />
+
+                      {/* Help */}
+                      <Route path="/help" element={
+                        <ProtectedRoute>
+                          <Help />
                         </ProtectedRoute>
                       } />
 

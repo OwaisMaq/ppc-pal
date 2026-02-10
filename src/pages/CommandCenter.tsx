@@ -452,14 +452,22 @@ const CommandCenter = () => {
             </div>
           </div>
         ) : (
-          <Card className="border-warning/20 bg-warning/5">
-            <CardContent className="pt-6">
-              <p className="text-sm text-warning-foreground mb-4">
-                No Amazon connections found. Please connect your account to get started.
-              </p>
-              <Button asChild>
-                <Link to="/settings">Connect Amazon Account</Link>
-              </Button>
+          <Card className="border-primary/20 bg-primary/5">
+            <CardContent className="pt-6 space-y-4">
+              <div className="text-center space-y-2">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                  <Activity className="h-6 w-6 text-primary" />
+                </div>
+                <h3 className="text-lg font-semibold">Welcome to PPC Pal!</h3>
+                <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                  Connect your Amazon Advertising account to get started. Your campaign data will sync automatically and insights will appear here.
+                </p>
+              </div>
+              <div className="flex justify-center">
+                <Button asChild>
+                  <Link to="/settings?tab=connections">Connect Amazon Account</Link>
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}

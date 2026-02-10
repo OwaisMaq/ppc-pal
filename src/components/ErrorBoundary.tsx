@@ -2,6 +2,7 @@ import React, { Component, ReactNode } from 'react';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Props {
   children: ReactNode;
@@ -25,6 +26,21 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('Error caught by boundary:', error, errorInfo);
+    this.logErrorToDb(error, errorInfo);
+  }
+
+  private async logErrorToDb(error: Error, errorInfo: React.ErrorInfo) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      await supabase.from('client_errors').insert({
+        user_id: user?.id || null,
+        error_message: error.message?.slice(0, 2000) || 'Unknown error',
+        component_stack: errorInfo.componentStack?.slice(0, 4000) || null,
+        page_url: window.location.href,
+      });
+    } catch {
+      // Silent fail — don't cause another error
+    }
   }
 
   handleReset = () => {
