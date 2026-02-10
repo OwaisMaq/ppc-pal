@@ -1,33 +1,112 @@
 
 
-## Operational Cost Reduction — ✅ COMPLETED
+## Profit Pulse: Weekly Digest + Monthly Report Card
 
-All 6 items implemented.
+Two features that solve the engagement paradox -- making PPC Pal's invisible work visible without requiring the user to do anything.
 
-| # | Item | Status | Details |
-|---|---|---|---|
-| 1 | Token refresh frequency | ✅ Done | Rescheduled from every 30s → every 20 min (`*/20 * * * *`). 97.5% reduction. |
-| 2 | Login sync cooldown | ✅ Done | `useLoginSync.ts` cooldown increased from 30 min → 4 hours. |
-| 3 | Entitlement checks client-side | ✅ Done | Confirmed no frontend code calls `check-entitlement` edge function — already optimized. |
-| 4 | AI insights data hash caching | ✅ Done | `ai-insights/index.ts` now computes a metric hash and skips LLM if cached insights exist within 12 hours. Scheduler reduced from 6h → 12h. |
-| 5 | Hourly cron consolidation | ✅ Done | Created `hourly-orchestrator` edge function. Replaced 3 individual cron jobs (`ams-hourly-aggregation`, `invoke-daypart-executor-hourly`, `rules-engine-runner-1h`) with single `hourly-orchestrator` job. |
-| 6 | Subscription check guard | ✅ Done | `useSubscription.ts` now checks `subscriptions.updated_at` and skips Stripe API call if data is less than 1 hour old. |
+---
 
-### Estimated Daily Savings
+### Part 1: Profit Pulse Edge Function
 
-| Area | Before | After | Reduction |
-|---|---|---|---|
-| Token refresh invocations | ~2,880 | 72 | 97.5% |
-| Hourly cron cold starts | 72 (3×24) | 24 | 67% |
-| AI insights LLM calls | ~4/user | ~1-2/user | 50-75% |
-| Stripe API calls | Every page load | 1/hour max | ~90% |
-| Login sync invocations | Every 30 min | Every 4 hours | 87.5% |
+A new `profit-pulse` edge function that runs weekly via `pg_cron`. It aggregates the last 7 days of activity per user/profile and sends a digest via Slack (now) and email (when Resend is configured later).
 
-### Files Changed
+**Data it aggregates (all already in the database):**
 
-- `src/hooks/useLoginSync.ts` — cooldown 30min → 4hrs
-- `src/hooks/useSubscription.ts` — cached Stripe check
-- `supabase/functions/ai-insights/index.ts` — data hash caching
-- `supabase/functions/hourly-orchestrator/index.ts` — NEW, consolidates 3 hourly jobs
-- `supabase/config.toml` — added hourly-orchestrator config
-- SQL migration — rescheduled token refresh, replaced 3 hourly crons, reduced AI scheduler to 12h
+| Metric | Source Table |
+|---|---|
+| Total actions applied | `action_queue` (status = 'applied', last 7 days) |
+| Savings breakdown | Same savings logic as `useSavingsMetric` -- negative keywords, paused targets, bid reductions, ACoS improvements |
+| Outcome win rate | `action_outcomes` (positive vs negative vs neutral) |
+| Alerts raised | `alerts` (last 7 days) |
+| Quick wins remaining | `keywords` (ACoS > 50%), `targets` (ROAS < 1) |
+| Week-over-week spend/sales delta | `campaign_performance_history` (this week vs last week) |
+
+**Slack message format:**
+
+```text
+-----------------------------------
+  PPC Pal Weekly Profit Pulse
+  Profile: [Brand Name]
+  Week of Feb 3 - Feb 9, 2026
+-----------------------------------
+
+  Savings This Week:     +£312
+  Actions Applied:       47
+  Win Rate:              82% positive outcomes
+
+  Breakdown:
+  - Wasted clicks blocked:   £142
+  - Bids optimised:          £98
+  - Underperformers paused:  £72
+
+  Week-over-Week:
+  - Spend: £2,340 (-3.2%)
+  - Sales: £8,920 (+1.8%)
+  - ACoS:  26.2% (improved from 27.1%)
+
+  1 Quick Win Available:
+  12 keywords with ACoS over 50%
+-----------------------------------
+```
+
+**New file:** `supabase/functions/profit-pulse/index.ts`
+
+---
+
+### Part 2: Monthly Report Card (In-App Page)
+
+A new `/report-card` page accessible from the sidebar. Shows a monthly summary with the same data, formatted as a clean dashboard card layout. No user input required -- it auto-generates from existing data.
+
+**Sections:**
+1. **Hero metric** -- Total savings this month (large number, emerald accent)
+2. **Decisions made** -- Count of all applied actions with outcome breakdown (positive/neutral/negative pie)
+3. **Savings breakdown** -- 4 category bars (negative keywords, paused targets, bid optimisation, ACoS improvement)
+4. **Month-over-month trend** -- Spend, Sales, ACoS compared to previous month
+5. **Guardian status** -- "PPC Pal made 847 decisions. 82% improved performance."
+
+**New files:**
+- `src/pages/ReportCard.tsx`
+- `src/hooks/useReportCard.ts` (aggregation hook, server-side query)
+
+---
+
+### Part 3: Notification Preferences Update
+
+Add a "weekly" option to digest frequency in `useNotificationPrefs` and `NotificationSettings`. Users who select "weekly" will receive the Profit Pulse instead of daily digests.
+
+**Updated files:**
+- `src/hooks/useNotificationPrefs.ts` -- add 'weekly' to frequency type
+- `src/components/NotificationSettings.tsx` -- add Weekly option to dropdown + explain what it includes
+
+---
+
+### Part 4: Cron Job + Config
+
+Schedule the `profit-pulse` function to run every Monday at 8am UTC.
+
+**Updated files:**
+- `supabase/config.toml` -- add `[functions.profit-pulse]` with `verify_jwt = false`
+- SQL migration -- `pg_cron` schedule for weekly Monday 8am
+
+---
+
+### Email Delivery Note
+
+Email sending requires a Resend API key, which is not currently configured. The Profit Pulse will work immediately via **Slack webhooks** (already functional). Email delivery will be logged but not sent until you set up a Resend account and provide the API key. This can be added later without any code changes to the Profit Pulse function -- it just needs the `RESEND_API_KEY` secret.
+
+---
+
+### Files Summary
+
+| File | Action |
+|---|---|
+| `supabase/functions/profit-pulse/index.ts` | Create -- weekly aggregation + Slack delivery |
+| `src/pages/ReportCard.tsx` | Create -- monthly report card page |
+| `src/hooks/useReportCard.ts` | Create -- data aggregation hook |
+| `src/hooks/useNotificationPrefs.ts` | Update -- add 'weekly' frequency option |
+| `src/components/NotificationSettings.tsx` | Update -- add Weekly option + description |
+| `src/components/AppSidebar.tsx` | Update -- add Report Card nav link |
+| `src/App.tsx` | Update -- add /report-card route |
+| `supabase/config.toml` | Update -- add profit-pulse function config |
+| SQL migration | Create -- pg_cron schedule for Monday 8am UTC |
+
