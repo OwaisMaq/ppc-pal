@@ -32,7 +32,8 @@ import {
   Globe,
   UserCheck,
   Sparkles,
-  FlaskConical
+  FlaskConical,
+  BookOpen
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useSyncStatus } from "@/hooks/useSyncStatus";
@@ -67,6 +68,7 @@ export function AppSidebar() {
     { title: "Analytics", url: "/analytics", icon: BarChart3 },
     { title: "Report Card", url: "/report-card", icon: FileText },
     { title: "Help", url: "/help", icon: HelpCircle },
+    { title: "Blog", url: "https://ppcpal.blog", icon: BookOpen, external: true },
     { title: "Settings", url: "/settings", icon: Settings },
     ...(isAdmin ? [
       { title: "User Approvals", url: "/admin/approvals", icon: UserCheck },
@@ -95,27 +97,39 @@ export function AppSidebar() {
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild tooltip={item.title}>
-                    <NavLink 
-                      to={item.url} 
-                      end={item.url === '/overview'} 
-                      className={({ isActive }) => cn(
-                        "flex items-center gap-2",
-                        isActive && "bg-muted text-foreground font-medium"
-                      )}
-                    >
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                      {item.comingSoon && !isCollapsed && (
-                        <span className="ml-auto text-[10px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                          Soon
-                        </span>
-                      )}
-                      {item.badge && !isCollapsed && (
-                        <span className="ml-auto text-[10px] font-medium text-primary bg-primary/10 px-1.5 py-0.5 rounded">
-                          {item.badge}
-                        </span>
-                      )}
-                    </NavLink>
+                    {item.external ? (
+                      <a 
+                        href={item.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2"
+                      >
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </a>
+                    ) : (
+                      <NavLink 
+                        to={item.url} 
+                        end={item.url === '/overview'} 
+                        className={({ isActive }) => cn(
+                          "flex items-center gap-2",
+                          isActive && "bg-muted text-foreground font-medium"
+                        )}
+                      >
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                        {item.comingSoon && !isCollapsed && (
+                          <span className="ml-auto text-[10px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                            Soon
+                          </span>
+                        )}
+                        {item.badge && !isCollapsed && (
+                          <span className="ml-auto text-[10px] font-medium text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                            {item.badge}
+                          </span>
+                        )}
+                      </NavLink>
+                    )}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
