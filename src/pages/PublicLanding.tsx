@@ -64,6 +64,7 @@ const PublicLanding = () => {
             <a href="#pricing" className="text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
             <a href="#faq" className="text-muted-foreground hover:text-foreground transition-colors">FAQ</a>
             <Link to="/about" className="text-muted-foreground hover:text-foreground transition-colors">About</Link>
+            <a href="https://ppcpal.blog" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">Blog</a>
           </nav>
           
           <div className="flex items-center gap-3">
@@ -956,6 +957,7 @@ const PublicLanding = () => {
               <Link to="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
               <Link to="/terms" className="hover:text-foreground transition-colors">Terms</Link>
               <Link to="/contact" className="hover:text-foreground transition-colors">Contact</Link>
+              <a href="https://ppcpal.blog" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Blog</a>
             </div>
             
             <div className="text-sm text-muted-foreground text-center md:text-right">
