@@ -71,7 +71,7 @@ export function FlowSimulator() {
           name: 'Amazon connections exist',
           run: async () => {
             const { data, error, count } = await supabase
-              .from('amazon_connections')
+              .from('amazon_connections_safe')
               .select('id, profile_name, status', { count: 'exact' });
             
             if (error) return { success: false, message: error.message };
@@ -236,7 +236,7 @@ export function FlowSimulator() {
           name: 'Check connection health',
           run: async () => {
             const { data, error } = await supabase
-              .from('amazon_connections')
+              .from('amazon_connections_safe')
               .select('id, profile_name, health_status, last_sync_at')
               .eq('status', 'active');
             

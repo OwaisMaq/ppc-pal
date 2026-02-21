@@ -38,7 +38,7 @@ export const TokenRefreshMonitor = () => {
     try {
       // Get all connections with their latest refresh log
       const { data: connectionsData, error: connError } = await supabase
-        .from('amazon_connections')
+        .from('amazon_connections_safe')
         .select('id, profile_id, profile_name, token_expires_at, status')
         .eq('status', 'active')
         .order('token_expires_at', { ascending: true });

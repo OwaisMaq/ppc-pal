@@ -35,7 +35,7 @@ export const useSyncStatus = (autoRefresh = true) => {
     try {
       // Get user's connections
       const { data: connections } = await supabase
-        .from('amazon_connections')
+        .from('amazon_connections_safe')
         .select('id, last_sync_at')
         .eq('user_id', user.id);
 
