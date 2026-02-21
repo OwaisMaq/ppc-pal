@@ -41,7 +41,7 @@ export const useLoginSync = () => {
         console.log('🔄 Triggering login sync for user:', user.id);
 
         const { data: connections } = await supabase
-          .from('amazon_connections')
+          .from('amazon_connections_safe')
           .select('id, profile_id, status, token_expires_at')
           .eq('user_id', user.id)
           .eq('status', 'active')

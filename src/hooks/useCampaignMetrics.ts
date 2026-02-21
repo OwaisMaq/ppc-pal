@@ -52,7 +52,7 @@ export const useCampaignMetrics = (connectionId?: string) => {
 
       // Lookup profile_id from connection
       const { data: connectionData, error: connectionError } = await supabase
-        .from("amazon_connections")
+        .from("amazon_connections_safe")
         .select("profile_id")
         .eq("id", connectionId)
         .single();

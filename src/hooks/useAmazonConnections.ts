@@ -36,7 +36,7 @@ export const useAmazonConnections = () => {
         return;
       }
       const { data, error } = await supabase
-        .from('amazon_connections')
+        .from('amazon_connections_safe')
         .select(`
           id,
           user_id,

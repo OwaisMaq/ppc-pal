@@ -48,7 +48,7 @@ export const useAmazonData = () => {
     try {
       // Get user's profile_ids from connections
       const { data: connections } = await supabase
-        .from('amazon_connections')
+        .from('amazon_connections_safe')
         .select('profile_id')
         .eq('user_id', user.id);
 
@@ -85,7 +85,7 @@ export const useAmazonData = () => {
     try {
       // Get user's profile_ids from connections
       const { data: connections } = await supabase
-        .from('amazon_connections')
+        .from('amazon_connections_safe')
         .select('profile_id')
         .eq('user_id', user.id);
 
@@ -122,7 +122,7 @@ export const useAmazonData = () => {
     try {
       // Get user's profile_ids from connections
       const { data: connections } = await supabase
-        .from('amazon_connections')
+        .from('amazon_connections_safe')
         .select('profile_id')
         .eq('user_id', user.id);
 
@@ -159,7 +159,7 @@ export const useAmazonData = () => {
     try {
       // Get user's profile_ids from connections
       const { data: connections } = await supabase
-        .from('amazon_connections')
+        .from('amazon_connections_safe')
         .select('profile_id')
         .eq('user_id', user.id);
 
@@ -198,7 +198,7 @@ export const useAmazonData = () => {
 
       // Verify the connection belongs to the current user
       const { data: connection, error: connError } = await supabase
-        .from('amazon_connections')
+        .from('amazon_connections_safe')
         .select('id, status, profile_name, last_sync_at')
         .eq('id', connectionId)
         .eq('user_id', user?.id)

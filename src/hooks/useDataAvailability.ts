@@ -90,7 +90,7 @@ export function useDataAvailability(profileId: string | undefined) {
     const fetchImportProgress = async () => {
       try {
         const { data: connection } = await supabase
-          .from('amazon_connections')
+          .from('amazon_connections_safe')
           .select('id')
           .eq('profile_id', profileId)
           .single();

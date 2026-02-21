@@ -26,7 +26,7 @@ export function DataValidator() {
       description: 'All connections have valid (non-expired) tokens',
       check: async () => {
         const { data, error } = await supabase
-          .from('amazon_connections')
+          .from('amazon_connections_safe')
           .select('id, profile_name, token_expires_at, status')
           .eq('status', 'active');
         
@@ -142,7 +142,7 @@ export function DataValidator() {
         const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
         
         const { data, error } = await supabase
-          .from('amazon_connections')
+          .from('amazon_connections_safe')
           .select('profile_name, last_sync_at')
           .not('last_sync_at', 'is', null)
           .gte('last_sync_at', oneDayAgo);
