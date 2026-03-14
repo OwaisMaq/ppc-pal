@@ -36,6 +36,7 @@ const Contact = lazy(() => import("@/pages/Contact"));
 const Company = lazy(() => import("@/pages/Company"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const Waitlist = lazy(() => import("@/pages/Waitlist"));
+const Solutions = lazy(() => import("@/pages/Solutions"));
 const AmazonCallback = lazy(() => import("@/pages/AmazonCallback"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const Onboarding = lazy(() => import("@/pages/Onboarding"));
@@ -98,6 +99,7 @@ const App = () => {
                       <Route path="/privacy" element={<PublicPrivacy />} />
                       <Route path="/terms" element={<PublicTerms />} />
                       <Route path="/waitlist" element={<Waitlist />} />
+                      <Route path="/solutions" element={<Solutions />} />
                       <Route path="/about" element={<About />} />
                       <Route path="/contact" element={<Contact />} />
                       <Route path="/company" element={<Company />} />
