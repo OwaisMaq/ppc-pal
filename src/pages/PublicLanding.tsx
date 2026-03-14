@@ -955,6 +955,7 @@ const PublicLanding = () => {
             </div>
             
             <div className="flex items-center gap-6 text-sm text-muted-foreground">
+              <Link to="/solutions" className="hover:text-foreground transition-colors">Solutions</Link>
               <Link to="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
               <Link to="/terms" className="hover:text-foreground transition-colors">Terms</Link>
               <Link to="/contact" className="hover:text-foreground transition-colors">Contact</Link>
