@@ -99,6 +99,7 @@ const App = () => {
                       <Route path="/privacy" element={<PublicPrivacy />} />
                       <Route path="/terms" element={<PublicTerms />} />
                       <Route path="/waitlist" element={<Waitlist />} />
+                      <Route path="/solutions" element={<Solutions />} />
                       <Route path="/about" element={<About />} />
                       <Route path="/contact" element={<Contact />} />
                       <Route path="/company" element={<Company />} />
