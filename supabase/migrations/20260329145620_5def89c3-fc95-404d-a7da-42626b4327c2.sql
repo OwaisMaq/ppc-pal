@@ -1,0 +1,1 @@
+DROP POLICY "Admin can view all feedback" ON public.feedback;
