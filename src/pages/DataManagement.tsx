@@ -93,15 +93,8 @@ const DataManagement = () => {
     
     setIsDeleting(true);
     try {
-      // Delete user data from all tables
-      await supabase.from('feedback').delete().eq('user_id', user.id);
-      await supabase.from('usage_tracking').delete().eq('user_id', user.id);
-      await supabase.from('subscriptions').delete().eq('user_id', user.id);
-      await supabase.from('profiles').delete().eq('id', user.id);
+      const { data, error } = await supabase.functions.invoke('delete-user');
 
-      // Delete auth user (this will cascade to other data)
-      const { error } = await supabase.auth.admin.deleteUser(user.id);
-      
       if (error) throw error;
 
       toast({
@@ -113,7 +106,6 @@ const DataManagement = () => {
       await supabase.auth.signOut();
       window.location.href = '/auth';
     } catch (error) {
-      console.error('Error deleting account:', error);
       toast({
         title: "Deletion failed",
         description: "There was an error deleting your account. Please contact support.",
